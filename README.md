@@ -90,4 +90,4 @@ This is a proprietary project. Development guidelines:
 4. Follow TypeScript best practices
 
 ---
-**Note**: The `main` branch contains the production-ready system currently in use. All development work should be done on the `development` branch to maintain production stability. 
+**Note**: The `main` branch contains the production-ready system currently in use. All development work should be done on the `development` branch to maintain production stability.
