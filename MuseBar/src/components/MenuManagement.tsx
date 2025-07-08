@@ -264,6 +264,25 @@ const MenuManagement: React.FC<MenuManagementProps> = ({ categories, products, o
     return archivedProducts.filter(product => product.categoryId === categoryId);
   };
 
+  // Get orphaned archived products (products whose categories no longer exist in archived categories)
+  const getOrphanedArchivedProducts = () => {
+    const archivedCategoryIds = new Set(archivedCategories.map(cat => cat.id));
+    return archivedProducts.filter(product => !archivedCategoryIds.has(product.categoryId));
+  };
+
+  // Get all categories that have archived products (including active categories with archived products)
+  const getCategoriesWithArchivedProducts = () => {
+    const categoriesWithArchivedProducts = new Set(archivedProducts.map(product => product.categoryId));
+    
+    // Get all categories (active + archived) that have archived products
+    const allCategories = [...categories, ...archivedCategories];
+    const uniqueCategories = allCategories.filter((category, index, self) => 
+      self.findIndex(c => c.id === category.id) === index
+    );
+    
+    return uniqueCategories.filter(category => categoriesWithArchivedProducts.has(category.id));
+  };
+
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -302,7 +321,7 @@ const MenuManagement: React.FC<MenuManagementProps> = ({ categories, products, o
       </Box>
 
       <Grid container spacing={3}>
-        {(showArchived ? archivedCategories : categories).map((category) => (
+        {(showArchived ? getCategoriesWithArchivedProducts() : categories).map((category) => (
           <Grid item xs={12} md={6} key={category.id}>
             <Card>
               <CardContent>
@@ -323,13 +342,15 @@ const MenuManagement: React.FC<MenuManagementProps> = ({ categories, products, o
                     )}
                   </Box>
                   {showArchived ? (
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => handleRestoreCategory(category.id)}
-                    >
-                      Restaurer
-                    </Button>
+                    !category.isActive && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => handleRestoreCategory(category.id)}
+                      >
+                        Restaurer
+                      </Button>
+                    )
                   ) : (
                     <Box>
                       <IconButton
@@ -439,6 +460,88 @@ const MenuManagement: React.FC<MenuManagementProps> = ({ categories, products, o
             </Card>
           </Grid>
         ))}
+        
+        {/* Show orphaned archived products if in archived view */}
+        {showArchived && getOrphanedArchivedProducts().length > 0 && (
+          <Grid item xs={12} md={6}>
+            <Card sx={{ border: '2px dashed #ff9800' }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box
+                      sx={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: '50%',
+                        backgroundColor: '#ff9800',
+                        border: '2px solid #ddd'
+                      }}
+                    />
+                    <Typography variant="h6">Produits Orphelins</Typography>
+                    <Chip label="Catégorie supprimée" size="small" color="error" />
+                  </Box>
+                </Box>
+
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Produits dont la catégorie a été supprimée
+                </Typography>
+
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="body2">
+                    {getOrphanedArchivedProducts().length} produit(s) archivé(s)
+                  </Typography>
+                </Box>
+
+                {getOrphanedArchivedProducts().map((product) => (
+                  <Accordion key={product.id} sx={{ mb: 1 }}>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                        <Typography>{product.name}</Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="body2" color="text.secondary">
+                            {product.price.toFixed(2)}€
+                          </Typography>
+                          <Chip label="Orphelin" size="small" color="error" />
+                          {product.isHappyHourEligible && (
+                            <Chip label="Happy Hour" size="small" color="warning" />
+                          )}
+                        </Box>
+                      </Box>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Box>
+                          {product.description && (
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                              {product.description}
+                            </Typography>
+                          )}
+                          <Typography variant="body2">
+                            Taxe: {(product.taxRate * 100).toFixed(0)}% | 
+                            Happy Hour: {product.isHappyHourEligible ? `${(product.happyHourDiscountValue)}` : 'Non éligible'}
+                          </Typography>
+                          <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+                            ⚠️ Catégorie supprimée - Nécessite une nouvelle catégorie pour la restauration
+                          </Typography>
+                        </Box>
+                        <Box>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="warning"
+                            onClick={() => handleRestoreProduct(product.id)}
+                          >
+                            Restaurer
+                          </Button>
+                        </Box>
+                      </Box>
+                    </AccordionDetails>
+                  </Accordion>
+                ))}
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
       </Grid>
 
       {/* Dialog Catégorie */}

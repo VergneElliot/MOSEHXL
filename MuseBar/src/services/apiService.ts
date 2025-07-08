@@ -1,5 +1,7 @@
 import { Category, Product, Order, OrderItem } from '../types';
 import { apiConfig } from '../config/api';
+import { v4 as uuidv4 } from 'uuid';
+import type { PaymentMethod } from '../types';
 
 export class ApiService {
   private static instance: ApiService;
@@ -307,7 +309,16 @@ export class ApiService {
       discountAmount: 0, // Calculate if needed
       finalAmount: parseFloat(order.total_amount),
       createdAt: new Date(order.created_at),
-      status: order.status as 'pending' | 'completed' | 'cancelled'
+      status: order.status as 'pending' | 'completed' | 'cancelled',
+      paymentMethod: order.payment_method as PaymentMethod,
+      subBills: (order.sub_bills || []).map((subBill: any) => ({
+        id: subBill.id.toString(),
+        orderId: order.id.toString(),
+        paymentMethod: subBill.payment_method as 'cash' | 'card',
+        amount: parseFloat(subBill.amount),
+        status: subBill.status as 'pending' | 'paid',
+        createdAt: new Date(subBill.created_at)
+      }))
     }));
   }
 
@@ -349,7 +360,9 @@ export class ApiService {
       discountAmount: 0,
       finalAmount: parseFloat(result.total_amount),
       createdAt: new Date(result.created_at),
-      status: result.status
+      status: result.status,
+      paymentMethod: order.paymentMethod,
+      subBills: []
     };
   }
 

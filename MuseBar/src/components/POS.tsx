@@ -28,7 +28,7 @@ import {
   Search as SearchIcon,
   Person as PersonIcon
 } from '@mui/icons-material';
-import { Category, Product, OrderItem, SubBill } from '../types';
+import { Category, Product, OrderItem, LocalSubBill } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { HappyHourService } from '../services/happyHourService';
 import { ApiService } from '../services/apiService';
@@ -48,7 +48,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'info' });
   const [checkoutMode, setCheckoutMode] = useState<'simple' | 'split-equal' | 'split-items'>('simple');
   const [splitCount, setSplitCount] = useState(2);
-  const [subBills, setSubBills] = useState<SubBill[]>([]);
+  const [subBills, setSubBills] = useState<LocalSubBill[]>([]);
   
   // Universal payment states - used for simple payment and individual sub-bills
   const [currentPaymentMethod, setCurrentPaymentMethod] = useState<'cash' | 'card' | 'split'>('cash');
@@ -241,7 +241,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
   const handleInitSplitEqual = (count: number) => {
     const total = orderCalculations.finalAmount;
     const part = parseFloat((total / count).toFixed(2));
-    const bills: SubBill[] = Array.from({ length: count }).map((_, i) => ({
+    const bills: LocalSubBill[] = Array.from({ length: count }).map((_, i) => ({
       id: uuidv4(),
       items: [], // Pour split égal, on ne détaille pas les items
       total: part,
@@ -925,7 +925,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                 sx={{ mb: 2, maxWidth: 250 }}
               />
               <Button variant="outlined" onClick={() => {
-                const bills: SubBill[] = Array.from({ length: splitCount }).map((_, i) => ({
+                const bills: LocalSubBill[] = Array.from({ length: splitCount }).map((_, i) => ({
                   id: uuidv4(),
                   items: [],
                   total: 0,
