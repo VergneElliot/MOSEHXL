@@ -2,6 +2,7 @@ import express from 'express';
 import { OrderModel, OrderItemModel, SubBillModel } from '../models';
 import { LegalJournalModel } from '../models/legalJournal';
 import { AuditTrailModel } from '../models/auditTrail';
+import { requireAuth } from './auth';
 
 const router = express.Router();
 
@@ -267,6 +268,186 @@ router.delete('/:id', async (req, res) => {
   } catch (error) {
     console.error('Error deleting order:', error);
     res.status(500).json({ error: 'Failed to delete order' });
+  }
+});
+
+// POST cancel/refund order - Create negative accounting entries for legal compliance
+router.post('/:id/cancel', requireAuth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'Invalid order ID' });
+    }
+
+    const { reason, partial_items = null } = req.body;
+
+    if (!reason || typeof reason !== 'string') {
+      return res.status(400).json({ error: 'Cancellation reason is required' });
+    }
+
+    // Get the original order
+    const originalOrder = await OrderModel.getById(id);
+    if (!originalOrder) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    if (originalOrder.status !== 'completed') {
+      return res.status(400).json({ error: 'Only completed orders can be cancelled' });
+    }
+
+    // Get order items
+    const orderItems = await OrderItemModel.getByOrderId(id);
+    
+    let itemsToCancel = orderItems;
+    if (partial_items && Array.isArray(partial_items)) {
+      // Partial cancellation - only cancel specified items
+      itemsToCancel = orderItems.filter(item => 
+        partial_items.some(partial => partial.item_id === item.id)
+      );
+    }
+
+    if (itemsToCancel.length === 0) {
+      return res.status(400).json({ error: 'No items to cancel' });
+    }
+
+    // Calculate cancellation amounts with proper tax breakdown
+    const taxBreakdown = { '10': 0, '20': 0 }; // Tax rates: 10% and 20%
+    let totalCancellationAmount = 0;
+    let totalTaxAmount = 0;
+
+    const cancellationDetails = itemsToCancel.map(item => {
+      const itemTotalPrice = parseFloat(item.total_price.toString());
+      const itemTaxRate = parseFloat(item.tax_rate.toString()) / 100; // Convert from percentage
+      
+      // Calculate tax amount for this item
+      const itemTaxAmount = itemTotalPrice * itemTaxRate / (1 + itemTaxRate);
+      const itemNetAmount = itemTotalPrice - itemTaxAmount;
+      
+      // Add to tax breakdown
+      const taxRatePercent = Math.round(itemTaxRate * 100);
+      if (taxBreakdown.hasOwnProperty(taxRatePercent.toString())) {
+        taxBreakdown[taxRatePercent.toString() as '10' | '20'] += itemTaxAmount;
+      }
+      
+      totalCancellationAmount += itemTotalPrice;
+      totalTaxAmount += itemTaxAmount;
+      
+      return {
+        item_id: item.id,
+        product_name: item.product_name,
+        quantity: item.quantity,
+        unit_price: parseFloat(item.unit_price.toString()),
+        total_price: itemTotalPrice,
+        tax_rate: itemTaxRate,
+        tax_amount: itemTaxAmount,
+        net_amount: itemNetAmount
+      };
+    });
+
+    const totalNetAmount = totalCancellationAmount - totalTaxAmount;
+
+    // Create cancellation order with negative amounts
+    const cancellationOrder = await OrderModel.create({
+      total_amount: -totalCancellationAmount,
+      total_tax: -totalTaxAmount,
+      payment_method: originalOrder.payment_method,
+      status: 'completed',
+      notes: `ANNULATION de la commande #${id} - Raison: ${reason}`
+    });
+
+    // Create negative order items
+    const cancellationItems = [];
+    for (const cancelItem of cancellationDetails) {
+      const negativeItem = await OrderItemModel.create({
+        order_id: cancellationOrder.id,
+        product_id: orderItems.find(oi => oi.id === cancelItem.item_id)?.product_id || undefined,
+        product_name: `[ANNULATION] ${cancelItem.product_name}`,
+        quantity: -cancelItem.quantity,
+        unit_price: cancelItem.unit_price,
+        total_price: -cancelItem.total_price,
+        tax_rate: cancelItem.tax_rate * 100, // Convert back to percentage for storage
+        tax_amount: -cancelItem.tax_amount,
+        happy_hour_applied: false,
+        happy_hour_discount_amount: 0
+      });
+      cancellationItems.push(negativeItem);
+    }
+
+    // Log to legal journal for compliance
+    try {
+      await LegalJournalModel.addEntry(
+        'REFUND',
+        cancellationOrder.id,
+        -totalCancellationAmount,
+        -totalTaxAmount,
+        originalOrder.payment_method || 'cash',
+        {
+          type: 'ORDER_CANCELLATION',
+          original_order_id: id,
+          reason: reason,
+          cancelled_items: cancellationDetails,
+          tax_breakdown: taxBreakdown,
+          total_net_amount: -totalNetAmount,
+          total_tax_amount: -totalTaxAmount,
+          total_amount: -totalCancellationAmount,
+          partial_cancellation: partial_items !== null
+        },
+        (req as any).user ? String((req as any).user.id) : undefined
+      );
+    } catch (journalError) {
+      console.error('Legal journal error (continuing):', journalError);
+    }
+
+    // Log audit trail
+    const ip = req.ip;
+    const userAgent = req.headers['user-agent'];
+    const userId = (req as any).user ? String((req as any).user.id) : undefined;
+    
+    try {
+      await AuditTrailModel.logAction({
+        user_id: userId,
+        action_type: 'CANCEL_ORDER',
+        resource_type: 'ORDER',
+        resource_id: String(id),
+        action_details: { 
+          original_order_id: id,
+          cancellation_order_id: cancellationOrder.id,
+          reason: reason,
+          cancelled_items: cancellationDetails.length,
+          total_cancelled_amount: totalCancellationAmount,
+          total_tax_cancelled: totalTaxAmount,
+          tax_breakdown: taxBreakdown,
+          partial_cancellation: partial_items !== null
+        },
+        ip_address: ip,
+        user_agent: userAgent
+      });
+    } catch (error) {
+      console.error('Audit log error:', error);
+    }
+
+    res.status(201).json({
+      message: partial_items 
+        ? `Annulation partielle effectuée avec succès pour ${cancellationDetails.length} article(s)`
+        : 'Annulation de commande effectuée avec succès',
+      cancellation_order: {
+        id: cancellationOrder.id,
+        original_order_id: id,
+        total_cancelled_amount: totalCancellationAmount,
+        total_net_cancelled: totalNetAmount,
+        total_tax_cancelled: totalTaxAmount,
+        tax_breakdown: taxBreakdown,
+        cancelled_items: cancellationDetails.length,
+        partial_cancellation: partial_items !== null,
+        reason: reason
+      }
+    });
+  } catch (error: any) {
+    console.error('Error cancelling order:', error);
+    res.status(500).json({ 
+      error: 'Échec de l\'annulation de la commande.',
+      details: error.message 
+    });
   }
 });
 
