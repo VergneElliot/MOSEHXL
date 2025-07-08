@@ -76,7 +76,7 @@ function App() {
   useEffect(() => {
     ApiService.setToken(token);
     if (token) {
-      fetch('http://localhost:3005/api/auth/me', {
+      fetch('http://localhost:3001/api/auth/me', {
         headers: { Authorization: `Bearer ${token}` }
       })
         .then(res => res.json())

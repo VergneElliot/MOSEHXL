@@ -104,7 +104,7 @@ const ClosureBulletinDashboard: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('http://localhost:3005/api/legal/closures');
+      const response = await fetch('http://localhost:3001/api/legal/closures');
       if (!response.ok) {
         throw new Error('Failed to load closure bulletins');
       }
@@ -120,7 +120,7 @@ const ClosureBulletinDashboard: React.FC = () => {
 
   const loadTodayStatus = async () => {
     try {
-      const response = await fetch('http://localhost:3005/api/legal/closure/today-status');
+      const response = await fetch('http://localhost:3001/api/legal/closure/today-status');
       if (response.ok) {
         const data = await response.json();
         setTodayStatus(data);
@@ -132,7 +132,7 @@ const ClosureBulletinDashboard: React.FC = () => {
 
   const loadClosureSettings = async () => {
     try {
-      const response = await fetch('http://localhost:3005/api/legal/closure-settings');
+      const response = await fetch('http://localhost:3001/api/legal/closure-settings');
       if (response.ok) {
         const data = await response.json();
         setClosureSettings(data);
@@ -146,7 +146,7 @@ const ClosureBulletinDashboard: React.FC = () => {
     try {
       setCreating(true);
       setError(null);
-      const response = await fetch('http://localhost:3005/api/legal/closure/create-daily', {
+      const response = await fetch('http://localhost:3001/api/legal/closure/create-daily', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: selectedDate }),
@@ -172,7 +172,7 @@ const ClosureBulletinDashboard: React.FC = () => {
 
   const updateClosureSettings = async (newSettings: any) => {
     try {
-      const response = await fetch('http://localhost:3005/api/legal/closure-settings', {
+      const response = await fetch('http://localhost:3001/api/legal/closure-settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
