@@ -1,6 +1,6 @@
 import { Category, Product, Order, OrderItem } from '../types';
 
-const API_BASE_URL = 'http://localhost:3005/api';
+const API_BASE_URL = 'http://localhost:3001/api';
 
 export class ApiService {
   private static instance: ApiService;
