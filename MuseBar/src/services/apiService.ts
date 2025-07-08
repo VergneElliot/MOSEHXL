@@ -1,6 +1,5 @@
 import { Category, Product, Order, OrderItem } from '../types';
-
-const API_BASE_URL = 'http://localhost:3001/api';
+import { apiConfig } from '../config/api';
 
 export class ApiService {
   private static instance: ApiService;
@@ -18,7 +17,12 @@ export class ApiService {
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const url = `${API_BASE_URL}${endpoint}`;
+    // Ensure API config is initialized
+    if (!apiConfig.isReady()) {
+      await apiConfig.initialize();
+    }
+    
+    const url = apiConfig.getEndpoint(`/api${endpoint}`);
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };

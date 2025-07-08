@@ -9,8 +9,9 @@ const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 const JWT_EXPIRES_IN = '12h';
 
 // Helper: generate JWT
-function generateToken(user: { id: number; email: string; is_admin: boolean }) {
-  return jwt.sign({ id: user.id, email: user.email, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+function generateToken(user: { id: number; email: string; is_admin: boolean }, rememberMe: boolean = false) {
+  const expiration = rememberMe ? '7d' : '12h';
+  return jwt.sign({ id: user.id, email: user.email, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: expiration });
 }
 
 // Middleware: require auth
@@ -97,7 +98,7 @@ router.post('/register', requireAuth, requireAdmin, async (req, res) => {
 
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, rememberMe } = req.body;
   const ip = req.ip;
   const userAgent = req.headers['user-agent'];
   if (!email || !password) {
@@ -130,15 +131,15 @@ router.post('/login', async (req, res) => {
     });
     return res.status(401).json({ error: 'Invalid credentials' });
   }
-  const token = generateToken(user);
+  const token = generateToken(user, rememberMe);
   await AuditTrailModel.logAction({
     user_id: String(user.id),
     action_type: 'LOGIN',
-    action_details: { email },
+    action_details: { email, rememberMe: !!rememberMe },
     ip_address: ip,
     user_agent: userAgent
   });
-  res.json({ token, user: { id: user.id, email: user.email, is_admin: user.is_admin } });
+  res.json({ token, user: { id: user.id, email: user.email, is_admin: user.is_admin }, expiresIn: rememberMe ? '7d' : '12h' });
 });
 
 // GET /api/auth/me
@@ -147,6 +148,25 @@ router.get('/me', requireAuth, async (req, res) => {
   if (!user) return res.status(404).json({ error: 'User not found' });
   const permissions = await UserModel.getUserPermissions(user.id);
   res.json({ id: user.id, email: user.email, is_admin: user.is_admin, permissions });
+});
+
+// POST /api/auth/refresh
+router.post('/refresh', requireAuth, async (req, res) => {
+  const user = await UserModel.findById((req as any).user.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  
+  const { rememberMe } = req.body;
+  const token = generateToken(user, rememberMe);
+  
+  await AuditTrailModel.logAction({
+    user_id: String(user.id),
+    action_type: 'TOKEN_REFRESH',
+    action_details: { email: user.email, rememberMe: !!rememberMe },
+    ip_address: req.ip,
+    user_agent: req.headers['user-agent']
+  });
+  
+  res.json({ token, expiresIn: rememberMe ? '7d' : '12h' });
 });
 
 // GET /api/auth/users (admin only)

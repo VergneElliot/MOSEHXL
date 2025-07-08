@@ -2,13 +2,13 @@
   "name": "mosehxl-backend",
   "version": "1.0.0",
   "description": "MOSEHXL - Point of Sale & Bar Management System Backend API",
-  "main": "dist/src/app.js",
+  "main": "dist/app.js",
   "author": "Elliot Vergne <elliot.vergne@gmail.com>",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "ts-node src/app.ts",
     "build": "tsc",
-    "start": "node dist/src/app.js"
+    "start": "node dist/app.js"
   },
   "keywords": ["pos", "restaurant", "bar", "legal-compliance", "point-of-sale"],
   "license": "PROPRIETARY",

@@ -55,6 +55,7 @@ export interface OrderItem {
   isHappyHourApplied: boolean;
   isManualHappyHour?: boolean; // For manually applied happy hour discounts
   isOffert?: boolean; // For complimentary items (price = 0)
+  isPerso?: boolean; // For employee complimentary items (price = 0)
   originalPrice?: number; // Store original price for reverting discounts
 }
 
