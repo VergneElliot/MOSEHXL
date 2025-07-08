@@ -25,7 +25,8 @@ import {
   Clear as ClearIcon,
   LocalOffer as DiscountIcon,
   CardGiftcard as OffertIcon,
-  Search as SearchIcon
+  Search as SearchIcon,
+  Person as PersonIcon
 } from '@mui/icons-material';
 import { Category, Product, OrderItem, SubBill } from '../types';
 import { v4 as uuidv4 } from 'uuid';
@@ -107,8 +108,6 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
     };
     setCurrentOrder(prev => [...prev, newItem]);
   };
-
-
 
   const handleRemoveFromOrder = (itemId: string) => {
     setCurrentOrder(prev => prev.filter(item => item.id !== itemId));
@@ -203,6 +202,33 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
     }));
   };
 
+  const handleTogglePerso = (itemId: string) => {
+    setCurrentOrder(prev => prev.map(item => {
+      if (item.id === itemId) {
+        if (item.isPerso) {
+          // Remove perso
+          return {
+            ...item,
+            isPerso: false,
+            unitPrice: item.originalPrice || item.unitPrice,
+            totalPrice: item.originalPrice || item.unitPrice
+          };
+        } else {
+          // Set as perso
+          const originalPrice = item.originalPrice || item.unitPrice;
+          return {
+            ...item,
+            isPerso: true,
+            unitPrice: 0,
+            totalPrice: 0,
+            originalPrice
+          };
+        }
+      }
+      return item;
+    }));
+  };
+
   const handlePayment = () => {
     if (currentOrder.length === 0) {
       setSnackbar({ open: true, message: 'Aucun article dans la commande', severity: 'error' });
@@ -226,254 +252,387 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
 
   return (
     <Box>
-      <Grid container spacing={3}>
-        {/* Colonne de gauche - Menu */}
-        <Grid item xs={12} md={8}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h5">
-                  Menu
-                </Typography>
-                <TextField
-                  size="small"
-                  placeholder="Rechercher un produit..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    // Clear category selection when searching to show results from all categories
-                    if (e.target.value && selectedCategory) {
-                      setSelectedCategory('');
-                    }
-                  }}
-                  sx={{ minWidth: 300 }}
-                  InputProps={{
-                    startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                  }}
-                />
-              </Box>
-              
-              {/* Catégories */}
-              <Box sx={{ mb: 3 }}>
-                <Button
-                  variant={selectedCategory === '' ? 'contained' : 'outlined'}
-                  onClick={() => setSelectedCategory('')}
-                  sx={{ mr: 1, mb: 1 }}
-                >
-                  Tout
-                </Button>
-                {categories.map((category) => (
+      {/* Replace Grid with flexbox layout */}
+      <Box sx={{ 
+        display: 'flex', 
+        gap: 3,
+        minHeight: '100vh',
+        '@media (max-width: 599px)': { // xs breakpoint
+          gap: 2
+        }
+      }}>
+        {/* Menu section - takes remaining space */}
+        <Box sx={{ 
+          flex: 1,
+          minWidth: 0, // Prevents flex item from overflowing
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100vh'
+        }}>
+          <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 2 }}>
+              {/* Sticky header */}
+              <Box sx={{ 
+                position: 'sticky', 
+                top: 0, 
+                backgroundColor: 'white', 
+                zIndex: 10,
+                pb: 2,
+                mb: 2,
+                borderBottom: '1px solid #eee'
+              }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h5">
+                    Menu
+                  </Typography>
+                  <TextField
+                    size="small"
+                    placeholder="Rechercher un produit..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      // Clear category selection when searching to show results from all categories
+                      if (e.target.value && selectedCategory) {
+                        setSelectedCategory('');
+                      }
+                    }}
+                    sx={{ 
+                      minWidth: { xs: 200, sm: 300 }, // Responsive search bar width
+                      maxWidth: { xs: 250, sm: 300 }
+                    }}
+                    InputProps={{
+                      startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                    }}
+                  />
+                </Box>
+                
+                {/* Catégories */}
+                <Box>
                   <Button
-                    key={category.id}
-                    variant={selectedCategory === category.id ? 'contained' : 'outlined'}
-                    onClick={() => setSelectedCategory(category.id)}
-                    sx={{ mr: 1, mb: 1 }}
+                    variant={selectedCategory === '' ? 'contained' : 'outlined'}
+                    onClick={() => setSelectedCategory('')}
+                    sx={{ mr: 1, mb: 1, fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                    size="small"
                   >
-                    {category.name}
+                    Tout
                   </Button>
-                ))}
+                  {categories.map((category) => (
+                    <Button
+                      key={category.id}
+                      variant={selectedCategory === category.id ? 'contained' : 'outlined'}
+                      onClick={() => setSelectedCategory(category.id)}
+                      sx={{ mr: 1, mb: 1, fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                      size="small"
+                    >
+                      {category.name}
+                    </Button>
+                  ))}
+                </Box>
               </Box>
 
-              {/* Produits */}
-              <Grid container spacing={2}>
-                {activeProducts
-                  .filter(product => {
-                    // Filter by category
-                    const matchesCategory = !selectedCategory || product.categoryId === selectedCategory;
-                    // Filter by search query
-                    const matchesSearch = !searchQuery || 
-                      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      (product.description && product.description.toLowerCase().includes(searchQuery.toLowerCase()));
-                    return matchesCategory && matchesSearch;
-                  })
-                  .map((product) => {
-                    const value = typeof product.happyHourDiscountValue === 'number' ? product.happyHourDiscountValue : 0;
-                    let happyHourLabel = '';
-                    if (isHappyHourActive && product.isHappyHourEligible) {
-                      happyHourLabel = product.happyHourDiscountType === 'percentage'
-                        ? `-${(value * 100).toFixed(0)}%`
-                        : `-${value.toFixed(2)}€`;
-                    }
-                    return (
-                      <Grid item xs={12} sm={6} md={4} key={product.id}>
-                        <Card 
-                          sx={{ 
-                            cursor: 'pointer',
-                            '&:hover': { backgroundColor: 'action.hover' }
-                          }}
-                          onClick={() => handleAddToOrder(product)}
-                        >
-                          <CardContent>
-                            <Typography variant="h6" noWrap>
-                              {product.name}
-                            </Typography>
-                            {product.description && (
-                              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                                {product.description}
+              {/* Scrollable products grid */}
+              <Box sx={{ 
+                flex: 1, 
+                overflowY: 'auto',
+                '&::-webkit-scrollbar': {
+                  width: '8px',
+                },
+                '&::-webkit-scrollbar-track': {
+                  background: '#f1f1f1',
+                  borderRadius: '4px',
+                },
+                '&::-webkit-scrollbar-thumb': {
+                  background: '#888',
+                  borderRadius: '4px',
+                },
+                '&::-webkit-scrollbar-thumb:hover': {
+                  background: '#555',
+                },
+              }}>
+                {/* Produits */}
+                <Grid container spacing={2}>
+                  {activeProducts
+                    .filter(product => {
+                      // Filter by category
+                      const matchesCategory = !selectedCategory || product.categoryId === selectedCategory;
+                      // Filter by search query
+                      const matchesSearch = !searchQuery || 
+                        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        (product.description && product.description.toLowerCase().includes(searchQuery.toLowerCase()));
+                      return matchesCategory && matchesSearch;
+                    })
+                    .map((product) => {
+                      const value = typeof product.happyHourDiscountValue === 'number' ? product.happyHourDiscountValue : 0;
+                      let happyHourLabel = '';
+                      if (isHappyHourActive && product.isHappyHourEligible) {
+                        happyHourLabel = 'HH'; // Changed from showing discount percentage to just "HH"
+                      }
+                      return (
+                        <Grid item xs={12} sm={6} md={4} lg={3} key={product.id}>
+                          <Card 
+                            sx={{ 
+                              cursor: 'pointer',
+                              '&:hover': { backgroundColor: 'action.hover' },
+                              height: { xs: 'auto', sm: '140px' }, // Responsive card height
+                              minHeight: '120px'
+                            }}
+                            onClick={() => handleAddToOrder(product)}
+                          >
+                            <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                              <Typography 
+                                variant="h6" 
+                                noWrap 
+                                sx={{ 
+                                  fontSize: { xs: '1rem', sm: '1.25rem' },
+                                  mb: 0.5
+                                }}
+                              >
+                                {product.name}
                               </Typography>
-                            )}
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Typography variant="h6" color="primary">
-                                {product.price.toFixed(2)}€
-                              </Typography>
-                              <Box>
-                                {isHappyHourActive && product.isHappyHourEligible && (
-                                  <Chip 
-                                    label={happyHourLabel}
-                                    color="warning" 
-                                    size="small" 
-                                  />
-                                )}
+                              {product.description && (
+                                <Typography 
+                                  variant="body2" 
+                                  color="text.secondary" 
+                                  sx={{ 
+                                    mb: 1,
+                                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                                    display: { xs: 'none', sm: 'block' } // Hide description on very small screens
+                                  }}
+                                >
+                                  {product.description}
+                                </Typography>
+                              )}
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Typography 
+                                  variant="h6" 
+                                  color="primary"
+                                  sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}
+                                >
+                                  {product.price.toFixed(2)}€
+                                </Typography>
+                                <Box>
+                                  {isHappyHourActive && product.isHappyHourEligible && (
+                                    <Chip 
+                                      label={happyHourLabel}
+                                      color="warning" 
+                                      size="small" 
+                                    />
+                                  )}
+                                </Box>
                               </Box>
-                            </Box>
-                          </CardContent>
-                        </Card>
-                      </Grid>
-                    );
-                  })}
-              </Grid>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      );
+                    })}
+                </Grid>
+              </Box>
             </CardContent>
           </Card>
-        </Grid>
+        </Box>
 
-        {/* Colonne de droite - Commande */}
-        <Grid item xs={12} md={4}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h5">
+        {/* Command panel - fixed width, always on right */}
+        <Box sx={{ 
+          width: {
+            xs: '280px',  // Mobile
+            sm: '320px',  // Tablet  
+            md: '350px'   // Desktop
+          },
+          flexShrink: 0, // Prevents shrinking
+          position: 'sticky',
+          top: 0,
+          maxHeight: 'calc(100vh - 20px)', // More compact - use almost full viewport height
+          zIndex: 20
+        }}>
+          <Card sx={{ height: '100%' }}>
+            <CardContent sx={{ 
+              height: '100%', 
+              display: 'flex', 
+              flexDirection: 'column',
+              p: { xs: 1.5, sm: 2 } // More compact padding
+            }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                <Typography variant="h5" sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
                   Commande
                 </Typography>
-                <IconButton onClick={handleClearOrder} color="error">
+                <IconButton onClick={handleClearOrder} color="error" size="small">
                   <ClearIcon />
                 </IconButton>
               </Box>
 
               {isHappyHourActive && (
-                <Alert severity="success" sx={{ mb: 2 }}>
+                <Alert severity="success" sx={{ mb: 1.5, flexShrink: 0, py: 0.5 }}>
                   Happy Hour actif ! 🎉
                 </Alert>
               )}
 
-              {currentOrder.length > 0 && (
-                <Alert severity="info" sx={{ mb: 2 }}>
-                  💡 Chaque item est maintenant individuel - vous pouvez appliquer Happy Hour et Offert séparément à chaque item !
-                </Alert>
-              )}
-
               {currentOrder.length === 0 ? (
-                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
-                  Aucun article dans la commande
-                </Typography>
+                <Box sx={{ 
+                  flex: 1, 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  minHeight: '200px'
+                }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+                    Aucun article dans la commande
+                  </Typography>
+                </Box>
               ) : (
                 <>
-                  <List>
-                    {currentOrder.map((item) => (
-                      <React.Fragment key={item.id}>
-                        <ListItem sx={{ py: 2, px: 1 }}>
-                          <Box sx={{ width: '100%' }}>
-                            {/* Item header with name and price */}
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                              <Box sx={{ flex: 1 }}>
-                                <Typography variant="subtitle2" fontWeight="bold">
-                                  {item.productName}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                  {item.totalPrice.toFixed(2)}€
-                                </Typography>
+                  {/* Scrollable item list - limited height to ensure PAYER button is always visible */}
+                  <Box sx={{ 
+                    overflowY: 'auto',
+                    mb: 1.5,
+                    maxHeight: {
+                      xs: '300px', // Mobile - limit to 300px so payment section is always visible
+                      sm: '350px', // Tablet
+                      md: '400px'  // Desktop
+                    },
+                    minHeight: '100px',
+                    '&::-webkit-scrollbar': {
+                      width: '6px',
+                    },
+                    '&::-webkit-scrollbar-track': {
+                      background: '#f1f1f1',
+                      borderRadius: '3px',
+                    },
+                    '&::-webkit-scrollbar-thumb': {
+                      background: '#888',
+                      borderRadius: '3px',
+                    },
+                    '&::-webkit-scrollbar-thumb:hover': {
+                      background: '#555',
+                    },
+                  }}>
+                    <List sx={{ p: 0 }}>
+                      {currentOrder.map((item) => (
+                        <React.Fragment key={item.id}>
+                          <ListItem sx={{ py: 2, px: 1 }}>
+                            <Box sx={{ width: '100%' }}>
+                              {/* Item header with name and price */}
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                                <Box sx={{ flex: 1 }}>
+                                  <Typography variant="subtitle2" fontWeight="bold">
+                                    {item.productName}
+                                  </Typography>
+                                  <Typography variant="body2" color="text.secondary">
+                                    {item.totalPrice.toFixed(2)}€
+                                  </Typography>
+                                </Box>
+                                
+                                {/* Delete control */}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() => handleRemoveFromOrder(item.id)}
+                                    title="Supprimer cet item"
+                                  >
+                                    <DeleteIcon />
+                                  </IconButton>
+                                </Box>
                               </Box>
                               
-                              {/* Delete control */}
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <IconButton
+                              {/* Status chips */}
+                              <Box sx={{ display: 'flex', gap: 1, mb: 1, flexWrap: 'wrap' }}>
+                                {item.isHappyHourApplied && (
+                                  <Chip label="Happy Hour Auto" size="small" color="warning" />
+                                )}
+                                {item.isManualHappyHour && (
+                                  <Chip label="Happy Hour Manuel" size="small" color="secondary" />
+                                )}
+                                {item.isOffert && (
+                                  <Chip label="OFFERT" size="small" color="success" />
+                                )}
+                                {item.isPerso && (
+                                  <Chip label="PERSO" size="small" color="info" />
+                                )}
+                              </Box>
+                              
+                              {/* Action buttons */}
+                              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                <Button
                                   size="small"
-                                  color="error"
-                                  onClick={() => handleRemoveFromOrder(item.id)}
-                                  title="Supprimer cet item"
+                                  variant={item.isManualHappyHour ? 'contained' : 'outlined'}
+                                  color={item.isManualHappyHour ? 'secondary' : 'primary'}
+                                  startIcon={<DiscountIcon />}
+                                  onClick={() => handleToggleIndividualHappyHour(item.id)}
+                                  disabled={item.isOffert || item.isPerso}
+                                  sx={{ fontSize: 11 }}
                                 >
-                                  <DeleteIcon />
-                                </IconButton>
+                                  {item.isManualHappyHour ? 'Retirer HH' : 'Happy Hour'}
+                                </Button>
+                                <Button
+                                  size="small"
+                                  variant={item.isOffert ? 'contained' : 'outlined'}
+                                  color={item.isOffert ? 'success' : 'primary'}
+                                  startIcon={<OffertIcon />}
+                                  onClick={() => handleToggleOffert(item.id)}
+                                  disabled={item.isPerso}
+                                  sx={{ fontSize: 11 }}
+                                >
+                                  {item.isOffert ? 'Annuler Offert' : 'Offert'}
+                                </Button>
+                                <Button
+                                  size="small"
+                                  variant={item.isPerso ? 'contained' : 'outlined'}
+                                  color={item.isPerso ? 'info' : 'primary'}
+                                  startIcon={<PersonIcon />}
+                                  onClick={() => handleTogglePerso(item.id)}
+                                  sx={{ fontSize: 11 }}
+                                >
+                                  {item.isPerso ? 'Annuler Perso' : 'Perso'}
+                                </Button>
                               </Box>
                             </Box>
-                            
-                            {/* Status chips */}
-                            <Box sx={{ display: 'flex', gap: 1, mb: 1, flexWrap: 'wrap' }}>
-                              {item.isHappyHourApplied && (
-                                <Chip label="Happy Hour Auto" size="small" color="warning" />
-                              )}
-                              {item.isManualHappyHour && (
-                                <Chip label="Happy Hour Manuel" size="small" color="secondary" />
-                              )}
-                              {item.isOffert && (
-                                <Chip label="OFFERT" size="small" color="success" />
-                              )}
-                            </Box>
-                            
-                            {/* Action buttons */}
-                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                              <Button
-                                size="small"
-                                variant={item.isManualHappyHour ? 'contained' : 'outlined'}
-                                color={item.isManualHappyHour ? 'secondary' : 'primary'}
-                                startIcon={<DiscountIcon />}
-                                onClick={() => handleToggleIndividualHappyHour(item.id)}
-                                disabled={item.isOffert}
-                                sx={{ fontSize: 11 }}
-                              >
-                                {item.isManualHappyHour ? 'Retirer HH' : 'Happy Hour'}
-                              </Button>
-                              <Button
-                                size="small"
-                                variant={item.isOffert ? 'contained' : 'outlined'}
-                                color={item.isOffert ? 'success' : 'primary'}
-                                startIcon={<OffertIcon />}
-                                onClick={() => handleToggleOffert(item.id)}
-                                sx={{ fontSize: 11 }}
-                              >
-                                {item.isOffert ? 'Annuler Offert' : 'Offert'}
-                              </Button>
-                            </Box>
-                          </Box>
-                        </ListItem>
-                        <Divider />
-                      </React.Fragment>
-                    ))}
-                  </List>
-
-                  <Divider sx={{ my: 2 }} />
-
-                  {/* Résumé de la commande */}
-                  <Box sx={{ mb: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                      <Typography>Sous-total TTC :</Typography>
-                      <Typography>{orderCalculations.subtotal.toFixed(2)}€</Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                      <Typography>TVA comprise :</Typography>
-                      <Typography>{orderCalculations.taxAmount.toFixed(2)}€</Typography>
-                    </Box>
-                    <Divider sx={{ my: 1 }} />
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="h6">Total à payer :</Typography>
-                      <Typography variant="h6">{orderCalculations.finalAmount.toFixed(2)}€</Typography>
-                    </Box>
+                          </ListItem>
+                          <Divider />
+                        </React.Fragment>
+                      ))}
+                    </List>
                   </Box>
 
-                  <Button
-                    variant="contained"
-                    fullWidth
-                    size="large"
-                    startIcon={<ReceiptIcon />}
-                    onClick={handlePayment}
-                  >
-                    Payer
-                  </Button>
+                  {/* Fixed summary and payment section - more compact */}
+                  <Box sx={{ 
+                    flexShrink: 0
+                  }}>
+                    <Divider sx={{ mb: 1.5 }} />
+
+                    {/* Résumé de la commande */}
+                    <Box sx={{ mb: 1.5 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                        <Typography variant="body2">Sous-total TTC :</Typography>
+                        <Typography variant="body2">{orderCalculations.subtotal.toFixed(2)}€</Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                        <Typography variant="body2">TVA comprise :</Typography>
+                        <Typography variant="body2">{orderCalculations.taxAmount.toFixed(2)}€</Typography>
+                      </Box>
+                      <Divider sx={{ my: 0.5 }} />
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="h6" sx={{ fontSize: '1.1rem' }}>Total à payer :</Typography>
+                        <Typography variant="h6" sx={{ fontSize: '1.1rem' }}>{orderCalculations.finalAmount.toFixed(2)}€</Typography>
+                      </Box>
+                    </Box>
+
+                    <Button
+                      variant="contained"
+                      fullWidth
+                      size="large"
+                      startIcon={<ReceiptIcon />}
+                      onClick={handlePayment}
+                      sx={{ py: 1.5 }}
+                    >
+                      Payer
+                    </Button>
+                  </Box>
                 </>
               )}
             </CardContent>
           </Card>
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
 
       {/* Dialog de paiement refondu */}
       <Dialog open={paymentDialogOpen} onClose={() => setPaymentDialogOpen(false)} maxWidth="md" fullWidth>
