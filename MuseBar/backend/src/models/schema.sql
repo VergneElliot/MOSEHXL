@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS categories (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     default_tax_rate DECIMAL(5,2) DEFAULT 20.00,
+    is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -17,6 +18,7 @@ CREATE TABLE IF NOT EXISTS products (
     happy_hour_discount_percent DECIMAL(5,2) DEFAULT NULL,
     happy_hour_discount_fixed DECIMAL(10,2) DEFAULT NULL,
     is_happy_hour_eligible BOOLEAN DEFAULT true,
+    is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -105,4 +107,22 @@ INSERT INTO products (name, price, tax_rate, category_id, happy_hour_discount_pe
     ('Mojito', 12.00, 20.00, 3, 25.00, true),
     ('Coca Cola 33cl', 4.00, 10.00, 4, 10.00, true),
     ('Chips', 3.50, 10.00, 5, 0.00, false)
-ON CONFLICT DO NOTHING; 
+ON CONFLICT DO NOTHING;
+
+-- Migration: Add is_active columns if they don't exist (for existing databases)
+DO $$ 
+BEGIN 
+    -- Add is_active to categories if it doesn't exist
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'categories' AND column_name = 'is_active') THEN
+        ALTER TABLE categories ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
+        UPDATE categories SET is_active = TRUE WHERE is_active IS NULL;
+    END IF;
+    
+    -- Add is_active to products if it doesn't exist
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'products' AND column_name = 'is_active') THEN
+        ALTER TABLE products ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
+        UPDATE products SET is_active = TRUE WHERE is_active IS NULL;
+    END IF;
+END $$; 

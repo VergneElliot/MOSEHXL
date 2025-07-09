@@ -1,6 +1,7 @@
 import { Category, Product, Order, OrderItem } from '../types';
-
-const API_BASE_URL = 'http://localhost:3001/api';
+import { apiConfig } from '../config/api';
+import { v4 as uuidv4 } from 'uuid';
+import type { PaymentMethod } from '../types';
 
 export class ApiService {
   private static instance: ApiService;
@@ -18,7 +19,12 @@ export class ApiService {
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const url = `${API_BASE_URL}${endpoint}`;
+    // Ensure API config is initialized
+    if (!apiConfig.isReady()) {
+      await apiConfig.initialize();
+    }
+    
+    const url = apiConfig.getEndpoint(`/api${endpoint}`);
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -303,7 +309,19 @@ export class ApiService {
       discountAmount: 0, // Calculate if needed
       finalAmount: parseFloat(order.total_amount),
       createdAt: new Date(order.created_at),
-      status: order.status as 'pending' | 'completed' | 'cancelled'
+      status: order.status as 'pending' | 'completed' | 'cancelled',
+      paymentMethod: order.payment_method as PaymentMethod,
+      subBills: (order.sub_bills || []).map((subBill: any) => ({
+        id: subBill.id.toString(),
+        orderId: order.id.toString(),
+        paymentMethod: subBill.payment_method as 'cash' | 'card',
+        amount: parseFloat(subBill.amount),
+        status: subBill.status as 'pending' | 'paid',
+        createdAt: new Date(subBill.created_at)
+      })),
+      notes: order.notes,
+      tips: order.tips || 0,
+      change: order.change || 0
     }));
   }
 
@@ -314,6 +332,8 @@ export class ApiService {
     paymentMethod: 'cash' | 'card' | 'split';
     status?: string;
     notes?: string;
+    tips?: number;
+    change?: number;
   }): Promise<Order> {
     const result = await this.request<any>('/orders', {
       method: 'POST',
@@ -323,6 +343,8 @@ export class ApiService {
         payment_method: order.paymentMethod,
         status: order.status || 'completed',
         notes: order.notes,
+        tips: order.tips || 0,
+        change: order.change || 0,
         items: order.items.map(item => ({
           product_id: parseInt(item.productId),
           product_name: item.productName,
@@ -345,7 +367,9 @@ export class ApiService {
       discountAmount: 0,
       finalAmount: parseFloat(result.total_amount),
       createdAt: new Date(result.created_at),
-      status: result.status
+      status: result.status,
+      paymentMethod: order.paymentMethod,
+      subBills: []
     };
   }
 

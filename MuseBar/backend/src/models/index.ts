@@ -31,6 +31,8 @@ export interface Order {
   payment_method: 'cash' | 'card' | 'split';
   status: 'pending' | 'completed' | 'cancelled';
   notes?: string;
+  tips?: number; // Pourboire
+  change?: number; // Monnaie rendue
   created_at: Date;
   updated_at: Date;
 }
@@ -99,7 +101,7 @@ export const CategoryModel = {
   },
 
   async delete(id: number): Promise<{ deleted: boolean; action: 'hard' | 'soft'; reason?: string }> {
-    console.log('=== CATEGORY SMART DELETE ===');
+    console.log('=== CATEGORY SMART DELETE WITH CASCADE ===');
     console.log('Category ID:', id);
     
     // Check if any products in this category were ever used in orders
@@ -113,48 +115,118 @@ export const CategoryModel = {
     const productsInOrderHistory = parseInt(orderHistoryResult.rows[0].products_in_orders, 10);
     console.log('Products from this category used in orders:', productsInOrderHistory);
     
-    // Check current products in category (active + archived)
-    const currentProductsResult = await pool.query('SELECT COUNT(*) FROM products WHERE category_id = $1', [id]);
-    const currentProductCount = parseInt(currentProductsResult.rows[0].count, 10);
-    console.log('Current products in category:', currentProductCount);
+    // Get all products in this category (active + archived) for cascading
+    const categoryProductsResult = await pool.query('SELECT id, name, is_active FROM products WHERE category_id = $1', [id]);
+    const categoryProducts = categoryProductsResult.rows;
+    console.log('Products in category to cascade:', categoryProducts.length);
     
     if (productsInOrderHistory > 0) {
       // Soft delete: category was part of order history, must be preserved for legal compliance
-      console.log('Soft deleting category - has order history');
-      const result = await pool.query(
+      // CASCADE: Also archive all products in this category
+      console.log('Soft deleting category and cascading to products - has order history');
+      
+      // Archive the category
+      const categoryResult = await pool.query(
         'UPDATE categories SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *',
         [id]
       );
-      console.log('=== END CATEGORY SMART DELETE ===');
+      
+      // Cascade: Archive all products in this category
+      if (categoryProducts.length > 0) {
+        await pool.query(
+          'UPDATE products SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP WHERE category_id = $1',
+          [id]
+        );
+        console.log(`Cascaded archive to ${categoryProducts.length} products`);
+      }
+      
+      console.log('=== END CATEGORY SMART DELETE WITH CASCADE ===');
       return { 
-        deleted: (result.rowCount || 0) > 0, 
+        deleted: (categoryResult.rowCount || 0) > 0, 
         action: 'soft',
-        reason: 'Category contains products that were used in orders (legal preservation required)'
+        reason: `Category and ${categoryProducts.length} products archived (legal preservation required due to order history)`
       };
-    } else if (currentProductCount > 0) {
-      // Error: has active products but no order history
-      console.log('Error - category has products but no order history');
-      console.log('=== END CATEGORY SMART DELETE ===');
-      throw new Error('Cannot delete category: it contains products. Please delete or move all products first.');
     } else {
-      // Hard delete: no products, no order history
-      console.log('Hard deleting category - no products or order history');
-      const result = await pool.query('DELETE FROM categories WHERE id = $1', [id]);
-      console.log('=== END CATEGORY SMART DELETE ===');
+      // Hard delete: no order history
+      // CASCADE: Also hard delete all products in this category
+      console.log('Hard deleting category and cascading to products - no order history');
+      
+      // Check if any products in this category have order history (they shouldn't, but double-check)
+      const productOrderHistoryResult = await pool.query(`
+        SELECT p.id, p.name, COUNT(oi.id) as order_count
+        FROM products p
+        LEFT JOIN order_items oi ON p.id = oi.product_id
+        WHERE p.category_id = $1
+        GROUP BY p.id, p.name
+        HAVING COUNT(oi.id) > 0
+      `, [id]);
+      
+      if (productOrderHistoryResult.rows.length > 0) {
+        console.log('Some products have order history, falling back to soft delete');
+        // Fall back to soft delete if individual products have order history
+        const categoryResult = await pool.query(
+          'UPDATE categories SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *',
+          [id]
+        );
+        
+        await pool.query(
+          'UPDATE products SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP WHERE category_id = $1',
+          [id]
+        );
+        
+        console.log('=== END CATEGORY SMART DELETE WITH CASCADE ===');
+        return { 
+          deleted: (categoryResult.rowCount || 0) > 0, 
+          action: 'soft',
+          reason: `Category and ${categoryProducts.length} products archived (some products had order history)`
+        };
+      }
+      
+      // Hard delete products first, then category
+      if (categoryProducts.length > 0) {
+        await pool.query('DELETE FROM products WHERE category_id = $1', [id]);
+        console.log(`Cascaded hard delete to ${categoryProducts.length} products`);
+      }
+      
+      // Hard delete the category
+      const categoryResult = await pool.query('DELETE FROM categories WHERE id = $1', [id]);
+      
+      console.log('=== END CATEGORY SMART DELETE WITH CASCADE ===');
       return { 
-        deleted: (result.rowCount || 0) > 0, 
+        deleted: (categoryResult.rowCount || 0) > 0, 
         action: 'hard',
-        reason: 'Category was empty and never used in orders'
+        reason: `Category and ${categoryProducts.length} products permanently deleted (no order history)`
       };
     }
   },
 
   async restore(id: number): Promise<boolean> {
-    const result = await pool.query(
+    console.log('=== CATEGORY RESTORE WITH CASCADE ===');
+    console.log('Category ID:', id);
+    
+    // Restore the category
+    const categoryResult = await pool.query(
       'UPDATE categories SET is_active = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *',
       [id]
     );
-    return (result.rowCount || 0) > 0;
+    
+    if (categoryResult.rowCount && categoryResult.rowCount > 0) {
+      // CASCADE: Also restore all archived products in this category
+      const productsResult = await pool.query(
+        'UPDATE products SET is_active = TRUE, updated_at = CURRENT_TIMESTAMP WHERE category_id = $1 AND is_active = FALSE RETURNING id, name',
+        [id]
+      );
+      
+      const restoredProducts = productsResult.rows;
+      console.log(`Cascaded restore to ${restoredProducts.length} products:`, restoredProducts.map(p => p.name));
+      console.log('=== END CATEGORY RESTORE WITH CASCADE ===');
+      
+      return true;
+    }
+    
+    console.log('Category restore failed');
+    console.log('=== END CATEGORY RESTORE WITH CASCADE ===');
+    return false;
   }
 };
 
@@ -258,10 +330,14 @@ export const OrderModel = {
   },
 
   async create(order: Omit<Order, 'id' | 'created_at' | 'updated_at'>): Promise<Order> {
+    const tipsValue = order.tips || 0;
+    const changeValue = order.change || 0;
+    
     const result = await pool.query(`
-      INSERT INTO orders (total_amount, total_tax, payment_method, status, notes) 
-      VALUES ($1, $2, $3, $4, $5) RETURNING *
-    `, [order.total_amount, order.total_tax, order.payment_method, order.status, order.notes]);
+      INSERT INTO orders (total_amount, total_tax, payment_method, status, notes, tips, change) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *
+    `, [order.total_amount, order.total_tax, order.payment_method, order.status, order.notes, tipsValue, changeValue]);
+    
     return result.rows[0];
   },
 

@@ -8,7 +8,7 @@ import { ClosureScheduler } from './utils/closureScheduler';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = parseInt(process.env.PORT || '3001');
 
 // Environment-specific configuration
 const NODE_ENV = process.env.NODE_ENV || 'production';
@@ -18,7 +18,19 @@ console.log(`🌍 Starting MOSEHXL in ${NODE_ENV} mode`);
 
 // Middleware
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000'
+  origin: [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    // Allow any local network IP
+    /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:3000$/,
+    /^http:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}:3000$/,
+    /^http:\/\/172\.1[6-9]\.\d{1,3}\.\d{1,3}:3000$/,
+    /^http:\/\/172\.2[0-9]\.\d{1,3}\.\d{1,3}:3000$/,
+    /^http:\/\/172\.3[0-1]\.\d{1,3}\.\d{1,3}:3000$/,
+    // Custom origins from environment
+    ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : [])
+  ],
+  credentials: true
 }));
 app.use(express.json());
 
@@ -57,11 +69,14 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
-// Start the server
-app.listen(PORT, () => {
+// Start the server on all network interfaces
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 MOSEHXL API Server running on port ${PORT}`);
   console.log(`🔧 Environment: ${NODE_ENV}`);
-  console.log(`🌐 CORS Origin: ${process.env.CORS_ORIGIN || 'http://localhost:3000'}`);
+  console.log(`🌐 Server accessible on:`);
+  console.log(`   - Local: http://localhost:${PORT}`);
+  console.log(`   - Network: http://[YOUR-LOCAL-IP]:${PORT}`);
+  console.log(`💡 To find your local IP, run: hostname -I | awk '{print $1}'`);
   
   // Start the automatic closure scheduler (only in production)
   if (NODE_ENV === 'production') {
