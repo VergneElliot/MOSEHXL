@@ -42,6 +42,11 @@ export interface Order {
   finalAmount: number;
   createdAt: Date;
   status: 'pending' | 'completed' | 'cancelled';
+  paymentMethod: PaymentMethod;
+  subBills?: SubBill[];
+  notes?: string;
+  tips?: number;
+  change?: number;
 }
 
 export interface OrderItem {
@@ -55,6 +60,7 @@ export interface OrderItem {
   isHappyHourApplied: boolean;
   isManualHappyHour?: boolean; // For manually applied happy hour discounts
   isOffert?: boolean; // For complimentary items (price = 0)
+  isPerso?: boolean; // For employee complimentary items (price = 0)
   originalPrice?: number; // Store original price for reverting discounts
 }
 
@@ -66,6 +72,16 @@ export interface Payment {
 }
 
 export interface SubBill {
+  id: string;
+  orderId: string;
+  paymentMethod: 'cash' | 'card';
+  amount: number;
+  status: 'pending' | 'paid';
+  createdAt: Date;
+}
+
+// Local interface for managing split bills in POS component
+export interface LocalSubBill {
   id: string;
   items: OrderItem[];
   total: number;
