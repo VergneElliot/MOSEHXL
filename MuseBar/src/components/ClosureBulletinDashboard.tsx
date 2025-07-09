@@ -75,6 +75,8 @@ interface ClosureBulletin {
   is_closed: boolean;
   closed_at: string | null;
   created_at: string;
+  tips_total?: number;
+  change_total?: number;
 }
 
 const ClosureBulletinDashboard: React.FC = () => {
@@ -231,8 +233,10 @@ const ClosureBulletinDashboard: React.FC = () => {
   const totalStats = bulletins.reduce((acc, bulletin) => ({
     totalAmount: acc.totalAmount + bulletin.total_amount,
     totalTransactions: acc.totalTransactions + bulletin.total_transactions,
-    totalVat: acc.totalVat + bulletin.total_vat
-  }), { totalAmount: 0, totalTransactions: 0, totalVat: 0 });
+    totalVat: acc.totalVat + bulletin.total_vat,
+    totalTips: acc.totalTips + (bulletin.tips_total || 0),
+    totalChange: acc.totalChange + (bulletin.change_total || 0)
+  }), { totalAmount: 0, totalTransactions: 0, totalVat: 0, totalTips: 0, totalChange: 0 });
 
   if (loading) {
     return (
@@ -311,7 +315,7 @@ const ClosureBulletinDashboard: React.FC = () => {
       )}
 
       <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={3}>
+        <Grid item xs={12} md={2.4}>
           <Card>
             <CardContent>
               <Typography variant="h6" color="primary">{bulletins.length}</Typography>
@@ -319,7 +323,7 @@ const ClosureBulletinDashboard: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} md={3}>
+        <Grid item xs={12} md={2.4}>
           <Card>
             <CardContent>
               <Typography variant="h6" color="success.main">{totalStats.totalTransactions}</Typography>
@@ -327,7 +331,7 @@ const ClosureBulletinDashboard: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} md={3}>
+        <Grid item xs={12} md={2.4}>
           <Card>
             <CardContent>
               <Typography variant="h6" color="warning.main">{formatCurrency(totalStats.totalAmount)}</Typography>
@@ -335,11 +339,38 @@ const ClosureBulletinDashboard: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} md={3}>
+        <Grid item xs={12} md={2.4}>
           <Card>
             <CardContent>
               <Typography variant="h6" color="error.main">{formatCurrency(totalStats.totalVat)}</Typography>
               <Typography variant="body2" color="text.secondary">TVA collectée totale</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={2.4}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" color="info.main">{formatCurrency(totalStats.totalTips)}</Typography>
+              <Typography variant="body2" color="text.secondary">Pourboires totaux</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+      
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" color="secondary.main">{formatCurrency(totalStats.totalChange)}</Typography>
+              <Typography variant="body2" color="text.secondary">Monnaie rendue totale</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" color="success.main">{formatCurrency(totalStats.totalAmount + totalStats.totalTips)}</Typography>
+              <Typography variant="body2" color="text.secondary">Chiffre d'affaires + Pourboires</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -377,6 +408,8 @@ const ClosureBulletinDashboard: React.FC = () => {
                   <TableCell>Période</TableCell>
                   <TableCell align="right">Transactions</TableCell>
                   <TableCell align="right">Montant TTC</TableCell>
+                  <TableCell align="right">Pourboires</TableCell>
+                  <TableCell align="right">Monnaie</TableCell>
                   <TableCell>Statut</TableCell>
                   <TableCell align="center">Actions</TableCell>
                 </TableRow>
@@ -384,7 +417,7 @@ const ClosureBulletinDashboard: React.FC = () => {
               <TableBody>
                 {filteredBulletins.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                       <Typography variant="body1" color="text.secondary">
                         Aucun bulletin de clôture trouvé
                       </Typography>
@@ -413,6 +446,16 @@ const ClosureBulletinDashboard: React.FC = () => {
                       <TableCell align="right">
                         <Typography variant="body2" fontWeight="medium">
                           {formatCurrency(bulletin.total_amount)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography variant="body2" fontWeight="medium" color="info.main">
+                          {formatCurrency(bulletin.tips_total || 0)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography variant="body2" fontWeight="medium" color="secondary.main">
+                          {formatCurrency(bulletin.change_total || 0)}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -551,6 +594,21 @@ const ClosureBulletinDashboard: React.FC = () => {
                             secondary={formatCurrency(selectedBulletin.total_amount)}
                           />
                         </ListItem>
+                        {/* Payment method breakdown */}
+                        <ListItem>
+                          <ListItemText
+                            primary="Détail par mode de paiement"
+                            secondary={
+                              <>
+                                {selectedBulletin.payment_methods_breakdown && Object.entries(selectedBulletin.payment_methods_breakdown).map(([method, amount]: [string, any]) => (
+                                  <Typography variant="body2" key={method} sx={{ ml: 1 }}>
+                                    {method === 'cash' ? 'Espèces' : method === 'card' ? 'Carte' : method}: {formatCurrency(amount)}
+                                  </Typography>
+                                ))}
+                              </>
+                            }
+                          />
+                        </ListItem>
                         <ListItem>
                           <ListItemIcon><EuroSymbol /></ListItemIcon>
                           <ListItemText 
@@ -558,11 +616,44 @@ const ClosureBulletinDashboard: React.FC = () => {
                             secondary={formatCurrency(selectedBulletin.total_vat)}
                           />
                         </ListItem>
+                        {/* TVA breakdown */}
+                        <ListItem>
+                          <ListItemText
+                            primary="Détail TVA"
+                            secondary={
+                              <>
+                                {selectedBulletin.vat_breakdown && (
+                                  <>
+                                    <Typography variant="body2" sx={{ ml: 1 }}>
+                                      10%: {formatCurrency(selectedBulletin.vat_breakdown.vat_10?.vat || 0)} (base: {formatCurrency(selectedBulletin.vat_breakdown.vat_10?.amount || 0)})
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ ml: 1 }}>
+                                      20%: {formatCurrency(selectedBulletin.vat_breakdown.vat_20?.vat || 0)} (base: {formatCurrency(selectedBulletin.vat_breakdown.vat_20?.amount || 0)})
+                                    </Typography>
+                                  </>
+                                )}
+                              </>
+                            }
+                          />
+                        </ListItem>
                         <ListItem>
                           <ListItemIcon><EuroSymbol /></ListItemIcon>
                           <ListItemText 
                             primary="Montant HT"
                             secondary={formatCurrency(selectedBulletin.total_amount - selectedBulletin.total_vat)}
+                          />
+                        </ListItem>
+                        {/* Tips and change */}
+                        <ListItem>
+                          <ListItemText
+                            primary="Pourboires (Tips)"
+                            secondary={formatCurrency(selectedBulletin.tips_total || 0)}
+                          />
+                        </ListItem>
+                        <ListItem>
+                          <ListItemText
+                            primary="Monnaie rendue (Change)"
+                            secondary={formatCurrency(selectedBulletin.change_total || 0)}
                           />
                         </ListItem>
                       </List>

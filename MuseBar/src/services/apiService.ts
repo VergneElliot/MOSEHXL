@@ -318,7 +318,10 @@ export class ApiService {
         amount: parseFloat(subBill.amount),
         status: subBill.status as 'pending' | 'paid',
         createdAt: new Date(subBill.created_at)
-      }))
+      })),
+      notes: order.notes,
+      tips: order.tips || 0,
+      change: order.change || 0
     }));
   }
 
@@ -329,6 +332,8 @@ export class ApiService {
     paymentMethod: 'cash' | 'card' | 'split';
     status?: string;
     notes?: string;
+    tips?: number;
+    change?: number;
   }): Promise<Order> {
     const result = await this.request<any>('/orders', {
       method: 'POST',
@@ -338,6 +343,8 @@ export class ApiService {
         payment_method: order.paymentMethod,
         status: order.status || 'completed',
         notes: order.notes,
+        tips: order.tips || 0,
+        change: order.change || 0,
         items: order.items.map(item => ({
           product_id: parseInt(item.productId),
           product_name: item.productName,

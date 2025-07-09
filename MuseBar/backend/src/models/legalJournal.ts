@@ -28,6 +28,8 @@ export interface ClosureBulletin {
   total_vat: number;
   vat_breakdown: any; // VAT by rate (10%, 20%)
   payment_methods_breakdown: any; // Totals by payment method
+  tips_total?: number; // Total pourboires
+  change_total?: number; // Total monnaie rendue
   first_sequence: number;
   last_sequence: number;
   closure_hash: string;
@@ -171,13 +173,27 @@ export class LegalJournalModel {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const entries = await this.getEntriesForPeriod(startOfDay, endOfDay);
-    const salesEntries = entries.filter(e => e.transaction_type === 'SALE');
+    // Get all orders for the period to calculate proper breakdowns
+    const ordersResult = await pool.query(
+      `SELECT * FROM orders WHERE created_at >= $1 AND created_at <= $2 ORDER BY created_at`,
+      [startOfDay, endOfDay]
+    );
+    const orders = ordersResult.rows;
 
-    // Calculate totals and breakdowns
-    const totalTransactions = salesEntries.length;
-    const totalAmount = salesEntries.reduce((sum, e) => sum + parseFloat(e.amount.toString()), 0);
-    const totalVat = salesEntries.reduce((sum, e) => sum + parseFloat(e.vat_amount.toString()), 0);
+    // Separate regular sales from change operations
+    const salesOrders = orders.filter(order => order.items && order.items.length > 0);
+    const changeOrders = orders.filter(order => 
+      order.items && order.items.length === 0 && 
+      order.total_amount === 0 && 
+      order.total_tax === 0 && 
+      order.change > 0 &&
+      order.notes && order.notes.includes('Changement de caisse')
+    );
+
+    // Calculate sales totals (excluding change operations)
+    const totalTransactions = salesOrders.length;
+    const totalAmount = salesOrders.reduce((sum, order) => sum + parseFloat(order.total_amount || '0'), 0);
+    const totalVat = salesOrders.reduce((sum, order) => sum + parseFloat(order.total_tax || '0'), 0);
 
     // VAT breakdown (French rates: 10% and 20%)
     const vatBreakdown = {
@@ -185,26 +201,83 @@ export class LegalJournalModel {
       'vat_20': { amount: 0, vat: 0 }
     };
 
-    // Payment methods breakdown
-    const paymentBreakdown: { [key: string]: number } = {};
+    // Payment methods breakdown - start with sales
+    const paymentBreakdown: { [key: string]: number } = {
+      'cash': 0,
+      'card': 0
+    };
 
-    salesEntries.forEach(entry => {
-      // Payment method totals
-      paymentBreakdown[entry.payment_method] = (paymentBreakdown[entry.payment_method] || 0) + parseFloat(entry.amount.toString());
-      
+    // Process sales orders
+    for (const order of salesOrders) {
+      const amount = parseFloat(order.total_amount || '0');
+      const vatAmount = parseFloat(order.total_tax || '0');
+      const tips = parseFloat(order.tips || '0');
+      const change = parseFloat(order.change || '0');
+
+      if (order.payment_method === 'split') {
+        // For split payments, query the sub_bills table for accurate breakdown
+        const subBillsResult = await pool.query(
+          `SELECT payment_method, amount FROM sub_bills WHERE order_id = $1`,
+          [order.id]
+        );
+        subBillsResult.rows.forEach((subBill: any) => {
+          const subAmount = parseFloat(subBill.amount || '0');
+          paymentBreakdown[subBill.payment_method] += subAmount;
+        });
+      } else {
+        paymentBreakdown[order.payment_method] += amount;
+      }
+
+      // Handle tips: subtract from cash, add to card
+      if (tips > 0) {
+        paymentBreakdown.cash -= tips;
+        paymentBreakdown.card += tips;
+      }
+
+      // Handle change: affects the payment method breakdown
+      if (change > 0) {
+        if (order.payment_method === 'cash') {
+          paymentBreakdown.cash -= change;
+        } else if (order.payment_method === 'card') {
+          paymentBreakdown.card -= change;
+        }
+      }
+
       // VAT breakdown (simplified - would need item-level data for accuracy)
-      const vatRate = parseFloat(entry.vat_amount.toString()) / parseFloat(entry.amount.toString());
-      if (Math.abs(vatRate - 0.083) < 0.01) { // ~10% VAT (10/110)
-        vatBreakdown.vat_10.amount += parseFloat(entry.amount.toString());
-        vatBreakdown.vat_10.vat += parseFloat(entry.vat_amount.toString());
-      } else if (Math.abs(vatRate - 0.167) < 0.01) { // ~20% VAT (20/120)
-        vatBreakdown.vat_20.amount += parseFloat(entry.amount.toString());
-        vatBreakdown.vat_20.vat += parseFloat(entry.vat_amount.toString());
+      if (amount > 0) {
+        const vatRate = vatAmount / amount;
+        if (Math.abs(vatRate - 0.083) < 0.01) { // ~10% VAT (10/110)
+          vatBreakdown.vat_10.amount += amount;
+          vatBreakdown.vat_10.vat += vatAmount;
+        } else if (Math.abs(vatRate - 0.167) < 0.01) { // ~20% VAT (20/120)
+          vatBreakdown.vat_20.amount += amount;
+          vatBreakdown.vat_20.vat += vatAmount;
+        }
+      }
+    }
+
+    // Process change operations (affect payment breakdown but not sales totals)
+    changeOrders.forEach(order => {
+      const changeAmount = parseFloat(order.change || '0');
+      if (order.payment_method === 'cash') {
+        // Cash → Card: subtract from cash, add to card
+        paymentBreakdown.cash -= changeAmount;
+        paymentBreakdown.card += changeAmount;
+      } else if (order.payment_method === 'card') {
+        // Card → Cash: subtract from card, add to cash
+        paymentBreakdown.card -= changeAmount;
+        paymentBreakdown.cash += changeAmount;
       }
     });
 
-    const firstSequence = entries.length > 0 ? Math.min(...entries.map(e => e.sequence_number)) : 0;
-    const lastSequence = entries.length > 0 ? Math.max(...entries.map(e => e.sequence_number)) : 0;
+    // Calculate tips and change totals
+    const tipsTotal = orders.reduce((sum, order) => sum + parseFloat(order.tips || '0'), 0);
+    const changeTotal = orders.reduce((sum, order) => sum + parseFloat(order.change || '0'), 0);
+
+    // Get legal journal entries for sequence calculation
+    const entries = await this.getEntriesForPeriod(startOfDay, endOfDay);
+    const firstSequence = entries.length > 0 ? Math.min(...entries.map((e: any) => e.sequence_number)) : 0;
+    const lastSequence = entries.length > 0 ? Math.max(...entries.map((e: any) => e.sequence_number)) : 0;
 
     // Generate closure hash
     const closureData = `DAILY|${date.toISOString().split('T')[0]}|${totalTransactions}|${totalAmount}|${totalVat}|${firstSequence}|${lastSequence}`;
@@ -213,9 +286,9 @@ export class LegalJournalModel {
     const query = `
       INSERT INTO closure_bulletins (
         closure_type, period_start, period_end, total_transactions, total_amount, 
-        total_vat, vat_breakdown, payment_methods_breakdown, first_sequence, 
+        total_vat, vat_breakdown, payment_methods_breakdown, tips_total, change_total, first_sequence, 
         last_sequence, closure_hash, is_closed, closed_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING *
     `;
 
@@ -228,6 +301,8 @@ export class LegalJournalModel {
       totalVat,
       JSON.stringify(vatBreakdown),
       JSON.stringify(paymentBreakdown),
+      tipsTotal,
+      changeTotal,
       firstSequence,
       lastSequence,
       closureHash,
@@ -252,7 +327,14 @@ export class LegalJournalModel {
     query += ' ORDER BY period_start DESC';
     
     const result = await pool.query(query, values);
-    return result.rows;
+    // Parse JSON fields and ensure tips_total/change_total are present
+    return result.rows.map((row: any) => ({
+      ...row,
+      vat_breakdown: typeof row.vat_breakdown === 'string' ? JSON.parse(row.vat_breakdown) : row.vat_breakdown,
+      payment_methods_breakdown: typeof row.payment_methods_breakdown === 'string' ? JSON.parse(row.payment_methods_breakdown) : row.payment_methods_breakdown,
+      tips_total: row.tips_total || 0,
+      change_total: row.change_total || 0
+    }));
   }
 
   // Log transaction in legal journal (called after order creation)

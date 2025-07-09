@@ -211,7 +211,12 @@ const HistoryDashboard: React.FC = () => {
       }, 2000);
       
     } catch (error: any) {
-      setCancelError(error.response?.data?.error || 'Erreur lors de l\'annulation de la commande');
+      // If backend returns both error and legal, combine as JSON string
+      if (error.response?.data?.legal) {
+        setCancelError(JSON.stringify({ error: error.response.data.error, legal: error.response.data.legal }));
+      } else {
+        setCancelError(error.response?.data?.error || 'Erreur lors de l\'annulation de la commande');
+      }
     } finally {
       setCancelLoading(false);
     }
@@ -283,6 +288,7 @@ const HistoryDashboard: React.FC = () => {
                       <TableCell>ID</TableCell>
                       <TableCell>Date</TableCell>
                       <TableCell>Total</TableCell>
+                      <TableCell>Tips</TableCell>
                       <TableCell>Statut</TableCell>
                       <TableCell align="right">Actions</TableCell>
                     </TableRow>
@@ -293,7 +299,34 @@ const HistoryDashboard: React.FC = () => {
                         <TableRow hover selected={selectedOrder?.id === order.id}>
                           <TableCell>#{order.id}</TableCell>
                           <TableCell>{order.createdAt.toLocaleString('fr-FR')}</TableCell>
-                          <TableCell>{order.finalAmount.toFixed(2)} €</TableCell>
+                          <TableCell>
+                            {order.items.length === 0 && order.change && Number(order.change) > 0 ? (
+                              <Typography variant="body2" color="text.primary" sx={{ fontWeight: 'medium' }}>
+                                0.00 €
+                              </Typography>
+                            ) : (
+                              `${order.finalAmount.toFixed(2)} €`
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {order.tips && Number(order.tips) > 0 ? (
+                              <Chip 
+                                label={`+${Number(order.tips).toFixed(2)}€`} 
+                                color="success" 
+                                size="small"
+                                variant="outlined"
+                              />
+                            ) : order.change && Number(order.change) > 0 ? (
+                              <Chip 
+                                label={`Change ${Number(order.change).toFixed(2)}€`} 
+                                color="info" 
+                                size="small"
+                                variant="outlined"
+                              />
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">-</Typography>
+                            )}
+                          </TableCell>
                           <TableCell>{order.status}</TableCell>
                           <TableCell align="right">
                             <IconButton 
@@ -309,7 +342,7 @@ const HistoryDashboard: React.FC = () => {
                         {/* Détail commande sous la ligne sélectionnée */}
                         {selectedOrder?.id === order.id && (
                           <TableRow>
-                            <TableCell colSpan={5} sx={{ py: 0, border: 0 }}>
+                            <TableCell colSpan={6} sx={{ py: 0, border: 0 }}>
                               <Box sx={{ 
                                 p: 3, 
                                 border: '2px solid #1976d2', 
@@ -333,6 +366,27 @@ const HistoryDashboard: React.FC = () => {
                                     <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
                                       Total : {selectedOrder.finalAmount.toFixed(2)} €
                                     </Typography>
+                                    {/* Tips and Change Information */}
+                                    {(selectedOrder.tips && Number(selectedOrder.tips) > 0) && (
+                                      <Typography variant="body2" sx={{ color: 'success.main', fontWeight: 'medium' }}>
+                                        Pourboire : +{Number(selectedOrder.tips).toFixed(2)} €
+                                      </Typography>
+                                    )}
+                                    {(selectedOrder.change && Number(selectedOrder.change) > 0) && (
+                                      <Typography variant="body2" sx={{ color: 'info.main', fontWeight: 'medium' }}>
+                                        {selectedOrder.items.length === 0 ? (
+                                          `🔄 Changement de caisse : ${Number(selectedOrder.change).toFixed(2)} €`
+                                        ) : (
+                                          `Monnaie rendue : -${Number(selectedOrder.change).toFixed(2)} €`
+                                        )}
+                                      </Typography>
+                                    )}
+                                    {/* Motif d'annulation si commande négative */}
+                                    {selectedOrder.notes && selectedOrder.notes.startsWith('ANNULATION') && (
+                                      <Alert severity="info" sx={{ mt: 2, mb: 1 }}>
+                                        <strong>Motif d'annulation :</strong> {selectedOrder.notes.replace(/.*Raison: /, '')}
+                                      </Alert>
+                                    )}
                                     
                                     {/* Payment Method Information */}
                                     <Divider sx={{ my: 1.5 }} />
@@ -504,6 +558,20 @@ const HistoryDashboard: React.FC = () => {
           {cancelError && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {cancelError}
+              {/* Display legal info if present in the error string (JSON) */}
+              {(() => {
+                try {
+                  const err = JSON.parse(cancelError);
+                  return (
+                    <>
+                      <br />
+                      {err.legal && <span style={{ fontWeight: 'bold', color: '#b71c1c' }}>{err.legal}</span>}
+                    </>
+                  );
+                } catch {
+                  return null;
+                }
+              })()}
             </Alert>
           )}
           
