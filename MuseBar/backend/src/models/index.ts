@@ -31,6 +31,8 @@ export interface Order {
   payment_method: 'cash' | 'card' | 'split';
   status: 'pending' | 'completed' | 'cancelled';
   notes?: string;
+  tips?: number; // Pourboire
+  change?: number; // Monnaie rendue
   created_at: Date;
   updated_at: Date;
 }
@@ -328,10 +330,14 @@ export const OrderModel = {
   },
 
   async create(order: Omit<Order, 'id' | 'created_at' | 'updated_at'>): Promise<Order> {
+    const tipsValue = order.tips || 0;
+    const changeValue = order.change || 0;
+    
     const result = await pool.query(`
-      INSERT INTO orders (total_amount, total_tax, payment_method, status, notes) 
-      VALUES ($1, $2, $3, $4, $5) RETURNING *
-    `, [order.total_amount, order.total_tax, order.payment_method, order.status, order.notes]);
+      INSERT INTO orders (total_amount, total_tax, payment_method, status, notes, tips, change) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *
+    `, [order.total_amount, order.total_tax, order.payment_method, order.status, order.notes, tipsValue, changeValue]);
+    
     return result.rows[0];
   },
 

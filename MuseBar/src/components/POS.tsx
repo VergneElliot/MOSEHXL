@@ -17,7 +17,14 @@ import {
   DialogContent,
   DialogActions,
   Alert,
-  Snackbar
+  Snackbar,
+  useTheme,
+  useMediaQuery,
+  AppBar,
+  Toolbar,
+  Badge,
+  DialogContentText,
+  Tooltip
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -26,7 +33,9 @@ import {
   LocalOffer as DiscountIcon,
   CardGiftcard as OffertIcon,
   Search as SearchIcon,
-  Person as PersonIcon
+  Person as PersonIcon,
+  SwapHoriz as SwapHorizIcon,
+  EuroSymbol
 } from '@mui/icons-material';
 import { Category, Product, OrderItem, LocalSubBill } from '../types';
 import { v4 as uuidv4 } from 'uuid';
@@ -50,13 +59,35 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
   const [splitCount, setSplitCount] = useState(2);
   const [subBills, setSubBills] = useState<LocalSubBill[]>([]);
   
+  // Mobile responsive state
+  const [mobileView, setMobileView] = useState<'menu' | 'order'>('menu');
+  
   // Universal payment states - used for simple payment and individual sub-bills
-  const [currentPaymentMethod, setCurrentPaymentMethod] = useState<'cash' | 'card' | 'split'>('cash');
+  // Change default payment method to 'card'
+  const [currentPaymentMethod, setCurrentPaymentMethod] = useState<'cash' | 'card' | 'split'>('card');
   const [cashAmount, setCashAmount] = useState('');
   const [cardAmount, setCardAmount] = useState('');
+  const [tips, setTips] = useState(''); // Tips input
+  const [change, setChange] = useState(''); // Change input
+  
+  // Add state for retour dialog
+  const [retourDialogOpen, setRetourDialogOpen] = useState(false);
+  const [retourItem, setRetourItem] = useState<OrderItem | null>(null);
+  const [retourReason, setRetourReason] = useState('');
+  const [retourLoading, setRetourLoading] = useState(false);
+  
+  // Add state for change dialog
+  const [changeDialogOpen, setChangeDialogOpen] = useState(false);
+  const [changeAmount, setChangeAmount] = useState('');
+  const [changeDirection, setChangeDirection] = useState<'card-to-cash' | 'cash-to-card'>('card-to-cash');
+  const [changeLoading, setChangeLoading] = useState(false);
   
   const happyHourService = HappyHourService.getInstance();
   const apiService = ApiService.getInstance();
+  
+  // Responsive design detection
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md')); // Below 900px is considered mobile
 
   // Calculs de la commande
   const orderCalculations = useMemo(() => {
@@ -252,22 +283,85 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
 
   return (
     <Box>
-      {/* Replace Grid with flexbox layout */}
+      {/* Mobile Navigation Bar */}
+      {isMobile && (
+        <AppBar position="sticky" sx={{ top: 0, zIndex: 1000, bgcolor: 'primary.main' }}>
+          <Toolbar sx={{ justifyContent: 'space-between', minHeight: '64px !important', px: 1 }}>
+            <Button
+              variant={mobileView === 'menu' ? 'contained' : 'text'}
+              color={mobileView === 'menu' ? 'secondary' : 'inherit'}
+              onClick={() => setMobileView('menu')}
+              sx={{ 
+                color: 'white', 
+                minWidth: 'auto', 
+                px: 3, 
+                py: 1.5,
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                borderRadius: 2,
+                ...(mobileView === 'menu' && {
+                  bgcolor: 'secondary.main',
+                  '&:hover': { bgcolor: 'secondary.dark' }
+                })
+              }}
+            >
+              🍽️ Menu
+            </Button>
+            <Button
+              variant={mobileView === 'order' ? 'contained' : 'text'}
+              color={mobileView === 'order' ? 'secondary' : 'inherit'}
+              onClick={() => setMobileView('order')}
+              sx={{ 
+                color: 'white', 
+                minWidth: 'auto', 
+                px: 3, 
+                py: 1.5,
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                borderRadius: 2,
+                position: 'relative',
+                ...(mobileView === 'order' && {
+                  bgcolor: 'secondary.main',
+                  '&:hover': { bgcolor: 'secondary.dark' }
+                })
+              }}
+            >
+              🛒 Commande
+              {currentOrder.length > 0 && (
+                <Badge 
+                  badgeContent={currentOrder.length} 
+                  color="error" 
+                  sx={{ 
+                    position: 'absolute', 
+                    top: 5, 
+                    right: 5,
+                    '& .MuiBadge-badge': {
+                      fontSize: '0.75rem',
+                      minWidth: '20px',
+                      height: '20px'
+                    }
+                  }}
+                />
+              )}
+            </Button>
+          </Toolbar>
+        </AppBar>
+      )}
+
+      {/* Main Layout */}
       <Box sx={{ 
         display: 'flex', 
-        gap: 3,
-        minHeight: '100vh',
-        '@media (max-width: 599px)': { // xs breakpoint
-          gap: 2
-        }
+        gap: isMobile ? 0 : 3,
+        minHeight: isMobile ? 'calc(100vh - 64px)' : '100vh',
+        position: 'relative'
       }}>
-        {/* Menu section - takes remaining space */}
+        {/* Menu section */}
         <Box sx={{ 
           flex: 1,
-          minWidth: 0, // Prevents flex item from overflowing
-          display: 'flex',
+          minWidth: 0,
+          display: isMobile ? (mobileView === 'menu' ? 'flex' : 'none') : 'flex',
           flexDirection: 'column',
-          height: '100vh'
+          height: isMobile ? 'calc(100vh - 64px)' : '100vh'
         }}>
           <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 2 }}>
@@ -431,33 +525,57 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
           </Card>
         </Box>
 
-        {/* Command panel - fixed width, always on right */}
+        {/* Command panel */}
         <Box sx={{ 
-          width: {
-            xs: '280px',  // Mobile
+          width: isMobile ? '100%' : {
             sm: '320px',  // Tablet  
             md: '350px'   // Desktop
           },
-          flexShrink: 0, // Prevents shrinking
-          position: 'sticky',
-          top: 0,
-          maxHeight: 'calc(100vh - 20px)', // More compact - use almost full viewport height
+          flexShrink: 0,
+          display: isMobile ? (mobileView === 'order' ? 'block' : 'none') : 'block',
+          position: isMobile ? 'relative' : 'sticky',
+          top: isMobile ? 0 : 0,
+          maxHeight: isMobile ? 'calc(100vh - 64px)' : 'calc(100vh - 20px)',
           zIndex: 20
         }}>
-          <Card sx={{ height: '100%' }}>
+          <Card sx={{ 
+            height: '100%',
+            ...(isMobile && { 
+              borderRadius: 0,
+              boxShadow: 'none',
+              border: 'none'
+            })
+          }}>
             <CardContent sx={{ 
               height: '100%', 
               display: 'flex', 
               flexDirection: 'column',
-              p: { xs: 1.5, sm: 2 } // More compact padding
+              p: isMobile ? 2 : { sm: 2 },
+              pb: isMobile ? 3 : { sm: 2 } // Extra bottom padding on mobile for better touch access
             }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5, width: '100%' }}>
                 <Typography variant="h5" sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
                   Commande
                 </Typography>
-                <IconButton onClick={handleClearOrder} color="error" size="small">
-                  <ClearIcon />
-                </IconButton>
+                {currentOrder.length === 0 && (
+                  <Tooltip title="Enregistrer un mouvement de monnaie (carte ↔ espèces)">
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      color="secondary"
+                      startIcon={<EuroSymbol />}
+                      onClick={() => setChangeDialogOpen(true)}
+                      sx={{ borderRadius: 8, ml: 2 }}
+                    >
+                      Faire de la Monnaie
+                    </Button>
+                  </Tooltip>
+                )}
+                {currentOrder.length > 0 && (
+                  <IconButton onClick={handleClearOrder} color="error" size="small" sx={{ ml: 'auto' }}>
+                    <ClearIcon />
+                  </IconButton>
+                )}
               </Box>
 
               {isHappyHourActive && (
@@ -583,6 +701,19 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                                   sx={{ fontSize: 11 }}
                                 >
                                   {item.isPerso ? 'Annuler Perso' : 'Perso'}
+                                </Button>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  color="secondary"
+                                  onClick={() => {
+                                    setRetourItem(item);
+                                    setRetourReason('');
+                                    setRetourDialogOpen(true);
+                                  }}
+                                  sx={{ fontSize: 11 }}
+                                >
+                                  Retour
                                 </Button>
                               </Box>
                             </Box>
@@ -1133,6 +1264,49 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
               )}
             </Box>
           )}
+          {checkoutMode === 'simple' && (
+            <Box sx={{ mt: 2, mb: 2 }}>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <TextField
+                    label="Pourboire (Tips) (€)"
+                    type="number"
+                    fullWidth
+                    value={tips}
+                    onChange={e => setTips(e.target.value)}
+                    inputProps={{ step: 0.01, min: 0 }}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    label="Monnaie rendue (Change) (€)"
+                    type="number"
+                    fullWidth
+                    value={change}
+                    onChange={e => setChange(e.target.value)}
+                    inputProps={{ step: 0.01, min: 0 }}
+                  />
+                </Grid>
+              </Grid>
+              {(parseFloat(tips || '0') > 0 || parseFloat(change || '0') > 0) && (
+                <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    <strong>Résumé:</strong>
+                  </Typography>
+                  {parseFloat(tips || '0') > 0 && (
+                    <Typography variant="body2">
+                      Pourboire: {parseFloat(tips || '0').toFixed(2)}€
+                    </Typography>
+                  )}
+                  {parseFloat(change || '0') > 0 && (
+                    <Typography variant="body2">
+                      Monnaie rendue: {parseFloat(change || '0').toFixed(2)}€
+                    </Typography>
+                  )}
+                </Box>
+              )}
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => {
@@ -1160,7 +1334,9 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                       taxAmount: orderCalculations.taxAmount,
                       paymentMethod: 'cash',
                       status: 'completed',
-                      notes: `Paiement: ${amount.toFixed(2)}€, Rendu: ${(amount - orderCalculations.finalAmount).toFixed(2)}€`
+                      notes: `Paiement: ${amount.toFixed(2)}€, Rendu: ${(amount - orderCalculations.finalAmount).toFixed(2)}€`,
+                      tips: parseFloat(tips || '0'),
+                      change: parseFloat(change || '0')
                     });
                     setSnackbar({ 
                       open: true, 
@@ -1175,7 +1351,9 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                       taxAmount: orderCalculations.taxAmount,
                       paymentMethod: 'card',
                       status: 'completed',
-                      notes: `Paiement par carte: ${orderCalculations.finalAmount.toFixed(2)}€`
+                      notes: `Paiement par carte: ${orderCalculations.finalAmount.toFixed(2)}€`,
+                      tips: parseFloat(tips || '0'),
+                      change: parseFloat(change || '0')
                     });
                     setSnackbar({ 
                       open: true, 
@@ -1197,7 +1375,9 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                       taxAmount: orderCalculations.taxAmount,
                       paymentMethod: 'split',
                       status: 'completed',
-                      notes: `Paiement split - Espèces: ${cash.toFixed(2)}€, Carte: ${card.toFixed(2)}€`
+                      notes: `Paiement split - Espèces: ${cash.toFixed(2)}€, Carte: ${card.toFixed(2)}€`,
+                      tips: parseFloat(tips || '0'),
+                      change: parseFloat(change || '0')
                     });
                     setSnackbar({
                       open: true,
@@ -1256,7 +1436,9 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                     taxAmount: orderCalculations.taxAmount,
                     paymentMethod: 'split',
                     status: 'completed',
-                    notes
+                    notes,
+                    tips: parseFloat(tips || '0'),
+                    change: parseFloat(change || '0')
                   });
                   
                   setSnackbar({
@@ -1285,6 +1467,123 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
             variant="contained"
           >
             CONFIRMER
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Retour dialog */}
+      <Dialog open={retourDialogOpen} onClose={() => setRetourDialogOpen(false)}>
+        <DialogTitle>Retour rapide d'article</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Cette action va enregistrer un retour immédiat pour l'article <b>{retourItem?.productName}</b> avec un montant négatif, pour conformité légale. Un motif est obligatoire.
+          </DialogContentText>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Motif du retour (obligatoire)"
+            type="text"
+            fullWidth
+            value={retourReason}
+            onChange={e => setRetourReason(e.target.value)}
+            required
+            error={retourReason.trim() === ''}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRetourDialogOpen(false)} disabled={retourLoading}>Annuler</Button>
+          <Button
+            onClick={async () => {
+              if (!retourItem || !retourReason.trim()) return;
+              setRetourLoading(true);
+              try {
+                await apiService.post('/orders/retour', {
+                  item: retourItem,
+                  reason: retourReason.trim()
+                });
+                setSnackbar({ open: true, message: 'Retour enregistré avec succès', severity: 'success' });
+                setRetourDialogOpen(false);
+                onDataUpdate();
+              } catch (err: any) {
+                setSnackbar({ open: true, message: err.response?.data?.error || 'Erreur lors du retour', severity: 'error' });
+              } finally {
+                setRetourLoading(false);
+              }
+            }}
+            color="error"
+            variant="contained"
+            disabled={retourLoading || retourReason.trim() === ''}
+          >
+            {retourLoading ? 'Enregistrement...' : 'Confirmer le retour'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Change dialog */}
+      <Dialog open={changeDialogOpen} onClose={() => setChangeDialogOpen(false)}>
+        <DialogTitle>Faire de la Monnaie</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mb: 2 }}>
+            <TextField
+              label="Montant (€)"
+              type="number"
+              fullWidth
+              value={changeAmount}
+              onChange={e => setChangeAmount(e.target.value)}
+              inputProps={{ step: 0.01, min: 0 }}
+              sx={{ mb: 2 }}
+            />
+            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+              <Button
+                variant={changeDirection === 'card-to-cash' ? 'contained' : 'outlined'}
+                onClick={() => setChangeDirection('card-to-cash')}
+              >
+                Carte → Espèces
+              </Button>
+              <Button
+                variant={changeDirection === 'cash-to-card' ? 'contained' : 'outlined'}
+                onClick={() => setChangeDirection('cash-to-card')}
+              >
+                Espèces → Carte
+              </Button>
+            </Box>
+            <Typography variant="body2" color="text.secondary">
+              Cette opération permet de transférer un montant entre la caisse espèces et la caisse carte, sans vente associée.
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setChangeDialogOpen(false)}>Annuler</Button>
+          <Button
+            variant="contained"
+            disabled={changeLoading || !changeAmount || Number(changeAmount) <= 0}
+            onClick={async () => {
+              setChangeLoading(true);
+              try {
+                // Create a special 'change' order
+                await apiService.createOrder({
+                  items: [],
+                  totalAmount: 0,
+                  taxAmount: 0,
+                  paymentMethod: changeDirection === 'card-to-cash' ? 'cash' : 'card',
+                  status: 'completed',
+                  notes: `Faire de la Monnaie: ${changeDirection === 'card-to-cash' ? 'Carte → Espèces' : 'Espèces → Carte'} ${Number(changeAmount).toFixed(2)}€`,
+                  tips: 0,
+                  change: Number(changeAmount)
+                });
+                setSnackbar({ open: true, message: 'Opération de monnaie enregistrée', severity: 'success' });
+                setChangeDialogOpen(false);
+                setChangeAmount('');
+                setChangeDirection('card-to-cash');
+                onDataUpdate();
+              } catch (err) {
+                setSnackbar({ open: true, message: 'Erreur lors de l\'enregistrement', severity: 'error' });
+              } finally {
+                setChangeLoading(false);
+              }
+            }}
+          >
+            Valider
           </Button>
         </DialogActions>
       </Dialog>

@@ -44,6 +44,9 @@ export interface Order {
   status: 'pending' | 'completed' | 'cancelled';
   paymentMethod: PaymentMethod;
   subBills?: SubBill[];
+  notes?: string;
+  tips?: number;
+  change?: number;
 }
 
 export interface OrderItem {

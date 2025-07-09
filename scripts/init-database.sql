@@ -18,3 +18,5 @@ CREATE DATABASE mosehxl_production;
 -- 3. For production, ensure proper backup and security measures
 -- 4. Development database can be reset/recreated as needed
 -- 5. Production database should NEVER be reset once in use (legal compliance) 
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS tips numeric DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS change numeric DEFAULT 0; 

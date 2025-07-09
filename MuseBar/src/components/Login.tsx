@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Button, TextField, Typography, Alert, CircularProgress, Paper, FormControlLabel, Checkbox } from '@mui/material';
+import { ApiService } from '../services/apiService';
 
 interface LoginProps {
   onLogin: (token: string, user: any, rememberMe: boolean, expiresIn: string) => void;
@@ -11,27 +12,44 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string>('');
+
+  const apiService = ApiService.getInstance();
+
+  useEffect(() => {
+    const loadDebugInfo = async () => {
+      try {
+        const { apiConfig } = await import('../config/api');
+        await apiConfig.initialize();
+        const info = apiConfig.getConnectionInfo();
+        setDebugInfo(`Backend: ${info.baseURL} | Host: ${info.currentHost} | Ready: ${info.isInitialized}`);
+      } catch (error) {
+        setDebugInfo(`Debug error: ${error}`);
+      }
+    };
+    loadDebugInfo();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('http://localhost:3001/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, rememberMe })
+      // Use ApiService to automatically handle network configuration
+      const response = await apiService.post<{
+        token: string;
+        user: any;
+        expiresIn: string;
+      }>('/auth/login', {
+        email,
+        password,
+        rememberMe
       });
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.error || 'Erreur de connexion');
-        setLoading(false);
-        return;
-      }
-      const data = await res.json();
+      const data = response.data;
       onLogin(data.token, data.user, rememberMe, data.expiresIn);
-    } catch (err) {
-      setError('Erreur réseau ou serveur');
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError(err.message || 'Erreur réseau ou serveur');
     } finally {
       setLoading(false);
     }
@@ -131,6 +149,20 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               }}
             >
               {error}
+            </Alert>
+          )}
+          {debugInfo && (
+            <Alert 
+              severity="info" 
+              sx={{ 
+                mt: 1,
+                '& .MuiAlert-message': {
+                  fontSize: { xs: '0.8rem', sm: '0.75rem' },
+                  wordBreak: 'break-all'
+                }
+              }}
+            >
+              Debug: {debugInfo}
             </Alert>
           )}
           <Box mt={2} display="flex" justifyContent="flex-end">
