@@ -112,7 +112,7 @@ function App() {
         }
         
         return fetch(apiConfig.getEndpoint('/api/auth/me'), {
-          headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` }
         });
       };
       
