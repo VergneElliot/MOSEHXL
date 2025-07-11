@@ -1456,6 +1456,7 @@ router.get('/business-info', async (req, res) => {
 
 // PUT update business info
 router.put('/business-info', async (req, res) => {
+  console.log('PUT /api/legal/business-info', req.body);
   try {
     const updated = await BusinessSettingsModel.update(req.body);
     res.json(updated);
