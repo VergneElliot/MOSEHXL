@@ -1436,6 +1436,10 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                       setSnackbar({ open: true, message: 'Le total ne correspond pas au montant à payer', severity: 'error' });
                       return;
                     }
+                    const sub_bills = subBills.flatMap(bill => bill.payments
+                      .filter(p => p.method === 'cash' || p.method === 'card')
+                      .map(p => ({ payment_method: p.method as 'cash' | 'card', amount: p.amount }))
+                    );
                     const savedOrder = await apiService.createOrder({
                       items: currentOrder,
                       totalAmount: orderCalculations.finalAmount,
@@ -1444,7 +1448,8 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                       status: 'completed',
                       notes: `Paiement split - Espèces: ${cash.toFixed(2)}€, Carte: ${card.toFixed(2)}€`,
                       tips: parseFloat(tips || '0'),
-                      change: parseFloat(change || '0')
+                      change: parseFloat(change || '0'),
+                      sub_bills
                     });
                     setSnackbar({
                       open: true,
@@ -1493,6 +1498,10 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                   
                   const notes = `${checkoutMode === 'split-equal' ? 'Split égal' : 'Split par items'} - ${subBills.length} parts: ${paymentDetails}`;
                   
+                  const sub_bills = subBills.flatMap(bill => bill.payments
+                    .filter(p => p.method === 'cash' || p.method === 'card')
+                    .map(p => ({ payment_method: p.method as 'cash' | 'card', amount: p.amount, status: 'paid' }))
+                  );
                   const savedOrder = await apiService.createOrder({
                     items: currentOrder,
                     totalAmount: orderCalculations.finalAmount,
@@ -1501,7 +1510,8 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                     status: 'completed',
                     notes,
                     tips: parseFloat(tips || '0'),
-                    change: parseFloat(change || '0')
+                    change: parseFloat(change || '0'),
+                    sub_bills
                   });
                   
                   setSnackbar({
