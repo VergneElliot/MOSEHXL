@@ -86,4 +86,5 @@ export interface LocalSubBill {
   items: OrderItem[];
   total: number;
   payments: Payment[];
+  tip?: string; // Optional tip value for this part
 } 

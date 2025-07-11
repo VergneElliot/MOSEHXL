@@ -1046,6 +1046,22 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                         </Button>
                       </Box>
 
+                      {/* Tips input for this part */}
+                      <TextField
+                        label="Pourboire (Tips) (€)"
+                        type="number"
+                        size="small"
+                        fullWidth
+                        value={bill.tip || ''}
+                        onChange={e => {
+                          const newBills = [...subBills];
+                          newBills[idx].tip = e.target.value;
+                          setSubBills(newBills);
+                        }}
+                        inputProps={{ step: 0.01, min: 0 }}
+                        sx={{ mt: 1, mb: 1 }}
+                      />
+
                       {/* Split payment details */}
                       {bill.payments.length === 2 && 
                        bill.payments[0].method === 'cash' && 
@@ -1270,6 +1286,22 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                         </Button>
                       </Box>
 
+                      {/* Tips input for this part */}
+                      <TextField
+                        label="Pourboire (Tips) (€)"
+                        type="number"
+                        size="small"
+                        fullWidth
+                        value={bill.tip || ''}
+                        onChange={e => {
+                          const newBills = [...subBills];
+                          newBills[idx].tip = e.target.value;
+                          setSubBills(newBills);
+                        }}
+                        inputProps={{ step: 0.01, min: 0 }}
+                        sx={{ mt: 1, mb: 1 }}
+                      />
+
                       {/* Split payment details for items */}
                       {bill.payments.length === 2 && 
                        bill.payments[0].method === 'cash' && 
@@ -1332,7 +1364,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
           {checkoutMode === 'simple' && (
             <Box sx={{ mt: 2, mb: 2 }}>
               <Grid container spacing={2}>
-                <Grid item xs={6}>
+                <Grid item xs={12}>
                   <TextField
                     label="Pourboire (Tips) (€)"
                     type="number"
@@ -1342,32 +1374,15 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                     inputProps={{ step: 0.01, min: 0 }}
                   />
                 </Grid>
-                <Grid item xs={6}>
-                  <TextField
-                    label="Monnaie rendue (Change) (€)"
-                    type="number"
-                    fullWidth
-                    value={change}
-                    onChange={e => setChange(e.target.value)}
-                    inputProps={{ step: 0.01, min: 0 }}
-                  />
-                </Grid>
               </Grid>
-              {(parseFloat(tips || '0') > 0 || parseFloat(change || '0') > 0) && (
+              {(parseFloat(tips || '0') > 0) && (
                 <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
                   <Typography variant="body2" color="text.secondary">
                     <strong>Résumé:</strong>
                   </Typography>
-                  {parseFloat(tips || '0') > 0 && (
-                    <Typography variant="body2">
-                      Pourboire: {parseFloat(tips || '0').toFixed(2)}€
-                    </Typography>
-                  )}
-                  {parseFloat(change || '0') > 0 && (
-                    <Typography variant="body2">
-                      Monnaie rendue: {parseFloat(change || '0').toFixed(2)}€
-                    </Typography>
-                  )}
+                  <Typography variant="body2">
+                    Pourboire: {parseFloat(tips || '0').toFixed(2)}€
+                  </Typography>
                 </Box>
               )}
             </Box>
@@ -1440,6 +1455,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                       .filter(p => p.method === 'cash' || p.method === 'card')
                       .map(p => ({ payment_method: p.method as 'cash' | 'card', amount: p.amount }))
                     );
+                    const totalTips = subBills.reduce((sum, bill) => sum + (parseFloat(bill.tip ?? '0') || 0), 0);
                     const savedOrder = await apiService.createOrder({
                       items: currentOrder,
                       totalAmount: orderCalculations.finalAmount,
@@ -1447,7 +1463,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                       paymentMethod: 'split',
                       status: 'completed',
                       notes: `Paiement split - Espèces: ${cash.toFixed(2)}€, Carte: ${card.toFixed(2)}€`,
-                      tips: parseFloat(tips || '0'),
+                      tips: totalTips,
                       change: parseFloat(change || '0'),
                       sub_bills
                     });
@@ -1502,6 +1518,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                     .filter(p => p.method === 'cash' || p.method === 'card')
                     .map(p => ({ payment_method: p.method as 'cash' | 'card', amount: p.amount, status: 'paid' }))
                   );
+                  const totalTips = subBills.reduce((sum, bill) => sum + (parseFloat(bill.tip ?? '0') || 0), 0);
                   const savedOrder = await apiService.createOrder({
                     items: currentOrder,
                     totalAmount: orderCalculations.finalAmount,
@@ -1509,7 +1526,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                     paymentMethod: 'split',
                     status: 'completed',
                     notes,
-                    tips: parseFloat(tips || '0'),
+                    tips: totalTips,
                     change: parseFloat(change || '0'),
                     sub_bills
                   });

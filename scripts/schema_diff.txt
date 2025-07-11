@@ -1,0 +1,251 @@
+--- scripts/schema_production.sql	2025-07-11 21:03:03.513093162 +0200
++++ scripts/schema_development.sql	2025-07-11 21:03:11.202135542 +0200
+@@ -17,20 +17,6 @@
+ SET row_security = off;
+ 
+ --
+--- Name: pgcrypto; Type: EXTENSION; Schema: -; Owner: -
+---
+-
+-CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
+-
+-
+---
+--- Name: EXTENSION pgcrypto; Type: COMMENT; Schema: -; Owner: 
+---
+-
+-COMMENT ON EXTENSION pgcrypto IS 'cryptographic functions';
+-
+-
+---
+ -- Name: prevent_closed_bulletin_modification(); Type: FUNCTION; Schema: public; Owner: postgres
+ --
+ 
+@@ -38,10 +24,13 @@
+     LANGUAGE plpgsql
+     AS $$
+ BEGIN
+-  IF (TG_OP = 'DELETE' OR TG_OP = 'UPDATE') THEN
+-    RAISE EXCEPTION 'Deletion of closed closure bulletin is forbidden for legal compliance';
+-  END IF;
+-  RETURN NEW;
++    IF TG_OP = 'UPDATE' AND OLD.is_closed = TRUE THEN
++        RAISE EXCEPTION 'Modification of closed closure bulletin is forbidden for legal compliance';
++    END IF;
++    IF TG_OP = 'DELETE' AND OLD.is_closed = TRUE THEN
++        RAISE EXCEPTION 'Deletion of closed closure bulletin is forbidden for legal compliance';
++    END IF;
++    RETURN NEW;
+ END;
+ $$;
+ 
+@@ -56,10 +45,10 @@
+     LANGUAGE plpgsql
+     AS $$
+ BEGIN
+-  IF (TG_OP = 'DELETE' OR TG_OP = 'UPDATE') THEN
+-    RAISE EXCEPTION 'Modification of legal journal is forbidden for legal compliance (Article 286-I-3 bis du CGI)';
+-  END IF;
+-  RETURN NEW;
++    IF TG_OP = 'UPDATE' OR TG_OP = 'DELETE' THEN
++        RAISE EXCEPTION 'Modification of legal journal is forbidden for legal compliance (Article 286-I-3 bis du CGI)';
++    END IF;
++    RETURN NEW;
+ END;
+ $$;
+ 
+@@ -88,9 +77,9 @@
+     created_by character varying(100),
+     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+     verified_at timestamp without time zone,
+-    CONSTRAINT archive_exports_export_status_check CHECK (((export_status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('COMPLETED'::character varying)::text, ('FAILED'::character varying)::text, ('VERIFIED'::character varying)::text]))),
+-    CONSTRAINT archive_exports_export_type_check CHECK (((export_type)::text = ANY (ARRAY[('DAILY'::character varying)::text, ('MONTHLY'::character varying)::text, ('ANNUAL'::character varying)::text, ('FULL'::character varying)::text]))),
+-    CONSTRAINT archive_exports_format_check CHECK (((format)::text = ANY (ARRAY[('CSV'::character varying)::text, ('XML'::character varying)::text, ('PDF'::character varying)::text, ('JSON'::character varying)::text]))),
++    CONSTRAINT archive_exports_export_status_check CHECK (((export_status)::text = ANY ((ARRAY['PENDING'::character varying, 'COMPLETED'::character varying, 'FAILED'::character varying, 'VERIFIED'::character varying])::text[]))),
++    CONSTRAINT archive_exports_export_type_check CHECK (((export_type)::text = ANY ((ARRAY['DAILY'::character varying, 'MONTHLY'::character varying, 'ANNUAL'::character varying, 'FULL'::character varying])::text[]))),
++    CONSTRAINT archive_exports_format_check CHECK (((format)::text = ANY ((ARRAY['CSV'::character varying, 'XML'::character varying, 'PDF'::character varying, 'JSON'::character varying])::text[]))),
+     CONSTRAINT file_size_positive CHECK ((file_size > 0)),
+     CONSTRAINT period_valid_archive CHECK (((period_end IS NULL) OR (period_start IS NULL) OR (period_end >= period_start)))
+ );
+@@ -126,15 +115,15 @@
+ 
+ CREATE TABLE public.audit_trail (
+     id integer NOT NULL,
+-    user_id character varying(100),
+-    action_type character varying(50) NOT NULL,
+-    resource_type character varying(50),
+-    resource_id character varying(100),
++    user_id character varying(50),
++    action_type character varying(100) NOT NULL,
++    resource_type character varying(100),
++    resource_id character varying(50),
+     action_details jsonb,
+     ip_address inet,
+     user_agent text,
+     session_id character varying(100),
+-    "timestamp" timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
++    "timestamp" timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+ );
+ 
+ 
+@@ -260,11 +249,12 @@
+     is_closed boolean DEFAULT false NOT NULL,
+     closed_at timestamp without time zone,
+     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+-    tips_total numeric DEFAULT 0,
+-    change_total numeric DEFAULT 0,
+-    CONSTRAINT closure_bulletins_closure_type_check CHECK (((closure_type)::text = ANY ((ARRAY['DAILY'::character varying, 'WEEKLY'::character varying, 'MONTHLY'::character varying, 'ANNUAL'::character varying])::text[]))),
++    tips_total numeric(12,2) DEFAULT 0 NOT NULL,
++    change_total numeric(12,2) DEFAULT 0 NOT NULL,
++    CONSTRAINT closure_bulletins_closure_type_check CHECK (((closure_type)::text = ANY ((ARRAY['DAILY'::character varying, 'MONTHLY'::character varying, 'ANNUAL'::character varying])::text[]))),
+     CONSTRAINT period_valid CHECK ((period_end >= period_start)),
+     CONSTRAINT sequence_order CHECK (((last_sequence IS NULL) OR (first_sequence IS NULL) OR (last_sequence >= first_sequence))),
++    CONSTRAINT tips_change_positive CHECK (((tips_total >= (0)::numeric) AND (change_total >= (0)::numeric))),
+     CONSTRAINT totals_positive CHECK (((total_transactions >= 0) AND (total_amount >= (0)::numeric) AND (total_vat >= (0)::numeric)))
+ );
+ 
+@@ -351,8 +341,8 @@
+     register_id character varying(100) NOT NULL,
+     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+     CONSTRAINT amount_positive CHECK ((amount >= (0)::numeric)),
+-    CONSTRAINT legal_journal_transaction_type_check CHECK (((transaction_type)::text = ANY (ARRAY[('SALE'::character varying)::text, ('REFUND'::character varying)::text, ('CORRECTION'::character varying)::text, ('CLOSURE'::character varying)::text, ('ARCHIVE'::character varying)::text]))),
+-    CONSTRAINT sequence_positive CHECK ((sequence_number > 0)),
++    CONSTRAINT legal_journal_transaction_type_check CHECK (((transaction_type)::text = ANY ((ARRAY['SALE'::character varying, 'REFUND'::character varying, 'CORRECTION'::character varying, 'CLOSURE'::character varying, 'ARCHIVE'::character varying])::text[]))),
++    CONSTRAINT sequence_positive CHECK ((sequence_number >= 0)),
+     CONSTRAINT vat_amount_positive CHECK ((vat_amount >= (0)::numeric))
+ );
+ 
+@@ -439,8 +429,8 @@
+     notes text,
+     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+-    tips numeric DEFAULT 0,
+-    change numeric DEFAULT 0
++    tips numeric(10,2) DEFAULT 0,
++    change numeric(10,2) DEFAULT 0
+ );
+ 
+ 
+@@ -890,13 +880,6 @@
+ 
+ 
+ --
+--- Name: idx_closure_bulletins_period_start; Type: INDEX; Schema: public; Owner: postgres
+---
+-
+-CREATE INDEX idx_closure_bulletins_period_start ON public.closure_bulletins USING btree (period_start);
+-
+-
+---
+ -- Name: idx_closure_closed; Type: INDEX; Schema: public; Owner: postgres
+ --
+ 
+@@ -960,13 +943,6 @@
+ 
+ 
+ --
+--- Name: idx_orders_created_at; Type: INDEX; Schema: public; Owner: postgres
+---
+-
+-CREATE INDEX idx_orders_created_at ON public.orders USING btree (created_at);
+-
+-
+---
+ -- Name: idx_products_category_id; Type: INDEX; Schema: public; Owner: postgres
+ --
+ 
+@@ -999,7 +975,7 @@
+ --
+ 
+ ALTER TABLE ONLY public.legal_journal
+-    ADD CONSTRAINT legal_journal_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
++    ADD CONSTRAINT legal_journal_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id);
+ 
+ 
+ --
+@@ -1015,7 +991,7 @@
+ --
+ 
+ ALTER TABLE ONLY public.order_items
+-    ADD CONSTRAINT order_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON UPDATE CASCADE ON DELETE SET NULL;
++    ADD CONSTRAINT order_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id);
+ 
+ 
+ --
+@@ -1065,13 +1041,6 @@
+ 
+ 
+ --
+--- Name: TABLE categories; Type: ACL; Schema: public; Owner: postgres
+---
+-
+-GRANT ALL ON TABLE public.categories TO musebar_user;
+-
+-
+---
+ -- Name: SEQUENCE categories_id_seq; Type: ACL; Schema: public; Owner: postgres
+ --
+ 
+@@ -1107,13 +1076,6 @@
+ 
+ 
+ --
+--- Name: TABLE order_items; Type: ACL; Schema: public; Owner: postgres
+---
+-
+-GRANT ALL ON TABLE public.order_items TO musebar_user;
+-
+-
+---
+ -- Name: SEQUENCE order_items_id_seq; Type: ACL; Schema: public; Owner: postgres
+ --
+ 
+@@ -1121,13 +1083,6 @@
+ 
+ 
+ --
+--- Name: TABLE orders; Type: ACL; Schema: public; Owner: postgres
+---
+-
+-GRANT ALL ON TABLE public.orders TO musebar_user;
+-
+-
+---
+ -- Name: SEQUENCE orders_id_seq; Type: ACL; Schema: public; Owner: postgres
+ --
+ 
+@@ -1135,10 +1090,10 @@
+ 
+ 
+ --
+--- Name: TABLE products; Type: ACL; Schema: public; Owner: postgres
++-- Name: SEQUENCE permissions_id_seq; Type: ACL; Schema: public; Owner: postgres
+ --
+ 
+-GRANT ALL ON TABLE public.products TO musebar_user;
++GRANT ALL ON SEQUENCE public.permissions_id_seq TO musebar_user;
+ 
+ 
+ --
+@@ -1149,17 +1104,17 @@
+ 
+ 
+ --
+--- Name: TABLE sub_bills; Type: ACL; Schema: public; Owner: postgres
++-- Name: SEQUENCE sub_bills_id_seq; Type: ACL; Schema: public; Owner: postgres
+ --
+ 
+-GRANT ALL ON TABLE public.sub_bills TO musebar_user;
++GRANT ALL ON SEQUENCE public.sub_bills_id_seq TO musebar_user;
+ 
+ 
+ --
+--- Name: SEQUENCE sub_bills_id_seq; Type: ACL; Schema: public; Owner: postgres
++-- Name: SEQUENCE users_id_seq; Type: ACL; Schema: public; Owner: postgres
+ --
+ 
+-GRANT ALL ON SEQUENCE public.sub_bills_id_seq TO musebar_user;
++GRANT ALL ON SEQUENCE public.users_id_seq TO musebar_user;
+ 
+ 
+ --
