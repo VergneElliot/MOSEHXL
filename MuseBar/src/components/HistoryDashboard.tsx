@@ -85,7 +85,12 @@ const HistoryDashboard: React.FC = () => {
     try {
       setLoading(true);
       const ordersData = await apiService.getOrders();
-      setOrders(ordersData);
+      // Map sub_bills to subBills for frontend compatibility
+      const mappedOrders = ordersData.map(order => ({
+        ...order,
+        subBills: (order as any)['sub_bills'] || order.subBills || []
+      }));
+      setOrders(mappedOrders);
       
       // Calculate stats
       const today = new Date().toDateString();

@@ -334,6 +334,7 @@ export class ApiService {
     notes?: string;
     tips?: number;
     change?: number;
+    sub_bills?: Array<{ payment_method: 'cash' | 'card'; amount: number }>;
   }): Promise<Order> {
     const result = await this.request<any>('/orders', {
       method: 'POST',
@@ -355,7 +356,8 @@ export class ApiService {
           tax_amount: item.totalPrice * item.taxRate / (1 + item.taxRate),
           happy_hour_applied: item.isHappyHourApplied,
           happy_hour_discount_amount: item.isHappyHourApplied ? (item.quantity * (item.unitPrice / (1 - 0.2)) * 0.2) : 0
-        }))
+        })),
+        ...(order.sub_bills ? { sub_bills: order.sub_bills } : {})
       }),
     });
 

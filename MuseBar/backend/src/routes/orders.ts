@@ -12,20 +12,22 @@ router.get('/', async (req, res) => {
   try {
     const orders = await OrderModel.getAll();
     
-    // Include items for each order
-    const ordersWithItems = await Promise.all(
+    // Include items and sub-bills for each order
+    const ordersWithDetails = await Promise.all(
       orders.map(async (order) => {
         const items = await OrderItemModel.getByOrderId(order.id);
+        const subBills = order.payment_method === 'split' ? await SubBillModel.getByOrderId(order.id) : [];
         return {
           ...order,
           items,
+          sub_bills: subBills,
           tips: order.tips || 0,
           change: order.change || 0
         };
       })
     );
     
-    res.json(ordersWithItems);
+    res.json(ordersWithDetails);
   } catch (error) {
     console.error('Error fetching orders:', error);
     res.status(500).json({ error: 'Failed to fetch orders' });
@@ -78,6 +80,9 @@ router.post('/', async (req, res) => {
       tips,
       change
     } = req.body;
+    
+    // Debug log for sub_bills
+    console.log('Received sub_bills:', sub_bills);
     const ip = req.ip;
     const userAgent = req.headers['user-agent'];
     const userId = (req as any).user ? String((req as any).user.id) : undefined;
@@ -149,6 +154,8 @@ router.post('/', async (req, res) => {
         });
         createdSubBills.push(createdSubBill);
       }
+      // Debug log for saved sub_bills
+      console.log(`Saved ${createdSubBills.length} sub_bills for order ${order.id}`);
     }
 
     // Log transaction in legal journal for French compliance (skip for change operations)
