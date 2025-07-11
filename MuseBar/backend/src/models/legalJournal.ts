@@ -314,6 +314,194 @@ export class LegalJournalModel {
     return result.rows[0];
   }
 
+  // Create weekly closure bulletin
+  static async createWeeklyClosure(date: Date): Promise<ClosureBulletin> {
+    // Get the start of the week (Monday) and end of the week (Sunday)
+    const startOfWeek = new Date(date);
+    const dayOfWeek = startOfWeek.getDay();
+    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Sunday = 0, Monday = 1
+    startOfWeek.setDate(startOfWeek.getDate() - daysToMonday);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(endOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    return await this.createPeriodClosure('WEEKLY', startOfWeek, endOfWeek, date);
+  }
+
+  // Create monthly closure bulletin
+  static async createMonthlyClosure(date: Date): Promise<ClosureBulletin> {
+    // Get the start and end of the month
+    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+    const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    return await this.createPeriodClosure('MONTHLY', startOfMonth, endOfMonth, date);
+  }
+
+  // Create annual closure bulletin
+  static async createAnnualClosure(date: Date): Promise<ClosureBulletin> {
+    // Get the start and end of the year
+    const startOfYear = new Date(date.getFullYear(), 0, 1);
+    const endOfYear = new Date(date.getFullYear(), 11, 31, 23, 59, 59, 999);
+
+    return await this.createPeriodClosure('ANNUAL', startOfYear, endOfYear, date);
+  }
+
+  // Generic method to create period closures (weekly, monthly, annual)
+  private static async createPeriodClosure(
+    closureType: 'WEEKLY' | 'MONTHLY' | 'ANNUAL',
+    startDate: Date,
+    endDate: Date,
+    referenceDate: Date
+  ): Promise<ClosureBulletin> {
+    // Get all orders for the period
+    const ordersResult = await pool.query(
+      `SELECT * FROM orders WHERE created_at >= $1 AND created_at <= $2 ORDER BY created_at`,
+      [startDate, endDate]
+    );
+    const orders = ordersResult.rows;
+
+    // Separate regular sales from change operations
+    const salesOrders = orders.filter(order => order.items && order.items.length > 0);
+    const changeOrders = orders.filter(order => 
+      order.items && order.items.length === 0 && 
+      order.total_amount === 0 && 
+      order.total_tax === 0 && 
+      order.change > 0 &&
+      order.notes && order.notes.includes('Changement de caisse')
+    );
+
+    // Calculate sales totals (excluding change operations)
+    const totalTransactions = salesOrders.length;
+    const totalAmount = salesOrders.reduce((sum, order) => sum + parseFloat(order.total_amount || '0'), 0);
+    const totalVat = salesOrders.reduce((sum, order) => sum + parseFloat(order.total_tax || '0'), 0);
+
+    // VAT breakdown (French rates: 10% and 20%)
+    const vatBreakdown = {
+      'vat_10': { amount: 0, vat: 0 },
+      'vat_20': { amount: 0, vat: 0 }
+    };
+
+    // Payment methods breakdown
+    const paymentBreakdown: { [key: string]: number } = {
+      'cash': 0,
+      'card': 0
+    };
+
+    // Process sales orders
+    for (const order of salesOrders) {
+      const amount = parseFloat(order.total_amount || '0');
+      const vatAmount = parseFloat(order.total_tax || '0');
+      const tips = parseFloat(order.tips || '0');
+      const change = parseFloat(order.change || '0');
+
+      if (order.payment_method === 'split') {
+        // For split payments, query the sub_bills table for accurate breakdown
+        const subBillsResult = await pool.query(
+          `SELECT payment_method, amount FROM sub_bills WHERE order_id = $1`,
+          [order.id]
+        );
+        subBillsResult.rows.forEach((subBill: any) => {
+          const subAmount = parseFloat(subBill.amount || '0');
+          paymentBreakdown[subBill.payment_method] += subAmount;
+        });
+      } else {
+        paymentBreakdown[order.payment_method] += amount;
+      }
+
+      // Handle tips: subtract from cash, add to card
+      if (tips > 0) {
+        paymentBreakdown.cash -= tips;
+        paymentBreakdown.card += tips;
+      }
+
+      // Handle change: affects the payment method breakdown
+      if (change > 0) {
+        if (order.payment_method === 'cash') {
+          paymentBreakdown.cash -= change;
+        } else if (order.payment_method === 'card') {
+          paymentBreakdown.card -= change;
+        }
+      }
+
+      // VAT breakdown (simplified - would need item-level data for accuracy)
+      if (amount > 0) {
+        const vatRate = vatAmount / amount;
+        if (Math.abs(vatRate - 0.083) < 0.01) { // ~10% VAT (10/110)
+          vatBreakdown.vat_10.amount += amount;
+          vatBreakdown.vat_10.vat += vatAmount;
+        } else if (Math.abs(vatRate - 0.167) < 0.01) { // ~20% VAT (20/120)
+          vatBreakdown.vat_20.amount += amount;
+          vatBreakdown.vat_20.vat += vatAmount;
+        }
+      }
+    }
+
+    // Process change operations (affect payment breakdown but not sales totals)
+    changeOrders.forEach(order => {
+      const changeAmount = parseFloat(order.change || '0');
+      if (order.payment_method === 'cash') {
+        // Cash → Card: subtract from cash, add to card
+        paymentBreakdown.cash -= changeAmount;
+        paymentBreakdown.card += changeAmount;
+      } else if (order.payment_method === 'card') {
+        // Card → Cash: subtract from card, add to cash
+        paymentBreakdown.card -= changeAmount;
+        paymentBreakdown.cash += changeAmount;
+      }
+    });
+
+    // Calculate tips and change totals
+    const tipsTotal = orders.reduce((sum, order) => sum + parseFloat(order.tips || '0'), 0);
+    const changeTotal = orders.reduce((sum, order) => sum + parseFloat(order.change || '0'), 0);
+
+    // Get legal journal entries for sequence calculation
+    const entries = await this.getEntriesForPeriod(startDate, endDate);
+    const firstSequence = entries.length > 0 ? Math.min(...entries.map((e: any) => e.sequence_number)) : 0;
+    const lastSequence = entries.length > 0 ? Math.max(...entries.map((e: any) => e.sequence_number)) : 0;
+
+    // Generate closure hash
+    const periodIdentifier = closureType === 'WEEKLY' 
+      ? `${referenceDate.getFullYear()}-W${Math.ceil((referenceDate.getTime() - new Date(referenceDate.getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000))}`
+      : closureType === 'MONTHLY'
+      ? `${referenceDate.getFullYear()}-${String(referenceDate.getMonth() + 1).padStart(2, '0')}`
+      : `${referenceDate.getFullYear()}`;
+
+    const closureData = `${closureType}|${periodIdentifier}|${totalTransactions}|${totalAmount}|${totalVat}|${firstSequence}|${lastSequence}`;
+    const closureHash = crypto.createHash('sha256').update(closureData).digest('hex');
+
+    const query = `
+      INSERT INTO closure_bulletins (
+        closure_type, period_start, period_end, total_transactions, total_amount, 
+        total_vat, vat_breakdown, payment_methods_breakdown, tips_total, change_total, first_sequence, 
+        last_sequence, closure_hash, is_closed, closed_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      RETURNING *
+    `;
+
+    const values = [
+      closureType,
+      startDate,
+      endDate,
+      totalTransactions,
+      totalAmount,
+      totalVat,
+      JSON.stringify(vatBreakdown),
+      JSON.stringify(paymentBreakdown),
+      tipsTotal,
+      changeTotal,
+      firstSequence,
+      lastSequence,
+      closureHash,
+      true,
+      new Date()
+    ];
+
+    const result = await pool.query(query, values);
+    return result.rows[0];
+  }
+
   // Get closure bulletins
   static async getClosureBulletins(type?: 'DAILY' | 'MONTHLY' | 'ANNUAL'): Promise<ClosureBulletin[]> {
     let query = 'SELECT * FROM closure_bulletins';

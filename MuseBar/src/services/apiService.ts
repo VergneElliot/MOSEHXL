@@ -401,6 +401,18 @@ export class ApiService {
     });
     return { data: result };
   }
+
+  // Business Info
+  async getBusinessInfo(): Promise<any> {
+    return this.request<any>('/legal/business-info');
+  }
+
+  async updateBusinessInfo(data: any): Promise<any> {
+    return this.request<any>('/legal/business-info', {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
 }
 
 // Export singleton instance

@@ -126,3 +126,15 @@ BEGIN
         UPDATE products SET is_active = TRUE WHERE is_active IS NULL;
     END IF;
 END $$; 
+
+-- Business settings for receipts and legal compliance
+CREATE TABLE IF NOT EXISTS business_settings (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    address TEXT NOT NULL,
+    phone VARCHAR(30) NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    siret VARCHAR(20) NOT NULL,
+    tax_identification VARCHAR(30) NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+); 

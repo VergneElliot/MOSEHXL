@@ -93,7 +93,12 @@ const ClosureBulletinDashboard: React.FC = () => {
   const [todayStatus, setTodayStatus] = useState<any>(null);
   const [closureSettings, setClosureSettings] = useState<any>({});
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  const [selectedClosureType, setSelectedClosureType] = useState<'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL'>('DAILY');
   
+  // Add state for print dialog
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [printBulletin, setPrintBulletin] = useState<ClosureBulletin | null>(null);
+
   const apiService = ApiService.getInstance();
 
   useEffect(() => {
@@ -148,10 +153,10 @@ const ClosureBulletinDashboard: React.FC = () => {
     try {
       setCreating(true);
       setError(null);
-      const response = await fetch('http://localhost:3001/api/legal/closure/create-daily', {
+      const response = await fetch('http://localhost:3001/api/legal/closure/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: selectedDate }),
+        body: JSON.stringify({ date: selectedDate, type: selectedClosureType }),
       });
       if (!response.ok) {
         const errorData = await response.json();
@@ -211,15 +216,17 @@ const ClosureBulletinDashboard: React.FC = () => {
   const getClosureTypeLabel = (type: string) => {
     switch (type) {
       case 'DAILY': return 'Journalière';
+      case 'WEEKLY': return 'Hebdomadaire';
       case 'MONTHLY': return 'Mensuelle';
       case 'ANNUAL': return 'Annuelle';
       default: return type;
     }
   };
 
-  const getClosureTypeColor = (type: string): 'primary' | 'secondary' | 'success' | 'default' => {
+  const getClosureTypeColor = (type: string): 'primary' | 'secondary' | 'success' | 'info' | 'default' => {
     switch (type) {
       case 'DAILY': return 'primary';
+      case 'WEEKLY': return 'info';
       case 'MONTHLY': return 'secondary';
       case 'ANNUAL': return 'success';
       default: return 'default';
@@ -230,13 +237,55 @@ const ClosureBulletinDashboard: React.FC = () => {
     filterType === 'ALL' || bulletin.closure_type === filterType
   );
 
-  const totalStats = bulletins.reduce((acc, bulletin) => ({
-    totalAmount: acc.totalAmount + bulletin.total_amount,
-    totalTransactions: acc.totalTransactions + bulletin.total_transactions,
-    totalVat: acc.totalVat + bulletin.total_vat,
-    totalTips: acc.totalTips + (bulletin.tips_total || 0),
-    totalChange: acc.totalChange + (bulletin.change_total || 0)
-  }), { totalAmount: 0, totalTransactions: 0, totalVat: 0, totalTips: 0, totalChange: 0 });
+  // Defensive reduce for stats
+  const totalStats = bulletins.reduce((acc, bulletin) => {
+    if (!bulletin || typeof bulletin.total_amount !== 'number' || typeof bulletin.total_transactions !== 'number' || typeof bulletin.total_vat !== 'number') {
+      return acc;
+    }
+    return {
+      totalAmount: acc.totalAmount + bulletin.total_amount,
+      totalTransactions: acc.totalTransactions + bulletin.total_transactions,
+      totalVat: acc.totalVat + bulletin.total_vat,
+      totalTips: acc.totalTips + (bulletin.tips_total || 0),
+      totalChange: acc.totalChange + (bulletin.change_total || 0)
+    };
+  }, { totalAmount: 0, totalTransactions: 0, totalVat: 0, totalTips: 0, totalChange: 0 });
+
+  // Print handler
+  const handlePrintBulletin = (bulletin: ClosureBulletin) => {
+    setPrintBulletin(bulletin);
+    setPrintDialogOpen(true);
+    setTimeout(() => window.print(), 300); // Give dialog time to render
+  };
+
+  // Add print CSS for closure bulletins
+  const printStyles = `
+  @media print {
+    body * { visibility: hidden !important; }
+    .closure-print-area, .closure-print-area * { visibility: visible !important; }
+    .closure-print-area {
+      position: absolute !important;
+      left: 0; top: 0;
+      width: 80mm !important;
+      min-width: 80mm !important;
+      max-width: 80mm !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      background: white !important;
+      font-size: 12px !important;
+      box-shadow: none !important;
+    }
+    @page { size: 80mm auto; margin: 0; }
+  }
+  `;
+  if (typeof window !== 'undefined' && document) {
+    if (!document.getElementById('closure-print-style')) {
+      const style = document.createElement('style');
+      style.id = 'closure-print-style';
+      style.innerHTML = printStyles;
+      document.head.appendChild(style);
+    }
+  }
 
   if (loading) {
     return (
@@ -388,6 +437,7 @@ const ClosureBulletinDashboard: React.FC = () => {
             >
               <MenuItem value="ALL">Tous</MenuItem>
               <MenuItem value="DAILY">Journalière</MenuItem>
+              <MenuItem value="WEEKLY">Hebdomadaire</MenuItem>
               <MenuItem value="MONTHLY">Mensuelle</MenuItem>
               <MenuItem value="ANNUAL">Annuelle</MenuItem>
             </Select>
@@ -492,25 +542,44 @@ const ClosureBulletinDashboard: React.FC = () => {
         <DialogTitle>
           <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Add />
-            Créer un Bulletin de Clôture Journalière
+            Créer un Bulletin de Clôture
           </Typography>
         </DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2 }}>
-            <TextField
-              type="date"
-              label="Date de clôture"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              fullWidth
-              InputLabelProps={{ shrink: true }}
-              sx={{ mb: 2 }}
-            />
-            <Alert severity="info">
-              <AlertTitle>Information</AlertTitle>
-              La clôture sera créée avec toutes les transactions de la journée sélectionnée.
-              Une fois créée, la clôture sera immuable pour des raisons de conformité légale.
-            </Alert>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <FormControl sx={{ minWidth: 200 }}>
+                  <InputLabel>Type de clôture</InputLabel>
+                  <Select
+                    value={selectedClosureType}
+                    label="Type de clôture"
+                    onChange={(e) => setSelectedClosureType(e.target.value as 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL')}
+                  >
+                    <MenuItem value="DAILY">Journalière</MenuItem>
+                    <MenuItem value="WEEKLY">Hebdomadaire</MenuItem>
+                    <MenuItem value="MONTHLY">Mensuelle</MenuItem>
+                    <MenuItem value="ANNUAL">Annuelle</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  type="date"
+                  label="Date de clôture"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  fullWidth
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ mb: 2 }}
+                />
+                <Alert severity="info">
+                  <AlertTitle>Information</AlertTitle>
+                  La clôture sera créée avec toutes les transactions de la journée sélectionnée.
+                  Une fois créée, la clôture sera immuable pour des raisons de conformité légale.
+                </Alert>
+              </Grid>
+            </Grid>
           </Box>
         </DialogContent>
         <DialogActions>
@@ -687,7 +756,9 @@ const ClosureBulletinDashboard: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button startIcon={<Download />} variant="outlined">Exporter</Button>
-          <Button startIcon={<Print />} variant="outlined">Imprimer</Button>
+          <Button startIcon={<Print />} variant="outlined" onClick={() => handlePrintBulletin(selectedBulletin!)}>
+            Imprimer
+          </Button>
           <Button onClick={() => setShowDetailsDialog(false)}>Fermer</Button>
         </DialogActions>
       </Dialog>
@@ -775,6 +846,40 @@ const ClosureBulletinDashboard: React.FC = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Print Dialog */}
+      <Dialog open={printDialogOpen} onClose={() => setPrintDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Impression du Bulletin de Clôture</DialogTitle>
+        <DialogContent>
+          {printBulletin && (
+            <Box className="closure-print-area" sx={{ p: 2, fontFamily: 'monospace', fontSize: '0.95rem', maxWidth: 400, mx: 'auto' }}>
+              <Typography variant="h6" align="center" gutterBottom>BULLETIN DE CLÔTURE</Typography>
+              <Divider sx={{ my: 1 }} />
+              <Typography variant="body2"><b>Type:</b> {getClosureTypeLabel(printBulletin.closure_type)}</Typography>
+              <Typography variant="body2"><b>Période:</b> {formatDate(printBulletin.period_start)} - {formatDate(printBulletin.period_end)}</Typography>
+              <Typography variant="body2"><b>Transactions:</b> {printBulletin.total_transactions}</Typography>
+              <Typography variant="body2"><b>Total TTC:</b> {formatCurrency(printBulletin.total_amount)}</Typography>
+              <Typography variant="body2"><b>TVA collectée:</b> {formatCurrency(printBulletin.total_vat)}</Typography>
+              <Typography variant="body2"><b>TVA 10%:</b> {formatCurrency(printBulletin.vat_breakdown.vat_10?.vat || 0)} (base: {formatCurrency(printBulletin.vat_breakdown.vat_10?.amount || 0)})</Typography>
+              <Typography variant="body2"><b>TVA 20%:</b> {formatCurrency(printBulletin.vat_breakdown.vat_20?.vat || 0)} (base: {formatCurrency(printBulletin.vat_breakdown.vat_20?.amount || 0)})</Typography>
+              <Typography variant="body2"><b>Espèces:</b> {formatCurrency(printBulletin.payment_methods_breakdown.cash || 0)}</Typography>
+              <Typography variant="body2"><b>Carte:</b> {formatCurrency(printBulletin.payment_methods_breakdown.card || 0)}</Typography>
+              <Typography variant="body2"><b>Pourboires:</b> {formatCurrency(printBulletin.tips_total || 0)}</Typography>
+              <Typography variant="body2"><b>Monnaie rendue:</b> {formatCurrency(printBulletin.change_total || 0)}</Typography>
+              <Divider sx={{ my: 1 }} />
+              <Typography variant="caption" color="text.secondary" display="block"><b>Hash de clôture:</b> {printBulletin.closure_hash}</Typography>
+              <Typography variant="caption" color="text.secondary" display="block"><b>Créé le:</b> {formatDate(printBulletin.created_at)}</Typography>
+              {printBulletin.closed_at && (
+                <Typography variant="caption" color="text.secondary" display="block"><b>Clôturé le:</b> {formatDate(printBulletin.closed_at)}</Typography>
+              )}
+              <Typography variant="caption" color="text.secondary" display="block">Conformité: Article 286-I-3 bis du CGI</Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPrintDialogOpen(false)}>Fermer</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
