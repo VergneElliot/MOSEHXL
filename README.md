@@ -68,6 +68,7 @@ This system maintains legal compliance with French regulations:
 - Sequential transaction recording
 - Audit trail preservation
 - Data integrity verification
+- **Legal compliance triggers are always enabled in production**
 
 ## 🔒 Security
 
@@ -75,6 +76,20 @@ This system maintains legal compliance with French regulations:
 - Role-based permissions
 - Encrypted sensitive data
 - Secure database connections
+
+## 🧹 Data Cleanup & Legal Reset
+
+- The project is now production-ready and contains only real data from July 5th, 2025.
+- All test and temporary data has been removed using a secure, legally-compliant process.
+- If you need to perform a legal/production data reset in the future:
+  1. Temporarily disable legal triggers and constraints (see your schema or consult a maintainer).
+  2. Remove unwanted data with SQL scripts.
+  3. Restore all legal triggers and constraints immediately after.
+- **Never perform destructive operations on production data without a full backup and legal review.**
+
+## 📝 README Maintenance
+
+This README will be kept up to date with all major operational, legal, or production changes. If you add new features, compliance requirements, or perform a major data operation, please update this file accordingly.
 
 ## 📝 License
 
