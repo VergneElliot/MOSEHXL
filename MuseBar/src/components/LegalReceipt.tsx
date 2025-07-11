@@ -20,6 +20,7 @@ import {
 
 interface ReceiptItem {
   name: string;
+  product_name?: string;
   quantity: number;
   unit_price: number;
   total_price: number;
@@ -29,15 +30,21 @@ interface ReceiptItem {
   happy_hour_discount_amount: number;
 }
 
+// Update LegalReceiptProps to allow string | number for subtotal_ht and vat in vat_breakdown
 interface LegalReceiptProps {
   order: {
     id: number;
     sequence_number: number;
-    total_amount: number;
-    total_tax: number;
+    total_amount: number | string;
+    total_tax: number | string;
     payment_method: string;
     created_at: string;
     items: ReceiptItem[];
+    vat_breakdown?: {
+      tax_rate: number;
+      vat: number | string;
+      subtotal_ht: number | string;
+    }[];
   };
   businessInfo: {
     name: string;
@@ -47,9 +54,47 @@ interface LegalReceiptProps {
     taxIdentification: string;
     siret: string;
   };
+  receiptType?: 'detailed' | 'summary';
 }
 
-const LegalReceipt: React.FC<LegalReceiptProps> = ({ order, businessInfo }) => {
+// Print CSS for receipts
+const printStyles = `
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  .receipt-print-area, .receipt-print-area * {
+    visibility: visible !important;
+  }
+  .receipt-print-area {
+    position: absolute !important;
+    left: 0; top: 0;
+    width: 80mm !important;
+    min-width: 80mm !important;
+    max-width: 80mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    font-size: 12px !important;
+    box-shadow: none !important;
+  }
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+}
+`;
+if (typeof window !== 'undefined' && document) {
+  if (!document.getElementById('receipt-print-style')) {
+    const style = document.createElement('style');
+    style.id = 'receipt-print-style';
+    style.innerHTML = printStyles;
+    document.head.appendChild(style);
+  }
+}
+
+const LegalReceipt: React.FC<LegalReceiptProps> = ({ order, businessInfo, receiptType = 'detailed' }) => {
+  // Update formatCurrency to accept a number
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
@@ -67,39 +112,198 @@ const LegalReceipt: React.FC<LegalReceiptProps> = ({ order, businessInfo }) => {
     });
   };
 
+  // Defensive: ensure order.items is always an array
+  const items = Array.isArray(order.items) ? order.items : [];
+
   const calculateSubtotal = () => {
-    return order.items.reduce((sum, item) => sum + item.total_price, 0);
+    return items.reduce((sum, item) => sum + item.total_price, 0);
   };
 
   const calculateTotalTax = () => {
-    return order.items.reduce((sum, item) => sum + item.tax_amount, 0);
+    return items.reduce((sum, item) => sum + item.tax_amount, 0);
   };
 
   const getVATBreakdown = () => {
-    const vat10 = order.items
+    const vat10 = items
       .filter(item => Math.abs(item.tax_rate - 10) < 0.1)
       .reduce((sum, item) => sum + item.tax_amount, 0);
     
-    const vat20 = order.items
+    const vat20 = items
       .filter(item => Math.abs(item.tax_rate - 20) < 0.1)
       .reduce((sum, item) => sum + item.tax_amount, 0);
     
     return { vat10, vat20 };
   };
 
-  const vatBreakdown = getVATBreakdown();
+  // Calculate totalVAT and totalHT as follows:
+  const vatBreakdown = Array.isArray(order.vat_breakdown) ? order.vat_breakdown : [];
+  const totalVAT = vatBreakdown.reduce((sum, v) => sum + parseFloat(String(v.vat)), 0);
+  const sousTotalHT = !isNaN(parseFloat(String(order.total_amount))) && !isNaN(totalVAT) ? parseFloat(String(order.total_amount)) - totalVAT : 0;
 
+  if (receiptType === 'summary') {
+    // Summary receipt for company cards - no item details
+    return (
+      <Paper className="receipt-print-area" elevation={3} sx={{ p: 3, maxWidth: 400, mx: 'auto', fontFamily: 'monospace', fontSize: '0.875rem' }}>
+        {/* Header with Business Information */}
+        <Box sx={{ textAlign: 'center', mb: 2 }}>
+          <Business sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
+          <Typography variant="h6" fontWeight="bold">
+            {businessInfo.name}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {businessInfo.address}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Tél: {businessInfo.phone}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {businessInfo.email}
+          </Typography>
+        </Box>
+
+        <Divider sx={{ my: 2 }} />
+
+        {/* Legal Compliance Header */}
+        {/* Removed blue compliance bubble and chip */}
+
+        {/* Receipt Information */}
+        <Box sx={{ mb: 2 }}>
+          <Grid container spacing={1}>
+            <Grid item xs={6}>
+              <Typography variant="body2" fontWeight="bold">
+                N° Ticket:
+              </Typography>
+            </Grid>
+            <Grid item xs={6}>
+              <Typography variant="body2">
+                {order.sequence_number.toString().padStart(6, '0')}
+              </Typography>
+            </Grid>
+            
+            <Grid item xs={6}>
+              <Typography variant="body2" fontWeight="bold">
+                Date/Heure:
+              </Typography>
+            </Grid>
+            <Grid item xs={6}>
+              <Typography variant="body2">
+                {formatDate(order.created_at)}
+              </Typography>
+            </Grid>
+            
+            <Grid item xs={6}>
+              <Typography variant="body2" fontWeight="bold">
+                Mode Paiement:
+              </Typography>
+            </Grid>
+            <Grid item xs={6}>
+              <Typography variant="body2">
+                {order.payment_method === 'card' ? 'Carte Bancaire' : 
+                 order.payment_method === 'cash' ? 'Espèces' : 'Split'}
+              </Typography>
+            </Grid>
+          </Grid>
+        </Box>
+
+        <Divider sx={{ my: 2 }} />
+
+        {/* Summary Information */}
+        <Box sx={{ mb: 2 }}>
+          
+          <Box sx={{ textAlign: 'center', py: 2 }}>
+            <Typography variant="h5" fontWeight="bold" color="primary">
+              TOTAL TTC
+            </Typography>
+            <Typography variant="h4" fontWeight="bold" color="primary">
+              {formatCurrency(parseFloat(String(order.total_amount)))}
+            </Typography>
+          </Box>
+        </Box>
+
+        <Divider sx={{ my: 2 }} />
+
+        {/* VAT Breakdown for Summary */}
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+            BREVET D'IMPÔT SUR LA VALEUR AJOUTÉE (TVA)
+          </Typography>
+          <Grid container spacing={1}>
+            {vatBreakdown.map((v, index) => {
+              // Support both 'tax_rate' and 'rate' for backend compatibility
+              const rate = typeof v.tax_rate === 'number' && !isNaN(v.tax_rate)
+                ? v.tax_rate
+                : (typeof (v as any).rate === 'number' && !isNaN((v as any).rate)
+                  ? (v as any).rate
+                  : '');
+              return (
+                <React.Fragment key={index}>
+                  <Grid item xs={6}>
+                    <Typography variant="body2">
+                      Base HT ({rate}%): {formatCurrency(parseFloat(String(v.subtotal_ht)))}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="body2">
+                      TVA {rate}%: {formatCurrency(parseFloat(String(v.vat)))}
+                    </Typography>
+                  </Grid>
+                </React.Fragment>
+              );
+            })}
+            <Grid item xs={6}>
+              <Typography variant="body2" fontWeight="bold">
+                TVA Totale: {formatCurrency(totalVAT)}
+              </Typography>
+            </Grid>
+            <Grid item xs={6}>
+              <Typography variant="body2">
+                Sous-total HT: {formatCurrency(sousTotalHT)}
+              </Typography>
+            </Grid>
+          </Grid>
+        </Box>
+
+        {/* Legal Information Footer */}
+        <Box sx={{ textAlign: 'center', mt: 3 }}>
+          <Typography variant="caption" color="text.secondary" display="block">
+            <Security sx={{ fontSize: 12, mr: 0.5, verticalAlign: 'middle' }} />
+            Ticket sécurisé - Inaltérable
+          </Typography>
+          
+          <Typography variant="caption" color="text.secondary" display="block">
+            N° SIRET: {businessInfo.siret}
+          </Typography>
+          
+          <Typography variant="caption" color="text.secondary" display="block">
+            N° TVA: {businessInfo.taxIdentification}
+          </Typography>
+          
+          <Typography variant="caption" color="text.secondary" display="block">
+            Registre: MUSEBAR-REG-001
+          </Typography>
+          
+          
+        </Box>
+
+        {/* Compliance Verification */}
+        <Box sx={{ mt: 2, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+          <Typography variant="caption" color="text.secondary">
+            <strong>Vérification d'intégrité:</strong> SHA-256
+          </Typography>
+          <Typography variant="caption" color="text.secondary" display="block">
+            <strong>Chaîne de hachage:</strong> {order.sequence_number.toString().padStart(6, '0')}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" display="block">
+            <strong>Conformité:</strong> Article 286-I-3 bis du CGI
+          </Typography>
+        </Box>
+      </Paper>
+    );
+  }
+
+  // Detailed receipt (original implementation)
   return (
-    <Paper 
-      elevation={3} 
-      sx={{ 
-        p: 3, 
-        maxWidth: 400, 
-        mx: 'auto',
-        fontFamily: 'monospace',
-        fontSize: '0.875rem'
-      }}
-    >
+    <Paper className="receipt-print-area" elevation={3} sx={{ p: 3, maxWidth: 400, mx: 'auto', fontFamily: 'monospace', fontSize: '0.875rem' }}>
       {/* Header with Business Information */}
       <Box sx={{ textAlign: 'center', mb: 2 }}>
         <Business sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
@@ -120,19 +324,7 @@ const LegalReceipt: React.FC<LegalReceiptProps> = ({ order, businessInfo }) => {
       <Divider sx={{ my: 2 }} />
 
       {/* Legal Compliance Header */}
-      <Box sx={{ mb: 2 }}>
-        <Alert severity="info" sx={{ mb: 1 }}>
-          <AlertTitle>Conformité Légale</AlertTitle>
-          Article 286-I-3 bis du CGI
-        </Alert>
-        <Chip 
-          icon={<VerifiedUser />}
-          label="Système de Caisse Sécurisé"
-          color="success"
-          size="small"
-          sx={{ mb: 1 }}
-        />
-      </Box>
+      {/* Removed blue compliance bubble and chip */}
 
       {/* Receipt Information */}
       <Box sx={{ mb: 2 }}>
@@ -181,12 +373,12 @@ const LegalReceipt: React.FC<LegalReceiptProps> = ({ order, businessInfo }) => {
           ARTICLES
         </Typography>
         
-        {order.items.map((item, index) => (
+        {items.map((item, index) => (
           <Box key={index} sx={{ mb: 1 }}>
             <Grid container spacing={1}>
               <Grid item xs={8}>
                 <Typography variant="body2">
-                  {item.name}
+                  {item.product_name || item.name}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   {item.quantity} x {formatCurrency(item.unit_price)}
@@ -212,36 +404,50 @@ const LegalReceipt: React.FC<LegalReceiptProps> = ({ order, businessInfo }) => {
 
       <Divider sx={{ my: 2 }} />
 
+      {/* VAT Breakdown for Detailed */}
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+          BREVET D'IMPÔT SUR LA VALEUR AJOUTÉE (TVA)
+        </Typography>
+        <Grid container spacing={1}>
+          {vatBreakdown.map((v, index) => {
+            // Support both 'tax_rate' and 'rate' for backend compatibility
+            const rate = typeof v.tax_rate === 'number' && !isNaN(v.tax_rate)
+              ? v.tax_rate
+              : (typeof (v as any).rate === 'number' && !isNaN((v as any).rate)
+                ? (v as any).rate
+                : '');
+            return (
+              <React.Fragment key={index}>
+                <Grid item xs={6}>
+                  <Typography variant="body2">
+                    Base HT ({rate}%): {formatCurrency(parseFloat(String(v.subtotal_ht)))}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2">
+                    TVA {rate}%: {formatCurrency(parseFloat(String(v.vat)))}
+                  </Typography>
+                </Grid>
+              </React.Fragment>
+            );
+          })}
+          <Grid item xs={6}>
+            <Typography variant="body2" fontWeight="bold">
+              TVA Totale: {formatCurrency(totalVAT)}
+            </Typography>
+          </Grid>
+          <Grid item xs={6}>
+            <Typography variant="body2">
+              Sous-total HT: {formatCurrency(sousTotalHT)}
+            </Typography>
+          </Grid>
+        </Grid>
+      </Box>
+
       {/* Totals */}
       <Box sx={{ mb: 2 }}>
         <Grid container spacing={1}>
-          <Grid item xs={8}>
-            <Typography variant="body2">Sous-total HT:</Typography>
-          </Grid>
-          <Grid item xs={4} sx={{ textAlign: 'right' }}>
-            <Typography variant="body2">
-              {formatCurrency(calculateSubtotal())}
-            </Typography>
-          </Grid>
-          
-          <Grid item xs={8}>
-            <Typography variant="body2">TVA 10%:</Typography>
-          </Grid>
-          <Grid item xs={4} sx={{ textAlign: 'right' }}>
-            <Typography variant="body2">
-              {formatCurrency(vatBreakdown.vat10)}
-            </Typography>
-          </Grid>
-          
-          <Grid item xs={8}>
-            <Typography variant="body2">TVA 20%:</Typography>
-          </Grid>
-          <Grid item xs={4} sx={{ textAlign: 'right' }}>
-            <Typography variant="body2">
-              {formatCurrency(vatBreakdown.vat20)}
-            </Typography>
-          </Grid>
-          
           <Grid item xs={8}>
             <Typography variant="body2" fontWeight="bold">
               TOTAL TTC:
@@ -249,7 +455,7 @@ const LegalReceipt: React.FC<LegalReceiptProps> = ({ order, businessInfo }) => {
           </Grid>
           <Grid item xs={4} sx={{ textAlign: 'right' }}>
             <Typography variant="body2" fontWeight="bold">
-              {formatCurrency(order.total_amount)}
+              {formatCurrency(parseFloat(String(order.total_amount)))}
             </Typography>
           </Grid>
         </Grid>

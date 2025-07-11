@@ -24,7 +24,11 @@ import {
   Toolbar,
   Badge,
   DialogContentText,
-  Tooltip
+  Tooltip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -35,12 +39,14 @@ import {
   Search as SearchIcon,
   Person as PersonIcon,
   SwapHoriz as SwapHorizIcon,
-  EuroSymbol
+  EuroSymbol,
+  Print
 } from '@mui/icons-material';
 import { Category, Product, OrderItem, LocalSubBill } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { HappyHourService } from '../services/happyHourService';
 import { ApiService } from '../services/apiService';
+import LegalReceipt from './LegalReceipt';
 
 interface POSProps {
   categories: Category[];
@@ -81,6 +87,11 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
   const [changeAmount, setChangeAmount] = useState('');
   const [changeDirection, setChangeDirection] = useState<'card-to-cash' | 'cash-to-card'>('card-to-cash');
   const [changeLoading, setChangeLoading] = useState(false);
+  
+  // Add state for receipt generation
+  const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
+  const [currentReceipt, setCurrentReceipt] = useState<any>(null);
+  const [receiptType, setReceiptType] = useState<'detailed' | 'summary'>('detailed');
   
   const happyHourService = HappyHourService.getInstance();
   const apiService = ApiService.getInstance();
@@ -279,6 +290,60 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
       payments: []
     }));
     setSubBills(bills);
+  };
+
+  // Generate receipt for an order
+  const generateReceipt = async (orderId: number, type: 'detailed' | 'summary' = 'detailed') => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/legal/receipt/${orderId}?type=${type}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate receipt');
+      }
+      
+      const receipt = await response.json();
+      setCurrentReceipt(receipt);
+      setReceiptType(type);
+      setReceiptDialogOpen(true);
+      
+      return receipt;
+    } catch (error) {
+      console.error('Error generating receipt:', error);
+      setSnackbar({ 
+        open: true, 
+        message: 'Erreur lors de la génération du reçu', 
+        severity: 'error' 
+      });
+    }
+  };
+
+  // Handle payment completion with receipt generation
+  const handlePaymentCompletion = async (savedOrder: any) => {
+    try {
+      // Generate detailed receipt by default
+      await generateReceipt(savedOrder.id, 'detailed');
+      
+      // Reset form
+      setCurrentOrder([]);
+      setPaymentDialogOpen(false);
+      setCashAmount('');
+      setCardAmount('');
+      setSubBills([]);
+      onDataUpdate();
+      
+    } catch (error) {
+      console.error('Error in payment completion:', error);
+      // Still reset form even if receipt generation fails
+      setCurrentOrder([]);
+      setPaymentDialogOpen(false);
+      setCashAmount('');
+      setCardAmount('');
+      setSubBills([]);
+      onDataUpdate();
+    }
   };
 
   return (
@@ -1343,6 +1408,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                       message: `Paiement accepté. Rendu: ${(amount - orderCalculations.finalAmount).toFixed(2)}€ - Commande #${savedOrder.id}`, 
                       severity: 'success' 
                     });
+                    await handlePaymentCompletion(savedOrder);
                   } else if (currentPaymentMethod === 'card') {
                     // Handle card payment (exact amount)
                     const savedOrder = await apiService.createOrder({
@@ -1360,6 +1426,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                       message: `Paiement par carte accepté - Commande #${savedOrder.id}`, 
                       severity: 'success' 
                     });
+                    await handlePaymentCompletion(savedOrder);
                   } else if (currentPaymentMethod === 'split') {
                     // Handle split payment
                     const cash = parseFloat(cashAmount) || 0;
@@ -1384,14 +1451,10 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                       message: `Paiement split accepté - Commande #${savedOrder.id}`,
                       severity: 'success'
                     });
+                    await handlePaymentCompletion(savedOrder);
                   }
                   
-                  // Reset form
-                  setCurrentOrder([]);
-                  setPaymentDialogOpen(false);
-                  setCashAmount('');
-                  setCardAmount('');
-                  onDataUpdate();
+                  // Reset form is now handled in handlePaymentCompletion
                   
                 } else if (checkoutMode === 'split-equal' || checkoutMode === 'split-items') {
                   // Validation for split modes
@@ -1447,13 +1510,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                     severity: 'success'
                   });
                   
-                  // Reset form
-                  setCurrentOrder([]);
-                  setPaymentDialogOpen(false);
-                  setSubBills([]);
-                  setCashAmount('');
-                  setCardAmount('');
-                  onDataUpdate();
+                  await handlePaymentCompletion(savedOrder);
                 }
               } catch (error) {
                 console.error('Error processing payment:', error);
@@ -1585,6 +1642,69 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
           >
             Valider
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Receipt Dialog */}
+      <Dialog open={receiptDialogOpen} onClose={() => setReceiptDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ReceiptIcon />
+            Reçu de Paiement
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          {currentReceipt && (
+            <Box sx={{ pt: 2 }}>
+              <Box sx={{ mb: 2 }}>
+                <FormControl sx={{ minWidth: 200 }}>
+                  <InputLabel>Type de reçu</InputLabel>
+                  <Select
+                    value={receiptType}
+                    label="Type de reçu"
+                    onChange={(e) => {
+                      const newType = e.target.value as 'detailed' | 'summary';
+                      setReceiptType(newType);
+                      generateReceipt(currentReceipt.order_id, newType);
+                    }}
+                  >
+                    <MenuItem value="detailed">Reçu détaillé</MenuItem>
+                    <MenuItem value="summary">Reçu simplifié (sans détails)</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+              
+              <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                <LegalReceipt
+                  order={{
+                    id: currentReceipt.order_id,
+                    sequence_number: currentReceipt.sequence_number,
+                    total_amount: currentReceipt.total_amount,
+                    total_tax: currentReceipt.total_tax,
+                    payment_method: currentReceipt.payment_method,
+                    created_at: currentReceipt.created_at,
+                    items: currentReceipt.items || [],
+                    vat_breakdown: currentReceipt.vat_breakdown || []
+                  }}
+                  businessInfo={currentReceipt.business_info}
+                  receiptType={receiptType}
+                />
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            startIcon={<Print />} 
+            variant="outlined"
+            onClick={() => {
+              // Print functionality would go here
+              window.print();
+            }}
+          >
+            Imprimer
+          </Button>
+          <Button onClick={() => setReceiptDialogOpen(false)}>Fermer</Button>
         </DialogActions>
       </Dialog>
 

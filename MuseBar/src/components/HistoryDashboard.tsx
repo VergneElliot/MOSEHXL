@@ -28,7 +28,11 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction
+  ListItemSecondaryAction,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import { 
   BarChart, 
@@ -37,11 +41,12 @@ import {
   CreditCard, 
   Money,
   Cancel as CancelIcon,
-  Warning as WarningIcon
+  Warning as WarningIcon,
+  Print
 } from '@mui/icons-material';
 import { ApiService } from '../services/apiService';
 import { Order } from '../types';
-
+import LegalReceipt from './LegalReceipt';
 
 
 const HistoryDashboard: React.FC = () => {
@@ -65,6 +70,11 @@ const HistoryDashboard: React.FC = () => {
   const [cancelSuccess, setCancelSuccess] = useState('');
   const [cancelError, setCancelError] = useState('');
   
+  // Receipt dialog state
+  const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
+  const [currentReceipt, setCurrentReceipt] = useState<any>(null);
+  const [receiptType, setReceiptType] = useState<'detailed' | 'summary'>('detailed');
+
   const apiService = ApiService.getInstance();
 
   useEffect(() => {
@@ -231,6 +241,20 @@ const HistoryDashboard: React.FC = () => {
   };
 
   const cancellationTotals = calculateCancellationTotals();
+
+  // Function to fetch and show receipt
+  const handleShowReceipt = async (orderId: number, type: 'detailed' | 'summary' = 'detailed') => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/legal/receipt/${orderId}?type=${type}`);
+      if (!response.ok) throw new Error('Failed to fetch receipt');
+      const receipt = await response.json();
+      setCurrentReceipt(receipt);
+      setReceiptType(type);
+      setReceiptDialogOpen(true);
+    } catch (error) {
+      alert('Erreur lors de la génération du reçu');
+    }
+  };
 
   return (
     <Box>
@@ -519,6 +543,17 @@ const HistoryDashboard: React.FC = () => {
                                   {selectedOrder.status === 'completed' && (
                                     <Button
                                       variant="outlined"
+                                      color="success"
+                                      size="small"
+                                      startIcon={<Print />}
+                                      onClick={() => handleShowReceipt(Number(selectedOrder.id), 'detailed')}
+                                    >
+                                      Imprimer le reçu
+                                    </Button>
+                                  )}
+                                  {selectedOrder.status === 'completed' && (
+                                    <Button
+                                      variant="outlined"
                                       color="error"
                                       size="small"
                                       startIcon={<CancelIcon />}
@@ -690,6 +725,65 @@ const HistoryDashboard: React.FC = () => {
           >
             {cancelLoading ? 'Annulation...' : 'Confirmer l\'annulation'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Receipt Dialog */}
+      <Dialog open={receiptDialogOpen} onClose={() => setReceiptDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Print />
+            Reçu de Paiement
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          {currentReceipt && (
+            <Box sx={{ pt: 2 }}>
+              <Box sx={{ mb: 2 }}>
+                <FormControl sx={{ minWidth: 200 }}>
+                  <InputLabel>Type de reçu</InputLabel>
+                  <Select
+                    value={receiptType}
+                    label="Type de reçu"
+                    onChange={(e) => {
+                      const newType = e.target.value as 'detailed' | 'summary';
+                      setReceiptType(newType);
+                      handleShowReceipt(currentReceipt.order_id, newType);
+                    }}
+                  >
+                    <MenuItem value="detailed">Reçu détaillé</MenuItem>
+                    <MenuItem value="summary">Reçu simplifié (sans détails)</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                <LegalReceipt
+                  order={{
+                    id: currentReceipt.order_id,
+                    sequence_number: currentReceipt.sequence_number,
+                    total_amount: currentReceipt.total_amount,
+                    total_tax: currentReceipt.total_tax,
+                    payment_method: currentReceipt.payment_method,
+                    created_at: currentReceipt.created_at,
+                    items: currentReceipt.items || [],
+                    vat_breakdown: currentReceipt.vat_breakdown || []
+                  }}
+                  businessInfo={currentReceipt.business_info}
+                  receiptType={receiptType}
+                />
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            startIcon={<Print />} 
+            variant="outlined"
+            onClick={() => window.print()}
+          >
+            Imprimer
+          </Button>
+          <Button onClick={() => setReceiptDialogOpen(false)}>Fermer</Button>
         </DialogActions>
       </Dialog>
     </Box>

@@ -62,6 +62,18 @@ export interface SubBill {
   created_at: Date;
 }
 
+// Business Settings Model
+export interface BusinessSettings {
+  id: number;
+  name: string;
+  address: string;
+  phone: string;
+  email: string;
+  siret: string;
+  tax_identification: string;
+  updated_at: Date;
+}
+
 // Database models
 export const CategoryModel = {
   async getAll(): Promise<Category[]> {
@@ -421,5 +433,34 @@ export const SubBillModel = {
       [id, ...values]
     );
     return result.rows[0] || null;
+  }
+}; 
+
+export const BusinessSettingsModel = {
+  async get(): Promise<BusinessSettings | null> {
+    const result = await pool.query('SELECT * FROM business_settings ORDER BY updated_at DESC LIMIT 1');
+    return result.rows[0] || null;
+  },
+  async update(settings: Partial<BusinessSettings>): Promise<BusinessSettings | null> {
+    // Only allow updating the latest row, or insert if none exists
+    const existing = await this.get();
+    if (existing) {
+      const updated = {
+        ...existing,
+        ...settings,
+        updated_at: new Date()
+      };
+      await pool.query(
+        `UPDATE business_settings SET name = $1, address = $2, phone = $3, email = $4, siret = $5, tax_identification = $6, updated_at = $7 WHERE id = $8`,
+        [updated.name, updated.address, updated.phone, updated.email, updated.siret, updated.tax_identification, updated.updated_at, existing.id]
+      );
+      return this.get();
+    } else {
+      const inserted = await pool.query(
+        `INSERT INTO business_settings (name, address, phone, email, siret, tax_identification, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+        [settings.name, settings.address, settings.phone, settings.email, settings.siret, settings.tax_identification, new Date()]
+      );
+      return inserted.rows[0];
+    }
   }
 }; 

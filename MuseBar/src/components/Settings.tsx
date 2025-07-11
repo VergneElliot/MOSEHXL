@@ -63,8 +63,20 @@ const Settings: React.FC = () => {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [businessInfo, setBusinessInfo] = useState({
+    name: '',
+    address: '',
+    phone: '',
+    email: '',
+    siret: '',
+    taxIdentification: ''
+  });
+  const [infoLoading, setInfoLoading] = useState(true);
+  const [infoSaving, setInfoSaving] = useState(false);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    loadBusinessInfo();
     loadClosureSettings();
   }, []);
 
@@ -77,6 +89,25 @@ const Settings: React.FC = () => {
       console.error('Error loading closure settings:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadBusinessInfo = async () => {
+    setInfoLoading(true);
+    try {
+      const info = await apiService.getBusinessInfo();
+      setBusinessInfo({
+        name: info.name || '',
+        address: info.address || '',
+        phone: info.phone || '',
+        email: info.email || '',
+        siret: info.siret || '',
+        taxIdentification: info.tax_identification || ''
+      });
+    } catch (error) {
+      setInfoMessage('Erreur lors du chargement des informations du bar');
+    } finally {
+      setInfoLoading(false);
     }
   };
 
@@ -94,6 +125,26 @@ const Settings: React.FC = () => {
     }
   };
 
+  const handleSaveBusinessInfo = async () => {
+    setInfoSaving(true);
+    setInfoMessage(null);
+    try {
+      await apiService.updateBusinessInfo({
+        name: businessInfo.name,
+        address: businessInfo.address,
+        phone: businessInfo.phone,
+        email: businessInfo.email,
+        siret: businessInfo.siret,
+        tax_identification: businessInfo.taxIdentification
+      });
+      setInfoMessage('Informations du bar sauvegardées avec succès');
+    } catch (error) {
+      setInfoMessage('Erreur lors de la sauvegarde des informations du bar');
+    } finally {
+      setInfoSaving(false);
+    }
+  };
+
   const triggerManualCheck = async () => {
     try {
       await apiService.post<any>('/legal/scheduler/trigger');
@@ -103,11 +154,6 @@ const Settings: React.FC = () => {
       console.error('Error triggering manual check:', error);
       alert('Error triggering manual check');
     }
-  };
-
-  const handleSaveSettings = () => {
-    // Ici on pourrait sauvegarder dans localStorage ou une base de données
-    localStorage.setItem('musebar-settings', JSON.stringify(settings));
   };
 
   if (loading) {
@@ -136,8 +182,8 @@ const Settings: React.FC = () => {
               <TextField
                 label="Nom du bar"
                 fullWidth
-                value={settings.barName}
-                onChange={(e) => setSettings(prev => ({ ...prev, barName: e.target.value }))}
+                value={businessInfo.name}
+                onChange={(e) => setBusinessInfo(prev => ({ ...prev, name: e.target.value }))}
                 sx={{ mb: 2 }}
               />
 
@@ -146,16 +192,16 @@ const Settings: React.FC = () => {
                 fullWidth
                 multiline
                 rows={3}
-                value={settings.address}
-                onChange={(e) => setSettings(prev => ({ ...prev, address: e.target.value }))}
+                value={businessInfo.address}
+                onChange={(e) => setBusinessInfo(prev => ({ ...prev, address: e.target.value }))}
                 sx={{ mb: 2 }}
               />
 
               <TextField
                 label="Téléphone"
                 fullWidth
-                value={settings.phone}
-                onChange={(e) => setSettings(prev => ({ ...prev, phone: e.target.value }))}
+                value={businessInfo.phone}
+                onChange={(e) => setBusinessInfo(prev => ({ ...prev, phone: e.target.value }))}
                 sx={{ mb: 2 }}
               />
 
@@ -163,16 +209,24 @@ const Settings: React.FC = () => {
                 label="Email"
                 type="email"
                 fullWidth
-                value={settings.email}
-                onChange={(e) => setSettings(prev => ({ ...prev, email: e.target.value }))}
+                value={businessInfo.email}
+                onChange={(e) => setBusinessInfo(prev => ({ ...prev, email: e.target.value }))}
                 sx={{ mb: 2 }}
               />
 
               <TextField
                 label="Numéro de TVA"
                 fullWidth
-                value={settings.taxIdentification}
-                onChange={(e) => setSettings(prev => ({ ...prev, taxIdentification: e.target.value }))}
+                value={businessInfo.taxIdentification}
+                onChange={(e) => setBusinessInfo(prev => ({ ...prev, taxIdentification: e.target.value }))}
+                sx={{ mb: 2 }}
+              />
+              <TextField
+                label="SIRET"
+                fullWidth
+                value={businessInfo.siret}
+                onChange={(e) => setBusinessInfo(prev => ({ ...prev, siret: e.target.value }))}
+                sx={{ mb: 2 }}
               />
             </CardContent>
           </Card>
@@ -205,11 +259,16 @@ const Settings: React.FC = () => {
               <Button
                 variant="contained"
                 startIcon={<SettingsIcon />}
-                onClick={handleSaveSettings}
+                onClick={handleSaveBusinessInfo}
                 fullWidth
               >
                 Sauvegarder les paramètres
               </Button>
+              {infoMessage && (
+                <Alert severity={infoMessage.includes('succès') ? 'success' : 'error'} sx={{ mt: 2 }}>
+                  {infoMessage}
+                </Alert>
+              )}
             </CardContent>
           </Card>
         </Grid>

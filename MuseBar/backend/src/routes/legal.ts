@@ -5,6 +5,7 @@ import { pool } from '../app';
 import { AuditTrailModel } from '../models/auditTrail';
 import { requireAdmin, requireAuth } from './auth';
 import { ClosureScheduler } from '../utils/closureScheduler';
+import { BusinessSettingsModel } from '../models';
 
 const router = express.Router();
 
@@ -89,6 +90,377 @@ router.post('/closure/daily', async (req, res) => {
   } catch (error) {
     console.error('Error creating daily closure:', error);
     res.status(500).json({ error: 'Failed to create daily closure' });
+  }
+});
+
+// POST create weekly closure bulletin
+router.post('/closure/weekly', async (req, res) => {
+  try {
+    const { date } = req.body;
+    
+    if (!date) {
+      return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
+    }
+    
+    const closureDate = new Date(date);
+    if (isNaN(closureDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid date format' });
+    }
+    
+    const closure = await LegalJournalModel.createWeeklyClosure(closureDate);
+    
+    res.status(201).json({
+      ...closure,
+      compliance_note: 'Weekly closure bulletin created per French fiscal requirements'
+    });
+  } catch (error) {
+    console.error('Error creating weekly closure:', error);
+    res.status(500).json({ error: 'Failed to create weekly closure' });
+  }
+});
+
+// POST create monthly closure bulletin
+router.post('/closure/monthly', async (req, res) => {
+  try {
+    const { date } = req.body;
+    
+    if (!date) {
+      return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
+    }
+    
+    const closureDate = new Date(date);
+    if (isNaN(closureDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid date format' });
+    }
+    
+    const closure = await LegalJournalModel.createMonthlyClosure(closureDate);
+    
+    res.status(201).json({
+      ...closure,
+      compliance_note: 'Monthly closure bulletin created per French fiscal requirements'
+    });
+  } catch (error) {
+    console.error('Error creating monthly closure:', error);
+    res.status(500).json({ error: 'Failed to create monthly closure' });
+  }
+});
+
+// POST create annual closure bulletin
+router.post('/closure/annual', async (req, res) => {
+  try {
+    const { date } = req.body;
+    
+    if (!date) {
+      return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
+    }
+    
+    const closureDate = new Date(date);
+    if (isNaN(closureDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid date format' });
+    }
+    
+    const closure = await LegalJournalModel.createAnnualClosure(closureDate);
+    
+    res.status(201).json({
+      ...closure,
+      compliance_note: 'Annual closure bulletin created per French fiscal requirements'
+    });
+  } catch (error) {
+    console.error('Error creating annual closure:', error);
+    res.status(500).json({ error: 'Failed to create annual closure' });
+  }
+});
+
+// POST create closure bulletin (generic endpoint for all types)
+router.post('/closure/create', async (req, res) => {
+  try {
+    const { date, type } = req.body;
+    
+    if (!date) {
+      return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
+    }
+    
+    if (!type || !['DAILY', 'WEEKLY', 'MONTHLY', 'ANNUAL'].includes(type)) {
+      return res.status(400).json({ 
+        error: 'Valid closure type is required (DAILY, WEEKLY, MONTHLY, ANNUAL)' 
+      });
+    }
+    
+    const closureDate = new Date(date);
+    if (isNaN(closureDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid date format' });
+    }
+    
+    let closure;
+    switch (type) {
+      case 'DAILY':
+        closure = await LegalJournalModel.createDailyClosure(closureDate);
+        break;
+      case 'WEEKLY':
+        closure = await LegalJournalModel.createWeeklyClosure(closureDate);
+        break;
+      case 'MONTHLY':
+        closure = await LegalJournalModel.createMonthlyClosure(closureDate);
+        break;
+      case 'ANNUAL':
+        closure = await LegalJournalModel.createAnnualClosure(closureDate);
+        break;
+      default:
+        return res.status(400).json({ error: 'Invalid closure type' });
+    }
+    
+    res.status(201).json({
+      ...closure,
+      compliance_note: `${type} closure bulletin created per French fiscal requirements`
+    });
+  } catch (error) {
+    console.error(`Error creating ${req.body.type} closure:`, error);
+    res.status(500).json({ error: `Failed to create ${req.body.type} closure` });
+  }
+});
+
+// GET receipt for order (detailed receipt)
+router.get('/receipt/:orderId', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { type = 'detailed' } = req.query; // 'detailed' or 'summary'
+    
+    // Get order with items
+    const orderQuery = `
+      SELECT o.*, 
+             array_agg(oi.*) as items
+      FROM orders o
+      LEFT JOIN order_items oi ON o.id = oi.order_id
+      WHERE o.id = $1
+      GROUP BY o.id
+    `;
+    const orderResult = await pool.query(orderQuery, [orderId]);
+    
+    if (orderResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    
+    const order = orderResult.rows[0];
+    
+    // Fetch order items using OrderItemModel for reliability
+    const { OrderItemModel } = require('../models');
+    const items = await OrderItemModel.getByOrderId(order.id);
+    order.items = items;
+    
+    // Get legal journal entry for this order
+    const journalQuery = `
+      SELECT * FROM legal_journal 
+      WHERE order_id = $1 AND transaction_type = 'SALE'
+      ORDER BY sequence_number DESC
+      LIMIT 1
+    `;
+    const journalResult = await pool.query(journalQuery, [orderId]);
+    const journalEntry = journalResult.rows[0];
+    
+    // Business information (should be configurable)
+    const businessInfo = await BusinessSettingsModel.get();
+    if (!businessInfo) {
+      return res.status(500).json({ error: 'Business info not configured' });
+    }
+    
+    // Calculate VAT breakdown
+    let vatBreakdown: Array<{ rate: number, subtotal_ht: number, vat: number }> = [];
+    let totalVat = 0;
+    let totalHT = 0;
+    if (order.items && Array.isArray(order.items)) {
+      const vatMap: { [rate: number]: { subtotal_ht: number, vat: number } } = {};
+      for (const item of order.items) {
+        // Defensive: parse and default to 0 if missing
+        const rateRaw = item.tax_rate !== undefined && item.tax_rate !== null ? Number(item.tax_rate) : 0;
+        const rate = Math.round(rateRaw); // Group by 10, 20, etc.
+        const vat = item.tax_amount !== undefined && item.tax_amount !== null ? Number(item.tax_amount) : 0;
+        const total_price = item.total_price !== undefined && item.total_price !== null ? Number(item.total_price) : 0;
+        const subtotal_ht = total_price - vat;
+        if (!vatMap[rate]) {
+          vatMap[rate] = { subtotal_ht: 0, vat: 0 };
+        }
+        vatMap[rate].subtotal_ht += subtotal_ht;
+        vatMap[rate].vat += vat;
+        totalVat += vat;
+        totalHT += subtotal_ht;
+      }
+      vatBreakdown = Object.entries(vatMap).map(([rate, vals]) => ({ rate: Number(rate), ...vals }));
+    }
+    // Defensive fallback
+    if (!vatBreakdown.length && journalEntry && journalEntry.vat_amount !== undefined) {
+      totalVat = parseFloat(journalEntry.vat_amount);
+    }
+
+    if (type === 'summary') {
+      // Summary receipt (no item details, but VAT breakdown if multiple rates)
+      const summaryReceipt = {
+        order_id: order.id,
+        sequence_number: journalEntry?.sequence_number || 0,
+        total_amount: order.total_amount,
+        total_tax: totalVat,
+        vat_breakdown: vatBreakdown,
+        payment_method: order.payment_method,
+        created_at: order.created_at,
+        business_info: businessInfo,
+        receipt_type: 'summary',
+        compliance_info: {
+          legal_reference: 'Article 286-I-3 bis du CGI',
+          receipt_hash: journalEntry?.current_hash || '',
+          register_id: 'MUSEBAR-REG-001'
+        }
+      };
+      return res.json(summaryReceipt);
+    } else {
+      // Detailed receipt (with item details and VAT breakdown)
+      const detailedReceipt = {
+        order_id: order.id,
+        sequence_number: journalEntry?.sequence_number || 0,
+        total_amount: order.total_amount,
+        total_tax: totalVat,
+        vat_breakdown: vatBreakdown,
+        payment_method: order.payment_method,
+        created_at: order.created_at,
+        items: order.items || [],
+        tips: order.tips || 0,
+        change: order.change || 0,
+        business_info: businessInfo,
+        receipt_type: 'detailed',
+        compliance_info: {
+          legal_reference: 'Article 286-I-3 bis du CGI',
+          receipt_hash: journalEntry?.current_hash || '',
+          register_id: 'MUSEBAR-REG-001'
+        }
+      };
+      return res.json(detailedReceipt);
+    }
+    
+  } catch (error) {
+    console.error('Error generating receipt:', error);
+    res.status(500).json({ error: 'Failed to generate receipt' });
+  }
+});
+
+// POST generate receipt (for immediate generation after payment)
+router.post('/receipt/generate', async (req, res) => {
+  try {
+    const { order_id, receipt_type = 'detailed' } = req.body;
+    
+    if (!order_id) {
+      return res.status(400).json({ error: 'Order ID is required' });
+    }
+    
+    // Get order with items
+    const orderQuery = `
+      SELECT o.*, 
+             array_agg(oi.*) as items
+      FROM orders o
+      LEFT JOIN order_items oi ON o.id = oi.order_id
+      WHERE o.id = $1
+      GROUP BY o.id
+    `;
+    const orderResult = await pool.query(orderQuery, [order_id]);
+    
+    if (orderResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    
+    const order = orderResult.rows[0];
+    
+    // Fetch order items using OrderItemModel for reliability
+    const { OrderItemModel } = require('../models');
+    const items = await OrderItemModel.getByOrderId(order.id);
+    order.items = items;
+
+    // Get legal journal entry for this order
+    const journalQuery = `
+      SELECT * FROM legal_journal 
+      WHERE order_id = $1 AND transaction_type = 'SALE'
+      ORDER BY sequence_number DESC
+      LIMIT 1
+    `;
+    const journalResult = await pool.query(journalQuery, [order_id]);
+    const journalEntry = journalResult.rows[0];
+
+    // Business information (should be configurable)
+    const businessInfo = await BusinessSettingsModel.get();
+    if (!businessInfo) {
+      return res.status(500).json({ error: 'Business info not configured' });
+    }
+
+    // Calculate VAT breakdown
+    let vatBreakdown: Array<{ rate: number, subtotal_ht: number, vat: number }> = [];
+    let totalVat = 0;
+    let totalHT = 0;
+    if (order.items && Array.isArray(order.items)) {
+      const vatMap: { [rate: number]: { subtotal_ht: number, vat: number } } = {};
+      for (const item of order.items) {
+        // Defensive: parse and default to 0 if missing
+        const rateRaw = item.tax_rate !== undefined && item.tax_rate !== null ? Number(item.tax_rate) : 0;
+        const rate = Math.round(rateRaw); // Group by 10, 20, etc.
+        const vat = item.tax_amount !== undefined && item.tax_amount !== null ? Number(item.tax_amount) : 0;
+        const total_price = item.total_price !== undefined && item.total_price !== null ? Number(item.total_price) : 0;
+        const subtotal_ht = total_price - vat;
+        if (!vatMap[rate]) {
+          vatMap[rate] = { subtotal_ht: 0, vat: 0 };
+        }
+        vatMap[rate].subtotal_ht += subtotal_ht;
+        vatMap[rate].vat += vat;
+        totalVat += vat;
+        totalHT += subtotal_ht;
+      }
+      vatBreakdown = Object.entries(vatMap).map(([rate, vals]) => ({ rate: Number(rate), ...vals }));
+    }
+    // Defensive fallback
+    if (!vatBreakdown.length && journalEntry && journalEntry.vat_amount !== undefined) {
+      totalVat = parseFloat(journalEntry.vat_amount);
+    }
+
+    if (receipt_type === 'summary') {
+      // Summary receipt (no item details, but VAT breakdown if multiple rates)
+      const summaryReceipt = {
+        order_id: order.id,
+        sequence_number: journalEntry?.sequence_number || 0,
+        total_amount: order.total_amount,
+        total_tax: totalVat,
+        vat_breakdown: vatBreakdown,
+        payment_method: order.payment_method,
+        created_at: order.created_at,
+        business_info: businessInfo,
+        receipt_type: 'summary',
+        compliance_info: {
+          legal_reference: 'Article 286-I-3 bis du CGI',
+          receipt_hash: journalEntry?.current_hash || '',
+          register_id: 'MUSEBAR-REG-001'
+        }
+      };
+      return res.json(summaryReceipt);
+    } else {
+      // Detailed receipt (with item details and VAT breakdown)
+      const detailedReceipt = {
+        order_id: order.id,
+        sequence_number: journalEntry?.sequence_number || 0,
+        total_amount: order.total_amount,
+        total_tax: totalVat,
+        vat_breakdown: vatBreakdown,
+        payment_method: order.payment_method,
+        created_at: order.created_at,
+        items: order.items || [],
+        tips: order.tips || 0,
+        change: order.change || 0,
+        business_info: businessInfo,
+        receipt_type: 'detailed',
+        compliance_info: {
+          legal_reference: 'Article 286-I-3 bis du CGI',
+          receipt_hash: journalEntry?.current_hash || '',
+          register_id: 'MUSEBAR-REG-001'
+        }
+      };
+      return res.json(detailedReceipt);
+    }
+    
+  } catch (error) {
+    console.error('Error generating receipt:', error);
+    res.status(500).json({ error: 'Failed to generate receipt' });
   }
 });
 
@@ -1068,6 +1440,27 @@ router.post('/settings/closure', async (req, res) => {
   } catch (error) {
     console.error('Error updating closure settings:', error);
     res.status(500).json({ error: 'Failed to update closure settings' });
+  }
+});
+
+// GET business info
+router.get('/business-info', async (req, res) => {
+  try {
+    const info = await BusinessSettingsModel.get();
+    if (!info) return res.status(404).json({ error: 'Business info not set' });
+    res.json(info);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch business info' });
+  }
+});
+
+// PUT update business info
+router.put('/business-info', async (req, res) => {
+  try {
+    const updated = await BusinessSettingsModel.update(req.body);
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update business info' });
   }
 });
 
