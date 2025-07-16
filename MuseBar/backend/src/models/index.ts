@@ -5,6 +5,7 @@ export interface Category {
   id: number;
   name: string;
   default_tax_rate: number;
+  color: string;
   is_active: boolean;
   created_at: Date;
   updated_at: Date;
@@ -50,6 +51,7 @@ export interface OrderItem {
   happy_hour_applied: boolean;
   happy_hour_discount_amount: number;
   sub_bill_id?: number;
+  description?: string; // Description for special items like Divers
   created_at: Date;
 }
 
@@ -96,26 +98,23 @@ export const CategoryModel = {
     return result.rows[0] || null;
   },
 
-  async create(name: string, default_tax_rate: number): Promise<Category> {
+  async create(name: string, default_tax_rate: number, color: string = '#1976d2'): Promise<Category> {
     const result = await pool.query(
-      'INSERT INTO categories (name, default_tax_rate, is_active) VALUES ($1, $2, TRUE) RETURNING *',
-      [name, default_tax_rate]
+      'INSERT INTO categories (name, default_tax_rate, color, is_active) VALUES ($1, $2, $3, TRUE) RETURNING *',
+      [name, default_tax_rate, color]
     );
     return result.rows[0];
   },
 
-  async update(id: number, name: string, default_tax_rate: number): Promise<Category | null> {
+  async update(id: number, name: string, default_tax_rate: number, color: string): Promise<Category | null> {
     const result = await pool.query(
-      'UPDATE categories SET name = $1, default_tax_rate = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 AND is_active = TRUE RETURNING *',
-      [name, default_tax_rate, id]
+      'UPDATE categories SET name = $1, default_tax_rate = $2, color = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 AND is_active = TRUE RETURNING *',
+      [name, default_tax_rate, color, id]
     );
     return result.rows[0] || null;
   },
 
   async delete(id: number): Promise<{ deleted: boolean; action: 'hard' | 'soft'; reason?: string }> {
-    console.log('=== CATEGORY SMART DELETE WITH CASCADE ===');
-    console.log('Category ID:', id);
-    
     // Check if any products in this category were ever used in orders
     const orderHistoryResult = await pool.query(`
       SELECT COUNT(DISTINCT oi.product_id) as products_in_orders
@@ -125,17 +124,14 @@ export const CategoryModel = {
     `, [id]);
     
     const productsInOrderHistory = parseInt(orderHistoryResult.rows[0].products_in_orders, 10);
-    console.log('Products from this category used in orders:', productsInOrderHistory);
     
     // Get all products in this category (active + archived) for cascading
     const categoryProductsResult = await pool.query('SELECT id, name, is_active FROM products WHERE category_id = $1', [id]);
     const categoryProducts = categoryProductsResult.rows;
-    console.log('Products in category to cascade:', categoryProducts.length);
     
     if (productsInOrderHistory > 0) {
       // Soft delete: category was part of order history, must be preserved for legal compliance
       // CASCADE: Also archive all products in this category
-      console.log('Soft deleting category and cascading to products - has order history');
       
       // Archive the category
       const categoryResult = await pool.query(
@@ -149,10 +145,7 @@ export const CategoryModel = {
           'UPDATE products SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP WHERE category_id = $1',
           [id]
         );
-        console.log(`Cascaded archive to ${categoryProducts.length} products`);
       }
-      
-      console.log('=== END CATEGORY SMART DELETE WITH CASCADE ===');
       return { 
         deleted: (categoryResult.rowCount || 0) > 0, 
         action: 'soft',
@@ -174,7 +167,6 @@ export const CategoryModel = {
       `, [id]);
       
       if (productOrderHistoryResult.rows.length > 0) {
-        console.log('Some products have order history, falling back to soft delete');
         // Fall back to soft delete if individual products have order history
         const categoryResult = await pool.query(
           'UPDATE categories SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *',
@@ -186,7 +178,6 @@ export const CategoryModel = {
           [id]
         );
         
-        console.log('=== END CATEGORY SMART DELETE WITH CASCADE ===');
         return { 
           deleted: (categoryResult.rowCount || 0) > 0, 
           action: 'soft',
@@ -197,13 +188,10 @@ export const CategoryModel = {
       // Hard delete products first, then category
       if (categoryProducts.length > 0) {
         await pool.query('DELETE FROM products WHERE category_id = $1', [id]);
-        console.log(`Cascaded hard delete to ${categoryProducts.length} products`);
       }
       
       // Hard delete the category
       const categoryResult = await pool.query('DELETE FROM categories WHERE id = $1', [id]);
-      
-      console.log('=== END CATEGORY SMART DELETE WITH CASCADE ===');
       return { 
         deleted: (categoryResult.rowCount || 0) > 0, 
         action: 'hard',
@@ -213,9 +201,6 @@ export const CategoryModel = {
   },
 
   async restore(id: number): Promise<boolean> {
-    console.log('=== CATEGORY RESTORE WITH CASCADE ===');
-    console.log('Category ID:', id);
-    
     // Restore the category
     const categoryResult = await pool.query(
       'UPDATE categories SET is_active = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *',
@@ -229,15 +214,9 @@ export const CategoryModel = {
         [id]
       );
       
-      const restoredProducts = productsResult.rows;
-      console.log(`Cascaded restore to ${restoredProducts.length} products:`, restoredProducts.map(p => p.name));
-      console.log('=== END CATEGORY RESTORE WITH CASCADE ===');
-      
       return true;
     }
     
-    console.log('Category restore failed');
-    console.log('=== END CATEGORY RESTORE WITH CASCADE ===');
     return false;
   }
 };
@@ -381,9 +360,9 @@ export const OrderItemModel = {
 
   async create(item: Omit<OrderItem, 'id' | 'created_at'>): Promise<OrderItem> {
     const result = await pool.query(`
-      INSERT INTO order_items (order_id, product_id, product_name, quantity, unit_price, total_price, tax_rate, tax_amount, happy_hour_applied, happy_hour_discount_amount, sub_bill_id) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *
-    `, [item.order_id, item.product_id, item.product_name, item.quantity, item.unit_price, item.total_price, item.tax_rate, item.tax_amount, item.happy_hour_applied, item.happy_hour_discount_amount, item.sub_bill_id]);
+      INSERT INTO order_items (order_id, product_id, product_name, quantity, unit_price, total_price, tax_rate, tax_amount, happy_hour_applied, happy_hour_discount_amount, sub_bill_id, description) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *
+    `, [item.order_id, item.product_id, item.product_name, item.quantity, item.unit_price, item.total_price, item.tax_rate, item.tax_amount, item.happy_hour_applied, item.happy_hour_discount_amount, item.sub_bill_id, item.description]);
     return result.rows[0];
   },
 

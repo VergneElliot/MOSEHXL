@@ -1,6 +1,7 @@
 import { pool } from '../app';
 import { LegalJournalModel } from '../models/legalJournal';
 import { AuditTrailModel } from '../models/auditTrail';
+import moment from 'moment-timezone';
 
 export class ClosureScheduler {
   private static interval: NodeJS.Timeout | null = null;
@@ -129,20 +130,24 @@ export class ClosureScheduler {
   // Execute automatic closure
   static async executeAutomaticClosure(now: Date) {
     try {
-      const today = new Date(now);
-      today.setHours(0, 0, 0, 0);
-      
-      // Check if there are any transactions today
-      const transactionsQuery = `
-        SELECT COUNT(*) as count FROM legal_journal 
-        WHERE DATE(timestamp) = $1 
-        AND transaction_type = 'SALE'
-      `;
-      const transactionsResult = await pool.query(transactionsQuery, [today.toISOString().split('T')[0]]);
-      const transactionCount = parseInt(transactionsResult.rows[0].count);
-      
-      // Create closure bulletin
-      const closureBulletin = await LegalJournalModel.createDailyClosure(today);
+      // Fetch closure settings
+      const settings = await this.getClosureSettings();
+      const closureTime = settings.daily_closure_time || '02:00';
+      const timezone = settings.timezone || 'Europe/Paris';
+
+      // Determine which business day to close
+      // If closure time is in the AM and now is after closure time, close previous day
+      const nowTz = moment.tz(now, timezone);
+      const closureHour = parseInt(closureTime.split(':')[0], 10);
+      let businessDay = nowTz.clone();
+      if (closureHour < 12 && nowTz.hour() < closureHour) {
+        // Before closure time, close previous day
+        businessDay = businessDay.subtract(1, 'day');
+      }
+      businessDay.set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
+
+      // Create closure bulletin for the correct business day
+      const closureBulletin = await LegalJournalModel.createDailyClosure(businessDay.toDate());
       
       // Log the automatic closure
       await AuditTrailModel.logAction({
@@ -151,8 +156,8 @@ export class ClosureScheduler {
         resource_id: closureBulletin.id.toString(),
         action_details: {
           closure_type: 'DAILY',
-          period_start: today.toISOString(),
-          transaction_count: transactionCount,
+          period_start: businessDay.toISOString(),
+          transaction_count: closureBulletin.total_transactions,
           total_amount: closureBulletin.total_amount,
           closure_time: now.toISOString(),
           trigger: 'AUTOMATIC'
@@ -161,8 +166,8 @@ export class ClosureScheduler {
         user_agent: 'ClosureScheduler'
       });
 
-      console.log(`✅ Automatic closure completed for ${today.toISOString().split('T')[0]}`);
-      console.log(`   - Transactions: ${transactionCount}`);
+      console.log(`✅ Automatic closure completed for ${businessDay.format('YYYY-MM-DD')}`);
+      console.log(`   - Transactions: ${closureBulletin.total_transactions}`);
       console.log(`   - Total amount: €${closureBulletin.total_amount}`);
       console.log(`   - Bulletin ID: ${closureBulletin.id}`);
       

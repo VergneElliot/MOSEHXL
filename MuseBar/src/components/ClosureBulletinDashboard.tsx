@@ -98,6 +98,8 @@ const ClosureBulletinDashboard: React.FC = () => {
   // Add state for print dialog
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [printBulletin, setPrintBulletin] = useState<ClosureBulletin | null>(null);
+  const [monthlyStats, setMonthlyStats] = useState<any>(null);
+  const [monthlyStatsError, setMonthlyStatsError] = useState<string | null>(null);
 
   const apiService = ApiService.getInstance();
 
@@ -105,6 +107,7 @@ const ClosureBulletinDashboard: React.FC = () => {
     loadBulletins();
     loadTodayStatus();
     loadClosureSettings();
+    loadMonthlyStats();
   }, []);
 
   const loadBulletins = async () => {
@@ -146,6 +149,17 @@ const ClosureBulletinDashboard: React.FC = () => {
       }
     } catch (err) {
       console.error('Error loading closure settings:', err);
+    }
+  };
+
+  const loadMonthlyStats = async () => {
+    try {
+      setMonthlyStatsError(null);
+      const stats = await apiService.getLiveMonthlyStats();
+      setMonthlyStats(stats);
+    } catch (err) {
+      setMonthlyStats(null);
+      setMonthlyStatsError('Impossible de charger les statistiques mensuelles en direct.');
     }
   };
 
@@ -238,7 +252,7 @@ const ClosureBulletinDashboard: React.FC = () => {
   );
 
   // Defensive reduce for stats
-  const totalStats = bulletins.reduce((acc, bulletin) => {
+  const totalStats = bulletins.filter(Boolean).reduce((acc, bulletin) => {
     if (!bulletin || typeof bulletin.total_amount !== 'number' || typeof bulletin.total_transactions !== 'number' || typeof bulletin.total_vat !== 'number') {
       return acc;
     }
@@ -297,6 +311,40 @@ const ClosureBulletinDashboard: React.FC = () => {
 
   return (
     <Box sx={{ p: 3 }}>
+      {/* Monthly Stats Card */}
+      <Card sx={{ mb: 3, bgcolor: 'info.lighter' }}>
+        <CardContent>
+          <Typography variant="h5" color="info.main" gutterBottom>
+            Statistiques du mois en cours
+          </Typography>
+          {monthlyStats ? (
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={2.4}>
+                <Typography variant="body2">Transactions</Typography>
+                <Typography variant="h6" color="success.main">{monthlyStats.total_transactions}</Typography>
+              </Grid>
+              <Grid item xs={12} md={2.4}>
+                <Typography variant="body2">Chiffre d'affaires</Typography>
+                <Typography variant="h6" color="warning.main">{formatCurrency(monthlyStats.total_amount)}</Typography>
+              </Grid>
+              <Grid item xs={12} md={2.4}>
+                <Typography variant="body2">TVA collectée</Typography>
+                <Typography variant="h6" color="error.main">{formatCurrency(monthlyStats.total_vat)}</Typography>
+              </Grid>
+              <Grid item xs={12} md={2.4}>
+                <Typography variant="body2">Pourboires</Typography>
+                <Typography variant="h6" color="info.main">{formatCurrency(monthlyStats.tips_total || 0)}</Typography>
+              </Grid>
+              <Grid item xs={12} md={2.4}>
+                <Typography variant="body2">Monnaie rendue</Typography>
+                <Typography variant="h6" color="secondary.main">{formatCurrency(monthlyStats.change_total || 0)}</Typography>
+              </Grid>
+            </Grid>
+          ) : (
+            <Alert severity="warning" sx={{ mt: 2 }}>{monthlyStatsError}</Alert>
+          )}
+        </CardContent>
+      </Card>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Box>
           <Typography variant="h4" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -474,62 +522,65 @@ const ClosureBulletinDashboard: React.FC = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredBulletins.map((bulletin) => (
-                    <TableRow key={bulletin.id} hover>
-                      <TableCell>
-                        <Chip 
-                          label={getClosureTypeLabel(bulletin.closure_type)}
-                          color={getClosureTypeColor(bulletin.closure_type)}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {formatDateShort(bulletin.period_start)} - {formatDateShort(bulletin.period_end)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">
-                        <Typography variant="body2" fontWeight="medium">
-                          {bulletin.total_transactions}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">
-                        <Typography variant="body2" fontWeight="medium">
-                          {formatCurrency(bulletin.total_amount)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">
-                        <Typography variant="body2" fontWeight="medium" color="info.main">
-                          {formatCurrency(bulletin.tips_total || 0)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">
-                        <Typography variant="body2" fontWeight="medium" color="secondary.main">
-                          {formatCurrency(bulletin.change_total || 0)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip 
-                          icon={bulletin.is_closed ? <Lock /> : <Schedule />}
-                          label={bulletin.is_closed ? 'Clôturé' : 'En cours'}
-                          color={bulletin.is_closed ? 'success' : 'warning'}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Button
-                          size="small"
-                          startIcon={<Visibility />}
-                          onClick={() => {
-                            setSelectedBulletin(bulletin);
-                            setShowDetailsDialog(true);
-                          }}
-                        >
-                          Détails
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  filteredBulletins.filter(Boolean).map((bulletin) => {
+                    if (!bulletin || !bulletin.closure_type) return null;
+                    return (
+                      <TableRow key={bulletin.id} hover>
+                        <TableCell>
+                          <Chip 
+                            label={getClosureTypeLabel(bulletin.closure_type)}
+                            color={getClosureTypeColor(bulletin.closure_type)}
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {formatDateShort(bulletin.period_start)} - {formatDateShort(bulletin.period_end)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography variant="body2" fontWeight="medium">
+                            {bulletin.total_transactions}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography variant="body2" fontWeight="medium">
+                            {formatCurrency(bulletin.total_amount)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography variant="body2" fontWeight="medium" color="info.main">
+                            {formatCurrency(bulletin.tips_total || 0)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography variant="body2" fontWeight="medium" color="secondary.main">
+                            {formatCurrency(bulletin.change_total || 0)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip 
+                            icon={bulletin.is_closed ? <Lock /> : <Schedule />}
+                            label={bulletin.is_closed ? 'Clôturé' : 'En cours'}
+                            color={bulletin.is_closed ? 'success' : 'warning'}
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Button
+                            size="small"
+                            startIcon={<Visibility />}
+                            onClick={() => {
+                              setSelectedBulletin(bulletin);
+                              setShowDetailsDialog(true);
+                            }}
+                          >
+                            Détails
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

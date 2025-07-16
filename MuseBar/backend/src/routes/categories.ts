@@ -61,7 +61,7 @@ router.get('/:id', async (req, res) => {
 // POST create new category
 router.post('/', requireAuth, async (req, res) => {
   try {
-    const { name, default_tax_rate } = req.body;
+    const { name, default_tax_rate, color } = req.body;
 
     if (!name || typeof name !== 'string') {
       return res.status(400).json({ error: 'Category name is required' });
@@ -71,7 +71,7 @@ router.post('/', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Default tax rate is required and must be a number' });
     }
 
-    const category = await CategoryModel.create(name, default_tax_rate);
+    const category = await CategoryModel.create(name, default_tax_rate, color || '#1976d2');
 
     // Log audit trail
     const ip = req.ip;
@@ -82,7 +82,7 @@ router.post('/', requireAuth, async (req, res) => {
       action_type: 'CREATE_CATEGORY',
       resource_type: 'CATEGORY',
       resource_id: String(category.id),
-      action_details: { name, default_tax_rate },
+      action_details: { name, default_tax_rate, color },
       ip_address: ip,
       user_agent: userAgent
     });
@@ -102,7 +102,7 @@ router.put('/:id', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid category ID' });
     }
 
-    const { name, default_tax_rate } = req.body;
+    const { name, default_tax_rate, color } = req.body;
 
     if (!name || typeof name !== 'string') {
       return res.status(400).json({ error: 'Category name is required' });
@@ -112,7 +112,7 @@ router.put('/:id', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Default tax rate is required and must be a number' });
     }
 
-    const category = await CategoryModel.update(id, name, default_tax_rate);
+    const category = await CategoryModel.update(id, name, default_tax_rate, color || '#1976d2');
     if (!category) {
       return res.status(404).json({ error: 'Category not found' });
     }
@@ -126,7 +126,7 @@ router.put('/:id', requireAuth, async (req, res) => {
       action_type: 'UPDATE_CATEGORY',
       resource_type: 'CATEGORY',
       resource_id: String(id),
-      action_details: { name, default_tax_rate },
+      action_details: { name, default_tax_rate, color },
       ip_address: ip,
       user_agent: userAgent
     });

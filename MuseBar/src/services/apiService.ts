@@ -103,7 +103,8 @@ export class ApiService {
       method: 'POST',
       body: JSON.stringify({
         name: category.name,
-        default_tax_rate: 20.0
+        default_tax_rate: 20.0,
+        color: category.color || '#1976d2'
       }),
     });
 
@@ -111,7 +112,7 @@ export class ApiService {
       id: result.id.toString(),
       name: result.name,
       description: category.description,
-      color: category.color,
+      color: result.color || '#1976d2',
       isActive: result.is_active !== false,
       createdAt: new Date(result.created_at),
       updatedAt: new Date(result.updated_at)
@@ -123,7 +124,8 @@ export class ApiService {
       method: 'PUT',
       body: JSON.stringify({
         name: category.name,
-        default_tax_rate: 20.0
+        default_tax_rate: 20.0,
+        color: category.color || '#1976d2'
       }),
     });
 
@@ -131,7 +133,7 @@ export class ApiService {
       id: result.id.toString(),
       name: result.name,
       description: category.description || '',
-      color: category.color || '#1976d2',
+      color: result.color || '#1976d2',
       isActive: result.is_active !== false,
       createdAt: new Date(result.created_at),
       updatedAt: new Date(result.updated_at)
@@ -414,6 +416,16 @@ export class ApiService {
       method: 'PUT',
       body: JSON.stringify(data)
     });
+  }
+
+  // Closure Bulletins
+  async getLatestMonthlyClosureBulletin(): Promise<any> {
+    return this.request<any>('/legal/closure/monthly-latest');
+  }
+
+  // Live monthly stats (not based on closure)
+  async getLiveMonthlyStats(): Promise<any> {
+    return this.request<any>('/legal/stats/monthly-live');
   }
 }
 
