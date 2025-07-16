@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { pool } from '../app';
+import moment from 'moment-timezone';
 
 export interface JournalEntry {
   id: number;
@@ -167,28 +168,62 @@ export class LegalJournalModel {
   }
 
   // Create daily closure bulletin
-  static async createDailyClosure(date: Date): Promise<ClosureBulletin> {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+  static async createDailyClosure(date: Date, force = false): Promise<ClosureBulletin> {
+    // Fetch closure settings
+    const settingsResult = await pool.query('SELECT setting_key, setting_value FROM closure_settings');
+    const settings: { [key: string]: string } = {};
+    settingsResult.rows.forEach(row => {
+      settings[row.setting_key] = row.setting_value;
+    });
+    const closureTime = settings.daily_closure_time || '02:00';
+    const timezone = settings.timezone || 'Europe/Paris';
+
+    // Calculate business day period
+    const { start, end } = getBusinessDayPeriod(date, closureTime, timezone);
+
+    // Check for existing closure for this period and type
+    const existingQuery = `SELECT * FROM closure_bulletins WHERE closure_type = 'DAILY' AND period_start::timestamp <= $2::timestamp AND period_end::timestamp >= $1::timestamp`;
+    const existing = await pool.query(existingQuery, [start, end]);
+    if (existing.rows.length > 0) {
+      // Duplicate closure check - existing closures found
+    }
+    if (existing.rows.length > 0 && !force) {
+      const debugInfo = existing.rows.map(row => `${row.period_start} to ${row.period_end}`).join('; ');
+      throw new Error(`Closure bulletin already exists for this business day. Existing: ${debugInfo}. Use force=true to override.`);
+    }
 
     // Get all orders for the period to calculate proper breakdowns
     const ordersResult = await pool.query(
       `SELECT * FROM orders WHERE created_at >= $1 AND created_at <= $2 ORDER BY created_at`,
-      [startOfDay, endOfDay]
+      [start, end]
     );
     const orders = ordersResult.rows;
 
-    // Separate regular sales from change operations
-    const salesOrders = orders.filter(order => order.items && order.items.length > 0);
-    const changeOrders = orders.filter(order => 
-      order.items && order.items.length === 0 && 
-      order.total_amount === 0 && 
-      order.total_tax === 0 && 
-      order.change > 0 &&
-      order.notes && order.notes.includes('Changement de caisse')
+
+
+    // Populate items for each order (similar to orders API)
+    const { OrderItemModel } = require('../models');
+    const ordersWithItems = await Promise.all(
+      orders.map(async (order) => {
+        const items = await OrderItemModel.getByOrderId(order.id);
+        return {
+          ...order,
+          items: Array.isArray(items) ? items : [] // Always set items as an array
+        };
+      })
     );
+
+    // Separate regular sales from change operations
+    const salesOrders = ordersWithItems.filter(order => order.items && order.items.length > 0);
+    const changeOrders = ordersWithItems.filter(order => 
+      (!order.items || order.items.length === 0) &&
+      parseFloat(order.total_amount || '0') === 0 &&
+      parseFloat(order.total_tax || '0') === 0 &&
+      parseFloat(order.change || '0') > 0 &&
+      order.notes && (order.notes.includes('Changement de caisse') || order.notes.includes('Faire de la Monnaie'))
+    );
+
+
 
     // Calculate sales totals (excluding change operations)
     const totalTransactions = salesOrders.length;
@@ -224,14 +259,18 @@ export class LegalJournalModel {
           const subAmount = parseFloat(subBill.amount || '0');
           paymentBreakdown[subBill.payment_method] += subAmount;
         });
+        // Only add tip ONCE for split payments
+        if (tips > 0) {
+          paymentBreakdown.card += tips;
+          paymentBreakdown.cash -= tips;
+        }
       } else {
         paymentBreakdown[order.payment_method] += amount;
-      }
-
-      // Handle tips: subtract from cash, add to card
-      if (tips > 0) {
-        paymentBreakdown.cash -= tips;
-        paymentBreakdown.card += tips;
+        // Handle tips: add to card (customer pays tip), subtract from cash (you give cash to staff)
+        if (tips > 0) {
+          paymentBreakdown.card += tips;
+          paymentBreakdown.cash -= tips;
+        }
       }
 
       // Handle change: affects the payment method breakdown
@@ -256,26 +295,30 @@ export class LegalJournalModel {
       }
     }
 
+
+
     // Process change operations (affect payment breakdown but not sales totals)
     changeOrders.forEach(order => {
       const changeAmount = parseFloat(order.change || '0');
       if (order.payment_method === 'cash') {
-        // Cash → Card: subtract from cash, add to card
-        paymentBreakdown.cash -= changeAmount;
+        // Card → Cash: customer pays on card, you give cash back
         paymentBreakdown.card += changeAmount;
+        paymentBreakdown.cash -= changeAmount;
       } else if (order.payment_method === 'card') {
-        // Card → Cash: subtract from card, add to cash
-        paymentBreakdown.card -= changeAmount;
+        // Cash → Card: customer pays cash, you credit card
         paymentBreakdown.cash += changeAmount;
+        paymentBreakdown.card -= changeAmount;
       }
     });
+
+
 
     // Calculate tips and change totals
     const tipsTotal = orders.reduce((sum, order) => sum + parseFloat(order.tips || '0'), 0);
     const changeTotal = orders.reduce((sum, order) => sum + parseFloat(order.change || '0'), 0);
 
     // Get legal journal entries for sequence calculation
-    const entries = await this.getEntriesForPeriod(startOfDay, endOfDay);
+    const entries = await this.getEntriesForPeriod(start, end);
     const firstSequence = entries.length > 0 ? Math.min(...entries.map((e: any) => e.sequence_number)) : 0;
     const lastSequence = entries.length > 0 ? Math.max(...entries.map((e: any) => e.sequence_number)) : 0;
 
@@ -294,8 +337,8 @@ export class LegalJournalModel {
 
     const values = [
       'DAILY',
-      startOfDay,
-      endOfDay,
+      start,
+      end,
       totalTransactions,
       totalAmount,
       totalVat,
@@ -362,18 +405,30 @@ export class LegalJournalModel {
     );
     const orders = ordersResult.rows;
 
+    // Populate items for each order (similar to orders API)
+    const { OrderItemModel } = require('../models');
+    const ordersWithItems = await Promise.all(
+      orders.map(async (order) => {
+        const items = await OrderItemModel.getByOrderId(order.id);
+        return {
+          ...order,
+          items
+        };
+      })
+    );
+
     // Separate regular sales from change operations
-    const salesOrders = orders.filter(order => order.items && order.items.length > 0);
-    const changeOrders = orders.filter(order => 
+    const salesOrders = ordersWithItems.filter(order => order.items && order.items.length > 0);
+    const changeOrders = ordersWithItems.filter(order => 
       order.items && order.items.length === 0 && 
       order.total_amount === 0 && 
       order.total_tax === 0 && 
       order.change > 0 &&
-      order.notes && order.notes.includes('Changement de caisse')
+      order.notes && (order.notes.includes('Changement de caisse') || order.notes.includes('Faire de la Monnaie'))
     );
 
     // Calculate sales totals (excluding change operations)
-    const totalTransactions = salesOrders.length;
+    const totalTransactions = salesOrders.length + changeOrders.length;
     const totalAmount = salesOrders.reduce((sum, order) => sum + parseFloat(order.total_amount || '0'), 0);
     const totalVat = salesOrders.reduce((sum, order) => sum + parseFloat(order.total_tax || '0'), 0);
 
@@ -545,4 +600,17 @@ export class LegalJournalModel {
       userId
     );
   }
+} 
+
+// Utility to calculate business day period
+function getBusinessDayPeriod(date: Date, closureTime: string, timezone: string) {
+  // date: the business day to close (e.g., 2025-07-11)
+  // closureTime: e.g., '02:00'
+  // timezone: e.g., 'Europe/Paris'
+  const [hours, minutes] = closureTime.split(':').map(Number);
+  // The period starts at the closure time of the given day
+  const start = moment.tz(date, timezone).set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
+  // The period ends at closure time the next day, minus 1ms
+  const end = start.clone().add(1, 'day').subtract(1, 'ms');
+  return { start: start.toDate(), end: end.toDate() };
 } 

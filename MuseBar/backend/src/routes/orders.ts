@@ -82,7 +82,7 @@ router.post('/', async (req, res) => {
     } = req.body;
     
     // Debug log for sub_bills
-    console.log('Received sub_bills:', sub_bills);
+
     const ip = req.ip;
     const userAgent = req.headers['user-agent'];
     const userId = (req as any).user ? String((req as any).user.id) : undefined;
@@ -155,7 +155,7 @@ router.post('/', async (req, res) => {
         createdSubBills.push(createdSubBill);
       }
       // Debug log for saved sub_bills
-      console.log(`Saved ${createdSubBills.length} sub_bills for order ${order.id}`);
+  
     }
 
     // Log transaction in legal journal for French compliance (skip for change operations)
@@ -172,12 +172,12 @@ router.post('/', async (req, res) => {
           },
           userId
         );
-        console.log(`Legal journal entry created: sequence ${journalEntry.sequence_number}`);
+    
       } catch (journalError) {
         console.error('Failed to log transaction in legal journal:', journalError);
       }
     } else {
-      console.log(`Change operation logged: ${notes}`);
+  
     }
 
     await AuditTrailModel.logAction({

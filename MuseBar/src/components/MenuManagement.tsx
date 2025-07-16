@@ -118,7 +118,11 @@ const MenuManagement: React.FC<MenuManagementProps> = ({ categories, products, o
   const handleCategorySubmit = async () => {
     try {
       if (editingCategory) {
-        await dataService.updateCategory(editingCategory.id, categoryForm);
+        await dataService.updateCategory(editingCategory.id, {
+          name: categoryForm.name,
+          description: categoryForm.description,
+          color: categoryForm.color // Ensure color is always sent
+        });
         setSnackbar({ open: true, message: 'Catégorie mise à jour avec succès', severity: 'success' });
       } else {
         await dataService.createCategory(categoryForm);

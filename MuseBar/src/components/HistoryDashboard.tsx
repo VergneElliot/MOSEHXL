@@ -47,6 +47,7 @@ import {
 import { ApiService } from '../services/apiService';
 import { Order } from '../types';
 import LegalReceipt from './LegalReceipt';
+import { mapBusinessInfoFromBackend } from '../utils/businessInfoMapper';
 
 
 const HistoryDashboard: React.FC = () => {
@@ -253,6 +254,12 @@ const HistoryDashboard: React.FC = () => {
       const response = await fetch(`http://localhost:3001/api/legal/receipt/${orderId}?type=${type}`);
       if (!response.ok) throw new Error('Failed to fetch receipt');
       const receipt = await response.json();
+      
+      // Map business info from backend format to frontend format
+      if (receipt.business_info) {
+        receipt.business_info = mapBusinessInfoFromBackend(receipt.business_info);
+      }
+      
       setCurrentReceipt(receipt);
       setReceiptType(type);
       setReceiptDialogOpen(true);

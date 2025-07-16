@@ -28,6 +28,7 @@ interface ReceiptItem {
   tax_amount: number;
   happy_hour_applied: boolean;
   happy_hour_discount_amount: number;
+  description?: string; // Added description field
 }
 
 // Update LegalReceiptProps to allow string | number for subtotal_ht and vat in vat_breakdown
@@ -380,6 +381,12 @@ const LegalReceipt: React.FC<LegalReceiptProps> = ({ order, businessInfo, receip
                 <Typography variant="body2">
                   {item.product_name || item.name}
                 </Typography>
+                {/* Show description if present */}
+                {item.description && (
+                  <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                    {item.description}
+                  </Typography>
+                )}
                 <Typography variant="caption" color="text.secondary">
                   {item.quantity} x {formatCurrency(item.unit_price)}
                   {item.happy_hour_applied && (

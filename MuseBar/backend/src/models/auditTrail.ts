@@ -41,10 +41,10 @@ export class AuditTrailModel {
       user_agent || null,
       session_id || null
     ];
-    console.log('[AUDIT LOG] Attempting to log action:', { values });
+
     try {
       const result = await pool.query(query, values);
-      console.log('[AUDIT LOG] Success:', result.rows[0]);
+      
       return result.rows[0];
     } catch (err) {
       console.error('[AUDIT LOG] Error logging action:', err);

@@ -174,7 +174,7 @@ router.post('/closure/annual', async (req, res) => {
 // POST create closure bulletin (generic endpoint for all types)
 router.post('/closure/create', async (req, res) => {
   try {
-    const { date, type } = req.body;
+    const { date, type, force } = req.body;
     
     if (!date) {
       return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
@@ -194,7 +194,7 @@ router.post('/closure/create', async (req, res) => {
     let closure;
     switch (type) {
       case 'DAILY':
-        closure = await LegalJournalModel.createDailyClosure(closureDate);
+        closure = await LegalJournalModel.createDailyClosure(closureDate, force);
         break;
       case 'WEEKLY':
         closure = await LegalJournalModel.createWeeklyClosure(closureDate);
@@ -214,6 +214,9 @@ router.post('/closure/create', async (req, res) => {
       compliance_note: `${type} closure bulletin created per French fiscal requirements`
     });
   } catch (error) {
+    if (error instanceof Error && error.message.includes('already exists')) {
+      return res.status(409).json({ error: error.message });
+    }
     console.error(`Error creating ${req.body.type} closure:`, error);
     res.status(500).json({ error: `Failed to create ${req.body.type} closure` });
   }
@@ -487,6 +490,37 @@ router.get('/closure/bulletins', async (req, res) => {
   } catch (error) {
     console.error('Error fetching closure bulletins:', error);
     res.status(500).json({ error: 'Failed to fetch closure bulletins' });
+  }
+});
+
+// GET latest monthly closure bulletin (current month)
+router.get('/closure/monthly-latest', async (req, res) => {
+  try {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    const bulletins = await LegalJournalModel.getClosureBulletins('MONTHLY');
+    // Find the bulletin for the current month
+    const currentMonthBulletin = bulletins.find(bulletin => {
+      const start = new Date(bulletin.period_start);
+      const end = new Date(bulletin.period_end);
+      return (
+        start.getFullYear() === monthStart.getFullYear() &&
+        start.getMonth() === monthStart.getMonth() &&
+        end.getFullYear() === monthEnd.getFullYear() &&
+        end.getMonth() === monthEnd.getMonth()
+      );
+    });
+
+    if (!currentMonthBulletin) {
+      return res.status(404).json({ error: 'No monthly closure bulletin found for the current month.' });
+    }
+
+    res.json(currentMonthBulletin);
+  } catch (error) {
+    console.error('Error fetching latest monthly closure:', error);
+    res.status(500).json({ error: 'Failed to fetch latest monthly closure' });
   }
 });
 
@@ -897,7 +931,7 @@ router.get('/dev/debug-hash', async (req, res) => {
 // PRODUCTION CLEAN RESET: Complete legal-compliant reset preserving admin
 router.post('/admin/clean-reset', async (req, res) => {
   try {
-    console.log('🧹 ADMIN: Starting complete clean reset...');
+
     
     // Read and execute the comprehensive reset script
     const fs = require('fs');
@@ -907,7 +941,7 @@ router.post('/admin/clean-reset', async (req, res) => {
     // Execute the script
     await pool.query(resetScript);
     
-    console.log('✅ Clean reset completed successfully');
+
     res.json({ 
       success: true, 
       message: 'Complete clean reset executed successfully - admin user preserved, all transactional data cleared',
@@ -925,7 +959,7 @@ router.post('/admin/clean-reset', async (req, res) => {
 router.post('/dev/reset-journal', async (req, res) => {
   try {
     // ⚠️ DEVELOPMENT ONLY - Never use in production!
-    console.log('🚨 DEVELOPMENT: Resetting legal journal...');
+
     
     // Step 1: Temporarily disable legal protection triggers for development
     await pool.query('DROP TRIGGER IF EXISTS trigger_prevent_legal_journal_modification ON legal_journal');
@@ -996,7 +1030,7 @@ router.post('/dev/reset-journal', async (req, res) => {
           EXECUTE FUNCTION prevent_closed_bulletin_modification();
     `);
     
-    console.log('✅ Legal journal reset completed with protections restored');
+
     res.json({ 
       success: true, 
       message: 'Legal journal has been reset for development with protections restored',
@@ -1090,7 +1124,7 @@ router.post('/closure/create-daily', async (req, res) => {
     // Create the daily closure using the legal model
     const closure = await LegalJournalModel.createDailyClosure(closureDate);
     
-    console.log(`📋 Daily closure created for ${dateString}`);
+
     res.json({ 
       success: true, 
       message: `Daily closure created for ${dateString}`,
@@ -1214,7 +1248,7 @@ router.post('/production/clean-reset', async (req, res) => {
       });
     }
 
-    console.log('🚨 STARTING PRODUCTION CLEAN RESET - Admin requested');
+
     
     // Step 1: Preserve admin user
     const adminBackup = await pool.query(
@@ -1355,7 +1389,7 @@ router.post('/production/clean-reset', async (req, res) => {
         (SELECT email FROM users WHERE email = 'elliot.vergne@gmail.com') as admin_preserved
     `);
     
-    console.log('✅ PRODUCTION CLEAN RESET COMPLETED SUCCESSFULLY');
+
     
     res.json({
       success: true,
@@ -1456,12 +1490,58 @@ router.get('/business-info', async (req, res) => {
 
 // PUT update business info
 router.put('/business-info', async (req, res) => {
-  console.log('PUT /api/legal/business-info', req.body);
+  
   try {
     const updated = await BusinessSettingsModel.update(req.body);
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update business info' });
+  }
+});
+
+// GET live monthly stats (not based on closure, but on all orders in the current month)
+router.get('/stats/monthly-live', async (req, res) => {
+  try {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    // Query all completed orders for the current month
+    const ordersResult = await pool.query(
+      `SELECT * FROM orders WHERE created_at >= $1 AND created_at <= $2 AND status = 'completed'`,
+      [monthStart, monthEnd]
+    );
+    const orders = ordersResult.rows;
+
+    // Populate items for each order
+    const { OrderItemModel } = require('../models');
+    const ordersWithItems = await Promise.all(
+      orders.map(async (order) => {
+        const items = await OrderItemModel.getByOrderId(order.id);
+        return {
+          ...order,
+          items: Array.isArray(items) ? items : []
+        };
+      })
+    );
+
+    // Calculate stats
+    const totalTransactions = ordersWithItems.length;
+    const totalAmount = ordersWithItems.reduce((sum, order) => sum + parseFloat(order.total_amount || '0'), 0);
+    const totalVat = ordersWithItems.reduce((sum, order) => sum + parseFloat(order.total_tax || '0'), 0);
+    const totalTips = ordersWithItems.reduce((sum, order) => sum + parseFloat(order.tips || '0'), 0);
+    const totalChange = ordersWithItems.reduce((sum, order) => sum + parseFloat(order.change || '0'), 0);
+
+    res.json({
+      total_transactions: totalTransactions,
+      total_amount: totalAmount,
+      total_vat: totalVat,
+      tips_total: totalTips,
+      change_total: totalChange
+    });
+  } catch (error) {
+    console.error('Error fetching live monthly stats:', error);
+    res.status(500).json({ error: 'Failed to fetch live monthly stats' });
   }
 });
 

@@ -62,6 +62,7 @@ export interface OrderItem {
   isOffert?: boolean; // For complimentary items (price = 0)
   isPerso?: boolean; // For employee complimentary items (price = 0)
   originalPrice?: number; // Store original price for reverting discounts
+  description?: string; // Description for special items like Divers
 }
 
 export type PaymentMethod = 'cash' | 'card' | 'split';

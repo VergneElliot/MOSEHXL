@@ -93,6 +93,13 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
   const [currentReceipt, setCurrentReceipt] = useState<any>(null);
   const [receiptType, setReceiptType] = useState<'detailed' | 'summary'>('detailed');
   
+  // Add state for divers dialog
+  const [diversDialogOpen, setDiversDialogOpen] = useState(false);
+  const [diversPrice, setDiversPrice] = useState('');
+  const [diversTax, setDiversTax] = useState('10');
+  const [diversDescription, setDiversDescription] = useState('');
+  const [diversError, setDiversError] = useState('');
+
   const happyHourService = HappyHourService.getInstance();
   const apiService = ApiService.getInstance();
   
@@ -346,6 +353,41 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
     }
   };
 
+  const handleAddDiversToOrder = async () => {
+    setDiversError('');
+    if (!diversPrice || !diversDescription) {
+      setDiversError('Prix et description sont obligatoires.');
+      return;
+    }
+
+    try {
+      const newItem: OrderItem = {
+        id: uuidv4(),
+        productId: uuidv4(), // Unique ID for a new product
+        productName: 'Divers',
+        quantity: 1,
+        unitPrice: parseFloat(diversPrice),
+        totalPrice: parseFloat(diversPrice),
+        taxRate: parseFloat(diversTax) / 100, // Convert percentage to decimal
+        isHappyHourApplied: false,
+        isManualHappyHour: false,
+        isOffert: false,
+        isPerso: false,
+        originalPrice: parseFloat(diversPrice),
+        description: diversDescription.trim() // Include the description
+      };
+      setCurrentOrder(prev => [...prev, newItem]);
+      setDiversDialogOpen(false);
+      setDiversPrice('');
+      setDiversTax('10');
+      setDiversDescription('');
+      setSnackbar({ open: true, message: 'Article Divers ajouté avec succès', severity: 'success' });
+      onDataUpdate();
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.response?.data?.error || 'Erreur lors de l\'ajout de l\'article Divers', severity: 'error' });
+    }
+  };
+
   return (
     <Box>
       {/* Mobile Navigation Bar */}
@@ -510,6 +552,56 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
               }}>
                 {/* Produits */}
                 <Grid container spacing={2}>
+                  {/* DIVERS BUTTON - always visible as first item */}
+                  <Grid item xs={12} sm={6} md={4} lg={3} key="divers">
+                    <Card 
+                      sx={{ 
+                        cursor: 'pointer',
+                        height: { xs: 'auto', sm: '140px' },
+                        minHeight: '120px',
+                        border: '2px dashed',
+                        borderColor: 'secondary.main',
+                        bgcolor: 'secondary.light',
+                        '&:hover': { 
+                          backgroundColor: 'secondary.main',
+                          color: 'white'
+                        }
+                      }}
+                      onClick={() => setDiversDialogOpen(true)}
+                    >
+                      <CardContent sx={{ p: { xs: 1.5, sm: 2 }, textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                        <Typography 
+                          variant="h6" 
+                          sx={{ 
+                            fontSize: { xs: '1rem', sm: '1.25rem' },
+                            mb: 0.5,
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          Divers
+                        </Typography>
+                        <Typography 
+                          variant="body2" 
+                          color="text.secondary"
+                          sx={{ 
+                            fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                            mb: 1
+                          }}
+                        >
+                          Prix flexible
+                        </Typography>
+                        <Typography 
+                          variant="h6" 
+                          color="primary"
+                          sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}
+                        >
+                          €€€
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  
+                  {/* Existing products */}
                   {activeProducts
                     .filter(product => {
                       // Filter by category
@@ -526,14 +618,26 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                       if (isHappyHourActive && product.isHappyHourEligible) {
                         happyHourLabel = 'HH'; // Changed from showing discount percentage to just "HH"
                       }
+                      
+                      // Find the category for this product
+                      const category = categories.find(cat => cat.id === product.categoryId);
+                      const categoryColor = category?.color || '#1976d2'; // Default to primary blue if no color
+                      
                       return (
                         <Grid item xs={12} sm={6} md={4} lg={3} key={product.id}>
                           <Card 
                             sx={{ 
                               cursor: 'pointer',
-                              '&:hover': { backgroundColor: 'action.hover' },
                               height: { xs: 'auto', sm: '140px' }, // Responsive card height
-                              minHeight: '120px'
+                              minHeight: '120px',
+                              backgroundColor: categoryColor,
+                              color: 'white',
+                              '&:hover': { 
+                                backgroundColor: categoryColor,
+                                opacity: 0.8,
+                                transform: 'scale(1.02)',
+                                transition: 'all 0.2s ease-in-out'
+                              }
                             }}
                             onClick={() => handleAddToOrder(product)}
                           >
@@ -543,7 +647,8 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                                 noWrap 
                                 sx={{ 
                                   fontSize: { xs: '1rem', sm: '1.25rem' },
-                                  mb: 0.5
+                                  mb: 0.5,
+                                  color: 'white'
                                 }}
                               >
                                 {product.name}
@@ -551,11 +656,11 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                               {product.description && (
                                 <Typography 
                                   variant="body2" 
-                                  color="text.secondary" 
                                   sx={{ 
                                     mb: 1,
                                     fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                                    display: { xs: 'none', sm: 'block' } // Hide description on very small screens
+                                    display: { xs: 'none', sm: 'block' }, // Hide description on very small screens
+                                    color: 'rgba(255, 255, 255, 0.8)'
                                   }}
                                 >
                                   {product.description}
@@ -564,8 +669,10 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <Typography 
                                   variant="h6" 
-                                  color="primary"
-                                  sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}
+                                  sx={{ 
+                                    fontSize: { xs: '1rem', sm: '1.25rem' },
+                                    color: 'white'
+                                  }}
                                 >
                                   {product.price.toFixed(2)}€
                                 </Typography>
@@ -699,6 +806,12 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                                   <Typography variant="subtitle2" fontWeight="bold">
                                     {item.productName}
                                   </Typography>
+                                  {/* Show description if present */}
+                                  {item.description && (
+                                    <Typography variant="caption" color="text.secondary">
+                                      {item.description}
+                                    </Typography>
+                                  )}
                                   <Typography variant="body2" color="text.secondary">
                                     {item.totalPrice.toFixed(2)}€
                                   </Typography>
@@ -1624,12 +1737,6 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
               >
                 Carte → Espèces
               </Button>
-              <Button
-                variant={changeDirection === 'cash-to-card' ? 'contained' : 'outlined'}
-                onClick={() => setChangeDirection('cash-to-card')}
-              >
-                Espèces → Carte
-              </Button>
             </Box>
             <Typography variant="body2" color="text.secondary">
               Cette opération permet de transférer un montant entre la caisse espèces et la caisse carte, sans vente associée.
@@ -1649,9 +1756,9 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                   items: [],
                   totalAmount: 0,
                   taxAmount: 0,
-                  paymentMethod: changeDirection === 'card-to-cash' ? 'cash' : 'card',
+                  paymentMethod: 'cash', // always cash for 'Faire de la Monnaie'
                   status: 'completed',
-                  notes: `Faire de la Monnaie: ${changeDirection === 'card-to-cash' ? 'Carte → Espèces' : 'Espèces → Carte'} ${Number(changeAmount).toFixed(2)}€`,
+                  notes: `Faire de la Monnaie: Carte → Espèces ${Number(changeAmount).toFixed(2)}€`,
                   tips: 0,
                   change: Number(changeAmount)
                 });
@@ -1669,6 +1776,51 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
           >
             Valider
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Divers Dialog */}
+      <Dialog open={diversDialogOpen} onClose={() => setDiversDialogOpen(false)}>
+        <DialogTitle>Ajouter un article Divers</DialogTitle>
+        <DialogContent>
+          <TextField
+            label="Prix (€)"
+            type="number"
+            value={diversPrice}
+            onChange={e => setDiversPrice(e.target.value)}
+            fullWidth
+            margin="normal"
+            inputProps={{ min: 0, step: 0.01 }}
+            required
+          />
+          <FormControl fullWidth margin="normal" required>
+            <InputLabel id="divers-tax-label">TVA</InputLabel>
+            <Select
+              labelId="divers-tax-label"
+              value={diversTax}
+              label="TVA"
+              onChange={e => setDiversTax(e.target.value as string)}
+            >
+              <MenuItem value="10">10%</MenuItem>
+              <MenuItem value="20">20%</MenuItem>
+            </Select>
+          </FormControl>
+          <TextField
+            label="Description (obligatoire)"
+            value={diversDescription}
+            onChange={e => setDiversDescription(e.target.value)}
+            fullWidth
+            margin="normal"
+            multiline
+            minRows={2}
+            required
+            placeholder="Ex: supplément sauce focaccia, casse matériel, etc."
+          />
+          {diversError && <Alert severity="error" sx={{ mt: 1 }}>{diversError}</Alert>}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDiversDialogOpen(false)}>Annuler</Button>
+          <Button onClick={handleAddDiversToOrder} variant="contained" color="primary">Ajouter</Button>
         </DialogActions>
       </Dialog>
 
