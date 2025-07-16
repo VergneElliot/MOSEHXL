@@ -1,119 +1,91 @@
--- Migration Script: Development Branch to Main Branch
--- This script migrates database structure changes from development to main
--- WITHOUT migrating any data content - only schema/structure changes
--- Use this when you've made schema changes in development and want to apply them to main
+-- MOSEHXL Migration: Development to Main (Production)
+-- This script ensures the production database is up to date with the latest schema required for unified return/cancellation logic and payment method handling.
+-- It is safe to run multiple times (idempotent) and will not drop or destructively modify existing data.
 
--- =====================================================
--- WARNING: This script will modify your production database
--- Make sure you have a backup before running this script
--- =====================================================
+-- 1. Ensure 'tips' and 'change' columns exist in orders table
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'orders' AND column_name = 'tips') THEN
+        ALTER TABLE orders ADD COLUMN tips NUMERIC(10,2) DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'orders' AND column_name = 'change') THEN
+        ALTER TABLE orders ADD COLUMN change NUMERIC(10,2) DEFAULT 0;
+    END IF;
+END $$;
 
--- =====================================================
--- STEP 1: Detect and Apply New Tables
--- =====================================================
+-- 2. Ensure 'sub_bills' table exists for split payments
+CREATE TABLE IF NOT EXISTS sub_bills (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
+    payment_method VARCHAR(20) NOT NULL,
+    amount NUMERIC(10,2) NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
--- This section will be updated based on what new tables you create in development
--- For now, it's a template for future migrations
+-- 3. Ensure 'payment_method' column exists in orders and sub_bills
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'orders' AND column_name = 'payment_method') THEN
+        ALTER TABLE orders ADD COLUMN payment_method VARCHAR(20) DEFAULT 'cash';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'sub_bills' AND column_name = 'payment_method') THEN
+        ALTER TABLE sub_bills ADD COLUMN payment_method VARCHAR(20) NOT NULL DEFAULT 'cash';
+    END IF;
+END $$;
 
--- Example: If you create a new table in development, add it here:
--- CREATE TABLE IF NOT EXISTS new_feature_table (
---     id SERIAL PRIMARY KEY,
---     name VARCHAR(100) NOT NULL,
---     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
--- );
+-- 4. Ensure 'legal_journal' table exists for legal compliance
+CREATE TABLE IF NOT EXISTS legal_journal (
+    id SERIAL PRIMARY KEY,
+    sequence_number INTEGER NOT NULL,
+    transaction_type VARCHAR(20) NOT NULL,
+    order_id INTEGER REFERENCES orders(id),
+    amount NUMERIC(10,2) NOT NULL,
+    vat_amount NUMERIC(10,2) NOT NULL,
+    payment_method VARCHAR(50) NOT NULL,
+    transaction_data JSONB NOT NULL,
+    previous_hash VARCHAR(64) NOT NULL,
+    current_hash VARCHAR(64) NOT NULL,
+    timestamp TIMESTAMP NOT NULL,
+    user_id VARCHAR(100),
+    register_id VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
--- =====================================================
--- STEP 2: Add New Columns to Existing Tables
--- =====================================================
+-- 5. Ensure all required indexes exist
+CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_order_items_product_id ON order_items(product_id);
+CREATE INDEX IF NOT EXISTS idx_sub_bills_order_id ON sub_bills(order_id);
 
--- This section will be updated based on what new columns you add in development
--- For now, it's a template for future migrations
+-- 6. Ensure 'closure_bulletins' table has tips_total and change_total columns
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'closure_bulletins' AND column_name = 'tips_total') THEN
+        ALTER TABLE closure_bulletins ADD COLUMN tips_total NUMERIC DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'closure_bulletins' AND column_name = 'change_total') THEN
+        ALTER TABLE closure_bulletins ADD COLUMN change_total NUMERIC DEFAULT 0;
+    END IF;
+END $$;
 
--- Example: If you add new columns in development, add them here:
--- DO $$ 
--- BEGIN 
---     -- Add new_column to existing_table if it doesn't exist
---     IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
---                    WHERE table_name = 'existing_table' AND column_name = 'new_column') THEN
---         ALTER TABLE existing_table ADD COLUMN new_column VARCHAR(100) DEFAULT NULL;
---     END IF;
--- END $$;
+-- 7. Ensure 'happy_hour_applied' and 'happy_hour_discount_amount' columns exist in order_items
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'order_items' AND column_name = 'happy_hour_applied') THEN
+        ALTER TABLE order_items ADD COLUMN happy_hour_applied BOOLEAN DEFAULT false;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'order_items' AND column_name = 'happy_hour_discount_amount') THEN
+        ALTER TABLE order_items ADD COLUMN happy_hour_discount_amount NUMERIC(10,2) DEFAULT 0;
+    END IF;
+END $$;
 
--- =====================================================
--- STEP 3: Create New Indexes
--- =====================================================
+-- 8. Ensure 'sub_bill_id' column exists in order_items for split payments
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'order_items' AND column_name = 'sub_bill_id') THEN
+        ALTER TABLE order_items ADD COLUMN sub_bill_id INTEGER DEFAULT NULL;
+    END IF;
+END $$;
 
--- This section will be updated based on what new indexes you create in development
--- For now, it's a template for future migrations
-
--- Example: If you create new indexes in development, add them here:
--- CREATE INDEX IF NOT EXISTS idx_new_feature_table_name ON new_feature_table(name);
-
--- =====================================================
--- STEP 4: Create New Functions and Triggers
--- =====================================================
-
--- This section will be updated based on what new functions/triggers you create in development
--- For now, it's a template for future migrations
-
--- Example: If you create new functions in development, add them here:
--- CREATE OR REPLACE FUNCTION new_feature_function()
--- RETURNS TRIGGER AS $$
--- BEGIN
---     -- Your function logic here
---     RETURN NEW;
--- END;
--- $$ LANGUAGE plpgsql;
-
--- Example: If you create new triggers in development, add them here:
--- DROP TRIGGER IF EXISTS trigger_new_feature ON new_feature_table;
--- CREATE TRIGGER trigger_new_feature
---     BEFORE INSERT ON new_feature_table
---     FOR EACH ROW
---     EXECUTE FUNCTION new_feature_function();
-
--- =====================================================
--- STEP 5: Update Constraints
--- =====================================================
-
--- This section will be updated based on what new constraints you add in development
--- For now, it's a template for future migrations
-
--- Example: If you add new constraints in development, add them here:
--- DO $$ 
--- BEGIN 
---     IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints 
---                    WHERE constraint_name = 'new_constraint_name' 
---                    AND table_name = 'existing_table') THEN
---         ALTER TABLE existing_table 
---         ADD CONSTRAINT new_constraint_name 
---         CHECK (some_condition);
---     END IF;
--- END $$;
-
--- =====================================================
--- STEP 6: Grant New Permissions
--- =====================================================
-
--- This section will be updated based on what new permissions you need in development
--- For now, it's a template for future migrations
-
--- Example: If you need new permissions in development, add them here:
--- GRANT ALL PRIVILEGES ON new_feature_table TO musebar_user;
-
--- =====================================================
--- MIGRATION TEMPLATE COMPLETE
--- =====================================================
-
--- This script is a template for future migrations
--- When you make schema changes in development:
--- 1. Add the new tables, columns, indexes, functions, triggers, and constraints here
--- 2. Test the migration on a copy of your production database first
--- 3. Run this script on your production database
--- 4. No data content will be migrated - only structure changes
-
--- IMPORTANT NOTES:
--- - Always backup your production database before running migrations
--- - Test migrations on a copy of production data first
--- - Only migrate structure changes, never data content
--- - Keep this script updated with all schema changes made in development 
+-- 9. Final notice
+DO $$ BEGIN RAISE NOTICE 'MOSEHXL migration from development to main complete. Schema is now up to date for unified return/cancellation logic.'; END $$; 
