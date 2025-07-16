@@ -40,9 +40,8 @@ import {
   Search as SearchIcon, 
   CreditCard, 
   Money,
-  Cancel as CancelIcon,
-  Warning as WarningIcon,
-  Print
+  Print,
+  SwapHoriz as SwapHorizIcon
 } from '@mui/icons-material';
 import { ApiService } from '../services/apiService';
 import { Order } from '../types';
@@ -61,20 +60,22 @@ const HistoryDashboard: React.FC = () => {
     topProduits: [] as Array<{ name: string; qty: number }>
   });
   
-  // Cancellation dialog state
-  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
-  const [cancelReason, setCancelReason] = useState('');
-  const [selectedItemsToCancel, setSelectedItemsToCancel] = useState<string[]>([]);
-  const [isPartialCancellation, setIsPartialCancellation] = useState(false);
-  const [cancelLoading, setCancelLoading] = useState(false);
-  const [cancelSuccess, setCancelSuccess] = useState('');
-  const [cancelError, setCancelError] = useState('');
+
   
   // Receipt dialog state
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   const [currentReceipt, setCurrentReceipt] = useState<any>(null);
   const [receiptType, setReceiptType] = useState<'detailed' | 'summary'>('detailed');
+  
+  // Return dialog state
+  const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+  const [orderToReturn, setOrderToReturn] = useState<Order | null>(null);
+  const [returnReason, setReturnReason] = useState('');
+  const [selectedItemsToReturn, setSelectedItemsToReturn] = useState<string[]>([]);
+  const [isPartialReturn, setIsPartialReturn] = useState(false);
+  const [returnLoading, setReturnLoading] = useState(false);
+  const [returnSuccess, setReturnSuccess] = useState('');
+  const [returnError, setReturnError] = useState('');
 
   const apiService = ApiService.getInstance();
 
@@ -132,43 +133,45 @@ const HistoryDashboard: React.FC = () => {
     order.createdAt.toISOString().includes(search)
   );
 
-  // Cancellation functions
-  const handleOpenCancelDialog = (order: Order) => {
+
+
+  // Return functions
+  const handleOpenReturnDialog = (order: Order) => {
     if (order.status !== 'completed') {
-      setCancelError('Seules les commandes terminées peuvent être annulées');
+      setReturnError('Seules les commandes terminées peuvent faire l\'objet d\'un retour');
       return;
     }
-    setOrderToCancel(order);
-    setCancelDialogOpen(true);
-    setCancelReason('');
-    setSelectedItemsToCancel([]);
-    setIsPartialCancellation(false);
-    setCancelError('');
-    setCancelSuccess('');
+    setOrderToReturn(order);
+    setReturnDialogOpen(true);
+    setReturnReason('');
+    setSelectedItemsToReturn([]);
+    setIsPartialReturn(false);
+    setReturnError('');
+    setReturnSuccess('');
   };
 
-  const handleCloseCancelDialog = () => {
-    setCancelDialogOpen(false);
-    setOrderToCancel(null);
-    setCancelReason('');
-    setSelectedItemsToCancel([]);
-    setIsPartialCancellation(false);
-    setCancelError('');
-    setCancelSuccess('');
+  const handleCloseReturnDialog = () => {
+    setReturnDialogOpen(false);
+    setOrderToReturn(null);
+    setReturnReason('');
+    setSelectedItemsToReturn([]);
+    setIsPartialReturn(false);
+    setReturnError('');
+    setReturnSuccess('');
   };
 
-  const calculateCancellationTotals = () => {
-    if (!orderToCancel) return { totalAmount: 0, totalTax: 0, totalNet: 0, taxBreakdown: { '10': 0, '20': 0 } };
+  const calculateReturnTotals = () => {
+    if (!orderToReturn) return { totalAmount: 0, totalTax: 0, totalNet: 0, taxBreakdown: { '10': 0, '20': 0 } };
     
-    const itemsToCancel = isPartialCancellation 
-      ? orderToCancel.items.filter(item => selectedItemsToCancel.includes(item.id))
-      : orderToCancel.items;
+    const itemsToReturn = isPartialReturn 
+      ? orderToReturn.items.filter(item => selectedItemsToReturn.includes(item.id))
+      : orderToReturn.items;
     
     let totalAmount = 0;
     let totalTax = 0;
     const taxBreakdown = { '10': 0, '20': 0 };
     
-    itemsToCancel.forEach(item => {
+    itemsToReturn.forEach(item => {
       const itemTotal = item.totalPrice;
       const itemTaxAmount = itemTotal * item.taxRate / (1 + item.taxRate);
       const taxRatePercent = Math.round(item.taxRate * 100);
@@ -191,62 +194,57 @@ const HistoryDashboard: React.FC = () => {
     };
   };
 
-  const handleCancelOrder = async () => {
-    if (!orderToCancel || !cancelReason.trim()) {
-      setCancelError('Veuillez fournir une raison pour l\'annulation');
+  const handleReturnOrder = async () => {
+    if (!orderToReturn || !returnReason.trim()) {
+      setReturnError('Veuillez fournir une raison pour le retour');
       return;
     }
 
-    if (isPartialCancellation && selectedItemsToCancel.length === 0) {
-      setCancelError('Veuillez sélectionner au moins un article à annuler');
+    if (isPartialReturn && selectedItemsToReturn.length === 0) {
+      setReturnError('Veuillez sélectionner au moins un article à retourner');
       return;
     }
 
-    setCancelLoading(true);
-    setCancelError('');
+    setReturnLoading(true);
+    setReturnError('');
 
     try {
-      const cancelData: any = {
-        reason: cancelReason.trim()
-      };
+      const itemsToReturn = isPartialReturn 
+        ? selectedItemsToReturn.map(itemId => ({ item_id: parseInt(itemId) }))
+        : orderToReturn.items.map(item => ({ item_id: parseInt(item.id) }));
 
-      if (isPartialCancellation) {
-        cancelData.partial_items = selectedItemsToCancel.map(itemId => ({ item_id: parseInt(itemId) }));
-      }
-
-      const response = await apiService.post(`/orders/${orderToCancel.id}/cancel`, cancelData);
+      const response = await apiService.post('/orders/retour-from-history', {
+        originalOrderId: parseInt(orderToReturn.id),
+        reason: returnReason.trim(),
+        itemsToReturn
+      });
       
-      setCancelSuccess((response.data as any).message);
+      setReturnSuccess((response.data as any).message);
       
       // Refresh orders list
       await loadOrders();
       
       // Close dialog after a short delay
       setTimeout(() => {
-        handleCloseCancelDialog();
+        handleCloseReturnDialog();
       }, 2000);
       
     } catch (error: any) {
-      // If backend returns both error and legal, combine as JSON string
-      if (error.response?.data?.legal) {
-        setCancelError(JSON.stringify({ error: error.response.data.error, legal: error.response.data.legal }));
-      } else {
-        setCancelError(error.response?.data?.error || 'Erreur lors de l\'annulation de la commande');
-      }
+      setReturnError(error.response?.data?.error || 'Erreur lors du retour de la commande');
     } finally {
-      setCancelLoading(false);
+      setReturnLoading(false);
     }
   };
 
-  const handleItemSelectionChange = (itemId: string, checked: boolean) => {
+  const handleReturnItemSelectionChange = (itemId: string, checked: boolean) => {
     if (checked) {
-      setSelectedItemsToCancel(prev => [...prev, itemId]);
+      setSelectedItemsToReturn(prev => [...prev, itemId]);
     } else {
-      setSelectedItemsToCancel(prev => prev.filter(id => id !== itemId));
+      setSelectedItemsToReturn(prev => prev.filter(id => id !== itemId));
     }
   };
 
-  const cancellationTotals = calculateCancellationTotals();
+  const returnTotals = calculateReturnTotals();
 
   // Function to fetch and show receipt
   const handleShowReceipt = async (orderId: number, type: 'detailed' | 'summary' = 'detailed') => {
@@ -566,12 +564,12 @@ const HistoryDashboard: React.FC = () => {
                                   {selectedOrder.status === 'completed' && (
                                     <Button
                                       variant="outlined"
-                                      color="error"
+                                      color="warning"
                                       size="small"
-                                      startIcon={<CancelIcon />}
-                                      onClick={() => handleOpenCancelDialog(selectedOrder)}
+                                      startIcon={<SwapHorizIcon />}
+                                      onClick={() => handleOpenReturnDialog(selectedOrder)}
                                     >
-                                      Annuler la commande
+                                      Retour basé sur historique
                                     </Button>
                                   )}
                                 </Box>
@@ -590,79 +588,67 @@ const HistoryDashboard: React.FC = () => {
         </Grid>
       </Grid>
       
-      {/* Cancellation Dialog */}
+
+
+      {/* Return Dialog */}
       <Dialog 
-        open={cancelDialogOpen} 
-        onClose={handleCloseCancelDialog} 
+        open={returnDialogOpen} 
+        onClose={handleCloseReturnDialog} 
         maxWidth="md" 
         fullWidth
       >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <WarningIcon color="error" />
-          Annulation de commande #{orderToCancel?.id}
+          <SwapHorizIcon color="warning" />
+          Retour basé sur historique - Commande #{orderToReturn?.id}
         </DialogTitle>
         <DialogContent>
-          {cancelError && (
+          {returnError && (
             <Alert severity="error" sx={{ mb: 2 }}>
-              {cancelError}
-              {/* Display legal info if present in the error string (JSON) */}
-              {(() => {
-                try {
-                  const err = JSON.parse(cancelError);
-                  return (
-                    <>
-                      <br />
-                      {err.legal && <span style={{ fontWeight: 'bold', color: '#b71c1c' }}>{err.legal}</span>}
-                    </>
-                  );
-                } catch {
-                  return null;
-                }
-              })()}
+              {returnError}
             </Alert>
           )}
           
-          {cancelSuccess && (
+          {returnSuccess && (
             <Alert severity="success" sx={{ mb: 2 }}>
-              {cancelSuccess}
+              {returnSuccess}
             </Alert>
           )}
 
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            ⚠️ Cette action créera des écritures comptables négatives pour maintenir la conformité légale.
-            Les montants seront déduits des totaux de taxes et du chiffre d'affaires.
+            🔄 Cette action créera un retour basé sur le mode de paiement original de la commande.
+            Pour les paiements partagés, les montants seront répartis proportionnellement.
           </Typography>
 
-          {/* Cancellation Type */}
+          {/* Return Type */}
           <Box sx={{ mb: 3 }}>
             <FormControlLabel
               control={
                 <Checkbox
-                  checked={isPartialCancellation}
+                  checked={isPartialReturn}
                   onChange={(e) => {
-                    setIsPartialCancellation(e.target.checked);
-                    setSelectedItemsToCancel([]);
+                    setIsPartialReturn(e.target.checked);
+                    setSelectedItemsToReturn([]);
                   }}
                 />
               }
-              label="Annulation partielle (sélectionner des articles spécifiques)"
+              label="Retour partiel (sélectionner des articles spécifiques)"
             />
           </Box>
 
-          {/* Item Selection for Partial Cancellation */}
-          {isPartialCancellation && orderToCancel && (
+          {/* Item Selection for Partial Return */}
+          {isPartialReturn && orderToReturn && (
             <Box sx={{ mb: 3 }}>
               <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                Sélectionner les articles à annuler:
+                Sélectionner les articles à retourner:
               </Typography>
               <List dense sx={{ maxHeight: 200, overflowY: 'auto', border: '1px solid #ddd', borderRadius: 1 }}>
-                {orderToCancel.items.map((item) => (
+                {orderToReturn.items.map((item) => (
                   <ListItem key={item.id} sx={{ py: 0.5 }}>
                     <FormControlLabel
                       control={
                         <Checkbox
-                          checked={selectedItemsToCancel.includes(item.id)}
-                          onChange={(e) => handleItemSelectionChange(item.id, e.target.checked)}
+                          checked={selectedItemsToReturn.includes(item.id)}
+                          onChange={(e) => handleReturnItemSelectionChange(item.id, e.target.checked)}
                         />
                       }
                       label=""
@@ -683,29 +669,49 @@ const HistoryDashboard: React.FC = () => {
             </Box>
           )}
 
+          {/* Payment Method Info */}
+          {orderToReturn && (
+            <Box sx={{ mb: 3, p: 2, border: '1px solid #ddd', borderRadius: 1, background: '#fff3e0' }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: '#e65100' }}>
+                💳 Mode de paiement original: {orderToReturn.paymentMethod === 'split' ? 'Paiement partagé' : 
+                  orderToReturn.paymentMethod === 'card' ? 'Carte' : 'Espèces'}
+              </Typography>
+              {orderToReturn.paymentMethod === 'split' && orderToReturn.subBills && orderToReturn.subBills.length > 0 && (
+                <Typography variant="body2" color="text.secondary">
+                  Le retour respectera la répartition originale: {orderToReturn.subBills.map((subBill, index) => (
+                    <span key={subBill.id}>
+                      {subBill.paymentMethod === 'card' ? 'Carte' : 'Espèces'}: {subBill.amount.toFixed(2)}€
+                      {index < (orderToReturn.subBills?.length || 0) - 1 ? ', ' : ''}
+                    </span>
+                  ))}
+                </Typography>
+              )}
+            </Box>
+          )}
+
           {/* Tax Breakdown */}
           <Box sx={{ mb: 3, p: 2, border: '1px solid #ddd', borderRadius: 1, background: '#f9f9f9' }}>
             <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 'bold' }}>
-              💰 Détail de l'annulation (montants négatifs):
+              💰 Détail du retour (montants négatifs):
             </Typography>
             <Grid container spacing={2}>
               <Grid item xs={6}>
                 <Typography variant="body2">
-                  <strong>Montant HT:</strong> -{cancellationTotals.totalNet.toFixed(2)} €
+                  <strong>Montant HT:</strong> -{returnTotals.totalNet.toFixed(2)} €
                 </Typography>
                 <Typography variant="body2">
-                  <strong>TVA 10%:</strong> -{cancellationTotals.taxBreakdown['10'].toFixed(2)} €
+                  <strong>TVA 10%:</strong> -{returnTotals.taxBreakdown['10'].toFixed(2)} €
                 </Typography>
                 <Typography variant="body2">
-                  <strong>TVA 20%:</strong> -{cancellationTotals.taxBreakdown['20'].toFixed(2)} €
+                  <strong>TVA 20%:</strong> -{returnTotals.taxBreakdown['20'].toFixed(2)} €
                 </Typography>
               </Grid>
               <Grid item xs={6}>
                 <Typography variant="body2">
-                  <strong>Total TVA:</strong> -{cancellationTotals.totalTax.toFixed(2)} €
+                  <strong>Total TVA:</strong> -{returnTotals.totalTax.toFixed(2)} €
                 </Typography>
-                <Typography variant="body2" sx={{ fontSize: '1.1em', fontWeight: 'bold', color: '#d32f2f' }}>
-                  <strong>Total TTC:</strong> -{cancellationTotals.totalAmount.toFixed(2)} €
+                <Typography variant="body2" sx={{ fontSize: '1.1em', fontWeight: 'bold', color: '#f57c00' }}>
+                  <strong>Total TTC:</strong> -{returnTotals.totalAmount.toFixed(2)} €
                 </Typography>
               </Grid>
             </Grid>
@@ -714,28 +720,28 @@ const HistoryDashboard: React.FC = () => {
           {/* Reason */}
           <TextField
             fullWidth
-            label="Raison de l'annulation (obligatoire)"
+            label="Raison du retour (obligatoire)"
             multiline
             rows={3}
-            value={cancelReason}
-            onChange={(e) => setCancelReason(e.target.value)}
-            placeholder="Ex: Erreur de commande, problème qualité, demande client..."
+            value={returnReason}
+            onChange={(e) => setReturnReason(e.target.value)}
+            placeholder="Ex: Article défectueux, demande client, erreur de commande..."
             required
-            error={cancelReason.trim() === '' && cancelError !== ''}
+            error={returnReason.trim() === '' && returnError !== ''}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseCancelDialog} disabled={cancelLoading}>
+          <Button onClick={handleCloseReturnDialog} disabled={returnLoading}>
             Annuler
           </Button>
           <Button
-            onClick={handleCancelOrder}
-            color="error"
+            onClick={handleReturnOrder}
+            color="warning"
             variant="contained"
-            disabled={cancelLoading || cancellationTotals.totalAmount === 0}
-            startIcon={cancelLoading ? <CircularProgress size={20} /> : <CancelIcon />}
+            disabled={returnLoading || returnTotals.totalAmount === 0}
+            startIcon={returnLoading ? <CircularProgress size={20} /> : <SwapHorizIcon />}
           >
-            {cancelLoading ? 'Annulation...' : 'Confirmer l\'annulation'}
+            {returnLoading ? 'Retour...' : 'Confirmer le retour'}
           </Button>
         </DialogActions>
       </Dialog>

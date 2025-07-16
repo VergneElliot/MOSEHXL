@@ -80,6 +80,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
   const [retourDialogOpen, setRetourDialogOpen] = useState(false);
   const [retourItem, setRetourItem] = useState<OrderItem | null>(null);
   const [retourReason, setRetourReason] = useState('');
+  const [retourPaymentMethod, setRetourPaymentMethod] = useState<'cash' | 'card'>('cash');
   const [retourLoading, setRetourLoading] = useState(false);
   
   // Add state for change dialog
@@ -1685,7 +1686,19 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
             onChange={e => setRetourReason(e.target.value)}
             required
             error={retourReason.trim() === ''}
+            sx={{ mb: 2 }}
           />
+          <FormControl fullWidth margin="dense">
+            <InputLabel>Mode de paiement pour le retour</InputLabel>
+            <Select
+              value={retourPaymentMethod}
+              label="Mode de paiement pour le retour"
+              onChange={e => setRetourPaymentMethod(e.target.value as 'cash' | 'card')}
+            >
+              <MenuItem value="cash">Espèces</MenuItem>
+              <MenuItem value="card">Carte</MenuItem>
+            </Select>
+          </FormControl>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setRetourDialogOpen(false)} disabled={retourLoading}>Annuler</Button>
@@ -1696,10 +1709,13 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
               try {
                 await apiService.post('/orders/retour', {
                   item: retourItem,
-                  reason: retourReason.trim()
+                  reason: retourReason.trim(),
+                  paymentMethod: retourPaymentMethod
                 });
                 setSnackbar({ open: true, message: 'Retour enregistré avec succès', severity: 'success' });
                 setRetourDialogOpen(false);
+                setRetourReason('');
+                setRetourPaymentMethod('cash');
                 onDataUpdate();
               } catch (err: any) {
                 setSnackbar({ open: true, message: err.response?.data?.error || 'Erreur lors du retour', severity: 'error' });

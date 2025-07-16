@@ -313,222 +313,35 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// POST cancel/refund order - Create negative accounting entries for legal compliance
-router.post('/:id/cancel', requireAuth, async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid order ID' });
-    }
 
-    const { reason, partial_items = null } = req.body;
-
-    if (!reason || typeof reason !== 'string') {
-      return res.status(400).json({ error: 'Cancellation reason is required' });
-    }
-
-    // Get the original order
-    const originalOrder = await OrderModel.getById(id);
-    if (!originalOrder) {
-      return res.status(404).json({ error: 'Order not found' });
-    }
-
-    if (originalOrder.status !== 'completed') {
-      return res.status(400).json({ error: 'Only completed orders can be cancelled' });
-    }
-
-    // LEGAL FAIL-SAFE: Block cancellation if order is in a closed bulletin
-    const closureCheckQuery = `
-      SELECT 1 FROM closure_bulletins
-      WHERE is_closed = TRUE
-        AND period_start <= $1
-        AND period_end >= $1
-      LIMIT 1
-    `;
-    const closureCheckResult = await pool.query(closureCheckQuery, [originalOrder.created_at]);
-    if (closureCheckResult.rows.length > 0) {
-      return res.status(400).json({
-        error: 'Annulation impossible : la commande fait partie d\'une période clôturée légalement.',
-        legal: 'Conformément à l\'article 286-I-3 bis du CGI, aucune modification n\'est autorisée après clôture.'
-      });
-    }
-
-    // Get order items
-    const orderItems = await OrderItemModel.getByOrderId(id);
-    
-    let itemsToCancel = orderItems;
-    if (partial_items && Array.isArray(partial_items)) {
-      // Partial cancellation - only cancel specified items
-      itemsToCancel = orderItems.filter(item => 
-        partial_items.some(partial => partial.item_id === item.id)
-      );
-    }
-
-    if (itemsToCancel.length === 0) {
-      return res.status(400).json({ error: 'No items to cancel' });
-    }
-
-    // Calculate cancellation amounts with proper tax breakdown
-    const taxBreakdown = { '10': 0, '20': 0 }; // Tax rates: 10% and 20%
-    let totalCancellationAmount = 0;
-    let totalTaxAmount = 0;
-
-    const cancellationDetails = itemsToCancel.map(item => {
-      const itemTotalPrice = parseFloat(item.total_price.toString());
-      const itemTaxRate = parseFloat(item.tax_rate.toString()) / 100; // Convert from percentage
-      
-      // Calculate tax amount for this item
-      const itemTaxAmount = itemTotalPrice * itemTaxRate / (1 + itemTaxRate);
-      const itemNetAmount = itemTotalPrice - itemTaxAmount;
-      
-      // Add to tax breakdown
-      const taxRatePercent = Math.round(itemTaxRate * 100);
-      if (taxBreakdown.hasOwnProperty(taxRatePercent.toString())) {
-        taxBreakdown[taxRatePercent.toString() as '10' | '20'] += itemTaxAmount;
-      }
-      
-      totalCancellationAmount += itemTotalPrice;
-      totalTaxAmount += itemTaxAmount;
-      
-      return {
-        item_id: item.id,
-        product_name: item.product_name,
-        quantity: item.quantity,
-        unit_price: parseFloat(item.unit_price.toString()),
-        total_price: itemTotalPrice,
-        tax_rate: itemTaxRate,
-        tax_amount: itemTaxAmount,
-        net_amount: itemNetAmount
-      };
-    });
-
-    const totalNetAmount = totalCancellationAmount - totalTaxAmount;
-
-    // Create cancellation order with negative amounts
-    const cancellationOrder = await OrderModel.create({
-      total_amount: -totalCancellationAmount,
-      total_tax: -totalTaxAmount,
-      payment_method: originalOrder.payment_method,
-      status: 'completed',
-      notes: `ANNULATION de la commande #${id} - Raison: ${reason}`
-    });
-
-    // Create negative order items
-    const cancellationItems = [];
-    for (const cancelItem of cancellationDetails) {
-      const negativeItem = await OrderItemModel.create({
-        order_id: cancellationOrder.id,
-        product_id: orderItems.find(oi => oi.id === cancelItem.item_id)?.product_id || undefined,
-        product_name: `[ANNULATION] ${cancelItem.product_name}`,
-        quantity: -cancelItem.quantity,
-        unit_price: cancelItem.unit_price,
-        total_price: -cancelItem.total_price,
-        tax_rate: cancelItem.tax_rate * 100, // Convert back to percentage for storage
-        tax_amount: -cancelItem.tax_amount,
-        happy_hour_applied: false,
-        happy_hour_discount_amount: 0
-      });
-      cancellationItems.push(negativeItem);
-    }
-
-    // Log to legal journal for compliance
-    try {
-      await LegalJournalModel.addEntry(
-        'REFUND',
-        cancellationOrder.id,
-        -totalCancellationAmount,
-        -totalTaxAmount,
-        originalOrder.payment_method || 'cash',
-        {
-          type: 'ORDER_CANCELLATION',
-          original_order_id: id,
-          reason: reason,
-          cancelled_items: cancellationDetails,
-          tax_breakdown: taxBreakdown,
-          total_net_amount: -totalNetAmount,
-          total_tax_amount: -totalTaxAmount,
-          total_amount: -totalCancellationAmount,
-          partial_cancellation: partial_items !== null
-        },
-        (req as any).user ? String((req as any).user.id) : undefined
-      );
-    } catch (journalError) {
-      console.error('Legal journal error (continuing):', journalError);
-    }
-
-    // Log audit trail
-    const ip = req.ip;
-    const userAgent = req.headers['user-agent'];
-    const userId = (req as any).user ? String((req as any).user.id) : undefined;
-    
-    try {
-      await AuditTrailModel.logAction({
-        user_id: userId,
-        action_type: 'CANCEL_ORDER',
-        resource_type: 'ORDER',
-        resource_id: String(id),
-        action_details: { 
-          original_order_id: id,
-          cancellation_order_id: cancellationOrder.id,
-          reason: reason,
-          cancelled_items: cancellationDetails.length,
-          total_cancelled_amount: totalCancellationAmount,
-          total_tax_cancelled: totalTaxAmount,
-          tax_breakdown: taxBreakdown,
-          partial_cancellation: partial_items !== null
-        },
-        ip_address: ip,
-        user_agent: userAgent
-      });
-    } catch (error) {
-      console.error('Audit log error:', error);
-    }
-
-    res.status(201).json({
-      message: partial_items 
-        ? `Annulation partielle effectuée avec succès pour ${cancellationDetails.length} article(s)`
-        : 'Annulation de commande effectuée avec succès',
-      cancellation_order: {
-        id: cancellationOrder.id,
-        original_order_id: id,
-        total_cancelled_amount: totalCancellationAmount,
-        total_net_cancelled: totalNetAmount,
-        total_tax_cancelled: totalTaxAmount,
-        tax_breakdown: taxBreakdown,
-        cancelled_items: cancellationDetails.length,
-        partial_cancellation: partial_items !== null,
-        reason: reason
-      }
-    });
-  } catch (error: any) {
-    console.error('Error cancelling order:', error);
-    res.status(500).json({ 
-      error: 'Échec de l\'annulation de la commande.',
-      details: error.message 
-    });
-  }
-});
 
 // POST quick item return (retour)
 router.post('/retour', requireAuth, async (req, res) => {
   try {
-    const { item, reason } = req.body;
+    const { item, reason, paymentMethod = 'cash' } = req.body;
     if (!item || !reason || typeof reason !== 'string' || !reason.trim()) {
       return res.status(400).json({ error: 'Item and return reason are required' });
     }
+    
+    if (!['cash', 'card'].includes(paymentMethod)) {
+      return res.status(400).json({ error: 'Payment method must be either "cash" or "card"' });
+    }
+    
     // Calculate negative amounts
     const totalPrice = parseFloat(item.totalPrice);
     const taxRate = parseFloat(item.taxRate);
     const itemTaxAmount = totalPrice * taxRate / (1 + taxRate);
     const netAmount = totalPrice - itemTaxAmount;
+    
     // Create negative order
     const order = await OrderModel.create({
       total_amount: -totalPrice,
       total_tax: -itemTaxAmount,
-      payment_method: 'cash', // Default to cash for returns
+      payment_method: paymentMethod,
       status: 'completed',
-      notes: `RETOUR direct - Article: ${item.productName} - Raison: ${reason}`
+      notes: `RETOUR direct - Article: ${item.productName} - Raison: ${reason} - Paiement: ${paymentMethod}`
     });
+    
     // Create negative order item
     const retourItem = await OrderItemModel.create({
       order_id: order.id,
@@ -542,6 +355,7 @@ router.post('/retour', requireAuth, async (req, res) => {
       happy_hour_applied: false,
       happy_hour_discount_amount: 0
     });
+    
     // Log to legal journal
     try {
       await LegalJournalModel.addEntry(
@@ -549,7 +363,7 @@ router.post('/retour', requireAuth, async (req, res) => {
         order.id,
         -totalPrice,
         -itemTaxAmount,
-        'cash',
+        paymentMethod,
         {
           type: 'RETOUR_DIRECT',
           reason,
@@ -557,13 +371,15 @@ router.post('/retour', requireAuth, async (req, res) => {
           quantity: -Math.abs(item.quantity || 1),
           net_amount: -netAmount,
           tax_amount: -itemTaxAmount,
-          total_amount: -totalPrice
+          total_amount: -totalPrice,
+          payment_method: paymentMethod
         },
         (req as any).user ? String((req as any).user.id) : undefined
       );
     } catch (journalError) {
       console.error('Legal journal error (retour):', journalError);
     }
+    
     // Log audit trail
     const ip = req.ip;
     const userAgent = req.headers['user-agent'];
@@ -574,13 +390,14 @@ router.post('/retour', requireAuth, async (req, res) => {
         action_type: 'RETOUR_ITEM',
         resource_type: 'ORDER',
         resource_id: String(order.id),
-        action_details: { retour_item: retourItem, reason },
+        action_details: { retour_item: retourItem, reason, payment_method: paymentMethod },
         ip_address: ip,
         user_agent: userAgent
       });
     } catch (error) {
       console.error('Audit log error (retour):', error);
     }
+    
     res.status(201).json({
       message: 'Retour enregistré avec succès',
       retour_order: order,
@@ -589,6 +406,174 @@ router.post('/retour', requireAuth, async (req, res) => {
   } catch (error: any) {
     console.error('Error processing retour:', error);
     res.status(500).json({ error: 'Erreur lors du retour de l\'article', details: error.message });
+  }
+});
+
+// POST return from history (based on original order payment method)
+router.post('/retour-from-history', requireAuth, async (req, res) => {
+  try {
+    const { originalOrderId, reason, itemsToReturn } = req.body;
+    
+    if (!originalOrderId || !reason || typeof reason !== 'string' || !reason.trim()) {
+      return res.status(400).json({ error: 'Original order ID and return reason are required' });
+    }
+    
+    if (!itemsToReturn || !Array.isArray(itemsToReturn) || itemsToReturn.length === 0) {
+      return res.status(400).json({ error: 'Items to return are required' });
+    }
+    
+    // Get the original order
+    const originalOrder = await OrderModel.getById(originalOrderId);
+    if (!originalOrder) {
+      return res.status(404).json({ error: 'Original order not found' });
+    }
+    
+    if (originalOrder.status !== 'completed') {
+      return res.status(400).json({ error: 'Only completed orders can be returned' });
+    }
+    
+    // Get original order items and sub-bills
+    const originalItems = await OrderItemModel.getByOrderId(originalOrderId);
+    const originalSubBills = originalOrder.payment_method === 'split' 
+      ? await SubBillModel.getByOrderId(originalOrderId) 
+      : [];
+    
+    // Calculate return amounts
+    let totalReturnAmount = 0;
+    let totalReturnTax = 0;
+    const returnItems = [];
+    
+    for (const returnItem of itemsToReturn) {
+      const originalItem = originalItems.find(item => item.id === returnItem.item_id);
+      if (!originalItem) {
+        return res.status(400).json({ error: `Original item ${returnItem.item_id} not found` });
+      }
+      
+      const itemTotalPrice = Math.abs(originalItem.total_price);
+      const itemTaxAmount = Math.abs(originalItem.tax_amount);
+      
+      totalReturnAmount += itemTotalPrice;
+      totalReturnTax += itemTaxAmount;
+      
+      returnItems.push({
+        ...originalItem,
+        total_price: -itemTotalPrice,
+        tax_amount: -itemTaxAmount,
+        quantity: -Math.abs(originalItem.quantity)
+      });
+    }
+    
+    // Create return order with same payment method as original
+    const returnOrder = await OrderModel.create({
+      total_amount: -totalReturnAmount,
+      total_tax: -totalReturnTax,
+      payment_method: originalOrder.payment_method,
+      status: 'completed',
+      notes: `RETOUR basé sur commande #${originalOrderId} - Raison: ${reason}`
+    });
+    
+    // Create return order items
+    const createdReturnItems = [];
+    for (const returnItem of returnItems) {
+      const createdItem = await OrderItemModel.create({
+        order_id: returnOrder.id,
+        product_id: returnItem.product_id,
+        product_name: `[RETOUR] ${returnItem.product_name}`,
+        quantity: returnItem.quantity,
+        unit_price: returnItem.unit_price,
+        total_price: returnItem.total_price,
+        tax_rate: returnItem.tax_rate,
+        tax_amount: returnItem.tax_amount,
+        happy_hour_applied: false,
+        happy_hour_discount_amount: 0
+      });
+      createdReturnItems.push(createdItem);
+    }
+    
+    // Handle split payment returns
+    if (originalOrder.payment_method === 'split' && originalSubBills.length > 0) {
+      // Calculate proportional returns for each sub-bill
+      const originalTotal = originalItems.reduce((sum, item) => sum + Math.abs(item.total_price), 0);
+      
+      for (const originalSubBill of originalSubBills) {
+        const subBillRatio = Math.abs(originalSubBill.amount) / originalTotal;
+        const returnAmount = totalReturnAmount * subBillRatio;
+        
+        if (returnAmount > 0) {
+          await SubBillModel.create({
+            order_id: returnOrder.id,
+            payment_method: originalSubBill.payment_method,
+            amount: -returnAmount,
+            status: 'paid'
+          });
+        }
+      }
+    }
+    
+    // Log to legal journal
+    try {
+      await LegalJournalModel.addEntry(
+        'REFUND',
+        returnOrder.id,
+        -totalReturnAmount,
+        -totalReturnTax,
+        originalOrder.payment_method,
+        {
+          type: 'RETOUR_FROM_HISTORY',
+          original_order_id: originalOrderId,
+          reason,
+          return_items: returnItems.map(item => ({
+            product_name: item.product_name,
+            quantity: item.quantity,
+            total_price: item.total_price,
+            tax_amount: item.tax_amount
+          })),
+          total_return_amount: -totalReturnAmount,
+          total_return_tax: -totalReturnTax,
+          payment_method: originalOrder.payment_method,
+          split_payment: originalOrder.payment_method === 'split'
+        },
+        (req as any).user ? String((req as any).user.id) : undefined
+      );
+    } catch (journalError) {
+      console.error('Legal journal error (retour from history):', journalError);
+    }
+    
+    // Log audit trail
+    const ip = req.ip;
+    const userAgent = req.headers['user-agent'];
+    const userId = (req as any).user ? String((req as any).user.id) : undefined;
+    try {
+      await AuditTrailModel.logAction({
+        user_id: userId,
+        action_type: 'RETOUR_FROM_HISTORY',
+        resource_type: 'ORDER',
+        resource_id: String(returnOrder.id),
+        action_details: { 
+          original_order_id: originalOrderId,
+          return_order_id: returnOrder.id,
+          reason,
+          return_items_count: returnItems.length,
+          total_return_amount: totalReturnAmount,
+          payment_method: originalOrder.payment_method
+        },
+        ip_address: ip,
+        user_agent: userAgent
+      });
+    } catch (error) {
+      console.error('Audit log error (retour from history):', error);
+    }
+    
+    res.status(201).json({
+      message: 'Retour basé sur l\'historique enregistré avec succès',
+      return_order: returnOrder,
+      return_items: createdReturnItems,
+      original_order_id: originalOrderId,
+      payment_method: originalOrder.payment_method
+    });
+  } catch (error: any) {
+    console.error('Error processing retour from history:', error);
+    res.status(500).json({ error: 'Erreur lors du retour basé sur l\'historique', details: error.message });
   }
 });
 
