@@ -108,6 +108,12 @@ This script will:
 ### Database Structure Changes ✅
 - `categories.color` column (VARCHAR(7), default '#1976d2')
 - `order_items.description` column (TEXT, nullable)
+- `pgcrypto` extension for cryptographic functions
+- Updated data types for tips/change columns (numeric(10,2) and numeric(12,2))
+- New constraints for tips/change totals (positive values)
+- Updated legal protection functions with proper error messages
+- New audit trail indexes for better performance
+- Updated foreign key constraints (removed CASCADE behaviors)
 - All required indexes for performance
 - Legal compliance tables (if not already present)
 - Protection functions and triggers

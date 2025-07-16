@@ -8,7 +8,12 @@
 -- This migration includes:
 -- 1. Color field for categories
 -- 2. Description field for order_items
--- 3. Any other structural changes from development
+-- 3. pgcrypto extension for cryptographic functions
+-- 4. Updated legal protection functions
+-- 5. New constraints for tips/change totals
+-- 6. New audit trail indexes
+-- 7. Updated data types for tips/change columns
+-- 8. Updated foreign key constraints
 
 -- =====================================================
 -- STEP 1: Add Color Column to Categories Table
@@ -38,7 +43,97 @@ BEGIN
 END $$;
 
 -- =====================================================
--- STEP 3: Ensure All Required Indexes Exist
+-- STEP 3: Add pgcrypto Extension
+-- =====================================================
+
+-- Add pgcrypto extension for cryptographic functions
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
+
+-- =====================================================
+-- STEP 4: Update Data Types for Tips and Change
+-- =====================================================
+
+-- Update orders table tips and change columns to proper numeric types
+DO $$ 
+BEGIN 
+    -- Update tips column type
+    IF EXISTS (SELECT 1 FROM information_schema.columns 
+               WHERE table_name = 'orders' AND column_name = 'tips' 
+               AND data_type = 'numeric' AND numeric_precision = 10) THEN
+        -- Column already has correct type
+    ELSE
+        ALTER TABLE orders ALTER COLUMN tips TYPE numeric(10,2);
+        ALTER TABLE orders ALTER COLUMN tips SET DEFAULT 0;
+    END IF;
+    
+    -- Update change column type
+    IF EXISTS (SELECT 1 FROM information_schema.columns 
+               WHERE table_name = 'orders' AND column_name = 'change' 
+               AND data_type = 'numeric' AND numeric_precision = 10) THEN
+        -- Column already has correct type
+    ELSE
+        ALTER TABLE orders ALTER COLUMN change TYPE numeric(10,2);
+        ALTER TABLE orders ALTER COLUMN change SET DEFAULT 0;
+    END IF;
+END $$;
+
+-- Update closure_bulletins table tips_total and change_total columns
+DO $$ 
+BEGIN 
+    -- Update tips_total column type
+    IF EXISTS (SELECT 1 FROM information_schema.columns 
+               WHERE table_name = 'closure_bulletins' AND column_name = 'tips_total' 
+               AND data_type = 'numeric' AND numeric_precision = 12) THEN
+        -- Column already has correct type
+    ELSE
+        ALTER TABLE closure_bulletins ALTER COLUMN tips_total TYPE numeric(12,2);
+        ALTER TABLE closure_bulletins ALTER COLUMN tips_total SET DEFAULT 0;
+        ALTER TABLE closure_bulletins ALTER COLUMN tips_total SET NOT NULL;
+    END IF;
+    
+    -- Update change_total column type
+    IF EXISTS (SELECT 1 FROM information_schema.columns 
+               WHERE table_name = 'closure_bulletins' AND column_name = 'change_total' 
+               AND data_type = 'numeric' AND numeric_precision = 12) THEN
+        -- Column already has correct type
+    ELSE
+        ALTER TABLE closure_bulletins ALTER COLUMN change_total TYPE numeric(12,2);
+        ALTER TABLE closure_bulletins ALTER COLUMN change_total SET DEFAULT 0;
+        ALTER TABLE closure_bulletins ALTER COLUMN change_total SET NOT NULL;
+    END IF;
+END $$;
+
+-- =====================================================
+-- STEP 5: Add New Constraints
+-- =====================================================
+
+-- Add constraint for tips and change totals to be positive
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints 
+                   WHERE constraint_name = 'tips_change_positive' 
+                   AND table_name = 'closure_bulletins') THEN
+        ALTER TABLE closure_bulletins 
+        ADD CONSTRAINT tips_change_positive 
+        CHECK (tips_total >= 0 AND change_total >= 0);
+    END IF;
+END $$;
+
+-- Update legal_journal sequence constraint
+DO $$ 
+BEGIN 
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints 
+               WHERE constraint_name = 'sequence_positive' 
+               AND table_name = 'legal_journal') THEN
+        -- Drop and recreate the constraint with updated logic
+        ALTER TABLE legal_journal DROP CONSTRAINT sequence_positive;
+        ALTER TABLE legal_journal 
+        ADD CONSTRAINT sequence_positive CHECK (sequence_number >= 0);
+    END IF;
+END $$;
+
+-- =====================================================
+-- STEP 6: Ensure All Required Indexes Exist
 -- =====================================================
 
 -- Indexes for better performance
@@ -46,6 +141,11 @@ CREATE INDEX IF NOT EXISTS idx_products_category_id ON products(category_id);
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_order_items_product_id ON order_items(product_id);
 CREATE INDEX IF NOT EXISTS idx_sub_bills_order_id ON sub_bills(order_id);
+
+-- New audit trail indexes
+CREATE INDEX IF NOT EXISTS idx_audit_action_time ON audit_trail(action_type, timestamp);
+CREATE INDEX IF NOT EXISTS idx_audit_resource ON audit_trail(resource_type, resource_id);
+CREATE INDEX IF NOT EXISTS idx_audit_user_time ON audit_trail(user_id, timestamp);
 
 -- =====================================================
 -- STEP 4: Ensure Legal Compliance Tables Exist
@@ -135,31 +235,68 @@ CREATE TABLE IF NOT EXISTS business_settings (
 );
 
 -- =====================================================
--- STEP 6: Create Legal Protection Functions
+-- STEP 7: Update Legal Protection Functions
 -- =====================================================
 
--- Function to prevent legal journal modification
+-- Function to prevent legal journal modification (updated version)
 CREATE OR REPLACE FUNCTION prevent_legal_journal_modification()
 RETURNS TRIGGER AS $$
 BEGIN
-    RAISE EXCEPTION 'Legal journal entries cannot be modified for compliance reasons';
-    RETURN NULL;
+    IF TG_OP = 'UPDATE' OR TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'Modification of legal journal is forbidden for legal compliance (Article 286-I-3 bis du CGI)';
+    END IF;
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
--- Function to prevent closed bulletin modification
+-- Function to prevent closed bulletin modification (updated version)
 CREATE OR REPLACE FUNCTION prevent_closed_bulletin_modification()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF OLD.is_closed = TRUE THEN
-        RAISE EXCEPTION 'Closed bulletins cannot be modified for compliance reasons';
+    IF TG_OP = 'UPDATE' AND OLD.is_closed = TRUE THEN
+        RAISE EXCEPTION 'Modification of closed closure bulletin is forbidden for legal compliance';
+    END IF;
+    IF TG_OP = 'DELETE' AND OLD.is_closed = TRUE THEN
+        RAISE EXCEPTION 'Deletion of closed closure bulletin is forbidden for legal compliance';
     END IF;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
 -- =====================================================
--- STEP 7: Apply Protection Triggers
+-- STEP 8: Update Foreign Key Constraints
+-- =====================================================
+
+-- Update legal_journal foreign key constraint
+DO $$ 
+BEGIN 
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints 
+               WHERE constraint_name = 'legal_journal_order_id_fkey' 
+               AND table_name = 'legal_journal') THEN
+        -- Drop and recreate with updated cascade behavior
+        ALTER TABLE legal_journal DROP CONSTRAINT legal_journal_order_id_fkey;
+        ALTER TABLE legal_journal 
+        ADD CONSTRAINT legal_journal_order_id_fkey 
+        FOREIGN KEY (order_id) REFERENCES orders(id);
+    END IF;
+END $$;
+
+-- Update order_items foreign key constraint
+DO $$ 
+BEGIN 
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints 
+               WHERE constraint_name = 'order_items_product_id_fkey' 
+               AND table_name = 'order_items') THEN
+        -- Drop and recreate with updated cascade behavior
+        ALTER TABLE order_items DROP CONSTRAINT order_items_product_id_fkey;
+        ALTER TABLE order_items 
+        ADD CONSTRAINT order_items_product_id_fkey 
+        FOREIGN KEY (product_id) REFERENCES products(id);
+    END IF;
+END $$;
+
+-- =====================================================
+-- STEP 9: Apply Protection Triggers
 -- =====================================================
 
 -- Legal journal protection trigger
@@ -177,7 +314,23 @@ CREATE TRIGGER trigger_prevent_closed_bulletin_modification
     EXECUTE FUNCTION prevent_closed_bulletin_modification();
 
 -- =====================================================
--- STEP 8: Ensure Required Permissions
+-- STEP 10: Add Column Comments
+-- =====================================================
+
+-- Add comment to order_items description column
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM pg_description 
+                   WHERE objoid = (SELECT oid FROM pg_class WHERE relname = 'order_items') 
+                   AND objsubid = (SELECT attnum FROM pg_attribute 
+                                  WHERE attrelid = (SELECT oid FROM pg_class WHERE relname = 'order_items') 
+                                  AND attname = 'description')) THEN
+        COMMENT ON COLUMN order_items.description IS 'Description for special items like Divers, used for traceability and legal compliance';
+    END IF;
+END $$;
+
+-- =====================================================
+-- STEP 11: Ensure Required Permissions
 -- =====================================================
 
 -- Grant necessary permissions (adjust user as needed)
