@@ -199,8 +199,6 @@ export class LegalJournalModel {
     );
     const orders = ordersResult.rows;
 
-
-
     // Populate items for each order (similar to orders API)
     const { OrderItemModel } = require('../models');
     const ordersWithItems = await Promise.all(
@@ -223,14 +221,12 @@ export class LegalJournalModel {
       order.notes && (order.notes.includes('Changement de caisse') || order.notes.includes('Faire de la Monnaie'))
     );
 
-
-
     // Calculate sales totals (excluding change operations)
     const totalTransactions = salesOrders.length;
     const totalAmount = salesOrders.reduce((sum, order) => sum + parseFloat(order.total_amount || '0'), 0);
     const totalVat = salesOrders.reduce((sum, order) => sum + parseFloat(order.total_tax || '0'), 0);
 
-    // VAT breakdown (French rates: 10% and 20%)
+    // VAT breakdown - calculate from item-level data for accuracy
     const vatBreakdown = {
       'vat_10': { amount: 0, vat: 0 },
       'vat_20': { amount: 0, vat: 0 }
@@ -242,27 +238,60 @@ export class LegalJournalModel {
       'card': 0
     };
 
-    // Process sales orders
+    // Process sales orders with item-level VAT calculation
     for (const order of salesOrders) {
       const amount = parseFloat(order.total_amount || '0');
-      const vatAmount = parseFloat(order.total_tax || '0');
       const tips = parseFloat(order.tips || '0');
       const change = parseFloat(order.change || '0');
 
+      // Debug logging for tips
+      if (tips > 0) {
+        console.log(`Processing tips for order ${order.id}: ${tips}€`);
+        console.log(`Before tips - Card: ${paymentBreakdown.card}, Cash: ${paymentBreakdown.cash}`);
+      }
+
+      // Calculate VAT breakdown from items
+      if (order.items && order.items.length > 0) {
+        for (const item of order.items) {
+          const itemTotal = parseFloat(item.total_price || '0');
+          const itemVat = parseFloat(item.tax_amount || '0');
+          const itemTaxRate = parseFloat(item.tax_rate || '0');
+          
+          // Group by tax rate (10% or 20%)
+          if (Math.abs(itemTaxRate - 10) < 0.1) {
+            vatBreakdown.vat_10.amount += itemTotal - itemVat; // Base HT
+            vatBreakdown.vat_10.vat += itemVat;
+          } else if (Math.abs(itemTaxRate - 20) < 0.1) {
+            vatBreakdown.vat_20.amount += itemTotal - itemVat; // Base HT
+            vatBreakdown.vat_20.vat += itemVat;
+          }
+        }
+      }
+
+      // Handle payment methods
       if (order.payment_method === 'split') {
         // For split payments, query the sub_bills table for accurate breakdown
         const subBillsResult = await pool.query(
           `SELECT payment_method, amount FROM sub_bills WHERE order_id = $1`,
           [order.id]
         );
-        subBillsResult.rows.forEach((subBill: any) => {
-          const subAmount = parseFloat(subBill.amount || '0');
-          paymentBreakdown[subBill.payment_method] += subAmount;
-        });
+        
+        if (subBillsResult.rows.length > 0) {
+          // Use sub_bills data if available
+          subBillsResult.rows.forEach((subBill: any) => {
+            const subAmount = parseFloat(subBill.amount || '0');
+            paymentBreakdown[subBill.payment_method] += subAmount;
+          });
+        } else {
+          // Fallback: if no sub_bills found, treat as card payment (most common for split)
+          paymentBreakdown.card += amount;
+        }
+        
         // Only add tip ONCE for split payments
         if (tips > 0) {
           paymentBreakdown.card += tips;
           paymentBreakdown.cash -= tips;
+          console.log(`After tips (split) - Card: ${paymentBreakdown.card}, Cash: ${paymentBreakdown.cash}`);
         }
       } else {
         paymentBreakdown[order.payment_method] += amount;
@@ -270,6 +299,7 @@ export class LegalJournalModel {
         if (tips > 0) {
           paymentBreakdown.card += tips;
           paymentBreakdown.cash -= tips;
+          console.log(`After tips (${order.payment_method}) - Card: ${paymentBreakdown.card}, Cash: ${paymentBreakdown.cash}`);
         }
       }
 
@@ -281,21 +311,7 @@ export class LegalJournalModel {
           paymentBreakdown.card -= change;
         }
       }
-
-      // VAT breakdown (simplified - would need item-level data for accuracy)
-      if (amount > 0) {
-        const vatRate = vatAmount / amount;
-        if (Math.abs(vatRate - 0.083) < 0.01) { // ~10% VAT (10/110)
-          vatBreakdown.vat_10.amount += amount;
-          vatBreakdown.vat_10.vat += vatAmount;
-        } else if (Math.abs(vatRate - 0.167) < 0.01) { // ~20% VAT (20/120)
-          vatBreakdown.vat_20.amount += amount;
-          vatBreakdown.vat_20.vat += vatAmount;
-        }
-      }
     }
-
-
 
     // Process change operations (affect payment breakdown but not sales totals)
     changeOrders.forEach(order => {
@@ -311,7 +327,24 @@ export class LegalJournalModel {
       }
     });
 
+    // Round VAT breakdown to ensure totals match exactly
+    vatBreakdown.vat_10.amount = Math.round(vatBreakdown.vat_10.amount * 100) / 100;
+    vatBreakdown.vat_10.vat = Math.round(vatBreakdown.vat_10.vat * 100) / 100;
+    vatBreakdown.vat_20.amount = Math.round(vatBreakdown.vat_20.amount * 100) / 100;
+    vatBreakdown.vat_20.vat = Math.round(vatBreakdown.vat_20.vat * 100) / 100;
 
+    // Ensure VAT breakdown totals match the calculated total VAT
+    const calculatedTotalVat = vatBreakdown.vat_10.vat + vatBreakdown.vat_20.vat;
+    const difference = totalVat - calculatedTotalVat;
+    
+    // Distribute the rounding difference proportionally
+    if (Math.abs(difference) > 0.01) {
+      if (vatBreakdown.vat_20.vat > 0) {
+        vatBreakdown.vat_20.vat = Math.round((vatBreakdown.vat_20.vat + difference) * 100) / 100;
+      } else if (vatBreakdown.vat_10.vat > 0) {
+        vatBreakdown.vat_10.vat = Math.round((vatBreakdown.vat_10.vat + difference) * 100) / 100;
+      }
+    }
 
     // Calculate tips and change totals
     const tipsTotal = orders.reduce((sum, order) => sum + parseFloat(order.tips || '0'), 0);
@@ -432,7 +465,7 @@ export class LegalJournalModel {
     const totalAmount = salesOrders.reduce((sum, order) => sum + parseFloat(order.total_amount || '0'), 0);
     const totalVat = salesOrders.reduce((sum, order) => sum + parseFloat(order.total_tax || '0'), 0);
 
-    // VAT breakdown (French rates: 10% and 20%)
+    // VAT breakdown - calculate from item-level data for accuracy
     const vatBreakdown = {
       'vat_10': { amount: 0, vat: 0 },
       'vat_20': { amount: 0, vat: 0 }
@@ -444,31 +477,69 @@ export class LegalJournalModel {
       'card': 0
     };
 
-    // Process sales orders
+    // Process sales orders with item-level VAT calculation
     for (const order of salesOrders) {
       const amount = parseFloat(order.total_amount || '0');
-      const vatAmount = parseFloat(order.total_tax || '0');
       const tips = parseFloat(order.tips || '0');
       const change = parseFloat(order.change || '0');
 
+      // Debug logging for tips
+      if (tips > 0) {
+        console.log(`Processing tips for order ${order.id}: ${tips}€`);
+        console.log(`Before tips - Card: ${paymentBreakdown.card}, Cash: ${paymentBreakdown.cash}`);
+      }
+
+      // Calculate VAT breakdown from items
+      if (order.items && order.items.length > 0) {
+        for (const item of order.items) {
+          const itemTotal = parseFloat(item.total_price || '0');
+          const itemVat = parseFloat(item.tax_amount || '0');
+          const itemTaxRate = parseFloat(item.tax_rate || '0');
+          
+          // Group by tax rate (10% or 20%)
+          if (Math.abs(itemTaxRate - 10) < 0.1) {
+            vatBreakdown.vat_10.amount += itemTotal - itemVat; // Base HT
+            vatBreakdown.vat_10.vat += itemVat;
+          } else if (Math.abs(itemTaxRate - 20) < 0.1) {
+            vatBreakdown.vat_20.amount += itemTotal - itemVat; // Base HT
+            vatBreakdown.vat_20.vat += itemVat;
+          }
+        }
+      }
+
+      // Handle payment methods
       if (order.payment_method === 'split') {
         // For split payments, query the sub_bills table for accurate breakdown
         const subBillsResult = await pool.query(
           `SELECT payment_method, amount FROM sub_bills WHERE order_id = $1`,
           [order.id]
         );
-        subBillsResult.rows.forEach((subBill: any) => {
-          const subAmount = parseFloat(subBill.amount || '0');
-          paymentBreakdown[subBill.payment_method] += subAmount;
-        });
+        
+        if (subBillsResult.rows.length > 0) {
+          // Use sub_bills data if available
+          subBillsResult.rows.forEach((subBill: any) => {
+            const subAmount = parseFloat(subBill.amount || '0');
+            paymentBreakdown[subBill.payment_method] += subAmount;
+          });
+        } else {
+          // Fallback: if no sub_bills found, treat as card payment (most common for split)
+          paymentBreakdown.card += amount;
+        }
+        
+        // Handle tips for split payments: add to card (customer pays tip), subtract from cash (you give cash to staff)
+        if (tips > 0) {
+          paymentBreakdown.card += tips;
+          paymentBreakdown.cash -= tips;
+          console.log(`After tips (split) - Card: ${paymentBreakdown.card}, Cash: ${paymentBreakdown.cash}`);
+        }
       } else {
         paymentBreakdown[order.payment_method] += amount;
-      }
-
-      // Handle tips: subtract from cash, add to card
-      if (tips > 0) {
-        paymentBreakdown.cash -= tips;
-        paymentBreakdown.card += tips;
+        // Handle tips: add to card (customer pays tip), subtract from cash (you give cash to staff)
+        if (tips > 0) {
+          paymentBreakdown.card += tips;
+          paymentBreakdown.cash -= tips;
+          console.log(`After tips (${order.payment_method}) - Card: ${paymentBreakdown.card}, Cash: ${paymentBreakdown.cash}`);
+        }
       }
 
       // Handle change: affects the payment method breakdown
@@ -479,17 +550,24 @@ export class LegalJournalModel {
           paymentBreakdown.card -= change;
         }
       }
+    }
 
-      // VAT breakdown (simplified - would need item-level data for accuracy)
-      if (amount > 0) {
-        const vatRate = vatAmount / amount;
-        if (Math.abs(vatRate - 0.083) < 0.01) { // ~10% VAT (10/110)
-          vatBreakdown.vat_10.amount += amount;
-          vatBreakdown.vat_10.vat += vatAmount;
-        } else if (Math.abs(vatRate - 0.167) < 0.01) { // ~20% VAT (20/120)
-          vatBreakdown.vat_20.amount += amount;
-          vatBreakdown.vat_20.vat += vatAmount;
-        }
+    // Round VAT breakdown to ensure totals match exactly
+    vatBreakdown.vat_10.amount = Math.round(vatBreakdown.vat_10.amount * 100) / 100;
+    vatBreakdown.vat_10.vat = Math.round(vatBreakdown.vat_10.vat * 100) / 100;
+    vatBreakdown.vat_20.amount = Math.round(vatBreakdown.vat_20.amount * 100) / 100;
+    vatBreakdown.vat_20.vat = Math.round(vatBreakdown.vat_20.vat * 100) / 100;
+
+    // Ensure VAT breakdown totals match the calculated total VAT
+    const calculatedTotalVat = vatBreakdown.vat_10.vat + vatBreakdown.vat_20.vat;
+    const difference = totalVat - calculatedTotalVat;
+    
+    // Distribute the rounding difference proportionally
+    if (Math.abs(difference) > 0.01) {
+      if (vatBreakdown.vat_20.vat > 0) {
+        vatBreakdown.vat_20.vat = Math.round((vatBreakdown.vat_20.vat + difference) * 100) / 100;
+      } else if (vatBreakdown.vat_10.vat > 0) {
+        vatBreakdown.vat_10.vat = Math.round((vatBreakdown.vat_10.vat + difference) * 100) / 100;
       }
     }
 

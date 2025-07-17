@@ -6,6 +6,7 @@ import { AuditTrailModel } from '../models/auditTrail';
 import { requireAdmin, requireAuth } from './auth';
 import { ClosureScheduler } from '../utils/closureScheduler';
 import { BusinessSettingsModel } from '../models';
+import { ThermalPrintService } from '../utils/thermalPrintService';
 
 const router = express.Router();
 
@@ -1122,7 +1123,7 @@ router.post('/closure/create-daily', async (req, res) => {
     }
     
     // Create the daily closure using the legal model
-    const closure = await LegalJournalModel.createDailyClosure(closureDate);
+    const closure = await LegalJournalModel.createDailyClosure(closureDate, force);
     
 
     res.json({ 
@@ -1542,6 +1543,165 @@ router.get('/stats/monthly-live', async (req, res) => {
   } catch (error) {
     console.error('Error fetching live monthly stats:', error);
     res.status(500).json({ error: 'Failed to fetch live monthly stats' });
+  }
+});
+
+// POST thermal print receipt
+router.post('/receipt/:orderId/thermal-print', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { type = 'detailed' } = req.query;
+    
+    // Get receipt data (reuse existing logic)
+    const orderQuery = `
+      SELECT o.*, 
+             array_agg(oi.*) as items
+      FROM orders o
+      LEFT JOIN order_items oi ON o.id = oi.order_id
+      WHERE o.id = $1
+      GROUP BY o.id
+    `;
+    const orderResult = await pool.query(orderQuery, [orderId]);
+    
+    if (orderResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    
+    const order = orderResult.rows[0];
+    
+    // Fetch order items using OrderItemModel for reliability
+    const { OrderItemModel } = require('../models');
+    const items = await OrderItemModel.getByOrderId(order.id);
+    order.items = items;
+    
+    // Get legal journal entry for this order
+    const journalQuery = `
+      SELECT * FROM legal_journal 
+      WHERE order_id = $1 AND transaction_type = 'SALE'
+      ORDER BY sequence_number DESC
+      LIMIT 1
+    `;
+    const journalResult = await pool.query(journalQuery, [orderId]);
+    const journalEntry = journalResult.rows[0];
+    
+    // Business information
+    const businessInfo = await BusinessSettingsModel.get();
+    if (!businessInfo) {
+      return res.status(500).json({ error: 'Business info not configured' });
+    }
+    
+    // Calculate VAT breakdown
+    let vatBreakdown: Array<{ rate: number, subtotal_ht: number, vat: number }> = [];
+    let totalVat = 0;
+    let totalHT = 0;
+    
+         if (items && items.length > 0) {
+       const vatRates = [...new Set(items.map((item: any) => parseFloat(String(item.tax_rate))))];
+       
+       for (const rate of vatRates) {
+         const rateNumber = rate as number;
+         const rateItems = items.filter((item: any) => Math.abs(parseFloat(String(item.tax_rate)) - rateNumber) < 0.01);
+         const rateSubtotalTTC = rateItems.reduce((sum: number, item: any) => sum + parseFloat(String(item.total_price)), 0);
+         const rateVat = rateSubtotalTTC * (rateNumber / 100) / (1 + rateNumber / 100);
+         const rateSubtotalHT = rateSubtotalTTC - rateVat;
+         
+         vatBreakdown.push({
+           rate: rate as number,
+           subtotal_ht: rateSubtotalHT,
+           vat: rateVat
+         });
+         
+         totalVat += rateVat;
+         totalHT += rateSubtotalHT;
+       }
+     }
+    
+    // Prepare thermal print data
+    const thermalPrintData = {
+      order_id: order.id,
+      sequence_number: journalEntry?.sequence_number || 0,
+      total_amount: parseFloat(String(order.total_amount)),
+      total_tax: totalVat,
+      payment_method: order.payment_method,
+      created_at: order.created_at,
+      items: type === 'detailed' ? order.items?.map((item: any) => ({
+        product_name: item.product_name,
+        quantity: item.quantity,
+        unit_price: parseFloat(String(item.unit_price)),
+        total_price: parseFloat(String(item.total_price)),
+        tax_rate: parseFloat(String(item.tax_rate))
+      })) : undefined,
+                   business_info: {
+        name: businessInfo.name,
+        address: businessInfo.address,
+        phone: businessInfo.phone,
+        email: businessInfo.email,
+        siret: businessInfo.siret,
+        tax_identification: businessInfo.tax_identification
+      },
+      vat_breakdown: vatBreakdown,
+      receipt_type: type as 'detailed' | 'summary',
+      tips: parseFloat(String(order.tips || 0)),
+      change: parseFloat(String(order.change || 0)),
+      compliance_info: {
+        receipt_hash: journalEntry?.current_hash || '',
+        cash_register_id: 'MUSEBAR-CR-001',
+        operator_id: 'OP-001'
+      }
+    };
+    
+    // Print to thermal printer
+    const printResult = await ThermalPrintService.printReceipt(thermalPrintData);
+    
+    if (printResult.success) {
+      res.json({ 
+        success: true, 
+        message: printResult.message,
+        receipt_data: thermalPrintData
+      });
+    } else {
+      res.status(500).json({ 
+        error: 'Print failed', 
+        details: printResult.message 
+      });
+    }
+    
+  } catch (error) {
+    console.error('Error thermal printing receipt:', error);
+    res.status(500).json({ error: 'Failed to print receipt' });
+  }
+});
+
+// GET thermal printer status
+router.get('/thermal-printer/status', async (req, res) => {
+  try {
+    const status = await ThermalPrintService.checkPrinterStatus();
+    res.json(status);
+  } catch (error) {
+    console.error('Error checking printer status:', error);
+    res.status(500).json({ 
+      available: false, 
+      status: 'Error checking printer status' 
+    });
+  }
+});
+
+// POST thermal printer test
+router.post('/thermal-printer/test', async (req, res) => {
+  try {
+    const result = await ThermalPrintService.testPrint();
+    
+    if (result.success) {
+      res.json({ success: true, message: result.message });
+    } else {
+      res.status(500).json({ success: false, message: result.message });
+    }
+  } catch (error) {
+    console.error('Error testing thermal printer:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error testing thermal printer' 
+    });
   }
 });
 
