@@ -10,7 +10,13 @@
     "build": "tsc",
     "start": "node dist/app.js"
   },
-  "keywords": ["pos", "restaurant", "bar", "legal-compliance", "point-of-sale"],
+  "keywords": [
+    "pos",
+    "restaurant",
+    "bar",
+    "legal-compliance",
+    "point-of-sale"
+  ],
   "license": "PROPRIETARY",
   "dependencies": {
     "@types/express": "^4.17.23",

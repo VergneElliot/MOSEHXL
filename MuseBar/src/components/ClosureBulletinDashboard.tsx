@@ -269,6 +269,8 @@ const ClosureBulletinDashboard: React.FC = () => {
   const handlePrintBulletin = (bulletin: ClosureBulletin) => {
     setPrintBulletin(bulletin);
     setPrintDialogOpen(true);
+    // Note: Closure bulletins should also use thermal printing if available
+    // For now, keeping window.print() for closure bulletins - can be enhanced later
     setTimeout(() => window.print(), 300); // Give dialog time to render
   };
 
@@ -745,10 +747,12 @@ const ClosureBulletinDashboard: React.FC = () => {
                                 {selectedBulletin.vat_breakdown && (
                                   <>
                                     <Typography variant="body2" sx={{ ml: 1 }}>
-                                      10%: {formatCurrency(selectedBulletin.vat_breakdown.vat_10?.vat || 0)} (base: {formatCurrency(selectedBulletin.vat_breakdown.vat_10?.amount || 0)})
+                                      10%: {formatCurrency(selectedBulletin.vat_breakdown.vat_10?.vat || 0)}
+                                      {/* Hide base HT for certification compliance - uncomment to show: (base: {formatCurrency(selectedBulletin.vat_breakdown.vat_10?.amount || 0)}) */}
                                     </Typography>
                                     <Typography variant="body2" sx={{ ml: 1 }}>
-                                      20%: {formatCurrency(selectedBulletin.vat_breakdown.vat_20?.vat || 0)} (base: {formatCurrency(selectedBulletin.vat_breakdown.vat_20?.amount || 0)})
+                                      20%: {formatCurrency(selectedBulletin.vat_breakdown.vat_20?.vat || 0)}
+                                      {/* Hide base HT for certification compliance - uncomment to show: (base: {formatCurrency(selectedBulletin.vat_breakdown.vat_20?.amount || 0)}) */}
                                     </Typography>
                                   </>
                                 )}
@@ -911,8 +915,8 @@ const ClosureBulletinDashboard: React.FC = () => {
               <Typography variant="body2"><b>Transactions:</b> {printBulletin.total_transactions}</Typography>
               <Typography variant="body2"><b>Total TTC:</b> {formatCurrency(printBulletin.total_amount)}</Typography>
               <Typography variant="body2"><b>TVA collectée:</b> {formatCurrency(printBulletin.total_vat)}</Typography>
-              <Typography variant="body2"><b>TVA 10%:</b> {formatCurrency(printBulletin.vat_breakdown.vat_10?.vat || 0)} (base: {formatCurrency(printBulletin.vat_breakdown.vat_10?.amount || 0)})</Typography>
-              <Typography variant="body2"><b>TVA 20%:</b> {formatCurrency(printBulletin.vat_breakdown.vat_20?.vat || 0)} (base: {formatCurrency(printBulletin.vat_breakdown.vat_20?.amount || 0)})</Typography>
+              <Typography variant="body2"><b>TVA 10%:</b> {formatCurrency(printBulletin.vat_breakdown.vat_10?.vat || 0)}</Typography>
+              <Typography variant="body2"><b>TVA 20%:</b> {formatCurrency(printBulletin.vat_breakdown.vat_20?.vat || 0)}</Typography>
               <Typography variant="body2"><b>Espèces:</b> {formatCurrency(printBulletin.payment_methods_breakdown.cash || 0)}</Typography>
               <Typography variant="body2"><b>Carte:</b> {formatCurrency(printBulletin.payment_methods_breakdown.card || 0)}</Typography>
               <Typography variant="body2"><b>Pourboires:</b> {formatCurrency(printBulletin.tips_total || 0)}</Typography>

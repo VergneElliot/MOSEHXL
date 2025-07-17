@@ -41,7 +41,8 @@ import {
   CreditCard, 
   Money,
   Print,
-  SwapHoriz as SwapHorizIcon
+  SwapHoriz as SwapHorizIcon,
+  Cancel as CancelIcon
 } from '@mui/icons-material';
 import { ApiService } from '../services/apiService';
 import { Order } from '../types';
@@ -76,6 +77,14 @@ const HistoryDashboard: React.FC = () => {
   const [returnLoading, setReturnLoading] = useState(false);
   const [returnSuccess, setReturnSuccess] = useState('');
   const [returnError, setReturnError] = useState('');
+
+  // Cancellation dialog state
+  const [cancellationDialogOpen, setCancellationDialogOpen] = useState(false);
+  const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
+  const [cancellationReason, setCancellationReason] = useState('');
+  const [cancellationLoading, setCancellationLoading] = useState(false);
+  const [cancellationSuccess, setCancellationSuccess] = useState('');
+  const [cancellationError, setCancellationError] = useState('');
 
   const apiService = ApiService.getInstance();
 
@@ -241,6 +250,59 @@ const HistoryDashboard: React.FC = () => {
       setSelectedItemsToReturn(prev => [...prev, itemId]);
     } else {
       setSelectedItemsToReturn(prev => prev.filter(id => id !== itemId));
+    }
+  };
+
+  // Cancellation functions
+  const handleOpenCancellationDialog = (order: Order) => {
+    if (order.status !== 'completed') {
+      setCancellationError('Seules les commandes terminées peuvent être annulées');
+      return;
+    }
+    setOrderToCancel(order);
+    setCancellationDialogOpen(true);
+    setCancellationReason('');
+    setCancellationError('');
+    setCancellationSuccess('');
+  };
+
+  const handleCloseCancellationDialog = () => {
+    setCancellationDialogOpen(false);
+    setOrderToCancel(null);
+    setCancellationReason('');
+    setCancellationError('');
+    setCancellationSuccess('');
+  };
+
+  const handleCancelOrder = async () => {
+    if (!orderToCancel || !cancellationReason.trim()) {
+      setCancellationError('Veuillez fournir une raison pour l\'annulation');
+      return;
+    }
+
+    setCancellationLoading(true);
+    setCancellationError('');
+
+    try {
+      const response = await apiService.post('/orders/cancel-order', {
+        orderId: parseInt(orderToCancel.id),
+        reason: cancellationReason.trim()
+      });
+      
+      setCancellationSuccess((response.data as any).message);
+      
+      // Refresh orders list
+      await loadOrders();
+      
+      // Close dialog after a short delay
+      setTimeout(() => {
+        handleCloseCancellationDialog();
+      }, 2000);
+      
+    } catch (error: any) {
+      setCancellationError(error.response?.data?.error || 'Erreur lors de l\'annulation de la commande');
+    } finally {
+      setCancellationLoading(false);
     }
   };
 
@@ -572,6 +634,17 @@ const HistoryDashboard: React.FC = () => {
                                       Retour basé sur historique
                                     </Button>
                                   )}
+                                  {selectedOrder.status === 'completed' && (
+                                    <Button
+                                      variant="outlined"
+                                      color="error"
+                                      size="small"
+                                      startIcon={<CancelIcon />}
+                                      onClick={() => handleOpenCancellationDialog(selectedOrder)}
+                                    >
+                                      Annuler commande complète
+                                    </Button>
+                                  )}
                                 </Box>
                               </Box>
                             </TableCell>
@@ -746,6 +819,108 @@ const HistoryDashboard: React.FC = () => {
         </DialogActions>
       </Dialog>
 
+      {/* Cancellation Dialog */}
+      <Dialog 
+        open={cancellationDialogOpen} 
+        onClose={handleCloseCancellationDialog} 
+        maxWidth="md" 
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <CancelIcon color="error" />
+          Annulation complète - Commande #{orderToCancel?.id}
+        </DialogTitle>
+        <DialogContent>
+          {cancellationError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {cancellationError}
+            </Alert>
+          )}
+          
+          {cancellationSuccess && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              {cancellationSuccess}
+            </Alert>
+          )}
+
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            ⚠️ Cette action annulera complètement la commande et créera des montants négatifs pour:
+          </Typography>
+
+          {/* Order Summary */}
+          {orderToCancel && (
+            <Box sx={{ mb: 3, p: 2, border: '1px solid #ffcdd2', borderRadius: 1, background: '#ffebee' }}>
+              <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 'bold', color: '#c62828' }}>
+                📋 Résumé de l'annulation:
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <Typography variant="body2">
+                    <strong>Montant commande:</strong> -{orderToCancel.finalAmount.toFixed(2)} €
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>TVA:</strong> -{orderToCancel.taxAmount.toFixed(2)} €
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2">
+                    <strong>Pourboire:</strong> {orderToCancel.tips && Number(orderToCancel.tips) > 0 ? `-${Number(orderToCancel.tips).toFixed(2)} €` : '0.00 €'}
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>Monnaie rendue:</strong> {orderToCancel.change && Number(orderToCancel.change) > 0 ? `+${Number(orderToCancel.change).toFixed(2)} €` : '0.00 €'}
+                  </Typography>
+                </Grid>
+              </Grid>
+              <Divider sx={{ my: 1.5 }} />
+              <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#c62828' }}>
+                <strong>Total remboursé:</strong> -{(orderToCancel.finalAmount + (Number(orderToCancel.tips) || 0) - (Number(orderToCancel.change) || 0)).toFixed(2)} €
+              </Typography>
+            </Box>
+          )}
+
+          {/* Payment Method Info */}
+          {orderToCancel && (
+            <Box sx={{ mb: 3, p: 2, border: '1px solid #ddd', borderRadius: 1, background: '#fff3e0' }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: '#e65100' }}>
+                💳 Mode de paiement original: {orderToCancel.paymentMethod === 'split' ? 'Paiement partagé' : 
+                  orderToCancel.paymentMethod === 'card' ? 'Carte' : 'Espèces'}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Le remboursement respectera le mode de paiement original de la commande.
+              </Typography>
+            </Box>
+          )}
+
+          {/* Reason */}
+          <TextField
+            fullWidth
+            label="Raison de l'annulation (obligatoire)"
+            multiline
+            rows={3}
+            value={cancellationReason}
+            onChange={(e) => setCancellationReason(e.target.value)}
+            placeholder="Ex: Erreur de commande, demande client, test système..."
+            required
+            error={cancellationReason.trim() === '' && cancellationError !== ''}
+            helperText="Cette raison sera enregistrée dans le journal légal pour conformité fiscale"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseCancellationDialog} disabled={cancellationLoading}>
+            Annuler
+          </Button>
+          <Button
+            onClick={handleCancelOrder}
+            color="error"
+            variant="contained"
+            disabled={cancellationLoading || cancellationReason.trim() === ''}
+            startIcon={cancellationLoading ? <CircularProgress size={20} /> : <CancelIcon />}
+          >
+            {cancellationLoading ? 'Annulation...' : 'Confirmer l\'annulation'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Receipt Dialog */}
       <Dialog open={receiptDialogOpen} onClose={() => setReceiptDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>
@@ -797,9 +972,34 @@ const HistoryDashboard: React.FC = () => {
           <Button 
             startIcon={<Print />} 
             variant="outlined"
+            onClick={async () => {
+              try {
+                const response = await fetch(`http://localhost:3001/api/legal/receipt/${currentReceipt.order_id}/thermal-print?type=${receiptType}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (response.ok) {
+                  const result = await response.json();
+                  alert('Reçu imprimé avec succès sur l\'imprimante thermique!');
+                } else {
+                  const error = await response.json();
+                  alert(`Erreur d'impression: ${error.details || error.error}`);
+                }
+              } catch (error) {
+                console.error('Error thermal printing:', error);
+                alert('Erreur lors de l\'impression thermique');
+              }
+            }}
+          >
+            Imprimer (Thermique)
+          </Button>
+          <Button 
+            startIcon={<Print />} 
+            variant="text"
             onClick={() => window.print()}
           >
-            Imprimer
+            Aperçu navigateur
           </Button>
           <Button onClick={() => setReceiptDialogOpen(false)}>Fermer</Button>
         </DialogActions>

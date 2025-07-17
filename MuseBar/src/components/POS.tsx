@@ -157,6 +157,8 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
       isHappyHourApplied
     };
     setCurrentOrder(prev => [...prev, newItem]);
+    // Reset search query when item is added
+    setSearchQuery('');
   };
 
   const handleRemoveFromOrder = (itemId: string) => {
@@ -284,6 +286,10 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
       setSnackbar({ open: true, message: 'Aucun article dans la commande', severity: 'error' });
       return;
     }
+    // Reset to default payment method (card) when opening payment dialog
+    setCurrentPaymentMethod('card');
+    setCardAmount(orderCalculations.finalAmount.toString());
+    setCashAmount('');
     setPaymentDialogOpen(true);
   };
 
@@ -508,28 +514,30 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                   />
                 </Box>
                 
-                {/* Catégories */}
-                <Box>
-                  <Button
-                    variant={selectedCategory === '' ? 'contained' : 'outlined'}
-                    onClick={() => setSelectedCategory('')}
-                    sx={{ mr: 1, mb: 1, fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
-                    size="small"
-                  >
-                    Tout
-                  </Button>
-                  {categories.map((category) => (
+                {/* Catégories - Only show when not searching */}
+                {!searchQuery && (
+                  <Box>
                     <Button
-                      key={category.id}
-                      variant={selectedCategory === category.id ? 'contained' : 'outlined'}
-                      onClick={() => setSelectedCategory(category.id)}
+                      variant={selectedCategory === '' ? 'contained' : 'outlined'}
+                      onClick={() => setSelectedCategory('')}
                       sx={{ mr: 1, mb: 1, fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
                       size="small"
                     >
-                      {category.name}
+                      Tout
                     </Button>
-                  ))}
-                </Box>
+                    {categories.map((category) => (
+                      <Button
+                        key={category.id}
+                        variant={selectedCategory === category.id ? 'contained' : 'outlined'}
+                        onClick={() => setSelectedCategory(category.id)}
+                        sx={{ mr: 1, mb: 1, fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                        size="small"
+                      >
+                        {category.name}
+                      </Button>
+                    ))}
+                  </Box>
+                )}
               </Box>
 
               {/* Scrollable products grid */}
@@ -553,54 +561,56 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
               }}>
                 {/* Produits */}
                 <Grid container spacing={2}>
-                  {/* DIVERS BUTTON - always visible as first item */}
-                  <Grid item xs={12} sm={6} md={4} lg={3} key="divers">
-                    <Card 
-                      sx={{ 
-                        cursor: 'pointer',
-                        height: { xs: 'auto', sm: '140px' },
-                        minHeight: '120px',
-                        border: '2px dashed',
-                        borderColor: 'secondary.main',
-                        bgcolor: 'secondary.light',
-                        '&:hover': { 
-                          backgroundColor: 'secondary.main',
-                          color: 'white'
-                        }
-                      }}
-                      onClick={() => setDiversDialogOpen(true)}
-                    >
-                      <CardContent sx={{ p: { xs: 1.5, sm: 2 }, textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                        <Typography 
-                          variant="h6" 
-                          sx={{ 
-                            fontSize: { xs: '1rem', sm: '1.25rem' },
-                            mb: 0.5,
-                            fontWeight: 'bold'
-                          }}
-                        >
-                          Divers
-                        </Typography>
-                        <Typography 
-                          variant="body2" 
-                          color="text.secondary"
-                          sx={{ 
-                            fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                            mb: 1
-                          }}
-                        >
-                          Prix flexible
-                        </Typography>
-                        <Typography 
-                          variant="h6" 
-                          color="primary"
-                          sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}
-                        >
-                          €€€
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
+                  {/* DIVERS BUTTON - only visible when not searching */}
+                  {!searchQuery && (
+                    <Grid item xs={12} sm={6} md={4} lg={3} key="divers">
+                      <Card 
+                        sx={{ 
+                          cursor: 'pointer',
+                          height: { xs: 'auto', sm: '140px' },
+                          minHeight: '120px',
+                          border: '2px dashed',
+                          borderColor: 'secondary.main',
+                          bgcolor: 'secondary.light',
+                          '&:hover': { 
+                            backgroundColor: 'secondary.main',
+                            color: 'white'
+                          }
+                        }}
+                        onClick={() => setDiversDialogOpen(true)}
+                      >
+                        <CardContent sx={{ p: { xs: 1.5, sm: 2 }, textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                          <Typography 
+                            variant="h6" 
+                            sx={{ 
+                              fontSize: { xs: '1rem', sm: '1.25rem' },
+                              mb: 0.5,
+                              fontWeight: 'bold'
+                            }}
+                          >
+                            Divers
+                          </Typography>
+                          <Typography 
+                            variant="body2" 
+                            color="text.secondary"
+                            sx={{ 
+                              fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                              mb: 1
+                            }}
+                          >
+                            Prix flexible
+                          </Typography>
+                          <Typography 
+                            variant="h6" 
+                            color="primary"
+                            sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}
+                          >
+                            €€€
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  )}
                   
                   {/* Existing products */}
                   {activeProducts
@@ -1505,7 +1515,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
         <DialogActions>
           <Button onClick={() => {
             setPaymentDialogOpen(false);
-            setCurrentPaymentMethod('cash');
+            setCurrentPaymentMethod('card');
             setCashAmount('');
             setCardAmount('');
             setSubBills([]);
@@ -1565,11 +1575,11 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                       setSnackbar({ open: true, message: 'Le total ne correspond pas au montant à payer', severity: 'error' });
                       return;
                     }
-                    const sub_bills = subBills.flatMap(bill => bill.payments
-                      .filter(p => p.method === 'cash' || p.method === 'card')
-                      .map(p => ({ payment_method: p.method as 'cash' | 'card', amount: p.amount }))
-                    );
-                    const totalTips = subBills.reduce((sum, bill) => sum + (parseFloat(bill.tip ?? '0') || 0), 0);
+                    const sub_bills = [
+                      { payment_method: 'cash' as const, amount: cash },
+                      { payment_method: 'card' as const, amount: card }
+                    ].filter(bill => bill.amount > 0);
+                    
                     const savedOrder = await apiService.createOrder({
                       items: currentOrder,
                       totalAmount: orderCalculations.finalAmount,
@@ -1577,7 +1587,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                       paymentMethod: 'split',
                       status: 'completed',
                       notes: `Paiement split - Espèces: ${cash.toFixed(2)}€, Carte: ${card.toFixed(2)}€`,
-                      tips: totalTips,
+                      tips: parseFloat(tips || '0'),
                       change: parseFloat(change || '0'),
                       sub_bills
                     });
@@ -1892,12 +1902,46 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
           <Button 
             startIcon={<Print />} 
             variant="outlined"
-            onClick={() => {
-              // Print functionality would go here
-              window.print();
+            onClick={async () => {
+              try {
+                const response = await fetch(`http://localhost:3001/api/legal/receipt/${currentReceipt.order_id}/thermal-print?type=${receiptType}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (response.ok) {
+                  const result = await response.json();
+                  setSnackbar({ 
+                    open: true, 
+                    message: 'Reçu imprimé avec succès sur l\'imprimante thermique!', 
+                    severity: 'success' 
+                  });
+                } else {
+                  const error = await response.json();
+                  setSnackbar({ 
+                    open: true, 
+                    message: `Erreur d'impression: ${error.details || error.error}`, 
+                    severity: 'error' 
+                  });
+                }
+              } catch (error) {
+                console.error('Error thermal printing:', error);
+                setSnackbar({ 
+                  open: true, 
+                  message: 'Erreur lors de l\'impression thermique', 
+                  severity: 'error' 
+                });
+              }
             }}
           >
-            Imprimer
+            Imprimer (Thermique)
+          </Button>
+          <Button 
+            startIcon={<Print />} 
+            variant="text"
+            onClick={() => window.print()}
+          >
+            Aperçu navigateur
           </Button>
           <Button onClick={() => setReceiptDialogOpen(false)}>Fermer</Button>
         </DialogActions>

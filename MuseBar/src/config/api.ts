@@ -31,7 +31,8 @@ class ApiConfig {
     const possibleUrls = [
       `http://${currentHost}:3001`, // Same host as frontend
       'http://localhost:3001',      // Local fallback
-      'http://127.0.0.1:3001'       // IP fallback
+      'http://127.0.0.1:3001',      // IP fallback
+      'http://192.168.0.152:3001'   // Network IP fallback
     ];
 
     // Add custom backend URL from environment if available
