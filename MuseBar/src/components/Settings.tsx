@@ -389,8 +389,70 @@ const Settings: React.FC = () => {
           </Card>
         </Grid>
 
+        {/* Thermal Printer Settings */}
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                🖨️ Imprimante Thermique
+              </Typography>
+              
+              <Box sx={{ mb: 2 }}>
+                <Button
+                  variant="outlined"
+                  onClick={async () => {
+                    try {
+                      const response = await fetch('http://localhost:3001/api/legal/thermal-printer/status');
+                      const status = await response.json();
+                      
+                      if (status.available) {
+                        alert(`✅ Imprimante disponible: ${status.status}`);
+                      } else {
+                        alert(`❌ Imprimante non disponible: ${status.status}`);
+                      }
+                    } catch (error) {
+                      alert('❌ Erreur lors de la vérification du statut de l\'imprimante');
+                    }
+                  }}
+                  sx={{ mr: 1, mb: 1 }}
+                >
+                  Vérifier le Statut
+                </Button>
+                
+                <Button
+                  variant="contained"
+                  onClick={async () => {
+                    try {
+                      const response = await fetch('http://localhost:3001/api/legal/thermal-printer/test', {
+                        method: 'POST'
+                      });
+                      const result = await response.json();
+                      
+                      if (result.success) {
+                        alert('✅ Test d\'impression réussi! Vérifiez l\'imprimante.');
+                      } else {
+                        alert(`❌ Échec du test: ${result.message}`);
+                      }
+                    } catch (error) {
+                      alert('❌ Erreur lors du test d\'impression');
+                    }
+                  }}
+                  sx={{ mb: 1 }}
+                >
+                  Test d'Impression
+                </Button>
+              </Box>
+              
+              <Alert severity="info" sx={{ fontSize: '0.875rem' }}>
+                <strong>Imprimante configurée:</strong> Oxhoo TP85v Network<br />
+                Utilisez ces boutons pour tester la connectivité et l'impression thermique.
+              </Alert>
+            </CardContent>
+          </Card>
+        </Grid>
+
         {/* Compliance Information */}
-        <Grid item xs={12}>
+        <Grid item xs={12} md={6}>
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>

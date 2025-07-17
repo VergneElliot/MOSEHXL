@@ -373,7 +373,14 @@ export class ApiService {
       createdAt: new Date(result.created_at),
       status: result.status,
       paymentMethod: order.paymentMethod,
-      subBills: []
+      subBills: (result.sub_bills || []).map((subBill: any) => ({
+        id: subBill.id.toString(),
+        orderId: result.id.toString(),
+        paymentMethod: subBill.payment_method as 'cash' | 'card',
+        amount: parseFloat(subBill.amount),
+        status: subBill.status as 'pending' | 'paid',
+        createdAt: new Date(subBill.created_at)
+      }))
     };
   }
 
