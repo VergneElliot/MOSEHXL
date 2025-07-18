@@ -117,6 +117,20 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
     // La réduction Happy Hour est déjà appliquée dans le totalPrice
     const discountAmount = 0; // On ne double pas la réduction
     const finalAmount = subtotal;
+    
+    // Validation: ensure finalAmount matches subtotal
+    if (Math.abs(finalAmount - subtotal) > 0.01) {
+      console.error('❌ CALCULATION ERROR: finalAmount does not match subtotal', {
+        finalAmount,
+        subtotal,
+        currentOrder: currentOrder.map(item => ({
+          name: item.productName,
+          price: item.totalPrice,
+          taxRate: item.taxRate
+        }))
+      });
+    }
+    
     return {
       subtotal,
       taxAmount,
@@ -1531,6 +1545,22 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                       setSnackbar({ open: true, message: 'Montant insuffisant', severity: 'error' });
                       return;
                     }
+                    
+                    // Validate order total before sending
+                    const expectedTotal = currentOrder.reduce((sum, item) => sum + item.totalPrice, 0);
+                    if (Math.abs(orderCalculations.finalAmount - expectedTotal) > 0.01) {
+                      console.error('❌ ORDER VALIDATION ERROR: Total mismatch detected', {
+                        orderCalculations: orderCalculations.finalAmount,
+                        expectedTotal,
+                        currentOrder: currentOrder.map(item => ({
+                          name: item.productName,
+                          price: item.totalPrice
+                        }))
+                      });
+                      setSnackbar({ open: true, message: 'Erreur de calcul détectée. Veuillez réessayer.', severity: 'error' });
+                      return;
+                    }
+                    
                     // Handle cash payment
                     const savedOrder = await apiService.createOrder({
                       items: currentOrder,
@@ -1550,6 +1580,22 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                     await handlePaymentCompletion(savedOrder);
                   } else if (currentPaymentMethod === 'card') {
                     // Handle card payment (exact amount)
+                    
+                    // Validate order total before sending
+                    const expectedTotal = currentOrder.reduce((sum, item) => sum + item.totalPrice, 0);
+                    if (Math.abs(orderCalculations.finalAmount - expectedTotal) > 0.01) {
+                      console.error('❌ ORDER VALIDATION ERROR: Total mismatch detected', {
+                        orderCalculations: orderCalculations.finalAmount,
+                        expectedTotal,
+                        currentOrder: currentOrder.map(item => ({
+                          name: item.productName,
+                          price: item.totalPrice
+                        }))
+                      });
+                      setSnackbar({ open: true, message: 'Erreur de calcul détectée. Veuillez réessayer.', severity: 'error' });
+                      return;
+                    }
+                    
                     const savedOrder = await apiService.createOrder({
                       items: currentOrder,
                       totalAmount: orderCalculations.finalAmount,
@@ -1575,6 +1621,22 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                       setSnackbar({ open: true, message: 'Le total ne correspond pas au montant à payer', severity: 'error' });
                       return;
                     }
+                    
+                    // Validate order total before sending
+                    const expectedTotal = currentOrder.reduce((sum, item) => sum + item.totalPrice, 0);
+                    if (Math.abs(orderCalculations.finalAmount - expectedTotal) > 0.01) {
+                      console.error('❌ ORDER VALIDATION ERROR: Total mismatch detected', {
+                        orderCalculations: orderCalculations.finalAmount,
+                        expectedTotal,
+                        currentOrder: currentOrder.map(item => ({
+                          name: item.productName,
+                          price: item.totalPrice
+                        }))
+                      });
+                      setSnackbar({ open: true, message: 'Erreur de calcul détectée. Veuillez réessayer.', severity: 'error' });
+                      return;
+                    }
+                    
                     const sub_bills = [
                       { payment_method: 'cash' as const, amount: cash },
                       { payment_method: 'card' as const, amount: card }

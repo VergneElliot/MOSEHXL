@@ -39,6 +39,37 @@ interface ReceiptData {
   };
 }
 
+interface ClosureBulletinData {
+  id: number;
+  closure_type: 'DAILY' | 'MONTHLY' | 'ANNUAL';
+  period_start: string;
+  period_end: string;
+  total_transactions: number;
+  total_amount: number;
+  total_vat: number;
+  vat_breakdown: {
+    vat_10: { amount: number; vat: number };
+    vat_20: { amount: number; vat: number };
+  };
+  payment_methods_breakdown: { [key: string]: number };
+  first_sequence: number;
+  last_sequence: number;
+  closure_hash: string;
+  is_closed: boolean;
+  closed_at: string | null;
+  created_at: string;
+  tips_total?: number;
+  change_total?: number;
+  business_info: {
+    name: string;
+    address: string;
+    phone: string;
+    email: string;
+    siret?: string;
+    tax_identification?: string;
+  };
+}
+
 export class ThermalPrintService {
   private static readonly PRINTER_NAME = 'Oxhoo-TP85v-Network';
   private static readonly TEMP_DIR = '/tmp';
@@ -175,7 +206,115 @@ export class ThermalPrintService {
     
     return content;
   }
-  
+
+  /**
+   * Generate thermal closure bulletin content in ESC/POS format
+   */
+  private static generateClosureBulletinContent(data: ClosureBulletinData): string {
+    let content = '';
+    
+    // Initialize printer
+    content += this.INIT;
+    
+    // Header - Business Info
+    content += this.CENTER + this.BOLD_ON + this.DOUBLE_HEIGHT;
+    content += data.business_info.name + '\n';
+    content += this.NORMAL_SIZE + this.BOLD_OFF;
+    content += data.business_info.address + '\n';
+    content += `Tel: ${data.business_info.phone}\n`;
+    content += `Email: ${data.business_info.email}\n`;
+    
+    if (data.business_info.siret) {
+      content += `SIRET: ${data.business_info.siret}\n`;
+    }
+    if (data.business_info.tax_identification) {
+      content += `TVA: ${data.business_info.tax_identification}\n`;
+    }
+    
+    // Separator
+    content += this.LEFT;
+    content += '================================\n';
+    
+    // Closure Bulletin Header
+    content += this.CENTER + this.BOLD_ON + this.DOUBLE_HEIGHT;
+    content += 'BULLETIN DE CLOTURE\n';
+    content += this.NORMAL_SIZE + this.BOLD_OFF;
+    
+    // Closure Type and Period
+    content += this.BOLD_ON;
+    content += `Type: ${this.formatClosureType(data.closure_type)}\n`;
+    content += this.BOLD_OFF;
+    content += `Periode: ${new Date(data.period_start).toLocaleDateString('fr-FR')}\n`;
+    content += `         ${new Date(data.period_end).toLocaleDateString('fr-FR')}\n`;
+    content += `Bulletin #${data.id}\n`;
+    
+    content += '================================\n';
+    
+    // Summary Information
+    content += this.BOLD_ON + 'RESUME PERIODE:\n' + this.BOLD_OFF;
+    content += '--------------------------------\n';
+    content += this.padLine('Transactions:', `${data.total_transactions}`, 32) + '\n';
+    content += this.padLine('Total TTC:', `${data.total_amount.toFixed(2)} EUR`, 32) + '\n';
+    content += this.padLine('TVA collectee:', `${data.total_vat.toFixed(2)} EUR`, 32) + '\n';
+    
+    // VAT Breakdown
+    content += '--------------------------------\n';
+    content += this.BOLD_ON + 'DETAIL TVA:\n' + this.BOLD_OFF;
+    if (data.vat_breakdown.vat_10) {
+      content += this.padLine('TVA 10%:', `${data.vat_breakdown.vat_10.vat.toFixed(2)} EUR`, 32) + '\n';
+    }
+    if (data.vat_breakdown.vat_20) {
+      content += this.padLine('TVA 20%:', `${data.vat_breakdown.vat_20.vat.toFixed(2)} EUR`, 32) + '\n';
+    }
+    
+    // Payment Methods Breakdown
+    content += '--------------------------------\n';
+    content += this.BOLD_ON + 'MODES DE PAIEMENT:\n' + this.BOLD_OFF;
+    if (data.payment_methods_breakdown.cash) {
+      content += this.padLine('Especes:', `${data.payment_methods_breakdown.cash.toFixed(2)} EUR`, 32) + '\n';
+    }
+    if (data.payment_methods_breakdown.card) {
+      content += this.padLine('Carte:', `${data.payment_methods_breakdown.card.toFixed(2)} EUR`, 32) + '\n';
+    }
+    
+    // Tips and Change
+    if (data.tips_total && data.tips_total > 0) {
+      content += this.padLine('Pourboires:', `${data.tips_total.toFixed(2)} EUR`, 32) + '\n';
+    }
+    if (data.change_total && data.change_total > 0) {
+      content += this.padLine('Monnaie rendue:', `${data.change_total.toFixed(2)} EUR`, 32) + '\n';
+    }
+    
+    // Sequences
+    content += '--------------------------------\n';
+    content += this.BOLD_ON + 'SEQUENCES:\n' + this.BOLD_OFF;
+    content += this.padLine('Premiere:', `${data.first_sequence}`, 32) + '\n';
+    content += this.padLine('Derniere:', `${data.last_sequence}`, 32) + '\n';
+    
+    content += '================================\n';
+    
+    // Footer
+    content += this.CENTER;
+    content += 'CLOTURE DEFINITIVE\n';
+    content += 'Conformite fiscale\n\n';
+    
+    // Legal compliance info
+    content += this.LEFT;
+    content += `Ref. legale: Article 286-I-3 bis du CGI\n`;
+    content += `Registre: MUSEBAR-REG-001\n`;
+    content += `Hash: ${data.closure_hash.substring(0, 16)}...\n`;
+    content += `Cree le: ${new Date(data.created_at).toLocaleString('fr-FR')}\n`;
+    if (data.closed_at) {
+      content += `Cloture le: ${new Date(data.closed_at).toLocaleString('fr-FR')}\n`;
+    }
+    
+    // Cut paper
+    content += '\n\n\n';
+    content += this.CUT;
+    
+    return content;
+  }
+
   /**
    * Format payment method for display
    */
@@ -185,6 +324,18 @@ export class ThermalPrintService {
       case 'card': return 'Carte';
       case 'split': return 'Mixte';
       default: return method;
+    }
+  }
+
+  /**
+   * Format closure type for display
+   */
+  private static formatClosureType(type: string): string {
+    switch (type) {
+      case 'DAILY': return 'QUOTIDIENNE';
+      case 'MONTHLY': return 'MENSUELLE';
+      case 'ANNUAL': return 'ANNUELLE';
+      default: return type;
     }
   }
   
@@ -258,6 +409,39 @@ export class ThermalPrintService {
       return {
         success: false,
         message: `Error printing receipt: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
+    }
+  }
+
+  /**
+   * Print closure bulletin to thermal printer
+   */
+  static async printClosureBulletin(bulletinData: ClosureBulletinData): Promise<{ success: boolean; message: string }> {
+    try {
+      // Generate closure bulletin content
+      const content = this.generateClosureBulletinContent(bulletinData);
+      
+      // Create temporary file
+      const tempFile = path.join(this.TEMP_DIR, `closure_bulletin_${Date.now()}.txt`);
+      await fs.writeFile(tempFile, content, 'utf8');
+      
+      // Print using lp command
+      const result = await this.sendToPrinter(tempFile);
+      
+      // Clean up temp file
+      try {
+        await fs.unlink(tempFile);
+      } catch (cleanupError) {
+        console.warn('Failed to clean up temp file:', cleanupError);
+      }
+      
+      return result;
+      
+    } catch (error) {
+      console.error('Error printing closure bulletin:', error);
+      return {
+        success: false,
+        message: `Error printing closure bulletin: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
   }
