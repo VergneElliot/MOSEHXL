@@ -908,7 +908,8 @@ router.get('/dev/debug-hash', async (req, res) => {
     }
     
     // Recreate the data string exactly as the verification function does
-    const dataString = `${entry.sequence_number}|${entry.transaction_type}|${entry.order_id}|${entry.amount}|${entry.vat_amount}|${entry.payment_method}|${entry.timestamp.toISOString()}|${entry.register_id}`;
+    const orderIdForHash = entry.order_id === null ? 'null' : (entry.order_id || '');
+    const dataString = `${entry.sequence_number}|${entry.transaction_type}|${orderIdForHash}|${entry.amount}|${entry.vat_amount}|${entry.payment_method}|${entry.timestamp.toISOString()}|${entry.register_id}`;
     
     // Calculate what the hash should be
     const crypto = require('crypto');
@@ -1595,26 +1596,33 @@ router.post('/receipt/:orderId/thermal-print', async (req, res) => {
     let totalVat = 0;
     let totalHT = 0;
     
-         if (items && items.length > 0) {
-       const vatRates = [...new Set(items.map((item: any) => parseFloat(String(item.tax_rate))))];
-       
-       for (const rate of vatRates) {
-         const rateNumber = rate as number;
-         const rateItems = items.filter((item: any) => Math.abs(parseFloat(String(item.tax_rate)) - rateNumber) < 0.01);
-         const rateSubtotalTTC = rateItems.reduce((sum: number, item: any) => sum + parseFloat(String(item.total_price)), 0);
-         const rateVat = rateSubtotalTTC * (rateNumber / 100) / (1 + rateNumber / 100);
-         const rateSubtotalHT = rateSubtotalTTC - rateVat;
-         
-         vatBreakdown.push({
-           rate: rate as number,
-           subtotal_ht: rateSubtotalHT,
-           vat: rateVat
-         });
-         
-         totalVat += rateVat;
-         totalHT += rateSubtotalHT;
-       }
-     }
+    if (order.items && order.items.length > 0) {
+      const vatRates = new Map<number, { subtotal_ht: number, vat: number }>();
+      
+      for (const item of order.items) {
+        const itemTotal = parseFloat(String(item.total_price));
+        const itemTax = parseFloat(String(item.tax_amount));
+        const itemHT = itemTotal - itemTax;
+        const taxRate = parseFloat(String(item.tax_rate));
+        
+        totalVat += itemTax;
+        totalHT += itemHT;
+        
+        if (!vatRates.has(taxRate)) {
+          vatRates.set(taxRate, { subtotal_ht: 0, vat: 0 });
+        }
+        
+        const existing = vatRates.get(taxRate)!;
+        existing.subtotal_ht += itemHT;
+        existing.vat += itemTax;
+      }
+      
+      vatBreakdown = Array.from(vatRates.entries()).map(([rate, data]) => ({
+        rate,
+        subtotal_ht: data.subtotal_ht,
+        vat: data.vat
+      }));
+    }
     
     // Prepare thermal print data
     const thermalPrintData = {
@@ -1669,6 +1677,81 @@ router.post('/receipt/:orderId/thermal-print', async (req, res) => {
   } catch (error) {
     console.error('Error thermal printing receipt:', error);
     res.status(500).json({ error: 'Failed to print receipt' });
+  }
+});
+
+// POST thermal print closure bulletin
+router.post('/closure/:bulletinId/thermal-print', async (req, res) => {
+  try {
+    const { bulletinId } = req.params;
+    
+    // Get closure bulletin data
+    const bulletinQuery = `
+      SELECT * FROM closure_bulletins 
+      WHERE id = $1
+    `;
+    const bulletinResult = await pool.query(bulletinQuery, [bulletinId]);
+    
+    if (bulletinResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Closure bulletin not found' });
+    }
+    
+    const bulletin = bulletinResult.rows[0];
+    
+    // Business information
+    const businessInfo = await BusinessSettingsModel.get();
+    if (!businessInfo) {
+      return res.status(500).json({ error: 'Business info not configured' });
+    }
+    
+    // Prepare thermal print data
+    const thermalPrintData = {
+      id: bulletin.id,
+      closure_type: bulletin.closure_type,
+      period_start: bulletin.period_start,
+      period_end: bulletin.period_end,
+      total_transactions: bulletin.total_transactions,
+      total_amount: parseFloat(String(bulletin.total_amount)),
+      total_vat: parseFloat(String(bulletin.total_vat)),
+      vat_breakdown: bulletin.vat_breakdown,
+      payment_methods_breakdown: bulletin.payment_methods_breakdown,
+      first_sequence: bulletin.first_sequence,
+      last_sequence: bulletin.last_sequence,
+      closure_hash: bulletin.closure_hash,
+      is_closed: bulletin.is_closed,
+      closed_at: bulletin.closed_at,
+      created_at: bulletin.created_at,
+      tips_total: parseFloat(String(bulletin.tips_total || 0)),
+      change_total: parseFloat(String(bulletin.change_total || 0)),
+      business_info: {
+        name: businessInfo.name,
+        address: businessInfo.address,
+        phone: businessInfo.phone,
+        email: businessInfo.email,
+        siret: businessInfo.siret,
+        tax_identification: businessInfo.tax_identification
+      }
+    };
+    
+    // Print to thermal printer
+    const printResult = await ThermalPrintService.printClosureBulletin(thermalPrintData);
+    
+    if (printResult.success) {
+      res.json({ 
+        success: true, 
+        message: printResult.message,
+        bulletin_data: thermalPrintData
+      });
+    } else {
+      res.status(500).json({ 
+        error: 'Print failed', 
+        details: printResult.message 
+      });
+    }
+    
+  } catch (error) {
+    console.error('Error thermal printing closure bulletin:', error);
+    res.status(500).json({ error: 'Failed to print closure bulletin' });
   }
 });
 
