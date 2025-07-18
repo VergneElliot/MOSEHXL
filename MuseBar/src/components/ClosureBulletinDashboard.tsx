@@ -52,7 +52,8 @@ import {
   Assignment,
   Settings as SettingsIcon,
   AccessTime,
-  AutoMode
+  AutoMode,
+  Print as ThermalPrintIcon
 } from '@mui/icons-material';
 import { ApiService } from '../services/apiService';
 
@@ -272,6 +273,37 @@ const ClosureBulletinDashboard: React.FC = () => {
     // Note: Closure bulletins should also use thermal printing if available
     // For now, keeping window.print() for closure bulletins - can be enhanced later
     setTimeout(() => window.print(), 300); // Give dialog time to render
+  };
+
+  // Thermal print handler
+  const handleThermalPrintBulletin = async (bulletin: ClosureBulletin) => {
+    try {
+      setLoading(true);
+      const response = await ApiService.getInstance().post<{ success: boolean; message: string; error?: string }>(`/legal/closure/${bulletin.id}/thermal-print`);
+      
+      if (response.data.success) {
+        setSnackbar({
+          open: true,
+          message: 'Bulletin de clôture imprimé avec succès sur l\'imprimante thermique',
+          severity: 'success'
+        });
+      } else {
+        setSnackbar({
+          open: true,
+          message: `Erreur d'impression: ${response.data.error || 'Erreur inconnue'}`,
+          severity: 'error'
+        });
+      }
+    } catch (error) {
+      console.error('Error thermal printing bulletin:', error);
+      setSnackbar({
+        open: true,
+        message: 'Erreur lors de l\'impression thermique du bulletin',
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Add print CSS for closure bulletins
@@ -569,16 +601,27 @@ const ClosureBulletinDashboard: React.FC = () => {
                           />
                         </TableCell>
                         <TableCell align="center">
-                          <Button
-                            size="small"
-                            startIcon={<Visibility />}
-                            onClick={() => {
-                              setSelectedBulletin(bulletin);
-                              setShowDetailsDialog(true);
-                            }}
-                          >
-                            Détails
-                          </Button>
+                          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                            <Button
+                              size="small"
+                              startIcon={<Visibility />}
+                              onClick={() => {
+                                setSelectedBulletin(bulletin);
+                                setShowDetailsDialog(true);
+                              }}
+                            >
+                              Détails
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<ThermalPrintIcon />}
+                              onClick={() => handleThermalPrintBulletin(bulletin)}
+                              disabled={loading}
+                            >
+                              Thermique
+                            </Button>
+                          </Box>
                         </TableCell>
                       </TableRow>
                     );
@@ -813,6 +856,9 @@ const ClosureBulletinDashboard: React.FC = () => {
           <Button startIcon={<Download />} variant="outlined">Exporter</Button>
           <Button startIcon={<Print />} variant="outlined" onClick={() => handlePrintBulletin(selectedBulletin!)}>
             Imprimer
+          </Button>
+          <Button startIcon={<ThermalPrintIcon />} variant="outlined" onClick={() => handleThermalPrintBulletin(selectedBulletin!)}>
+            Imprimer Thermique
           </Button>
           <Button onClick={() => setShowDetailsDialog(false)}>Fermer</Button>
         </DialogActions>
