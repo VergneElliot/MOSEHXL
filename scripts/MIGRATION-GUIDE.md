@@ -8,6 +8,12 @@ Your project uses two separate databases:
 - **Production Database** (`mosehxl_production`): Contains real-world legal data that must not be tampered with
 - **Development Database** (`mosehxl_development`): Contains mock/generated data for testing features
 
+## Current Status (July 18, 2025)
+
+✅ **System is fully operational and legally compliant**
+✅ **Development branch will be synced with main branch**
+✅ **All databases are clean and optimized**
+
 ## Migration Strategy
 
 ### Key Principles
@@ -16,7 +22,28 @@ Your project uses two separate databases:
 3. **Backup First**: Always backup your production database before any migration
 4. **Test First**: Test migrations on a copy of production data before applying to production
 
-## Migration Scripts
+## Available Scripts
+
+- `migrate-main-to-development.sql` - Apply production schema to development
+- `migrate-development-to-main.sql` - Apply development changes to production
+- `run-migration.sh` - Safe migration runner with confirmations
+
+## Usage
+
+```bash
+# Sync development with current production schema
+./scripts/run-migration.sh main-to-dev
+
+# Apply development changes to production
+./scripts/run-migration.sh dev-to-main
+```
+
+## Important Notes
+
+- Always backup before migrations
+- Test on copies of production data first
+- Never migrate data content, only structure
+- Maintain legal compliance in all changes
 
 ### 1. Main to Development Migration
 **File**: `scripts/migrate-main-to-development.sql`
