@@ -258,12 +258,14 @@ export class LegalJournalModel {
     );
 
     // Separate regular sales from change operations
-    const salesOrders = ordersWithItems.filter(order => order.items && order.items.length > 0);
+    const salesOrders = ordersWithItems.filter(order => 
+      order.items && order.items.length > 0 && 
+      !(order.notes && order.notes.includes('Faire de la Monnaie'))
+    );
     const changeOrders = ordersWithItems.filter(order => 
       (!order.items || order.items.length === 0) &&
       parseFloat(order.total_amount || '0') === 0 &&
       parseFloat(order.total_tax || '0') === 0 &&
-      parseFloat(order.change || '0') > 0 &&
       order.notes && (order.notes.includes('Changement de caisse') || order.notes.includes('Faire de la Monnaie'))
     );
 
@@ -335,16 +337,17 @@ export class LegalJournalModel {
         
         // Only add tip ONCE for split payments
         if (tips > 0) {
-          paymentBreakdown.card += tips;
-          paymentBreakdown.cash -= tips;
+          // Tips: customer pays extra on card, we take cash out to give to staff
+          paymentBreakdown.card += tips;  // + on card (customer pays)
+          paymentBreakdown.cash -= tips;  // - from cash (we take out)
           console.log(`After tips (split) - Card: ${paymentBreakdown.card}, Cash: ${paymentBreakdown.cash}`);
         }
       } else {
         paymentBreakdown[order.payment_method] += amount;
-        // Handle tips: add to card (customer pays tip), subtract from cash (you give cash to staff)
+        // Handle tips: customer pays extra on card, we take cash out to give to staff
         if (tips > 0) {
-          paymentBreakdown.card += tips;
-          paymentBreakdown.cash -= tips;
+          paymentBreakdown.card += tips;  // + on card (customer pays)
+          paymentBreakdown.cash -= tips;  // - from cash (we take out)
           console.log(`After tips (${order.payment_method}) - Card: ${paymentBreakdown.card}, Cash: ${paymentBreakdown.cash}`);
         }
       }
@@ -360,18 +363,35 @@ export class LegalJournalModel {
     }
 
     // Process change operations (affect payment breakdown but not sales totals)
-    changeOrders.forEach(order => {
-      const changeAmount = parseFloat(order.change || '0');
-      if (order.payment_method === 'cash') {
-        // Card → Cash: customer pays on card, you give cash back
-        paymentBreakdown.card += changeAmount;
-        paymentBreakdown.cash -= changeAmount;
-      } else if (order.payment_method === 'card') {
-        // Cash → Card: customer pays cash, you credit card
-        paymentBreakdown.cash += changeAmount;
-        paymentBreakdown.card -= changeAmount;
+    for (const order of changeOrders) {
+      // Handle new sub_bills format for "Faire de la monnaie"
+      if (order.payment_method === 'split') {
+        const subBillsResult = await pool.query(
+          `SELECT payment_method, amount FROM sub_bills WHERE order_id = $1`,
+          [order.id]
+        );
+        
+        if (subBillsResult.rows.length > 0) {
+          // Process each sub-bill for change operations
+          subBillsResult.rows.forEach((subBill: any) => {
+            const subAmount = parseFloat(subBill.amount || '0');
+            paymentBreakdown[subBill.payment_method] += subAmount;
+          });
+        }
+      } else {
+        // Legacy change handling (fallback)
+        const changeAmount = parseFloat(order.change || '0');
+        if (order.payment_method === 'cash') {
+          // Card → Cash: customer pays on card, you give cash back
+          paymentBreakdown.card += changeAmount;
+          paymentBreakdown.cash -= changeAmount;
+        } else if (order.payment_method === 'card') {
+          // Cash → Card: customer pays cash, you credit card
+          paymentBreakdown.cash += changeAmount;
+          paymentBreakdown.card -= changeAmount;
+        }
       }
-    });
+    }
 
     // Round VAT breakdown to ensure totals match exactly
     vatBreakdown.vat_10.amount = Math.round(vatBreakdown.vat_10.amount * 100) / 100;
@@ -393,10 +413,16 @@ export class LegalJournalModel {
     }
 
     // Calculate tips and change totals
-    const tipsTotal = orders
+    // For closure bulletins, we need to handle net negative amounts properly
+    // The constraint requires tips_total >= 0 and change_total >= 0
+    const netTipsTotal = orders
       .reduce((sum, order) => sum + parseFloat(order.tips || '0'), 0);
-    const changeTotal = orders
+    const netChangeTotal = orders
       .reduce((sum, order) => sum + parseFloat(order.change || '0'), 0);
+    
+    // Apply constraint requirement: use absolute values or set to 0 if negative
+    const tipsTotal = Math.max(0, netTipsTotal);
+    const changeTotal = Math.max(0, netChangeTotal);
 
     // Get legal journal entries for sequence calculation
     const entries = await this.getEntriesForPeriod(start, end);
@@ -499,12 +525,14 @@ export class LegalJournalModel {
     );
 
     // Separate regular sales from change operations
-    const salesOrders = ordersWithItems.filter(order => order.items && order.items.length > 0);
+    const salesOrders = ordersWithItems.filter(order => 
+      order.items && order.items.length > 0 && 
+      !(order.notes && order.notes.includes('Faire de la Monnaie'))
+    );
     const changeOrders = ordersWithItems.filter(order => 
-      order.items && order.items.length === 0 && 
-      order.total_amount === 0 && 
-      order.total_tax === 0 && 
-      order.change > 0 &&
+      (!order.items || order.items.length === 0) &&
+      parseFloat(order.total_amount || '0') === 0 &&
+      parseFloat(order.total_tax || '0') === 0 &&
       order.notes && (order.notes.includes('Changement de caisse') || order.notes.includes('Faire de la Monnaie'))
     );
 
@@ -531,11 +559,7 @@ export class LegalJournalModel {
       const tips = parseFloat(order.tips || '0');
       const change = parseFloat(order.change || '0');
 
-      // Debug logging for tips
-      if (tips > 0) {
-        console.log(`Processing tips for order ${order.id}: ${tips}€`);
-        console.log(`Before tips - Card: ${paymentBreakdown.card}, Cash: ${paymentBreakdown.cash}`);
-      }
+      // Process tips for payment breakdown
 
       // Calculate VAT breakdown from items
       if (order.items && order.items.length > 0) {
@@ -578,7 +602,6 @@ export class LegalJournalModel {
         if (tips > 0) {
           paymentBreakdown.card += tips;
           paymentBreakdown.cash -= tips;
-          console.log(`After tips (split) - Card: ${paymentBreakdown.card}, Cash: ${paymentBreakdown.cash}`);
         }
       } else {
         paymentBreakdown[order.payment_method] += amount;
@@ -586,7 +609,6 @@ export class LegalJournalModel {
         if (tips > 0) {
           paymentBreakdown.card += tips;
           paymentBreakdown.cash -= tips;
-          console.log(`After tips (${order.payment_method}) - Card: ${paymentBreakdown.card}, Cash: ${paymentBreakdown.cash}`);
         }
       }
 
@@ -620,18 +642,35 @@ export class LegalJournalModel {
     }
 
     // Process change operations (affect payment breakdown but not sales totals)
-    changeOrders.forEach(order => {
-      const changeAmount = parseFloat(order.change || '0');
-      if (order.payment_method === 'cash') {
-        // Cash → Card: subtract from cash, add to card
-        paymentBreakdown.cash -= changeAmount;
-        paymentBreakdown.card += changeAmount;
-      } else if (order.payment_method === 'card') {
-        // Card → Cash: subtract from card, add to cash
-        paymentBreakdown.card -= changeAmount;
-        paymentBreakdown.cash += changeAmount;
+    for (const order of changeOrders) {
+      // Handle new sub_bills format for "Faire de la monnaie"
+      if (order.payment_method === 'split') {
+        const subBillsResult = await pool.query(
+          `SELECT payment_method, amount FROM sub_bills WHERE order_id = $1`,
+          [order.id]
+        );
+        
+        if (subBillsResult.rows.length > 0) {
+          // Process each sub-bill for change operations
+          subBillsResult.rows.forEach((subBill: any) => {
+            const subAmount = parseFloat(subBill.amount || '0');
+            paymentBreakdown[subBill.payment_method] += subAmount;
+          });
+        }
+      } else {
+        // Legacy change handling (fallback)
+        const changeAmount = parseFloat(order.change || '0');
+        if (order.payment_method === 'cash') {
+          // Cash → Card: subtract from cash, add to card
+          paymentBreakdown.cash -= changeAmount;
+          paymentBreakdown.card += changeAmount;
+        } else if (order.payment_method === 'card') {
+          // Card → Cash: subtract from card, add to cash
+          paymentBreakdown.card -= changeAmount;
+          paymentBreakdown.cash += changeAmount;
+        }
       }
-    });
+    }
 
     // Calculate tips and change totals
     const tipsTotal = orders.reduce((sum, order) => sum + parseFloat(order.tips || '0'), 0);

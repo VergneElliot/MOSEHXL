@@ -9,8 +9,6 @@ import {
   Tab,
   Paper,
   Chip,
-  IconButton,
-  Tooltip,
   Button
 } from '@mui/material';
 import {
@@ -68,7 +66,7 @@ function App() {
   // Auth state
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
-  const [permissions, setPermissions] = useState<string[]>([]);
+  const [, setPermissions] = useState<string[]>([]);
   const [rememberMe, setRememberMe] = useState<boolean>(false);
   const [tokenExpiresIn, setTokenExpiresIn] = useState<string>('12h');
 
@@ -81,7 +79,7 @@ function App() {
       // Initialize API configuration first
       try {
         await apiConfig.initialize();
-        console.log('📡 API configuration initialized:', apiConfig.getConnectionInfo());
+        // API configuration initialized
       } catch (error) {
         console.error('❌ Failed to initialize API configuration:', error);
       }
@@ -128,7 +126,7 @@ function App() {
           setPermissions(data.permissions || []);
         })
         .catch(() => {
-          console.log('Token expired or invalid, logging out');
+          // Token expired, logout required
           handleLogout();
         });
     } else {
@@ -147,7 +145,7 @@ function App() {
 
     const intervalId = setInterval(async () => {
       try {
-        console.log('Auto-refreshing token...');
+        // Auto-refreshing token
         
         // Ensure API config is ready
         if (!apiConfig.isReady()) {
@@ -172,7 +170,7 @@ function App() {
           localStorage.setItem('auth_token', data.token);
           localStorage.setItem('token_expires_in', data.expiresIn);
           
-          console.log('Token refreshed successfully');
+          // Token refreshed successfully
         } else {
           throw new Error('Failed to refresh token');
         }
@@ -242,6 +240,7 @@ function App() {
     }, 60000);
 
     return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const updateData = async () => {

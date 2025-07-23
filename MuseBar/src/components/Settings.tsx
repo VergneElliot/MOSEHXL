@@ -7,18 +7,10 @@ import {
   Button,
   TextField,
   Grid,
-  Alert,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon
+  Alert
 } from '@mui/material';
 import {
-  Settings as SettingsIcon,
-  Info as InfoIcon,
-  Warning as WarningIcon,
-  CheckCircle as CheckIcon
+  Settings as SettingsIcon
 } from '@mui/icons-material';
 import { apiService } from '../services/apiService';
 
@@ -71,8 +63,8 @@ const Settings: React.FC = () => {
     siret: '',
     taxIdentification: ''
   });
-  const [infoLoading, setInfoLoading] = useState(true);
-  const [infoSaving, setInfoSaving] = useState(false);
+  const [, setInfoLoading] = useState(true);
+  const [, setInfoSaving] = useState(false);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
   useEffect(() => {

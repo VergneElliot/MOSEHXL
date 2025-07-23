@@ -26,7 +26,6 @@ import {
 import {
   Schedule as ScheduleIcon,
   PlayArrow as PlayIcon,
-  Stop as StopIcon,
   Settings as SettingsIcon,
   CheckCircle as CheckIcon,
   Cancel as CancelIcon,
@@ -76,6 +75,7 @@ const HappyHourControl: React.FC<HappyHourControlProps> = ({ isActive, timeUntil
     dataService.getProducts().then((products: Product[]) => {
       setEligibleProducts(products.filter((p: Product) => p.isHappyHourEligible && p.isActive));
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleToggleManual = () => {

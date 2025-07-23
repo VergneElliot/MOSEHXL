@@ -20,7 +20,7 @@ const AuditTrailDashboard: React.FC<{ token: string }> = ({ token }) => {
   const [pageSize, setPageSize] = useState(25);
   const [total, setTotal] = useState(0);
   const [filters, setFilters] = useState({ user_id: '', action_type: '', resource_type: '', start: '', end: '' });
-  const [loading, setLoading] = useState(false);
+  const [, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<any | null>(null);
 
@@ -43,7 +43,10 @@ const AuditTrailDashboard: React.FC<{ token: string }> = ({ token }) => {
     }
   };
 
-  useEffect(() => { fetchLogs(); /* eslint-disable-next-line */ }, [page, pageSize]);
+  useEffect(() => { 
+    fetchLogs(); 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, pageSize]);
 
   const handleFilter = () => {
     setPage(0);

@@ -100,7 +100,7 @@ class ApiConfig {
   public setBaseURL(url: string): void {
     this.baseURL = url;
     this.isInitialized = true;
-    console.log(`🔧 API URL manually set to: ${url}`);
+    // API URL manually configured
   }
 
   /**
