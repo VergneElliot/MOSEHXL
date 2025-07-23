@@ -41,8 +41,7 @@ import {
   CreditCard, 
   Money,
   Print,
-  SwapHoriz as SwapHorizIcon,
-  Cancel as CancelIcon
+  SwapHoriz as SwapHorizIcon
 } from '@mui/icons-material';
 import { ApiService } from '../services/apiService';
 import { Order } from '../types';
@@ -73,23 +72,17 @@ const HistoryDashboard: React.FC = () => {
   const [orderToReturn, setOrderToReturn] = useState<Order | null>(null);
   const [returnReason, setReturnReason] = useState('');
   const [selectedItemsToReturn, setSelectedItemsToReturn] = useState<string[]>([]);
+  const [selectedTipToReturn, setSelectedTipToReturn] = useState<boolean>(false);
   const [isPartialReturn, setIsPartialReturn] = useState(false);
   const [returnLoading, setReturnLoading] = useState(false);
   const [returnSuccess, setReturnSuccess] = useState('');
   const [returnError, setReturnError] = useState('');
 
-  // Cancellation dialog state
-  const [cancellationDialogOpen, setCancellationDialogOpen] = useState(false);
-  const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
-  const [cancellationReason, setCancellationReason] = useState('');
-  const [cancellationLoading, setCancellationLoading] = useState(false);
-  const [cancellationSuccess, setCancellationSuccess] = useState('');
-  const [cancellationError, setCancellationError] = useState('');
-
   const apiService = ApiService.getInstance();
 
   useEffect(() => {
     loadOrders();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadOrders = async () => {
@@ -154,6 +147,7 @@ const HistoryDashboard: React.FC = () => {
     setReturnDialogOpen(true);
     setReturnReason('');
     setSelectedItemsToReturn([]);
+    setSelectedTipToReturn(false);
     setIsPartialReturn(false);
     setReturnError('');
     setReturnSuccess('');
@@ -164,13 +158,56 @@ const HistoryDashboard: React.FC = () => {
     setOrderToReturn(null);
     setReturnReason('');
     setSelectedItemsToReturn([]);
+    setSelectedTipToReturn(false);
     setIsPartialReturn(false);
     setReturnError('');
     setReturnSuccess('');
   };
 
   const calculateReturnTotals = () => {
-    if (!orderToReturn) return { totalAmount: 0, totalTax: 0, totalNet: 0, taxBreakdown: { '10': 0, '20': 0 } };
+    if (!orderToReturn) return { totalAmount: 0, totalTax: 0, totalNet: 0, taxBreakdown: { '10': 0, '20': 0 }, isChangeOperation: false, isTipOperation: false };
+    
+    // Check if this is a "Faire de la monnaie" operation
+    const isChangeOperation = 
+      orderToReturn.items.length === 0 &&
+      orderToReturn.totalAmount === 0 &&
+      orderToReturn.taxAmount === 0 &&
+      orderToReturn.notes &&
+      orderToReturn.notes.includes('Faire de la Monnaie');
+
+    // Check if this is a tip reversal operation
+    const isTipOperation = 
+      orderToReturn.items.length === 0 &&
+      orderToReturn.totalAmount === 0 &&
+      orderToReturn.taxAmount === 0 &&
+      orderToReturn.notes &&
+      orderToReturn.notes.includes('ANNULATION pourboire');
+    
+    // For change operations, we allow cancellation even with 0 amount
+    if (isChangeOperation) {
+      return {
+        totalAmount: 1, // Set to 1 to enable the button, actual reversal handled by backend
+        displayAmount: 0, // Display amount for UI
+        totalTax: 0,
+        totalNet: 0,
+        taxBreakdown: { '10': 0, '20': 0 },
+        isChangeOperation: true,
+        isTipOperation: false
+      };
+    }
+
+    // For tip operations, we allow cancellation even with 0 amount
+    if (isTipOperation) {
+      return {
+        totalAmount: 1, // Set to 1 to enable the button, actual reversal handled by backend
+        displayAmount: 0, // Display amount for UI
+        totalTax: 0,
+        totalNet: 0,
+        taxBreakdown: { '10': 0, '20': 0 },
+        isChangeOperation: false,
+        isTipOperation: true
+      };
+    }
     
     const itemsToReturn = isPartialReturn 
       ? orderToReturn.items.filter(item => selectedItemsToReturn.includes(item.id))
@@ -182,8 +219,11 @@ const HistoryDashboard: React.FC = () => {
     
     itemsToReturn.forEach(item => {
       const itemTotal = item.totalPrice;
-      const itemTaxAmount = itemTotal * item.taxRate / (1 + item.taxRate);
-      const taxRatePercent = Math.round(item.taxRate * 100);
+      // Convert tax rate from percentage (10, 20) to decimal (0.10, 0.20) for calculation
+      const taxRateDecimal = item.taxRate / 100;
+      const itemTaxAmount = itemTotal * taxRateDecimal / (1 + taxRateDecimal);
+      // Tax rate is already stored as percentage (10, 20)
+      const taxRatePercent = Math.round(item.taxRate);
       
       totalAmount += itemTotal;
       totalTax += itemTaxAmount;
@@ -197,9 +237,12 @@ const HistoryDashboard: React.FC = () => {
     
     return {
       totalAmount,
+      displayAmount: totalAmount, // Same as totalAmount for regular operations
       totalTax,
       totalNet: totalAmount - totalTax,
-      taxBreakdown
+      taxBreakdown,
+      isChangeOperation: false,
+      isTipOperation: false
     };
   };
 
@@ -209,8 +252,8 @@ const HistoryDashboard: React.FC = () => {
       return;
     }
 
-    if (isPartialReturn && selectedItemsToReturn.length === 0) {
-      setReturnError('Veuillez sélectionner au moins un article à retourner');
+    if (isPartialReturn && selectedItemsToReturn.length === 0 && !selectedTipToReturn) {
+      setReturnError('Veuillez sélectionner au moins un article ou le pourboire à retourner');
       return;
     }
 
@@ -222,10 +265,13 @@ const HistoryDashboard: React.FC = () => {
         ? selectedItemsToReturn.map(itemId => ({ item_id: parseInt(itemId) }))
         : orderToReturn.items.map(item => ({ item_id: parseInt(item.id) }));
 
-      const response = await apiService.post('/orders/retour-from-history', {
-        originalOrderId: parseInt(orderToReturn.id),
+      // Use unified cancellation endpoint
+      const response = await apiService.post('/orders/cancel-unified', {
+        orderId: parseInt(orderToReturn.id),
         reason: returnReason.trim(),
-        itemsToReturn
+        cancellationType: isPartialReturn ? 'partial' : 'full',
+        itemsToCancel: isPartialReturn ? itemsToReturn : undefined,
+        includeTipReversal: isPartialReturn ? selectedTipToReturn : (orderToReturn.tips || 0) > 0
       });
       
       setReturnSuccess((response.data as any).message);
@@ -250,59 +296,6 @@ const HistoryDashboard: React.FC = () => {
       setSelectedItemsToReturn(prev => [...prev, itemId]);
     } else {
       setSelectedItemsToReturn(prev => prev.filter(id => id !== itemId));
-    }
-  };
-
-  // Cancellation functions
-  const handleOpenCancellationDialog = (order: Order) => {
-    if (order.status !== 'completed') {
-      setCancellationError('Seules les commandes terminées peuvent être annulées');
-      return;
-    }
-    setOrderToCancel(order);
-    setCancellationDialogOpen(true);
-    setCancellationReason('');
-    setCancellationError('');
-    setCancellationSuccess('');
-  };
-
-  const handleCloseCancellationDialog = () => {
-    setCancellationDialogOpen(false);
-    setOrderToCancel(null);
-    setCancellationReason('');
-    setCancellationError('');
-    setCancellationSuccess('');
-  };
-
-  const handleCancelOrder = async () => {
-    if (!orderToCancel || !cancellationReason.trim()) {
-      setCancellationError('Veuillez fournir une raison pour l\'annulation');
-      return;
-    }
-
-    setCancellationLoading(true);
-    setCancellationError('');
-
-    try {
-      const response = await apiService.post('/orders/cancel-order', {
-        orderId: parseInt(orderToCancel.id),
-        reason: cancellationReason.trim()
-      });
-      
-      setCancellationSuccess((response.data as any).message);
-      
-      // Refresh orders list
-      await loadOrders();
-      
-      // Close dialog after a short delay
-      setTimeout(() => {
-        handleCloseCancellationDialog();
-      }, 2000);
-      
-    } catch (error: any) {
-      setCancellationError(error.response?.data?.error || 'Erreur lors de l\'annulation de la commande');
-    } finally {
-      setCancellationLoading(false);
     }
   };
 
@@ -400,6 +393,13 @@ const HistoryDashboard: React.FC = () => {
                               <Typography variant="body2" color="text.primary" sx={{ fontWeight: 'medium' }}>
                                 0.00 €
                               </Typography>
+                            ) : order.items.length === 0 && (
+                              (order.change && Number(order.change) < 0) ||
+                              (order.tips && Number(order.tips) < 0)
+                            ) ? (
+                              <Typography variant="body2" color="warning.main" sx={{ fontWeight: 'medium' }}>
+                                0.00 € (reversal)
+                              </Typography>
                             ) : (
                               `${order.finalAmount.toFixed(2)} €`
                             )}
@@ -412,10 +412,24 @@ const HistoryDashboard: React.FC = () => {
                                 size="small"
                                 variant="outlined"
                               />
+                            ) : order.tips && Number(order.tips) < 0 ? (
+                              <Chip 
+                                label={`🔄 Tip ${Number(order.tips).toFixed(2)}€ (0€ net)`} 
+                                color="warning" 
+                                size="small"
+                                variant="outlined"
+                              />
                             ) : order.change && Number(order.change) > 0 ? (
                               <Chip 
                                 label={`Change ${Number(order.change).toFixed(2)}€`} 
                                 color="info" 
+                                size="small"
+                                variant="outlined"
+                              />
+                            ) : order.change && Number(order.change) < 0 ? (
+                              <Chip 
+                                label={`🔄 Change ${Number(order.change).toFixed(2)}€ (0€ net)`} 
+                                color="warning" 
                                 size="small"
                                 variant="outlined"
                               />
@@ -468,6 +482,11 @@ const HistoryDashboard: React.FC = () => {
                                         Pourboire : +{Number(selectedOrder.tips).toFixed(2)} €
                                       </Typography>
                                     )}
+                                    {(selectedOrder.tips && Number(selectedOrder.tips) < 0) && (
+                                      <Typography variant="body2" sx={{ color: 'warning.main', fontWeight: 'medium' }}>
+                                        🔄 Annulation pourboire : {Number(selectedOrder.tips).toFixed(2)} € (net: 0.00 €)
+                                      </Typography>
+                                    )}
                                     {(selectedOrder.change && Number(selectedOrder.change) > 0) && (
                                       <Typography variant="body2" sx={{ color: 'info.main', fontWeight: 'medium' }}>
                                         {selectedOrder.items.length === 0 ? (
@@ -477,10 +496,60 @@ const HistoryDashboard: React.FC = () => {
                                         )}
                                       </Typography>
                                     )}
-                                    {/* Motif d'annulation si commande négative */}
-                                    {selectedOrder.notes && selectedOrder.notes.startsWith('ANNULATION') && (
+                                    {(selectedOrder.change && Number(selectedOrder.change) < 0) && (
+                                      <Typography variant="body2" sx={{ color: 'warning.main', fontWeight: 'medium' }}>
+                                        🔄 Annulation monnaie : {Number(selectedOrder.change).toFixed(2)} € (net: 0.00 €)
+                                      </Typography>
+                                    )}
+                                    {/* Commentary for cancellation orders */}
+                                    {selectedOrder.notes && (
+                                      selectedOrder.notes.includes('ANNULATION') || 
+                                      selectedOrder.notes.includes('Retour') ||
+                                      selectedOrder.notes.startsWith('[')
+                                    ) && (
                                       <Alert severity="info" sx={{ mt: 2, mb: 1 }}>
-                                        <strong>Motif d'annulation :</strong> {selectedOrder.notes.replace(/.*Raison: /, '')}
+                                        <strong>Commentaire de l'opération :</strong> <br />
+                                        {(() => {
+                                          const notes = selectedOrder.notes || '';
+                                          // Try different patterns to extract the reason
+                                          const patterns = [
+                                            /Raison:\s*(.+?)(?:\s*-|$)/,
+                                            /- Raison:\s*(.+?)(?:\s*-|$)/,
+                                            /reason:\s*(.+?)(?:\s*-|$)/i,
+                                            /Motif:\s*(.+?)(?:\s*-|$)/i,
+                                            /Commentaire:\s*(.+?)(?:\s*-|$)/i,
+                                            /\[.*?\]\s*ANNULATION.*?-\s*Commande\s*#\d+\s*-\s*Raison:\s*(.+?)(?:\s*-|$)/,
+                                            /ANNULATION.*?-\s*Commande\s*#\d+\s*-\s*Raison:\s*(.+?)(?:\s*-|$)/,
+                                            /RETOUR direct.*?-\s*Raison:\s*(.+?)(?:\s*-|$)/
+                                          ];
+                                          
+                                          for (const pattern of patterns) {
+                                            const match = notes.match(pattern);
+                                            if (match && match[1] && match[1].trim()) {
+                                              return match[1].trim();
+                                            }
+                                          }
+                                          
+                                          // If no pattern matches, try to extract any meaningful text after key words
+                                          const fallbackPatterns = [
+                                            /(?:ANNULATION|RETOUR).*?[:-]\s*(.+)/i,
+                                            /\[.*?\]\s*(.+)/
+                                          ];
+                                          
+                                          for (const pattern of fallbackPatterns) {
+                                            const match = notes.match(pattern);
+                                            if (match && match[1] && match[1].trim() && !match[1].includes('Commande #')) {
+                                              return match[1].trim();
+                                            }
+                                          }
+                                          
+                                          // If still no match and it's clearly a cancellation/return, show the full notes
+                                          if (notes.includes('ANNULATION') || notes.includes('RETOUR') || notes.startsWith('[')) {
+                                            return notes;
+                                          }
+                                          
+                                          return 'Aucun commentaire spécifique';
+                                        })()}
                                       </Alert>
                                     )}
                                     
@@ -491,14 +560,14 @@ const HistoryDashboard: React.FC = () => {
                                     </Typography>
                                     {selectedOrder.paymentMethod === 'split' ? (
                                       <Box>
-                                        <Typography variant="body2" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
                                           <Chip 
                                             label="Paiement mixte" 
                                             color="warning" 
                                             size="small"
                                             icon={<CreditCard />}
                                           />
-                                        </Typography>
+                                        </Box>
                                         {selectedOrder.subBills && selectedOrder.subBills.length > 0 ? (
                                           selectedOrder.subBills.map((subBill, index) => (
                                             <Typography key={subBill.id} variant="body2" sx={{ ml: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -517,7 +586,7 @@ const HistoryDashboard: React.FC = () => {
                                         )}
                                       </Box>
                                     ) : (
-                                      <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                         {selectedOrder.paymentMethod === 'cash' ? (
                                           <>
                                             <Money sx={{ fontSize: 16, color: '#4caf50' }} />
@@ -529,7 +598,7 @@ const HistoryDashboard: React.FC = () => {
                                             <Chip label="Carte bancaire" color="primary" size="small" />
                                           </>
                                         )}
-                                      </Typography>
+                                      </Box>
                                     )}
                                   </Grid>
                                   
@@ -631,18 +700,7 @@ const HistoryDashboard: React.FC = () => {
                                       startIcon={<SwapHorizIcon />}
                                       onClick={() => handleOpenReturnDialog(selectedOrder)}
                                     >
-                                      Retour basé sur historique
-                                    </Button>
-                                  )}
-                                  {selectedOrder.status === 'completed' && (
-                                    <Button
-                                      variant="outlined"
-                                      color="error"
-                                      size="small"
-                                      startIcon={<CancelIcon />}
-                                      onClick={() => handleOpenCancellationDialog(selectedOrder)}
-                                    >
-                                      Annuler commande complète
+                                      Annuler / Retourner
                                     </Button>
                                   )}
                                 </Box>
@@ -672,7 +730,7 @@ const HistoryDashboard: React.FC = () => {
       >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <SwapHorizIcon color="warning" />
-          Retour basé sur historique - Commande #{orderToReturn?.id}
+          Annulation / Retour - Commande #{orderToReturn?.id}
         </DialogTitle>
         <DialogContent>
           {returnError && (
@@ -688,8 +746,9 @@ const HistoryDashboard: React.FC = () => {
           )}
 
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            🔄 Cette action créera un retour basé sur le mode de paiement original de la commande.
-            Pour les paiements partagés, les montants seront répartis proportionnellement.
+            🔄 <strong>Annulation complète</strong>: Annule tout (articles, pourboires, monnaie) avec reversements corrects aux totaux espèces/carte.
+            <br />
+            📋 <strong>Retour partiel</strong>: Retourne seulement les articles sélectionnés (garde pourboires/monnaie intacts).
           </Typography>
 
           {/* Return Type */}
@@ -701,6 +760,7 @@ const HistoryDashboard: React.FC = () => {
                   onChange={(e) => {
                     setIsPartialReturn(e.target.checked);
                     setSelectedItemsToReturn([]);
+                    setSelectedTipToReturn(false);
                   }}
                 />
               }
@@ -729,7 +789,7 @@ const HistoryDashboard: React.FC = () => {
                     />
                     <ListItemText
                       primary={`${item.productName} (x${item.quantity})`}
-                      secondary={`TVA ${Math.round(item.taxRate * 100)}%`}
+                      secondary={`TVA ${Math.round(item.taxRate)}%`}
                     />
                     <ListItemSecondaryAction>
                       <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
@@ -739,6 +799,30 @@ const HistoryDashboard: React.FC = () => {
                   </ListItem>
                 ))}
               </List>
+              
+              {/* Tip Selection for Partial Return */}
+              {orderToReturn && orderToReturn.tips !== undefined && orderToReturn.tips !== null && Number(orderToReturn.tips) > 0 && (
+                <Box sx={{ mt: 2, p: 2, border: '1px solid #ddd', borderRadius: 1, background: '#f3e5f5' }}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={selectedTipToReturn}
+                        onChange={(e) => setSelectedTipToReturn(e.target.checked)}
+                      />
+                    }
+                    label={
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                          💰 Pourboire: {Number(orderToReturn.tips || 0).toFixed(2)} €
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Cocher pour annuler le pourboire (remboursement: carte → espèces)
+                        </Typography>
+                      </Box>
+                    }
+                  />
+                </Box>
+              )}
             </Box>
           )}
 
@@ -767,27 +851,53 @@ const HistoryDashboard: React.FC = () => {
             <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 'bold' }}>
               💰 Détail du retour (montants négatifs):
             </Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={6}>
-                <Typography variant="body2">
-                  <strong>Montant HT:</strong> -{returnTotals.totalNet.toFixed(2)} €
+            {returnTotals.isChangeOperation ? (
+              <Box sx={{ textAlign: 'center', py: 2 }}>
+                <Typography variant="body1" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
+                  🔄 Opération de monnaie - Annulation
                 </Typography>
-                <Typography variant="body2">
-                  <strong>TVA 10%:</strong> -{returnTotals.taxBreakdown['10'].toFixed(2)} €
+                <Typography variant="body2" color="text.secondary">
+                  Cette opération inverse les mouvements de caisse (carte ↔ espèces)
                 </Typography>
-                <Typography variant="body2">
-                  <strong>TVA 20%:</strong> -{returnTotals.taxBreakdown['20'].toFixed(2)} €
+                <Typography variant="h6" sx={{ mt: 1, fontWeight: 'bold', color: '#f57c00' }}>
+                  Total net: 0.00 €
                 </Typography>
+              </Box>
+            ) : returnTotals.isTipOperation ? (
+              <Box sx={{ textAlign: 'center', py: 2 }}>
+                <Typography variant="body1" sx={{ fontWeight: 'bold', color: '#4caf50' }}>
+                  💰 Annulation de pourboire
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Cette opération inverse le pourboire (carte → espèces)
+                </Typography>
+                <Typography variant="h6" sx={{ mt: 1, fontWeight: 'bold', color: '#f57c00' }}>
+                  Total net: 0.00 €
+                </Typography>
+              </Box>
+            ) : (
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <Typography variant="body2">
+                    <strong>Montant HT:</strong> -{returnTotals.totalNet.toFixed(2)} €
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>TVA 10%:</strong> -{returnTotals.taxBreakdown['10'].toFixed(2)} €
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>TVA 20%:</strong> -{returnTotals.taxBreakdown['20'].toFixed(2)} €
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2">
+                    <strong>Total TVA:</strong> -{returnTotals.totalTax.toFixed(2)} €
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontSize: '1.1em', fontWeight: 'bold', color: '#f57c00' }}>
+                    <strong>Total TTC:</strong> -{(returnTotals.displayAmount || returnTotals.totalAmount).toFixed(2)} €
+                  </Typography>
+                </Grid>
               </Grid>
-              <Grid item xs={6}>
-                <Typography variant="body2">
-                  <strong>Total TVA:</strong> -{returnTotals.totalTax.toFixed(2)} €
-                </Typography>
-                <Typography variant="body2" sx={{ fontSize: '1.1em', fontWeight: 'bold', color: '#f57c00' }}>
-                  <strong>Total TTC:</strong> -{returnTotals.totalAmount.toFixed(2)} €
-                </Typography>
-              </Grid>
-            </Grid>
+            )}
           </Box>
 
           {/* Reason */}
@@ -811,112 +921,10 @@ const HistoryDashboard: React.FC = () => {
             onClick={handleReturnOrder}
             color="warning"
             variant="contained"
-            disabled={returnLoading || returnTotals.totalAmount === 0}
+            disabled={returnLoading || (returnTotals.totalAmount === 0 && !returnTotals.isChangeOperation && !returnTotals.isTipOperation) || returnReason.trim() === ''}
             startIcon={returnLoading ? <CircularProgress size={20} /> : <SwapHorizIcon />}
           >
             {returnLoading ? 'Retour...' : 'Confirmer le retour'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Cancellation Dialog */}
-      <Dialog 
-        open={cancellationDialogOpen} 
-        onClose={handleCloseCancellationDialog} 
-        maxWidth="md" 
-        fullWidth
-      >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <CancelIcon color="error" />
-          Annulation complète - Commande #{orderToCancel?.id}
-        </DialogTitle>
-        <DialogContent>
-          {cancellationError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {cancellationError}
-            </Alert>
-          )}
-          
-          {cancellationSuccess && (
-            <Alert severity="success" sx={{ mb: 2 }}>
-              {cancellationSuccess}
-            </Alert>
-          )}
-
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            ⚠️ Cette action annulera complètement la commande et créera des montants négatifs pour:
-          </Typography>
-
-          {/* Order Summary */}
-          {orderToCancel && (
-            <Box sx={{ mb: 3, p: 2, border: '1px solid #ffcdd2', borderRadius: 1, background: '#ffebee' }}>
-              <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 'bold', color: '#c62828' }}>
-                📋 Résumé de l'annulation:
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <Typography variant="body2">
-                    <strong>Montant commande:</strong> -{orderToCancel.finalAmount.toFixed(2)} €
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>TVA:</strong> -{orderToCancel.taxAmount.toFixed(2)} €
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2">
-                    <strong>Pourboire:</strong> {orderToCancel.tips && Number(orderToCancel.tips) > 0 ? `-${Number(orderToCancel.tips).toFixed(2)} €` : '0.00 €'}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Monnaie rendue:</strong> {orderToCancel.change && Number(orderToCancel.change) > 0 ? `+${Number(orderToCancel.change).toFixed(2)} €` : '0.00 €'}
-                  </Typography>
-                </Grid>
-              </Grid>
-              <Divider sx={{ my: 1.5 }} />
-              <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#c62828' }}>
-                <strong>Total remboursé:</strong> -{(orderToCancel.finalAmount + (Number(orderToCancel.tips) || 0) - (Number(orderToCancel.change) || 0)).toFixed(2)} €
-              </Typography>
-            </Box>
-          )}
-
-          {/* Payment Method Info */}
-          {orderToCancel && (
-            <Box sx={{ mb: 3, p: 2, border: '1px solid #ddd', borderRadius: 1, background: '#fff3e0' }}>
-              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: '#e65100' }}>
-                💳 Mode de paiement original: {orderToCancel.paymentMethod === 'split' ? 'Paiement partagé' : 
-                  orderToCancel.paymentMethod === 'card' ? 'Carte' : 'Espèces'}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Le remboursement respectera le mode de paiement original de la commande.
-              </Typography>
-            </Box>
-          )}
-
-          {/* Reason */}
-          <TextField
-            fullWidth
-            label="Raison de l'annulation (obligatoire)"
-            multiline
-            rows={3}
-            value={cancellationReason}
-            onChange={(e) => setCancellationReason(e.target.value)}
-            placeholder="Ex: Erreur de commande, demande client, test système..."
-            required
-            error={cancellationReason.trim() === '' && cancellationError !== ''}
-            helperText="Cette raison sera enregistrée dans le journal légal pour conformité fiscale"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseCancellationDialog} disabled={cancellationLoading}>
-            Annuler
-          </Button>
-          <Button
-            onClick={handleCancelOrder}
-            color="error"
-            variant="contained"
-            disabled={cancellationLoading || cancellationReason.trim() === ''}
-            startIcon={cancellationLoading ? <CircularProgress size={20} /> : <CancelIcon />}
-          >
-            {cancellationLoading ? 'Annulation...' : 'Confirmer l\'annulation'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -980,7 +988,6 @@ const HistoryDashboard: React.FC = () => {
                 });
                 
                 if (response.ok) {
-                  const result = await response.json();
                   alert('Reçu imprimé avec succès sur l\'imprimante thermique!');
                 } else {
                   const error = await response.json();
