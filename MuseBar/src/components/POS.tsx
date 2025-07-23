@@ -48,6 +48,7 @@ import { Category, Product, OrderItem, LocalSubBill } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { HappyHourService } from '../services/happyHourService';
 import { ApiService } from '../services/apiService';
+import { apiConfig } from '../config/api';
 import LegalReceipt from './LegalReceipt';
 
 interface POSProps {
@@ -434,7 +435,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
   // Generate receipt for an order
   const generateReceipt = async (orderId: number, type: 'detailed' | 'summary' = 'detailed') => {
     try {
-      const response = await fetch(`http://localhost:3001/api/legal/receipt/${orderId}?type=${type}`, {
+              const response = await fetch(apiConfig.getEndpoint(`/api/legal/receipt/${orderId}?type=${type}`), {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -2177,7 +2178,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
             variant="outlined"
             onClick={async () => {
               try {
-                const response = await fetch(`http://localhost:3001/api/legal/receipt/${currentReceipt.order_id}/thermal-print?type=${receiptType}`, {
+                const response = await fetch(apiConfig.getEndpoint(`/api/legal/receipt/${currentReceipt.order_id}/thermal-print?type=${receiptType}`), {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' }
                 });

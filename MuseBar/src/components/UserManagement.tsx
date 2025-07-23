@@ -3,6 +3,7 @@ import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Button, TextField, Checkbox, FormControlLabel, Dialog, DialogTitle, DialogContent, DialogActions, Alert
 } from '@mui/material';
+import { apiConfig } from '../config/api';
 
 const PERMISSIONS = [
   { key: 'access_pos', label: 'Caisse' },
@@ -30,7 +31,7 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('http://localhost:3001/api/auth/users', {
+      const res = await fetch(apiConfig.getEndpoint('/api/auth/users'), {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Erreur chargement utilisateurs');
@@ -49,7 +50,7 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
 
   const handleAddUser = async () => {
     try {
-      const res = await fetch('http://localhost:3001/api/auth/register', {
+      const res = await fetch(apiConfig.getEndpoint('/api/auth/register'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ email: newEmail, password: newPassword, is_admin: newIsAdmin })
@@ -70,7 +71,7 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
     setPermError(null);
     setPermSaving(false);
     // Fetch permissions
-          const res = await fetch(`http://localhost:3001/api/auth/users/${user.id}/permissions`, {
+          const res = await fetch(apiConfig.getEndpoint(`/api/auth/users/${user.id}/permissions`), {
       headers: { Authorization: `Bearer ${token}` }
     });
     const data = await res.json();
@@ -85,7 +86,7 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
     const userId = permDialog.user.id;
     const perms = Object.keys(permState).filter(k => permState[k]);
     try {
-      const res = await fetch(`http://localhost:3001/api/auth/users/${userId}/permissions`, {
+      const res = await fetch(apiConfig.getEndpoint(`/api/auth/users/${userId}/permissions`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ permissions: perms })

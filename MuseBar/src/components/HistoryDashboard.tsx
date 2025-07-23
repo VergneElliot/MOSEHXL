@@ -44,6 +44,7 @@ import {
   SwapHoriz as SwapHorizIcon
 } from '@mui/icons-material';
 import { ApiService } from '../services/apiService';
+import { apiConfig } from '../config/api';
 import { Order } from '../types';
 import LegalReceipt from './LegalReceipt';
 import { mapBusinessInfoFromBackend } from '../utils/businessInfoMapper';
@@ -293,7 +294,7 @@ const HistoryDashboard: React.FC = () => {
   // Function to fetch and show receipt
   const handleShowReceipt = async (orderId: number, type: 'detailed' | 'summary' = 'detailed') => {
     try {
-      const response = await fetch(`http://localhost:3001/api/legal/receipt/${orderId}?type=${type}`);
+              const response = await fetch(apiConfig.getEndpoint(`/api/legal/receipt/${orderId}?type=${type}`));
       if (!response.ok) throw new Error('Failed to fetch receipt');
       const receipt = await response.json();
       
@@ -1108,7 +1109,7 @@ const HistoryDashboard: React.FC = () => {
             variant="outlined"
             onClick={async () => {
               try {
-                const response = await fetch(`http://localhost:3001/api/legal/receipt/${currentReceipt.order_id}/thermal-print?type=${receiptType}`, {
+                const response = await fetch(apiConfig.getEndpoint(`/api/legal/receipt/${currentReceipt.order_id}/thermal-print?type=${receiptType}`), {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' }
                 });

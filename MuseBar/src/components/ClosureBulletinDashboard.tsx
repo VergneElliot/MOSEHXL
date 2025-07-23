@@ -55,6 +55,7 @@ import {
   Print as ThermalPrintIcon
 } from '@mui/icons-material';
 import { ApiService } from '../services/apiService';
+import { apiConfig } from '../config/api';
 
 interface ClosureBulletin {
   id: number;
@@ -115,7 +116,7 @@ const ClosureBulletinDashboard: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('http://localhost:3001/api/legal/closures');
+      const response = await fetch(apiConfig.getEndpoint('/api/legal/closures'));
       if (!response.ok) {
         throw new Error('Failed to load closure bulletins');
       }
@@ -131,7 +132,7 @@ const ClosureBulletinDashboard: React.FC = () => {
 
   const loadTodayStatus = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/legal/closure/today-status');
+      const response = await fetch(apiConfig.getEndpoint('/api/legal/closure/today-status'));
       if (response.ok) {
         const data = await response.json();
         setTodayStatus(data);
@@ -143,7 +144,7 @@ const ClosureBulletinDashboard: React.FC = () => {
 
   const loadClosureSettings = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/legal/closure-settings');
+      const response = await fetch(apiConfig.getEndpoint('/api/legal/closure-settings'));
       if (response.ok) {
         const data = await response.json();
         setClosureSettings(data);
@@ -168,7 +169,7 @@ const ClosureBulletinDashboard: React.FC = () => {
     try {
       setCreating(true);
       setError(null);
-      const response = await fetch('http://localhost:3001/api/legal/closure/create', {
+      const response = await fetch(apiConfig.getEndpoint('/api/legal/closure/create'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: selectedDate, type: selectedClosureType }),
@@ -194,7 +195,7 @@ const ClosureBulletinDashboard: React.FC = () => {
 
   const updateClosureSettings = async (newSettings: any) => {
     try {
-      const response = await fetch('http://localhost:3001/api/legal/closure-settings', {
+      const response = await fetch(apiConfig.getEndpoint('/api/legal/closure-settings'), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

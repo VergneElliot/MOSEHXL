@@ -13,6 +13,7 @@ import {
   Settings as SettingsIcon
 } from '@mui/icons-material';
 import { apiService } from '../services/apiService';
+import { apiConfig } from '../config/api';
 
 interface ClosureSettings {
   auto_closure_enabled: boolean;
@@ -394,7 +395,7 @@ const Settings: React.FC = () => {
                   variant="outlined"
                   onClick={async () => {
                     try {
-                      const response = await fetch('http://localhost:3001/api/legal/thermal-printer/status');
+                      const response = await fetch(apiConfig.getEndpoint('/api/legal/thermal-printer/status'));
                       const status = await response.json();
                       
                       if (status.available) {
@@ -415,7 +416,7 @@ const Settings: React.FC = () => {
                   variant="contained"
                   onClick={async () => {
                     try {
-                      const response = await fetch('http://localhost:3001/api/legal/thermal-printer/test', {
+                      const response = await fetch(apiConfig.getEndpoint('/api/legal/thermal-printer/test'), {
                         method: 'POST'
                       });
                       const result = await response.json();
