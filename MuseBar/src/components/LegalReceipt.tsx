@@ -399,7 +399,7 @@ const LegalReceipt: React.FC<LegalReceiptProps> = ({ order, businessInfo, receip
               ? v.tax_rate
               : (typeof (v as any).rate === 'number' && !isNaN((v as any).rate)
                 ? (v as any).rate
-                : '');
+                : 0);
             return (
               <React.Fragment key={index}>
                 <Grid item xs={6}>
