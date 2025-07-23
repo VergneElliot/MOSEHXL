@@ -37,9 +37,7 @@ import {
   Timeline,
   Receipt,
   VerifiedUser,
-  Gavel,
-  EuroSymbol,
-  Schedule
+  Gavel
 } from '@mui/icons-material';
 import { ApiService } from '../services/apiService';
 

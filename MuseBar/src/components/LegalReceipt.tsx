@@ -5,17 +5,11 @@ import {
   Typography,
   Divider,
   Grid,
-  Chip,
-  Alert,
-  AlertTitle
+  Chip
 } from '@mui/material';
 import {
-  Receipt,
   Business,
-  EuroSymbol,
-  Schedule,
-  Security,
-  VerifiedUser
+  Security
 } from '@mui/icons-material';
 
 interface ReceiptItem {
@@ -116,25 +110,7 @@ const LegalReceipt: React.FC<LegalReceiptProps> = ({ order, businessInfo, receip
   // Defensive: ensure order.items is always an array
   const items = Array.isArray(order.items) ? order.items : [];
 
-  const calculateSubtotal = () => {
-    return items.reduce((sum, item) => sum + item.total_price, 0);
-  };
 
-  const calculateTotalTax = () => {
-    return items.reduce((sum, item) => sum + item.tax_amount, 0);
-  };
-
-  const getVATBreakdown = () => {
-    const vat10 = items
-      .filter(item => Math.abs(item.tax_rate - 10) < 0.1)
-      .reduce((sum, item) => sum + item.tax_amount, 0);
-    
-    const vat20 = items
-      .filter(item => Math.abs(item.tax_rate - 20) < 0.1)
-      .reduce((sum, item) => sum + item.tax_amount, 0);
-    
-    return { vat10, vat20 };
-  };
 
   // Calculate totalVAT and totalHT as follows:
   const vatBreakdown = Array.isArray(order.vat_breakdown) ? order.vat_breakdown : [];

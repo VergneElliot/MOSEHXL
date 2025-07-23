@@ -104,7 +104,6 @@ router.post('/', async (req, res) => {
     const isChangeOperation =
       total_amount === 0 &&
       total_tax === 0 &&
-      change > 0 &&
       notes &&
       (notes.includes('Changement de caisse') || notes.includes('Faire de la Monnaie'));
     
@@ -409,7 +408,343 @@ router.post('/retour', requireAuth, async (req, res) => {
   }
 });
 
-// POST return from history (based on original order payment method)
+// POST unified cancellation function - handles all cancellation scenarios
+router.post('/cancel-unified', requireAuth, async (req, res) => {
+  try {
+    const { orderId, reason, cancellationType = 'full', itemsToCancel, includeTipReversal = false } = req.body;
+    
+    if (!orderId || !reason || typeof reason !== 'string' || !reason.trim()) {
+      return res.status(400).json({ error: 'Order ID and cancellation reason are required' });
+    }
+    
+    // Validate cancellation type
+    const validTypes = ['full', 'partial', 'items-only'];
+    if (!validTypes.includes(cancellationType)) {
+      return res.status(400).json({ error: 'Invalid cancellation type' });
+    }
+    
+    // Get the original order
+    const originalOrder = await OrderModel.getById(orderId);
+    if (!originalOrder) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    
+    if (originalOrder.status !== 'completed') {
+      return res.status(400).json({ error: 'Only completed orders can be cancelled' });
+    }
+    
+    // Check if this is a "Faire de la monnaie" operation
+    const isChangeOperation = 
+      originalOrder.total_amount === 0 &&
+      originalOrder.total_tax === 0 &&
+      originalOrder.notes &&
+      originalOrder.notes.includes('Faire de la Monnaie');
+    
+    // Get original order items and sub-bills
+    const originalItems = await OrderItemModel.getByOrderId(orderId);
+    const originalSubBills = originalOrder.payment_method === 'split' 
+      ? await SubBillModel.getByOrderId(orderId) 
+      : [];
+    
+    // Order validation for cancellation
+    
+    // Handle "Faire de la monnaie" cancellations differently
+    if (isChangeOperation) {
+      if (originalSubBills.length === 0) {
+        return res.status(400).json({ error: 'Aucune donnée de sous-factures trouvée pour cette opération de monnaie' });
+      }
+      
+      // Create reversal order for "Faire de la monnaie"
+      const changeReversalOrder = await OrderModel.create({
+        total_amount: 0,
+        total_tax: 0,
+        payment_method: 'split',
+        status: 'completed',
+        notes: `ANNULATION Faire de la Monnaie - Commande #${orderId} - Raison: ${reason}`,
+        tips: 0,
+        change: 0
+      });
+      
+      // Reverse each sub-bill (opposite direction)
+      for (const originalSubBill of originalSubBills) {
+        await SubBillModel.create({
+          order_id: changeReversalOrder.id,
+          payment_method: originalSubBill.payment_method,
+          amount: -originalSubBill.amount, // Reverse the amount
+          status: 'paid'
+        });
+      }
+      
+      return res.json({
+        message: `Annulation de l'opération "Faire de la Monnaie" réussie`,
+        cancellation: {
+          cancellationOrder: changeReversalOrder,
+          type: 'change_operation_reversal'
+        }
+      });
+    }
+    
+    // Handle regular order cancellations
+    if (cancellationType === 'partial' && (!itemsToCancel || !Array.isArray(itemsToCancel) || (itemsToCancel.length === 0 && !includeTipReversal))) {
+      return res.status(400).json({ error: 'Items to cancel or tip reversal are required for partial cancellations' });
+    }
+    
+    let itemsToProcess = originalItems;
+    let isPartialCancellation = false;
+    
+    // Handle partial cancellations
+    if (cancellationType === 'partial' && itemsToCancel) {
+      itemsToProcess = [];
+      isPartialCancellation = true;
+      
+      for (const cancelItem of itemsToCancel) {
+        const originalItem = originalItems.find(item => item.id === cancelItem.item_id);
+        if (!originalItem) {
+          return res.status(400).json({ error: `Original item ${cancelItem.item_id} not found` });
+        }
+        itemsToProcess.push(originalItem);
+      }
+    }
+    
+    // Calculate cancellation amounts
+    let totalCancelAmount = 0;
+    let totalCancelTax = 0;
+    const cancelItems = [];
+    
+    for (const item of itemsToProcess) {
+      const itemTotalPrice = Math.abs(item.total_price);
+      const itemTaxAmount = Math.abs(item.tax_amount);
+      
+      // Calculate negative amounts for cancellation
+      
+      totalCancelAmount += itemTotalPrice;
+      totalCancelTax += itemTaxAmount;
+      
+      cancelItems.push({
+        ...item,
+        total_price: -itemTotalPrice,
+        tax_amount: -itemTaxAmount,
+        quantity: -Math.abs(item.quantity)
+      });
+    }
+    
+    // Cancellation totals calculated
+    
+    // Calculate tips and change to handle
+    const shouldReverseTips = 
+      (cancellationType === 'full') || 
+      (cancellationType === 'partial' && includeTipReversal);
+    
+    const totalTips = shouldReverseTips ? Math.abs(originalOrder.tips || 0) : 0;
+    const totalChange = (cancellationType === 'full') ? Math.abs(originalOrder.change || 0) : 0;
+    
+    // Create main cancellation order
+    const cancellationOrder = await OrderModel.create({
+      total_amount: -totalCancelAmount,
+      total_tax: -totalCancelTax,
+      payment_method: originalOrder.payment_method,
+      status: 'completed',
+      notes: `[${cancellationType.toUpperCase()}] ANNULATION - Commande #${orderId} - Raison: ${reason}`,
+      tips: 0,
+      change: 0
+    });
+    
+    // Create negative order items
+    const createdCancellationItems = [];
+    for (const cancelItem of cancelItems) {
+      const cancellationItem = await OrderItemModel.create({
+        order_id: cancellationOrder.id,
+        product_id: cancelItem.product_id,
+        product_name: `[ANNULATION] ${cancelItem.product_name}`,
+        quantity: cancelItem.quantity,
+        unit_price: cancelItem.unit_price,
+        total_price: cancelItem.total_price,
+        tax_rate: cancelItem.tax_rate,
+        tax_amount: cancelItem.tax_amount,
+        happy_hour_applied: false,
+        happy_hour_discount_amount: 0
+      });
+      createdCancellationItems.push(cancellationItem);
+    }
+    
+    // Handle payment reversals
+    if (originalOrder.payment_method === 'split' && originalSubBills.length > 0) {
+      // Calculate proportional cancellations for split payments
+      const originalTotal = originalItems.reduce((sum, item) => sum + Math.abs(item.total_price), 0);
+      
+      if (isPartialCancellation) {
+        // For partial cancellations, create proportional sub-bills
+        for (const originalSubBill of originalSubBills) {
+          const subBillRatio = Math.abs(originalSubBill.amount) / originalTotal;
+          const cancellationAmount = totalCancelAmount * subBillRatio;
+          
+          if (cancellationAmount > 0) {
+            await SubBillModel.create({
+              order_id: cancellationOrder.id,
+              payment_method: originalSubBill.payment_method,
+              amount: -cancellationAmount,
+              status: 'paid'
+            });
+          }
+        }
+      } else {
+        // For full cancellations, reverse all sub-bills
+        for (const originalSubBill of originalSubBills) {
+          await SubBillModel.create({
+            order_id: cancellationOrder.id,
+            payment_method: originalSubBill.payment_method,
+            amount: -Math.abs(originalSubBill.amount),
+            status: 'paid'
+          });
+        }
+      }
+    }
+    
+    // Handle tip and change reversals for full cancellations
+    const additionalOrders = [];
+    
+    if (totalTips > 0) {
+      const tipReversalOrder = await OrderModel.create({
+        total_amount: 0,
+        total_tax: 0,
+        payment_method: originalOrder.payment_method,
+        status: 'completed',
+        notes: `ANNULATION pourboire - Commande #${orderId} - Raison: ${reason}`,
+        tips: -totalTips,
+        change: 0
+      });
+      
+      // Create tip reversal sub-bills (always card→cash reversal)
+      await SubBillModel.create({
+        order_id: tipReversalOrder.id,
+        payment_method: 'card',
+        amount: -totalTips,
+        status: 'paid'
+      });
+      await SubBillModel.create({
+        order_id: tipReversalOrder.id,
+        payment_method: 'cash',
+        amount: totalTips,
+        status: 'paid'
+      });
+      
+      additionalOrders.push({ type: 'tip_reversal', order: tipReversalOrder });
+    }
+    
+    if (totalChange > 0) {
+      const changeReversalOrder = await OrderModel.create({
+        total_amount: 0,
+        total_tax: 0,
+        payment_method: originalOrder.payment_method,
+        status: 'completed',
+        notes: `ANNULATION monnaie - Commande #${orderId} - Raison: ${reason}`,
+        tips: 0,
+        change: -totalChange
+      });
+      
+      // Create change reversal sub-bill (money back to drawer)
+      await SubBillModel.create({
+        order_id: changeReversalOrder.id,
+        payment_method: originalOrder.payment_method === 'card' ? 'card' : 'cash',
+        amount: totalChange,
+        status: 'paid'
+      });
+      
+      additionalOrders.push({ type: 'change_reversal', order: changeReversalOrder });
+    }
+    
+    // Log to legal journal with proper transaction type
+    // Use REFUND for all cancellations since we're returning money to customers
+    const transactionType = 'REFUND';
+    
+    try {
+      // For REFUND transactions, amounts should be negative (money going back to customer)
+      const journalAmount = -totalCancelAmount;
+      const journalTax = -totalCancelTax;
+      
+      await LegalJournalModel.addEntry(
+        transactionType,
+        cancellationOrder.id,
+        journalAmount,
+        journalTax,
+        originalOrder.payment_method,
+        {
+          type: 'UNIFIED_CANCELLATION',
+          cancellation_type: cancellationType,
+          original_order_id: orderId,
+          reason,
+          is_partial: isPartialCancellation,
+          original_amount: totalCancelAmount,
+          original_tax: totalCancelTax,
+          original_tips: totalTips,
+          original_change: totalChange,
+          cancellation_amount: -totalCancelAmount,
+          cancellation_tax: -totalCancelTax,
+          payment_method: originalOrder.payment_method,
+          split_payment: originalOrder.payment_method === 'split',
+          items_cancelled: itemsToProcess.length,
+          total_original_items: originalItems.length,
+          additional_reversals: additionalOrders.map(ao => ao.type)
+        },
+        (req as any).user ? String((req as any).user.id) : undefined
+      );
+    } catch (journalError) {
+      console.error('Legal journal error (unified cancellation):', journalError);
+    }
+    
+    // Log audit trail
+    const ip = req.ip;
+    const userAgent = req.headers['user-agent'];
+    const userId = (req as any).user ? String((req as any).user.id) : undefined;
+    
+    try {
+      await AuditTrailModel.logAction({
+        user_id: userId,
+        action_type: 'UNIFIED_CANCELLATION',
+        resource_type: 'ORDER',
+        resource_id: String(cancellationOrder.id),
+        action_details: { 
+          original_order_id: orderId,
+          cancellation_order_id: cancellationOrder.id,
+          cancellation_type: cancellationType,
+          reason,
+          is_partial: isPartialCancellation,
+          items_cancelled: itemsToProcess.length,
+          total_cancel_amount: totalCancelAmount,
+          tips_cancelled: totalTips,
+          change_cancelled: totalChange,
+          payment_method: originalOrder.payment_method,
+          additional_orders: additionalOrders.length
+        },
+        ip_address: ip,
+        user_agent: userAgent
+      });
+    } catch (error) {
+      console.error('Audit log error (unified cancellation):', error);
+    }
+    
+    res.status(201).json({
+      message: `${isPartialCancellation ? 'Annulation partielle' : 'Annulation complète'} enregistrée avec succès`,
+      cancellation_order: cancellationOrder,
+      cancellation_items: createdCancellationItems,
+      additional_orders: additionalOrders,
+      original_order_id: orderId,
+      cancellation_type: cancellationType,
+      payment_method: originalOrder.payment_method,
+      totals: {
+        cancelled_amount: totalCancelAmount,
+        cancelled_tax: totalCancelTax,
+        tips_cancelled: totalTips,
+        change_cancelled: totalChange
+      }
+    });
+  } catch (error: any) {
+    console.error('Error processing unified cancellation:', error);
+    res.status(500).json({ error: 'Erreur lors de l\'annulation', details: error.message });
+  }
+});
+
+// POST return from history (based on original order payment method) - DEPRECATED: Use cancel-unified instead
 router.post('/retour-from-history', requireAuth, async (req, res) => {
   try {
     const { originalOrderId, reason, itemsToReturn } = req.body;
@@ -577,7 +912,7 @@ router.post('/retour-from-history', requireAuth, async (req, res) => {
   }
 });
 
-// POST cancel entire order (full cancellation with tips/change reversal)
+// POST cancel entire order (full cancellation with tips/change reversal) - DEPRECATED: Use cancel-unified instead
 router.post('/cancel-order', requireAuth, async (req, res) => {
   try {
     const { orderId, reason } = req.body;
@@ -757,10 +1092,10 @@ router.post('/cancel-order', requireAuth, async (req, res) => {
       }
     }
     
-    // Log to legal journal as CORRECTION for main order
+    // Log to legal journal as REFUND for main order
     try {
       await LegalJournalModel.addEntry(
-        'CORRECTION',
+        'REFUND',
         cancellationOrder.id,
         -totalOrderAmount,
         -totalOrderTax,

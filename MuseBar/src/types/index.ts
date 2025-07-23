@@ -51,12 +51,13 @@ export interface Order {
 
 export interface OrderItem {
   id: string;
-  productId: string;
+  productId: string | null; // Allow null for Divers items
   productName: string;
   quantity: number;
   unitPrice: number;
   totalPrice: number;
   taxRate: number;
+  taxAmount: number; // Add missing tax amount field
   isHappyHourApplied: boolean;
   isManualHappyHour?: boolean; // For manually applied happy hour discounts
   isOffert?: boolean; // For complimentary items (price = 0)

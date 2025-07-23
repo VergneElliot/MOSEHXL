@@ -15,7 +15,7 @@ const PERMISSIONS = [
 
 const UserManagement: React.FC<{ token: string }> = ({ token }) => {
   const [users, setUsers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [newEmail, setNewEmail] = useState('');
@@ -42,7 +42,10 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
     }
   };
 
-  useEffect(() => { fetchUsers(); }, [token]);
+  useEffect(() => { 
+    fetchUsers(); 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const handleAddUser = async () => {
     try {

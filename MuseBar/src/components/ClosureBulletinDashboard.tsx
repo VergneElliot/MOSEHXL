@@ -52,7 +52,6 @@ import {
   Assignment,
   Settings as SettingsIcon,
   AccessTime,
-  AutoMode,
   Print as ThermalPrintIcon
 } from '@mui/icons-material';
 import { ApiService } from '../services/apiService';
@@ -109,6 +108,7 @@ const ClosureBulletinDashboard: React.FC = () => {
     loadTodayStatus();
     loadClosureSettings();
     loadMonthlyStats();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadBulletins = async () => {

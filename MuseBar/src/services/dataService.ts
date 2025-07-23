@@ -1,5 +1,4 @@
 import { Category, Product } from '../types';
-import { v4 as uuidv4 } from 'uuid';
 import { ApiService } from './apiService';
 
 export class DataService {

@@ -38,7 +38,6 @@ import {
   CardGiftcard as OffertIcon,
   Search as SearchIcon,
   Person as PersonIcon,
-  SwapHoriz as SwapHorizIcon,
   EuroSymbol,
   Print
 } from '@mui/icons-material';
@@ -74,7 +73,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
   const [cashAmount, setCashAmount] = useState('');
   const [cardAmount, setCardAmount] = useState('');
   const [tips, setTips] = useState(''); // Tips input
-  const [change, setChange] = useState(''); // Change input
+  const [change] = useState(''); // Change input
   
   // Add state for retour dialog
   const [retourDialogOpen, setRetourDialogOpen] = useState(false);
@@ -112,8 +111,11 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
   const orderCalculations = useMemo(() => {
     // Le prix est TTC, on ne rajoute pas la taxe
     const subtotal = currentOrder.reduce((sum, item) => sum + item.totalPrice, 0);
-    // Calcul de la TVA comprise dans chaque item
-    const taxAmount = currentOrder.reduce((sum, item) => sum + (item.totalPrice * item.taxRate / (1 + item.taxRate)), 0);
+    // Calcul de la TVA comprise dans chaque item - convert tax rate from percentage to decimal
+    const taxAmount = currentOrder.reduce((sum, item) => {
+      const taxRateDecimal = item.taxRate / 100;
+      return sum + (item.totalPrice * taxRateDecimal / (1 + taxRateDecimal));
+    }, 0);
     // La réduction Happy Hour est déjà appliquée dans le totalPrice
     const discountAmount = 0; // On ne double pas la réduction
     const finalAmount = subtotal;
@@ -160,6 +162,11 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
         unitPrice = Math.max(0, product.price - discountValue);
       }
     }
+    
+    // Calculate tax amount from the unit price - convert tax rate from percentage to decimal
+    const taxRateDecimal = product.taxRate / 100;
+    const taxAmount = unitPrice * taxRateDecimal / (1 + taxRateDecimal);
+    
     const newItem: OrderItem = {
       id: uuidv4(),
       productId: product.id,
@@ -168,6 +175,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
       unitPrice,
       totalPrice: unitPrice,
       taxRate: product.taxRate,
+      taxAmount: taxAmount, // Add the missing tax amount
       isHappyHourApplied
     };
     setCurrentOrder(prev => [...prev, newItem]);
@@ -189,12 +197,15 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
         if (item.isManualHappyHour || item.isOffert) {
           // Remove manual happy hour or revert from offert
           const originalPrice = item.originalPrice || item.unitPrice;
+          const taxRateDecimal = item.taxRate / 100;
+          const taxAmount = originalPrice * taxRateDecimal / (1 + taxRateDecimal);
           return {
             ...item,
             isManualHappyHour: false,
             isOffert: false,
             unitPrice: originalPrice,
             totalPrice: originalPrice,
+            taxAmount: taxAmount,
             originalPrice: originalPrice
           };
         } else {
@@ -223,12 +234,16 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
             happyHourPrice = Math.max(0, originalPrice - discountValue);
           }
 
+          const taxRateDecimal = item.taxRate / 100;
+          const taxAmount = happyHourPrice * taxRateDecimal / (1 + taxRateDecimal);
+
           return {
             ...item,
             isManualHappyHour: true,
             isOffert: false,
             unitPrice: happyHourPrice,
             totalPrice: happyHourPrice,
+            taxAmount: taxAmount,
             originalPrice
           };
         }
@@ -243,16 +258,19 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
         if (item.isOffert) {
           // Revert from offert
           const originalPrice = item.originalPrice || item.unitPrice;
+          const taxRateDecimal = item.taxRate / 100;
+          const taxAmount = originalPrice * taxRateDecimal / (1 + taxRateDecimal);
           return {
             ...item,
             isOffert: false,
             isManualHappyHour: false,
             unitPrice: originalPrice,
             totalPrice: originalPrice,
+            taxAmount: taxAmount,
             originalPrice
           };
         } else {
-          // Set as offert (complimentary)
+          // Set as offert (complimentary) - no tax on free items
           const originalPrice = item.originalPrice || item.unitPrice;
           return {
             ...item,
@@ -260,6 +278,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
             isManualHappyHour: false,
             unitPrice: 0,
             totalPrice: 0,
+            taxAmount: 0,
             originalPrice
           };
         }
@@ -273,20 +292,25 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
       if (item.id === itemId) {
         if (item.isPerso) {
           // Remove perso
+          const originalPrice = item.originalPrice || item.unitPrice;
+          const taxRateDecimal = item.taxRate / 100;
+          const taxAmount = originalPrice * taxRateDecimal / (1 + taxRateDecimal);
           return {
             ...item,
             isPerso: false,
-            unitPrice: item.originalPrice || item.unitPrice,
-            totalPrice: item.originalPrice || item.unitPrice
+            unitPrice: originalPrice,
+            totalPrice: originalPrice,
+            taxAmount: taxAmount
           };
         } else {
-          // Set as perso
+          // Set as perso - no tax on free items
           const originalPrice = item.originalPrice || item.unitPrice;
           return {
             ...item,
             isPerso: true,
             unitPrice: 0,
             totalPrice: 0,
+            taxAmount: 0,
             originalPrice
           };
         }
@@ -382,19 +406,25 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
     }
 
     try {
+      const price = parseFloat(diversPrice);
+      const taxRatePercent = parseFloat(diversTax); // Store as percentage (10, 20)
+      const taxRateDecimal = taxRatePercent / 100; // Convert to decimal for calculation
+      const taxAmount = price * taxRateDecimal / (1 + taxRateDecimal); // Calculate tax amount from price including tax
+
       const newItem: OrderItem = {
         id: uuidv4(),
-        productId: uuidv4(), // Unique ID for a new product
+        productId: null, // Divers items don't have a real product ID
         productName: 'Divers',
         quantity: 1,
-        unitPrice: parseFloat(diversPrice),
-        totalPrice: parseFloat(diversPrice),
-        taxRate: parseFloat(diversTax) / 100, // Convert percentage to decimal
+        unitPrice: price,
+        totalPrice: price,
+        taxRate: taxRatePercent, // Store as percentage to be consistent with system
+        taxAmount: taxAmount, // Add the missing tax amount calculation
         isHappyHourApplied: false,
         isManualHappyHour: false,
         isOffert: false,
         isPerso: false,
-        originalPrice: parseFloat(diversPrice),
+        originalPrice: price,
         description: diversDescription.trim() // Include the description
       };
       setCurrentOrder(prev => [...prev, newItem]);
@@ -638,7 +668,6 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                       return matchesCategory && matchesSearch;
                     })
                     .map((product) => {
-                      const value = typeof product.happyHourDiscountValue === 'number' ? product.happyHourDiscountValue : 0;
                       let happyHourLabel = '';
                       if (isHappyHourActive && product.isHappyHourEligible) {
                         happyHourLabel = 'HH'; // Changed from showing discount percentage to just "HH"
@@ -1839,16 +1868,20 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
             onClick={async () => {
               setChangeLoading(true);
               try {
-                // Create a special 'change' order
+                // Create a special 'change' order with proper card→cash accounting
                 await apiService.createOrder({
                   items: [],
                   totalAmount: 0,
                   taxAmount: 0,
-                  paymentMethod: 'cash', // always cash for 'Faire de la Monnaie'
+                  paymentMethod: 'split', // Use split to properly handle card→cash transfer
                   status: 'completed',
                   notes: `Faire de la Monnaie: Carte → Espèces ${Number(changeAmount).toFixed(2)}€`,
                   tips: 0,
-                  change: Number(changeAmount)
+                  change: 0,
+                  sub_bills: [
+                    { payment_method: 'card', amount: Number(changeAmount) },
+                    { payment_method: 'cash', amount: -Number(changeAmount) }
+                  ]
                 });
                 setSnackbar({ open: true, message: 'Opération de monnaie enregistrée', severity: 'success' });
                 setChangeDialogOpen(false);
@@ -1972,7 +2005,6 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                 });
                 
                 if (response.ok) {
-                  const result = await response.json();
                   setSnackbar({ 
                     open: true, 
                     message: 'Reçu imprimé avec succès sur l\'imprimante thermique!', 

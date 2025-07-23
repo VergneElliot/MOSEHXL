@@ -1,6 +1,5 @@
 import { Category, Product, Order, OrderItem } from '../types';
 import { apiConfig } from '../config/api';
-import { v4 as uuidv4 } from 'uuid';
 import type { PaymentMethod } from '../types';
 
 export class ApiService {
@@ -349,15 +348,17 @@ export class ApiService {
         tips: order.tips || 0,
         change: order.change || 0,
         items: order.items.map(item => ({
-          product_id: parseInt(item.productId),
+          product_id: item.productId ? (isNaN(parseInt(item.productId)) ? null : parseInt(item.productId)) : null,
           product_name: item.productName,
           quantity: item.quantity,
           unit_price: item.unitPrice,
           total_price: item.totalPrice,
-          tax_rate: item.taxRate * 100,
-          tax_amount: item.totalPrice * item.taxRate / (1 + item.taxRate),
+          tax_rate: item.taxRate, // Keep as decimal, don't multiply by 100
+          tax_amount: item.taxAmount || (item.totalPrice * item.taxRate / (1 + item.taxRate)), // Use provided taxAmount or calculate
           happy_hour_applied: item.isHappyHourApplied,
-          happy_hour_discount_amount: item.isHappyHourApplied ? (item.quantity * (item.unitPrice / (1 - 0.2)) * 0.2) : 0
+          happy_hour_discount_amount: item.isHappyHourApplied ? 
+            (item.originalPrice ? ((item.originalPrice - item.unitPrice) * item.quantity) : 0) : 0,
+          description: item.description || null
         })),
         ...(order.sub_bills ? { sub_bills: order.sub_bills } : {})
       }),

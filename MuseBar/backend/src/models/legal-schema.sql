@@ -19,9 +19,8 @@ CREATE TABLE IF NOT EXISTS legal_journal (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
     -- Legal constraints
-    CONSTRAINT sequence_positive CHECK (sequence_number >= 0),
-    CONSTRAINT amount_positive CHECK (amount >= 0),
-    CONSTRAINT vat_amount_positive CHECK (vat_amount >= 0)
+    CONSTRAINT sequence_positive CHECK (sequence_number >= 0)
+    -- Removed amount constraints to allow negative amounts for refunds/cancellations
 );
 
 -- Closure bulletins for periodic data consolidation
@@ -44,8 +43,9 @@ CREATE TABLE IF NOT EXISTS closure_bulletins (
     
     -- Legal constraints
     CONSTRAINT period_valid CHECK (period_end >= period_start),
-    CONSTRAINT totals_positive CHECK (total_transactions >= 0 AND total_amount >= 0 AND total_vat >= 0),
+    CONSTRAINT transactions_positive CHECK (total_transactions >= 0),
     CONSTRAINT sequence_order CHECK (last_sequence IS NULL OR first_sequence IS NULL OR last_sequence >= first_sequence)
+    -- Removed amount constraints to allow negative adjustments
 );
 
 -- Audit trail for user actions (Sécurisation pillar)

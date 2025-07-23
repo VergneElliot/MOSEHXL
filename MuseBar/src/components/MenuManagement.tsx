@@ -113,6 +113,7 @@ const MenuManagement: React.FC<MenuManagementProps> = ({ categories, products, o
       loadArchivedProducts();
       loadArchivedCategories();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showArchived]);
 
   const handleCategorySubmit = async () => {
@@ -227,7 +228,7 @@ const MenuManagement: React.FC<MenuManagementProps> = ({ categories, products, o
 
   const handleDeleteProduct = async (productId: string) => {
     try {
-      const response = await dataService.deleteProduct(productId);
+      await dataService.deleteProduct(productId);
       setSnackbar({ open: true, message: 'Produit traité avec succès', severity: 'success' });
       await onDataUpdate();
       if (showArchived) {
