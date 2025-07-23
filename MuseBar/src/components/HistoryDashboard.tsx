@@ -209,8 +209,8 @@ const HistoryDashboard: React.FC = () => {
     
     itemsToReturn.forEach(item => {
       const itemTotal = item.totalPrice;
-      // Tax rate is already a decimal (0.10, 0.20)
-      const itemTaxAmount = itemTotal * item.taxRate / (1 + item.taxRate);
+      // Use the pre-calculated tax amount from the order item
+      const itemTaxAmount = item.taxAmount || 0;
       // Convert decimal to percentage for display (0.10 -> 10)
       const taxRatePercent = Math.round(item.taxRate * 100);
       

@@ -635,18 +635,26 @@ router.post('/cancel-unified', requireAuth, async (req, res) => {
       const changeReversalOrder = await OrderModel.create({
         total_amount: 0,
         total_tax: 0,
-        payment_method: originalOrder.payment_method,
+        payment_method: 'split', // Use split to properly track both sides
         status: 'completed',
         notes: `ANNULATION monnaie - Commande #${orderId} - Raison: ${reason}`,
         tips: 0,
         change: -totalChange
       });
       
-      // Create change reversal sub-bill (money back to drawer)
+      // Reverse the change operation: undo the original card→cash movement
+      // Original change was: +card (customer paid), -cash (business gave change)
+      // Reversal should be: -card (refund customer), +cash (take cash back)
       await SubBillModel.create({
         order_id: changeReversalOrder.id,
-        payment_method: originalOrder.payment_method === 'card' ? 'card' : 'cash',
-        amount: totalChange,
+        payment_method: 'card',
+        amount: -totalChange, // Refund to customer's card
+        status: 'paid'
+      });
+      await SubBillModel.create({
+        order_id: changeReversalOrder.id,
+        payment_method: 'cash',
+        amount: totalChange, // Take cash back to drawer
         status: 'paid'
       });
       
