@@ -305,11 +305,14 @@ export class LegalJournalModel {
           const itemVat = parseFloat(item.tax_amount || '0');
           const itemTaxRate = parseFloat(item.tax_rate || '0');
           
+          // Convert decimal tax rate to percentage for comparison
+          const itemTaxRatePercent = itemTaxRate * 100;
+          
           // Group by tax rate (10% or 20%)
-          if (Math.abs(itemTaxRate - 10) < 0.1) {
+          if (Math.abs(itemTaxRatePercent - 10) < 0.1) {
             vatBreakdown.vat_10.amount += itemTotal - itemVat; // Base HT
             vatBreakdown.vat_10.vat += itemVat;
-          } else if (Math.abs(itemTaxRate - 20) < 0.1) {
+          } else if (Math.abs(itemTaxRatePercent - 20) < 0.1) {
             vatBreakdown.vat_20.amount += itemTotal - itemVat; // Base HT
             vatBreakdown.vat_20.vat += itemVat;
           }
@@ -568,11 +571,14 @@ export class LegalJournalModel {
           const itemVat = parseFloat(item.tax_amount || '0');
           const itemTaxRate = parseFloat(item.tax_rate || '0');
           
+          // Convert decimal tax rate to percentage for comparison
+          const itemTaxRatePercent = itemTaxRate * 100;
+          
           // Group by tax rate (10% or 20%)
-          if (Math.abs(itemTaxRate - 10) < 0.1) {
+          if (Math.abs(itemTaxRatePercent - 10) < 0.1) {
             vatBreakdown.vat_10.amount += itemTotal - itemVat; // Base HT
             vatBreakdown.vat_10.vat += itemVat;
-          } else if (Math.abs(itemTaxRate - 20) < 0.1) {
+          } else if (Math.abs(itemTaxRatePercent - 20) < 0.1) {
             vatBreakdown.vat_20.amount += itemTotal - itemVat; // Base HT
             vatBreakdown.vat_20.vat += itemVat;
           }
