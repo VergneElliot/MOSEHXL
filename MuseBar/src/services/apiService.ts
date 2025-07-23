@@ -300,6 +300,7 @@ export class ApiService {
         unitPrice: parseFloat(item.unit_price || '0'),
         totalPrice: parseFloat(item.total_price || '0'),
         taxRate: parseFloat(item.tax_rate || '20') / 100, // Convert from percentage to decimal
+        taxAmount: parseFloat(item.tax_amount || '0'), // Add missing tax amount field
         isHappyHourApplied: item.happy_hour_applied || false,
         isManualHappyHour: item.happy_hour_applied || false,
         isOffert: parseFloat(item.total_price || '0') === 0,
