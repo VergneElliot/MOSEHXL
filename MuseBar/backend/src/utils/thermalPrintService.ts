@@ -137,8 +137,9 @@ export class ThermalPrintService {
         const total = `${item.total_price.toFixed(2)} EUR`;
         content += this.padLine(qtyPrice, total, 32) + '\n';
         
-        // Tax rate
-        content += `  TVA ${item.tax_rate.toFixed(1)}%\n`;
+        // Tax rate - convert decimal to percentage for display
+        const taxRatePercent = item.tax_rate * 100;
+        content += `  TVA ${taxRatePercent.toFixed(1)}%\n`;
         content += '\n';
       }
       

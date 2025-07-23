@@ -57,7 +57,10 @@ const HistoryDashboard: React.FC = () => {
   const [stats, setStats] = useState({
     caJour: 0,
     ventesJour: 0,
-    topProduits: [] as Array<{ name: string; qty: number }>
+    topProduits: [] as Array<{ name: string; qty: number }>,
+    cardTotal: 0,
+    cashTotal: 0,
+    businessDayPeriod: null as any
   });
   
 
@@ -88,6 +91,8 @@ const HistoryDashboard: React.FC = () => {
   const loadOrders = async () => {
     try {
       setLoading(true);
+      
+      // Load orders list
       const ordersData = await apiService.getOrders();
       // Map sub_bills to subBills for frontend compatibility
       const mappedOrders = ordersData.map(order => ({
@@ -96,35 +101,20 @@ const HistoryDashboard: React.FC = () => {
       }));
       setOrders(mappedOrders);
       
-      // Calculate stats
-      const today = new Date().toDateString();
-      const todayOrders = ordersData.filter(order => 
-        order.createdAt.toDateString() === today && order.status === 'completed'
-      );
-      
-      const caJour = todayOrders.reduce((sum, order) => sum + order.finalAmount, 0);
-      const ventesJour = todayOrders.length;
-      
-      // Calculate top products from real order data
-      const productCounts: { [key: string]: number } = {};
-      todayOrders.forEach(order => {
-        order.items.forEach(item => {
-          productCounts[item.productName] = (productCounts[item.productName] || 0) + item.quantity;
-        });
-      });
-      
-      const topProduits = Object.entries(productCounts)
-        .sort(([,a], [,b]) => b - a)
-        .slice(0, 3)
-        .map(([name, qty]) => ({ name, qty }));
+      // Load business day statistics
+      const businessDayResponse = await apiService.get('/legal/business-day-stats');
+      const businessDayData = businessDayResponse.data as any;
       
       setStats({
-        caJour,
-        ventesJour,
-        topProduits
+        caJour: businessDayData.stats.total_ttc || 0,
+        ventesJour: businessDayData.stats.total_sales || 0,
+        topProduits: businessDayData.stats.top_products || [],
+        cardTotal: businessDayData.stats.card_total || 0,
+        cashTotal: businessDayData.stats.cash_total || 0,
+        businessDayPeriod: businessDayData.business_day_period || null
       });
     } catch (error) {
-      console.error('Failed to load orders:', error);
+      console.error('Failed to load orders or business day stats:', error);
     } finally {
       setLoading(false);
     }
@@ -219,11 +209,10 @@ const HistoryDashboard: React.FC = () => {
     
     itemsToReturn.forEach(item => {
       const itemTotal = item.totalPrice;
-      // Convert tax rate from percentage (10, 20) to decimal (0.10, 0.20) for calculation
-      const taxRateDecimal = item.taxRate / 100;
-      const itemTaxAmount = itemTotal * taxRateDecimal / (1 + taxRateDecimal);
-      // Tax rate is already stored as percentage (10, 20)
-      const taxRatePercent = Math.round(item.taxRate);
+      // Tax rate is already a decimal (0.10, 0.20)
+      const itemTaxAmount = itemTotal * item.taxRate / (1 + item.taxRate);
+      // Convert decimal to percentage for display (0.10 -> 10)
+      const taxRatePercent = Math.round(item.taxRate * 100);
       
       totalAmount += itemTotal;
       totalTax += itemTaxAmount;
@@ -326,26 +315,163 @@ const HistoryDashboard: React.FC = () => {
       <Typography variant="h4" gutterBottom>Dashboard & Historique</Typography>
       <Grid container spacing={3}>
         {/* Dashboard */}
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} md={6}>
           <Card sx={{ mb: 2 }}>
             <CardContent>
-              <Typography variant="h6">Chiffre d'affaires du jour</Typography>
-              <Typography variant="h4" color="primary" sx={{ fontWeight: 'bold' }}>{stats.caJour.toFixed(2)} €</Typography>
-              <Divider sx={{ my: 1 }} />
-              <Typography variant="body2">Ventes du jour : <b>{stats.ventesJour}</b></Typography>
-              <Divider sx={{ my: 1 }} />
-              <Typography variant="body2" sx={{ mb: 1 }}>Top produits :</Typography>
-              {stats.topProduits.map((prod, i) => (
-                <Typography key={i} variant="body2">{prod.name} <b>x{prod.qty}</b></Typography>
-              ))}
+              <Typography variant="h6" sx={{ mb: 1 }}>Chiffre d'affaires de la journée</Typography>
+              <Typography variant="h4" color="primary" sx={{ fontWeight: 'bold', mb: 2 }}>
+                {stats.caJour.toFixed(2)} €
+              </Typography>
+              
+              {/* Business day period info */}
+              {stats.businessDayPeriod && (
+                <Box sx={{ mb: 2, p: 1, bgcolor: 'info.light', borderRadius: 1 }}>
+                  <Typography variant="caption" color="info.dark" sx={{ fontWeight: 'bold' }}>
+                    📅 Journée d'activité: {new Date(stats.businessDayPeriod.start).toLocaleDateString('fr-FR')} {stats.businessDayPeriod.closure_time} → {new Date(stats.businessDayPeriod.end).toLocaleDateString('fr-FR')} {stats.businessDayPeriod.closure_time}
+                  </Typography>
+                </Box>
+              )}
+              
+              <Divider sx={{ my: 1.5 }} />
+              
+              {/* Sales count */}
+              <Typography variant="body2" sx={{ mb: 1.5 }}>
+                Ventes de la journée : <b>{stats.ventesJour}</b>
+              </Typography>
+              
+              {/* Payment breakdown */}
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>Répartition des paiements :</Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <CreditCard sx={{ fontSize: 16, color: 'primary.main' }} />
+                    <Typography variant="body2">Carte :</Typography>
+                  </Box>
+                  <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                    {stats.cardTotal.toFixed(2)} €
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Money sx={{ fontSize: 16, color: 'success.main' }} />
+                    <Typography variant="body2">Espèces :</Typography>
+                  </Box>
+                  <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                    {stats.cashTotal.toFixed(2)} €
+                  </Typography>
+                </Box>
+              </Box>
+              
+              <Divider sx={{ my: 1.5 }} />
+              
+              {/* Top products */}
+              <Box>
+                <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>Top produits :</Typography>
+                {stats.topProduits.length > 0 ? (
+                  stats.topProduits.map((prod, i) => (
+                    <Typography key={i} variant="body2" sx={{ mb: 0.5 }}>
+                      {prod.name} <b>x{prod.qty}</b>
+                    </Typography>
+                  ))
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    Aucune vente pour cette journée
+                  </Typography>
+                )}
+              </Box>
             </CardContent>
           </Card>
         </Grid>
-        {/* Graphique mock */}
-        <Grid item xs={12} md={8}>
-          <Card sx={{ mb: 2, minHeight: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <BarChart sx={{ fontSize: 80, color: 'grey.300', mr: 2 }} />
-            <Typography variant="body2" color="text.secondary">Graphique d'évolution des ventes (à venir)</Typography>
+        {/* Payment Methods Breakdown Chart */}
+        <Grid item xs={12} md={6}>
+          <Card sx={{ mb: 2, minHeight: 180 }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 2 }}>Répartition des paiements</Typography>
+              {stats.caJour > 0 ? (
+                <Box>
+                  {/* Card payments */}
+                  <Box sx={{ mb: 2 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CreditCard sx={{ color: 'primary.main' }} />
+                        <Typography variant="body1">Paiements Carte</Typography>
+                      </Box>
+                      <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                        {((stats.cardTotal / stats.caJour) * 100).toFixed(1)}%
+                      </Typography>
+                    </Box>
+                    <Box sx={{ 
+                      width: '100%', 
+                      height: 12, 
+                      bgcolor: 'grey.200', 
+                      borderRadius: 1,
+                      overflow: 'hidden'
+                    }}>
+                      <Box sx={{ 
+                        width: `${(stats.cardTotal / stats.caJour) * 100}%`,
+                        height: '100%',
+                        bgcolor: 'primary.main',
+                        transition: 'width 0.5s ease-in-out'
+                      }} />
+                    </Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                      {stats.cardTotal.toFixed(2)} €
+                    </Typography>
+                  </Box>
+                  
+                  {/* Cash payments */}
+                  <Box sx={{ mb: 2 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Money sx={{ color: 'success.main' }} />
+                        <Typography variant="body1">Paiements Espèces</Typography>
+                      </Box>
+                      <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                        {((stats.cashTotal / stats.caJour) * 100).toFixed(1)}%
+                      </Typography>
+                    </Box>
+                    <Box sx={{ 
+                      width: '100%', 
+                      height: 12, 
+                      bgcolor: 'grey.200', 
+                      borderRadius: 1,
+                      overflow: 'hidden'
+                    }}>
+                      <Box sx={{ 
+                        width: `${(stats.cashTotal / stats.caJour) * 100}%`,
+                        height: '100%',
+                        bgcolor: 'success.main',
+                        transition: 'width 0.5s ease-in-out'
+                      }} />
+                    </Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                      {stats.cashTotal.toFixed(2)} €
+                    </Typography>
+                  </Box>
+                  
+                  {/* Total */}
+                  <Divider sx={{ my: 2 }} />
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="h6">Total</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                      {stats.caJour.toFixed(2)} €
+                    </Typography>
+                  </Box>
+                </Box>
+              ) : (
+                <Box sx={{ 
+                  display: 'flex', 
+                  flexDirection: 'column',
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  minHeight: 120,
+                  color: 'text.secondary'
+                }}>
+                  <BarChart sx={{ fontSize: 48, mb: 1 }} />
+                  <Typography variant="body1">Aucune vente aujourd'hui</Typography>
+                </Box>
+              )}
+            </CardContent>
           </Card>
         </Grid>
         {/* Historique des commandes */}

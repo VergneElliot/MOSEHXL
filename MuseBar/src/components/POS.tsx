@@ -39,7 +39,10 @@ import {
   Search as SearchIcon,
   Person as PersonIcon,
   EuroSymbol,
-  Print
+  Print,
+  Add as AddIcon,
+  Remove as RemoveIcon,
+  CreditCard as CreditCardIcon
 } from '@mui/icons-material';
 import { Category, Product, OrderItem, LocalSubBill } from '../types';
 import { v4 as uuidv4 } from 'uuid';
@@ -54,6 +57,11 @@ interface POSProps {
   onDataUpdate: () => void;
 }
 
+// Function to normalize accents for search
+const normalizeAccents = (str: string): string => {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+};
+
 const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDataUpdate }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -63,6 +71,9 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
   const [checkoutMode, setCheckoutMode] = useState<'simple' | 'split-equal' | 'split-items'>('simple');
   const [splitCount, setSplitCount] = useState(2);
   const [subBills, setSubBills] = useState<LocalSubBill[]>([]);
+  
+  // Add state for item quantities
+  const [itemQuantities, setItemQuantities] = useState<{ [productId: string]: number }>({});
   
   // Mobile responsive state
   const [mobileView, setMobileView] = useState<'menu' | 'order'>('menu');
@@ -107,14 +118,35 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md')); // Below 900px is considered mobile
 
+  // Helper function to get quantity for a product
+  const getQuantity = (productId: string): number => {
+    return itemQuantities[productId] || 1;
+  };
+
+  // Helper function to update quantity for a product
+  const updateQuantity = (productId: string, quantity: number) => {
+    setItemQuantities(prev => ({
+      ...prev,
+      [productId]: Math.max(1, quantity)
+    }));
+  };
+
+  // Helper function to reset quantity for a product
+  const resetQuantity = (productId: string) => {
+    setItemQuantities(prev => {
+      const newQuantities = { ...prev };
+      delete newQuantities[productId];
+      return newQuantities;
+    });
+  };
+
   // Calculs de la commande
   const orderCalculations = useMemo(() => {
     // Le prix est TTC, on ne rajoute pas la taxe
     const subtotal = currentOrder.reduce((sum, item) => sum + item.totalPrice, 0);
-    // Calcul de la TVA comprise dans chaque item - convert tax rate from percentage to decimal
+    // Calcul de la TVA comprise dans chaque item - taxRate is already a decimal
     const taxAmount = currentOrder.reduce((sum, item) => {
-      const taxRateDecimal = item.taxRate / 100;
-      return sum + (item.totalPrice * taxRateDecimal / (1 + taxRateDecimal));
+      return sum + (item.totalPrice * item.taxRate / (1 + item.taxRate));
     }, 0);
     // La réduction Happy Hour est déjà appliquée dans le totalPrice
     const discountAmount = 0; // On ne double pas la réduction
@@ -144,42 +176,50 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
   const activeProducts = products.filter(product => product.isActive);
 
   const handleAddToOrder = (product: Product) => {
-    // Always create a new line item for individual control
-    const isHappyHourApplied = isHappyHourActive && product.isHappyHourEligible;
-    let unitPrice = product.price;
-    let discountType = product.happyHourDiscountType;
-    let discountValue = product.happyHourDiscountValue;
-    // Fallback sur les paramètres généraux si pas de valeur spécifique (>0)
-    if (isHappyHourApplied && (!discountValue || discountValue <= 0)) {
-      const settings = happyHourService.getSettings();
-      discountType = settings.discountType;
-      discountValue = settings.discountValue;
-    }
-    if (isHappyHourApplied) {
-      if (discountType === 'percentage') {
-        unitPrice = product.price * (1 - discountValue);
-      } else if (discountType === 'fixed') {
-        unitPrice = Math.max(0, product.price - discountValue);
+    const quantity = getQuantity(product.id);
+    
+    // Create items based on quantity
+    const newItems: OrderItem[] = [];
+    for (let i = 0; i < quantity; i++) {
+      const isHappyHourApplied = isHappyHourActive && product.isHappyHourEligible;
+      let unitPrice = product.price;
+      let discountType = product.happyHourDiscountType;
+      let discountValue = product.happyHourDiscountValue;
+      
+      // Fallback sur les paramètres généraux si pas de valeur spécifique (>0)
+      if (isHappyHourApplied && (!discountValue || discountValue <= 0)) {
+        const settings = happyHourService.getSettings();
+        discountType = settings.discountType;
+        discountValue = settings.discountValue;
       }
+      if (isHappyHourApplied) {
+        if (discountType === 'percentage') {
+          unitPrice = product.price * (1 - discountValue);
+        } else if (discountType === 'fixed') {
+          unitPrice = Math.max(0, product.price - discountValue);
+        }
+      }
+      
+      // Calculate tax amount from the unit price - taxRate is already a decimal
+      const taxAmount = unitPrice * product.taxRate / (1 + product.taxRate);
+      
+      const newItem: OrderItem = {
+        id: uuidv4(),
+        productId: product.id,
+        productName: product.name,
+        quantity: 1,
+        unitPrice,
+        totalPrice: unitPrice,
+        taxRate: product.taxRate,
+        taxAmount: taxAmount,
+        isHappyHourApplied
+      };
+      newItems.push(newItem);
     }
     
-    // Calculate tax amount from the unit price - convert tax rate from percentage to decimal
-    const taxRateDecimal = product.taxRate / 100;
-    const taxAmount = unitPrice * taxRateDecimal / (1 + taxRateDecimal);
-    
-    const newItem: OrderItem = {
-      id: uuidv4(),
-      productId: product.id,
-      productName: product.name,
-      quantity: 1,
-      unitPrice,
-      totalPrice: unitPrice,
-      taxRate: product.taxRate,
-      taxAmount: taxAmount, // Add the missing tax amount
-      isHappyHourApplied
-    };
-    setCurrentOrder(prev => [...prev, newItem]);
-    // Reset search query when item is added
+    setCurrentOrder(prev => [...prev, ...newItems]);
+    // Reset quantity and search query when items are added
+    resetQuantity(product.id);
     setSearchQuery('');
   };
 
@@ -197,8 +237,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
         if (item.isManualHappyHour || item.isOffert) {
           // Remove manual happy hour or revert from offert
           const originalPrice = item.originalPrice || item.unitPrice;
-          const taxRateDecimal = item.taxRate / 100;
-          const taxAmount = originalPrice * taxRateDecimal / (1 + taxRateDecimal);
+          const taxAmount = originalPrice * item.taxRate / (1 + item.taxRate);
           return {
             ...item,
             isManualHappyHour: false,
@@ -234,8 +273,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
             happyHourPrice = Math.max(0, originalPrice - discountValue);
           }
 
-          const taxRateDecimal = item.taxRate / 100;
-          const taxAmount = happyHourPrice * taxRateDecimal / (1 + taxRateDecimal);
+          const taxAmount = happyHourPrice * item.taxRate / (1 + item.taxRate);
 
           return {
             ...item,
@@ -258,8 +296,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
         if (item.isOffert) {
           // Revert from offert
           const originalPrice = item.originalPrice || item.unitPrice;
-          const taxRateDecimal = item.taxRate / 100;
-          const taxAmount = originalPrice * taxRateDecimal / (1 + taxRateDecimal);
+          const taxAmount = originalPrice * item.taxRate / (1 + item.taxRate);
           return {
             ...item,
             isOffert: false,
@@ -293,8 +330,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
         if (item.isPerso) {
           // Remove perso
           const originalPrice = item.originalPrice || item.unitPrice;
-          const taxRateDecimal = item.taxRate / 100;
-          const taxAmount = originalPrice * taxRateDecimal / (1 + taxRateDecimal);
+          const taxAmount = originalPrice * item.taxRate / (1 + item.taxRate);
           return {
             ...item,
             isPerso: false,
@@ -329,6 +365,57 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
     setCardAmount(orderCalculations.finalAmount.toString());
     setCashAmount('');
     setPaymentDialogOpen(true);
+  };
+
+  // Quick card payment function
+  const handleQuickCardPayment = async () => {
+    if (currentOrder.length === 0) {
+      setSnackbar({ open: true, message: 'Aucun article dans la commande', severity: 'error' });
+      return;
+    }
+
+    try {
+      // Validate order total before sending
+      const expectedTotal = currentOrder.reduce((sum, item) => sum + item.totalPrice, 0);
+      if (Math.abs(orderCalculations.finalAmount - expectedTotal) > 0.01) {
+        console.error('❌ ORDER VALIDATION ERROR: Total mismatch detected', {
+          orderCalculations: orderCalculations.finalAmount,
+          expectedTotal,
+          currentOrder: currentOrder.map(item => ({
+            name: item.productName,
+            price: item.totalPrice
+          }))
+        });
+        setSnackbar({ open: true, message: 'Erreur de calcul détectée. Veuillez réessayer.', severity: 'error' });
+        return;
+      }
+      
+      const savedOrder = await apiService.createOrder({
+        items: currentOrder,
+        totalAmount: orderCalculations.finalAmount,
+        taxAmount: orderCalculations.taxAmount,
+        paymentMethod: 'card',
+        status: 'completed',
+        notes: `Paiement rapide par carte: ${orderCalculations.finalAmount.toFixed(2)}€`,
+        tips: 0,
+        change: 0
+      });
+      
+      setSnackbar({ 
+        open: true, 
+        message: `Paiement rapide par carte accepté - Commande #${savedOrder.id}`, 
+        severity: 'success' 
+      });
+      
+      await handlePaymentCompletion(savedOrder);
+    } catch (error) {
+      console.error('Error processing quick card payment:', error);
+      setSnackbar({ 
+        open: true, 
+        message: 'Erreur lors du traitement du paiement rapide', 
+        severity: 'error' 
+      });
+    }
   };
 
   // Nouvelle fonction pour initialiser les sous-notes pour split égal
@@ -407,8 +494,8 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
 
     try {
       const price = parseFloat(diversPrice);
-      const taxRatePercent = parseFloat(diversTax); // Store as percentage (10, 20)
-      const taxRateDecimal = taxRatePercent / 100; // Convert to decimal for calculation
+      const taxRatePercent = parseFloat(diversTax); // UI shows percentage (10, 20)
+      const taxRateDecimal = taxRatePercent / 100; // Convert to decimal for storage (0.10, 0.20)
       const taxAmount = price * taxRateDecimal / (1 + taxRateDecimal); // Calculate tax amount from price including tax
 
       const newItem: OrderItem = {
@@ -418,8 +505,8 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
         quantity: 1,
         unitPrice: price,
         totalPrice: price,
-        taxRate: taxRatePercent, // Store as percentage to be consistent with system
-        taxAmount: taxAmount, // Add the missing tax amount calculation
+        taxRate: taxRateDecimal, // Store as decimal to be consistent with other products
+        taxAmount: taxAmount,
         isHappyHourApplied: false,
         isManualHappyHour: false,
         isOffert: false,
@@ -661,10 +748,11 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                     .filter(product => {
                       // Filter by category
                       const matchesCategory = !selectedCategory || product.categoryId === selectedCategory;
-                      // Filter by search query
+                      // Filter by search query with accent normalization
+                      const normalizedQuery = normalizeAccents(searchQuery);
                       const matchesSearch = !searchQuery || 
-                        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        (product.description && product.description.toLowerCase().includes(searchQuery.toLowerCase()));
+                        normalizeAccents(product.name).includes(normalizedQuery) ||
+                        (product.description && normalizeAccents(product.description).includes(normalizedQuery));
                       return matchesCategory && matchesSearch;
                     })
                     .map((product) => {
@@ -681,21 +769,24 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                         <Grid item xs={12} sm={6} md={4} lg={3} key={product.id}>
                           <Card 
                             sx={{ 
-                              cursor: 'pointer',
-                              height: { xs: 'auto', sm: '140px' }, // Responsive card height
-                              minHeight: '120px',
+                              height: { xs: 'auto', sm: '170px' }, // Increased height for quantity controls
+                              minHeight: '150px',
                               backgroundColor: categoryColor,
                               color: 'white',
-                              '&:hover': { 
-                                backgroundColor: categoryColor,
-                                opacity: 0.8,
-                                transform: 'scale(1.02)',
-                                transition: 'all 0.2s ease-in-out'
-                              }
+                              position: 'relative',
+                              display: 'flex',
+                              flexDirection: 'column'
                             }}
-                            onClick={() => handleAddToOrder(product)}
                           >
-                            <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                            <CardContent 
+                              sx={{ 
+                                p: { xs: 1.5, sm: 2 }, 
+                                flex: 1, 
+                                display: 'flex', 
+                                flexDirection: 'column',
+                                pb: { xs: 1, sm: 1 } // Reduced bottom padding 
+                              }}
+                            >
                               <Typography 
                                 variant="h6" 
                                 noWrap 
@@ -720,7 +811,7 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                                   {product.description}
                                 </Typography>
                               )}
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                                 <Typography 
                                   variant="h6" 
                                   sx={{ 
@@ -739,6 +830,81 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                                     />
                                   )}
                                 </Box>
+                              </Box>
+                              
+                              {/* Quantity controls and add button */}
+                              <Box sx={{ 
+                                display: 'flex', 
+                                justifyContent: 'space-between', 
+                                alignItems: 'center',
+                                mt: 'auto',
+                                gap: 1
+                              }}>
+                                {/* Quantity selector */}
+                                <Box sx={{ 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                                  borderRadius: 1,
+                                  px: 0.5
+                                }}>
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      updateQuantity(product.id, getQuantity(product.id) - 1);
+                                    }}
+                                    sx={{ color: 'white', p: 0.25 }}
+                                  >
+                                    <RemoveIcon fontSize="small" />
+                                  </IconButton>
+                                  <Typography 
+                                    variant="body2" 
+                                    sx={{ 
+                                      mx: 1, 
+                                      minWidth: '20px', 
+                                      textAlign: 'center',
+                                      color: 'white',
+                                      fontWeight: 'bold'
+                                    }}
+                                  >
+                                    {getQuantity(product.id)}
+                                  </Typography>
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      updateQuantity(product.id, getQuantity(product.id) + 1);
+                                    }}
+                                    sx={{ color: 'white', p: 0.25 }}
+                                  >
+                                    <AddIcon fontSize="small" />
+                                  </IconButton>
+                                </Box>
+                                
+                                {/* Add to order button */}
+                                <Button
+                                  variant="contained"
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAddToOrder(product);
+                                  }}
+                                  sx={{
+                                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                    color: categoryColor,
+                                    fontWeight: 'bold',
+                                    fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                                    px: { xs: 1, sm: 1.5 },
+                                    py: 0.5,
+                                    '&:hover': {
+                                      backgroundColor: 'white',
+                                      transform: 'scale(1.05)'
+                                    }
+                                  }}
+                                >
+                                  Ajouter
+                                </Button>
                               </Box>
                             </CardContent>
                           </Card>
@@ -979,16 +1145,28 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
                       </Box>
                     </Box>
 
-                    <Button
-                      variant="contained"
-                      fullWidth
-                      size="large"
-                      startIcon={<ReceiptIcon />}
-                      onClick={handlePayment}
-                      sx={{ py: 1.5 }}
-                    >
-                      Payer
-                    </Button>
+                    <Box sx={{ display: 'flex', gap: 1, flexDirection: 'column' }}>
+                      <Button
+                        variant="contained"
+                        fullWidth
+                        size="large"
+                        startIcon={<CreditCardIcon />}
+                        onClick={handleQuickCardPayment}
+                        sx={{ py: 1.5, bgcolor: 'success.main', '&:hover': { bgcolor: 'success.dark' } }}
+                      >
+                        Paiement Carte Rapide
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        fullWidth
+                        size="large"
+                        startIcon={<ReceiptIcon />}
+                        onClick={handlePayment}
+                        sx={{ py: 1.5 }}
+                      >
+                        Options de Paiement
+                      </Button>
+                    </Box>
                   </Box>
                 </>
               )}

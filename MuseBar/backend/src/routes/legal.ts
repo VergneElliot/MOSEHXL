@@ -276,7 +276,8 @@ router.get('/receipt/:orderId', async (req, res) => {
       for (const item of order.items) {
         // Defensive: parse and default to 0 if missing
         const rateRaw = item.tax_rate !== undefined && item.tax_rate !== null ? Number(item.tax_rate) : 0;
-        const rate = Math.round(rateRaw); // Group by 10, 20, etc.
+        // Convert decimal to percentage: 0.10 -> 10, 0.20 -> 20
+        const rate = Math.round(rateRaw * 100); // Group by 10, 20, etc.
         const vat = item.tax_amount !== undefined && item.tax_amount !== null ? Number(item.tax_amount) : 0;
         const total_price = item.total_price !== undefined && item.total_price !== null ? Number(item.total_price) : 0;
         const subtotal_ht = total_price - vat;
@@ -400,7 +401,8 @@ router.post('/receipt/generate', async (req, res) => {
       for (const item of order.items) {
         // Defensive: parse and default to 0 if missing
         const rateRaw = item.tax_rate !== undefined && item.tax_rate !== null ? Number(item.tax_rate) : 0;
-        const rate = Math.round(rateRaw); // Group by 10, 20, etc.
+        // Convert decimal to percentage: 0.10 -> 10, 0.20 -> 20
+        const rate = Math.round(rateRaw * 100); // Group by 10, 20, etc.
         const vat = item.tax_amount !== undefined && item.tax_amount !== null ? Number(item.tax_amount) : 0;
         const total_price = item.total_price !== undefined && item.total_price !== null ? Number(item.total_price) : 0;
         const subtotal_ht = total_price - vat;
@@ -1490,6 +1492,139 @@ router.get('/business-info', async (req, res) => {
   }
 });
 
+// GET business day statistics
+router.get('/business-day-stats', async (req, res) => {
+  try {
+    // Get closure settings to determine business day period
+    const settingsQuery = 'SELECT setting_key, setting_value FROM closure_settings';
+    const settingsResult = await pool.query(settingsQuery);
+    const settings: { [key: string]: string } = {};
+    settingsResult.rows.forEach(row => {
+      settings[row.setting_key] = row.setting_value;
+    });
+    
+    const closureTime = settings.daily_closure_time || '02:00';
+    const timezone = settings.timezone || 'Europe/Paris';
+    
+    // Calculate current business day period
+    const [hours, minutes] = closureTime.split(':').map(Number);
+    const now = new Date();
+    
+    // Determine the business day start
+    let businessDayStart = new Date(now);
+    businessDayStart.setHours(hours, minutes, 0, 0);
+    
+    // If current time is before closure time, we're still in yesterday's business day
+    if (now.getHours() < hours || (now.getHours() === hours && now.getMinutes() < minutes)) {
+      businessDayStart.setDate(businessDayStart.getDate() - 1);
+    }
+    
+    // Business day end is one day later minus 1ms
+    const businessDayEnd = new Date(businessDayStart);
+    businessDayEnd.setDate(businessDayEnd.getDate() + 1);
+    businessDayEnd.setMilliseconds(businessDayEnd.getMilliseconds() - 1);
+    
+    // Query orders within the business day period
+    const ordersQuery = `
+      SELECT o.*, 
+             COALESCE(sb.sub_bills, '[]'::jsonb) as sub_bills_data
+      FROM orders o
+      LEFT JOIN (
+        SELECT order_id, jsonb_agg(
+          jsonb_build_object(
+            'payment_method', payment_method,
+            'amount', amount,
+            'status', status
+          )
+        ) as sub_bills
+        FROM sub_bills
+        GROUP BY order_id
+      ) sb ON o.id = sb.order_id
+      WHERE o.created_at >= $1 AND o.created_at <= $2 
+      AND o.status = 'completed'
+      ORDER BY o.created_at
+    `;
+    
+    const ordersResult = await pool.query(ordersQuery, [businessDayStart, businessDayEnd]);
+    const businessDayOrders = ordersResult.rows;
+    
+    // Calculate totals
+    const totalTTC = businessDayOrders.reduce((sum, order) => sum + parseFloat(order.total_amount || 0), 0);
+    const totalSales = businessDayOrders.length;
+    
+    // Calculate payment method breakdown
+    let cardTotal = 0;
+    let cashTotal = 0;
+    
+    businessDayOrders.forEach(order => {
+      const paymentMethod = order.payment_method;
+      const amount = parseFloat(order.total_amount || 0);
+      
+      if (paymentMethod === 'card') {
+        cardTotal += amount;
+      } else if (paymentMethod === 'cash') {
+        cashTotal += amount;
+      } else if (paymentMethod === 'split') {
+        // For split payments, check sub_bills
+        const subBills = order.sub_bills_data || [];
+        subBills.forEach((subBill: any) => {
+          if (subBill.payment_method === 'card') {
+            cardTotal += parseFloat(subBill.amount || 0);
+          } else if (subBill.payment_method === 'cash') {
+            cashTotal += parseFloat(subBill.amount || 0);
+          }
+        });
+      }
+    });
+    
+    // Calculate top products
+    const productCounts: { [key: string]: number } = {};
+    
+    // Get order items for business day orders
+    if (businessDayOrders.length > 0) {
+      const orderIds = businessDayOrders.map(order => order.id);
+      const itemsQuery = `
+        SELECT product_name, quantity
+        FROM order_items 
+        WHERE order_id = ANY($1)
+      `;
+      const itemsResult = await pool.query(itemsQuery, [orderIds]);
+      
+      itemsResult.rows.forEach(item => {
+        const productName = item.product_name;
+        const quantity = parseInt(item.quantity || 1);
+        productCounts[productName] = (productCounts[productName] || 0) + quantity;
+      });
+    }
+    
+    const topProducts = Object.entries(productCounts)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 3)
+      .map(([name, qty]) => ({ name, qty }));
+    
+    res.json({
+      business_day_period: {
+        start: businessDayStart.toISOString(),
+        end: businessDayEnd.toISOString(),
+        closure_time: closureTime,
+        timezone: timezone
+      },
+      stats: {
+        total_ttc: totalTTC,
+        total_sales: totalSales,
+        card_total: cardTotal,
+        cash_total: cashTotal,
+        top_products: topProducts
+      },
+      orders_count: businessDayOrders.length
+    });
+    
+  } catch (error) {
+    console.error('Error fetching business day stats:', error);
+    res.status(500).json({ error: 'Failed to fetch business day statistics' });
+  }
+});
+
 // PUT update business info
 router.put('/business-info', async (req, res) => {
   
@@ -1603,7 +1738,9 @@ router.post('/receipt/:orderId/thermal-print', async (req, res) => {
         const itemTotal = parseFloat(String(item.total_price));
         const itemTax = parseFloat(String(item.tax_amount));
         const itemHT = itemTotal - itemTax;
-        const taxRate = parseFloat(String(item.tax_rate));
+        const taxRateDecimal = parseFloat(String(item.tax_rate));
+        // Convert decimal to percentage: 0.10 -> 10, 0.20 -> 20
+        const taxRate = Math.round(taxRateDecimal * 100);
         
         totalVat += itemTax;
         totalHT += itemHT;
