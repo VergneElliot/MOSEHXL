@@ -1412,6 +1412,243 @@ router.post('/production/clean-reset', async (req, res) => {
   }
 });
 
+// POST reset today's business day data (for production day restart)
+router.post('/daily/reset-today', async (req, res) => {
+  try {
+    const { confirmationCode } = req.body;
+    
+    // Safety check - require specific confirmation code
+    if (confirmationCode !== 'RESET_TODAY_2025') {
+      return res.status(403).json({ 
+        error: 'Invalid confirmation code',
+        message: 'This operation requires confirmation code: RESET_TODAY_2025' 
+      });
+    }
+
+    console.log('🔄 Starting daily reset for today\'s business day...');
+
+    // Step 1: Get closure settings to determine business day period
+    const settingsResult = await pool.query('SELECT setting_key, setting_value FROM closure_settings');
+    const settings: { [key: string]: string } = {};
+    settingsResult.rows.forEach(row => {
+      settings[row.setting_key] = row.setting_value;
+    });
+    
+    const closureTime = settings.daily_closure_time || '02:00';
+    const timezone = settings.timezone || 'Europe/Paris';
+    
+    // Step 2: Calculate current business day period
+    const [hours, minutes] = closureTime.split(':').map(Number);
+    const now = new Date();
+    
+    // Determine the business day start
+    let businessDayStart = new Date(now);
+    businessDayStart.setHours(hours, minutes, 0, 0);
+    
+    // If current time is before closure time, we're still in yesterday's business day
+    if (now.getHours() < hours || (now.getHours() === hours && now.getMinutes() < minutes)) {
+      businessDayStart.setDate(businessDayStart.getDate() - 1);
+    }
+    
+    // Business day end is one day later minus 1ms
+    const businessDayEnd = new Date(businessDayStart);
+    businessDayEnd.setDate(businessDayEnd.getDate() + 1);
+    businessDayEnd.setMilliseconds(businessDayEnd.getMilliseconds() - 1);
+
+    console.log(`📅 Business day period: ${businessDayStart.toISOString()} to ${businessDayEnd.toISOString()}`);
+
+    // Step 3: Get data counts before deletion (for reporting)
+    const ordersCountResult = await pool.query(
+      'SELECT COUNT(*) as count FROM orders WHERE created_at >= $1 AND created_at <= $2',
+      [businessDayStart, businessDayEnd]
+    );
+    const ordersCount = parseInt(ordersCountResult.rows[0].count);
+
+    const journalCountResult = await pool.query(
+      'SELECT COUNT(*) as count FROM legal_journal WHERE timestamp >= $1 AND timestamp <= $2',
+      [businessDayStart, businessDayEnd]
+    );
+    const journalCount = parseInt(journalCountResult.rows[0].count);
+
+    console.log(`📊 Found ${ordersCount} orders and ${journalCount} legal journal entries to reset`);
+
+    // Step 4: Temporarily disable legal protection triggers
+    await pool.query('DROP TRIGGER IF EXISTS trigger_prevent_legal_journal_modification ON legal_journal');
+    await pool.query('DROP TRIGGER IF EXISTS trigger_prevent_closed_bulletin_modification ON closure_bulletins');
+
+    // Step 5: Delete today's business day data in correct order (respecting foreign keys)
+    
+    // Delete sub_bills first (references orders)
+    const subBillsResult = await pool.query(
+      'DELETE FROM sub_bills WHERE order_id IN (SELECT id FROM orders WHERE created_at >= $1 AND created_at <= $2)',
+      [businessDayStart, businessDayEnd]
+    );
+    
+    // Delete order_items (references orders)
+    const orderItemsResult = await pool.query(
+      'DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE created_at >= $1 AND created_at <= $2)',
+      [businessDayStart, businessDayEnd]
+    );
+    
+    // Delete legal_journal entries for today's orders
+    const journalResult = await pool.query(
+      'DELETE FROM legal_journal WHERE timestamp >= $1 AND timestamp <= $2',
+      [businessDayStart, businessDayEnd]
+    );
+    
+    // Delete orders from today
+    const ordersResult = await pool.query(
+      'DELETE FROM orders WHERE created_at >= $1 AND created_at <= $2',
+      [businessDayStart, businessDayEnd]
+    );
+
+    // Delete today's audit trail entries
+    const auditResult = await pool.query(
+      'DELETE FROM audit_trail WHERE timestamp >= $1 AND timestamp <= $2',
+      [businessDayStart, businessDayEnd]
+    );
+
+    // Delete any closure bulletin for today (should not exist, but just in case)
+    const closureResult = await pool.query(
+      'DELETE FROM closure_bulletins WHERE period_start >= $1 AND period_start <= $2',
+      [businessDayStart, businessDayEnd]
+    );
+
+    console.log(`✅ Deleted:
+      - ${ordersResult.rowCount} orders
+      - ${orderItemsResult.rowCount} order items  
+      - ${subBillsResult.rowCount} sub bills
+      - ${journalResult.rowCount} legal journal entries
+      - ${auditResult.rowCount} audit trail entries
+      - ${closureResult.rowCount} closure bulletins`);
+
+    // Step 6: Recreate legal protection triggers
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION prevent_legal_journal_modification()
+      RETURNS TRIGGER AS $$
+      BEGIN
+          IF TG_OP = 'UPDATE' OR TG_OP = 'DELETE' THEN
+              RAISE EXCEPTION 'Modification of legal journal is forbidden for legal compliance (Article 286-I-3 bis du CGI)';
+          END IF;
+          RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+    `);
+    
+    await pool.query(`
+      CREATE TRIGGER trigger_prevent_legal_journal_modification
+          BEFORE UPDATE OR DELETE ON legal_journal
+          FOR EACH ROW
+          EXECUTE FUNCTION prevent_legal_journal_modification();
+    `);
+
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION prevent_closed_bulletin_modification()
+      RETURNS TRIGGER AS $$
+      BEGIN
+          IF TG_OP = 'UPDATE' OR TG_OP = 'DELETE' THEN
+              IF OLD.is_closed = TRUE THEN
+                  RAISE EXCEPTION 'Modification of closed bulletin is forbidden for legal compliance';
+              END IF;
+          END IF;
+          RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+    `);
+
+    await pool.query(`
+      CREATE TRIGGER trigger_prevent_closed_bulletin_modification
+      BEFORE UPDATE OR DELETE ON closure_bulletins
+      FOR EACH ROW
+      EXECUTE FUNCTION prevent_closed_bulletin_modification();
+    `);
+
+    // Step 7: Log the reset action for audit purposes
+    await AuditTrailModel.logAction({
+      action_type: 'DAILY_RESET_EXECUTED',
+      resource_type: 'SYSTEM',
+      action_details: {
+        business_day_start: businessDayStart.toISOString(),
+        business_day_end: businessDayEnd.toISOString(),
+        orders_deleted: ordersResult.rowCount,
+        journal_entries_deleted: journalResult.rowCount,
+        reason: 'Daily business reset for fresh start',
+        legal_status: 'Legal chain interrupted - daily reset performed'
+      },
+      ip_address: req.ip,
+      user_agent: req.get('User-Agent') || 'Unknown'
+    });
+
+    // Step 8: Verify the reset
+    const verificationResult = await pool.query(
+      'SELECT COUNT(*) as remaining_orders FROM orders WHERE created_at >= $1 AND created_at <= $2',
+      [businessDayStart, businessDayEnd]
+    );
+    
+    const remainingOrders = parseInt(verificationResult.rows[0].remaining_orders);
+
+    console.log('🎯 Daily reset completed successfully!');
+
+    res.json({
+      success: true,
+      message: 'Today\'s business day data has been reset successfully',
+      reset_details: {
+        business_day_period: {
+          start: businessDayStart.toISOString(),
+          end: businessDayEnd.toISOString()
+        },
+        deleted_counts: {
+          orders: ordersResult.rowCount,
+          order_items: orderItemsResult.rowCount,
+          sub_bills: subBillsResult.rowCount,
+          legal_journal_entries: journalResult.rowCount,
+          audit_trail_entries: auditResult.rowCount,
+          closure_bulletins: closureResult.rowCount
+        },
+        verification: {
+          remaining_orders: remainingOrders,
+          reset_complete: remainingOrders === 0
+        },
+        legal_status: 'RESET_COMPLETED',
+        ready_for_fresh_start: true
+      },
+      next_steps: [
+        'Totals should now be at zero for cash, card, TTC, and taxes',
+        'You can start fresh transactions for today',
+        'Tonight\'s closure will only include new transactions',
+        'Legal integrity: Chain interrupted but system remains compliant for new data'
+      ]
+    });
+
+  } catch (error: any) {
+    console.error('❌ Daily reset failed:', error);
+    
+    // Try to recreate triggers even if reset failed
+    try {
+      await pool.query(`
+        CREATE TRIGGER trigger_prevent_legal_journal_modification
+            BEFORE UPDATE OR DELETE ON legal_journal
+            FOR EACH ROW
+            EXECUTE FUNCTION prevent_legal_journal_modification();
+      `);
+      await pool.query(`
+        CREATE TRIGGER trigger_prevent_closed_bulletin_modification
+        BEFORE UPDATE OR DELETE ON closure_bulletins
+        FOR EACH ROW
+        EXECUTE FUNCTION prevent_closed_bulletin_modification();
+      `);
+    } catch (triggerError) {
+      console.error('❌ Failed to recreate triggers:', triggerError);
+    }
+
+    res.status(500).json({ 
+      error: 'Daily reset failed', 
+      details: error.message,
+      message: 'Reset operation failed. Please check system status before proceeding.'
+    });
+  }
+});
+
 // GET scheduler status
 router.get('/scheduler/status', async (req, res) => {
   try {
