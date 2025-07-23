@@ -1548,22 +1548,57 @@ router.get('/business-day-stats', async (req, res) => {
     const ordersResult = await pool.query(ordersQuery, [businessDayStart, businessDayEnd]);
     const businessDayOrders = ordersResult.rows;
     
-    // Calculate totals
-    const totalTTC = businessDayOrders.reduce((sum, order) => sum + parseFloat(order.total_amount || 0), 0);
-    const totalSales = businessDayOrders.length;
+    // Separate regular sales from special operations (tips/change)
+    const salesOrders = businessDayOrders.filter(order => {
+      const amount = parseFloat(order.total_amount || 0);
+      const notes = order.notes || '';
+      // Regular sales have non-zero amounts and are not tip/change operations
+      return amount !== 0 && !notes.includes('ANNULATION pourboire') && !notes.includes('ANNULATION monnaie');
+    });
+    
+    const specialOperations = businessDayOrders.filter(order => {
+      const amount = parseFloat(order.total_amount || 0);
+      const notes = order.notes || '';
+      // Special operations: tip/change operations with $0 total but sub_bills
+      return amount === 0 && (notes.includes('ANNULATION pourboire') || notes.includes('ANNULATION monnaie'));
+    });
+    
+    // Calculate totals based only on sales orders
+    const totalTTC = salesOrders.reduce((sum, order) => sum + parseFloat(order.total_amount || 0), 0);
+    const totalSales = salesOrders.length;
     
     // Calculate payment method breakdown
     let cardTotal = 0;
     let cashTotal = 0;
     
-    businessDayOrders.forEach(order => {
+    // Process sales orders
+    salesOrders.forEach(order => {
       const paymentMethod = order.payment_method;
       const amount = parseFloat(order.total_amount || 0);
+      const tips = parseFloat(order.tips || 0);
+      const change = parseFloat(order.change || 0);
       
       if (paymentMethod === 'card') {
         cardTotal += amount;
+        // Handle tips: customer pays tip on card, business gives cash to staff
+        if (tips > 0) {
+          cardTotal += tips;  // Customer pays tip on card
+          cashTotal -= tips;  // Business gives cash to staff
+        }
+        // Handle change: customer overpaid, business gives change
+        if (change > 0) {
+          cardTotal -= change; // Less net card payment
+        }
       } else if (paymentMethod === 'cash') {
         cashTotal += amount;
+        // Handle tips: customer pays tip in cash, stays in cash
+        if (tips > 0) {
+          // Tips in cash don't affect card/cash split (already included in amount)
+        }
+        // Handle change: customer overpaid cash, business gives cash back
+        if (change > 0) {
+          cashTotal -= change; // Less net cash payment
+        }
       } else if (paymentMethod === 'split') {
         // For split payments, check sub_bills
         const subBills = order.sub_bills_data || [];
@@ -1574,21 +1609,46 @@ router.get('/business-day-stats', async (req, res) => {
             cashTotal += parseFloat(subBill.amount || 0);
           }
         });
+        
+        // Handle tips for split payments: ALWAYS +card, -cash
+        if (tips > 0) {
+          cardTotal += tips;  // Customer pays tip on card
+          cashTotal -= tips;  // Business gives cash to staff
+        }
+        
+        // Handle change for split payments
+        if (change > 0) {
+          // For split payments, change typically comes from the main payment method
+          // Default to reducing card total
+          cardTotal -= change;
+        }
       }
     });
     
-    // Calculate top products
+    // Process special operations (tip reversals, change reversals)
+    specialOperations.forEach(order => {
+      const subBills = order.sub_bills_data || [];
+      subBills.forEach((subBill: any) => {
+        if (subBill.payment_method === 'card') {
+          cardTotal += parseFloat(subBill.amount || 0);
+        } else if (subBill.payment_method === 'cash') {
+          cashTotal += parseFloat(subBill.amount || 0);
+        }
+      });
+    });
+    
+    // Calculate top products (only from sales orders)
     const productCounts: { [key: string]: number } = {};
     
-    // Get order items for business day orders
-    if (businessDayOrders.length > 0) {
-      const orderIds = businessDayOrders.map(order => order.id);
+    // Get order items for sales orders only
+    if (salesOrders.length > 0) {
+      const salesOrderIds = salesOrders.map(order => order.id);
       const itemsQuery = `
         SELECT product_name, quantity
         FROM order_items 
         WHERE order_id = ANY($1)
       `;
-      const itemsResult = await pool.query(itemsQuery, [orderIds]);
+      const itemsResult = await pool.query(itemsQuery, [salesOrderIds]);
       
       itemsResult.rows.forEach(item => {
         const productName = item.product_name;
@@ -1616,7 +1676,9 @@ router.get('/business-day-stats', async (req, res) => {
         cash_total: cashTotal,
         top_products: topProducts
       },
-      orders_count: businessDayOrders.length
+      orders_count: businessDayOrders.length,
+      sales_orders_count: salesOrders.length,
+      special_operations_count: specialOperations.length
     });
     
   } catch (error) {
