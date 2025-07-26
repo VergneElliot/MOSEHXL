@@ -98,6 +98,29 @@ See `FRENCH_CASHIER_COMPLIANCE_ANALYSIS.md` for detailed compliance documentatio
 - **Current Status**: ✅ Fully operational and legally compliant
 - **Hash Chain Integrity**: ✅ Valid (0 verification errors)
 - **Legal Journal**: 130 entries with complete audit trail
+- **Cross-Platform Compatibility**: ✅ Fixed (Linux/Windows compatibility issues resolved)
+
+## 🔧 Cross-Platform Compatibility
+
+The system now supports consistent operation across different environments:
+
+### Recent Fixes Applied
+- **Schema Compatibility**: Fixed differences between development and production databases
+- **Thermal Printing**: Cross-platform support for Linux and Windows
+- **Data Type Consistency**: Standardized numeric precision and constraints
+
+### Quick Fix Application
+```bash
+# Apply schema compatibility fixes
+./scripts/apply-schema-fix.sh
+
+# Restart backend after applying fixes
+cd MuseBar/backend
+npm run build
+npm start
+```
+
+For detailed information about cross-platform compatibility issues and solutions, see `CROSS-PLATFORM-COMPATIBILITY.md`.
 - **Database**: Using `mosehxl_production` and `mosehxl_development` only
 - **Database Structure**: ✅ Successfully cloned (July 24, 2025)
 - **Backups**: Available in `backups/` directory
