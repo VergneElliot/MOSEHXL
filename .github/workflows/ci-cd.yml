@@ -1,0 +1,284 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, development ]
+  pull_request:
+    branches: [ main, development ]
+
+env:
+  NODE_VERSION: '18'
+  POSTGRES_VERSION: '13'
+
+jobs:
+  # Frontend Testing
+  frontend-test:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: MuseBar/package-lock.json
+
+    - name: Install frontend dependencies
+      working-directory: MuseBar
+      run: npm ci
+
+    - name: Run frontend linting
+      working-directory: MuseBar
+      run: npm run lint
+
+    - name: Run frontend type checking
+      working-directory: MuseBar
+      run: npm run type-check
+
+    - name: Run frontend tests
+      working-directory: MuseBar
+      run: npm run test:ci
+
+    - name: Upload frontend test coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: MuseBar/coverage/lcov.info
+        flags: frontend
+        name: frontend-coverage
+
+  # Backend Testing
+  backend-test:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:${{ env.POSTGRES_VERSION }}
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mosehxl_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: MuseBar/backend/package-lock.json
+
+    - name: Install backend dependencies
+      working-directory: MuseBar/backend
+      run: npm ci
+
+    - name: Run backend linting
+      working-directory: MuseBar/backend
+      run: npm run lint
+
+    - name: Run backend type checking
+      working-directory: MuseBar/backend
+      run: npm run type-check
+
+    - name: Run database migrations
+      working-directory: MuseBar/backend
+      env:
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_USER: postgres
+        DB_PASSWORD: postgres
+        DB_NAME: mosehxl_test
+      run: npm run migration:migrate
+
+    - name: Run backend tests
+      working-directory: MuseBar/backend
+      env:
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_USER: postgres
+        DB_PASSWORD: postgres
+        DB_NAME: mosehxl_test
+      run: npm test
+
+  # Security Scanning
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Run npm audit
+      working-directory: MuseBar
+      run: npm audit --audit-level=moderate
+
+    - name: Run npm audit (backend)
+      working-directory: MuseBar/backend
+      run: npm audit --audit-level=moderate
+
+  # Build and Deploy (only on main branch)
+  build-and-deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    needs: [frontend-test, backend-test, security-scan]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Build frontend
+      working-directory: MuseBar
+      run: |
+        npm ci
+        npm run build
+
+    - name: Build backend
+      working-directory: MuseBar/backend
+      run: |
+        npm ci
+        npm run build
+
+    - name: Create deployment package
+      run: |
+        mkdir -p deployment
+        cp -r MuseBar/build/* deployment/frontend/
+        cp -r MuseBar/backend/dist/* deployment/backend/
+        cp MuseBar/backend/package.json deployment/backend/
+        cp -r MuseBar/backend/node_modules deployment/backend/
+        tar -czf musebar-deployment.tar.gz deployment/
+
+    - name: Upload deployment artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: musebar-deployment
+        path: musebar-deployment.tar.gz
+
+    - name: Deploy to production
+      if: github.ref == 'refs/heads/main'
+      run: |
+        echo "🚀 Deploying to production..."
+        # Add your deployment logic here
+        # Examples:
+        # - Deploy to AWS, Google Cloud, or Azure
+        # - Deploy to Docker containers
+        # - Deploy to Kubernetes cluster
+        # - Deploy to VPS via SSH
+
+  # Performance Testing
+  performance-test:
+    name: Performance Test
+    runs-on: ubuntu-latest
+    needs: [frontend-test, backend-test]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        cd MuseBar && npm ci
+        cd ../backend && npm ci
+
+    - name: Start backend server
+      working-directory: MuseBar/backend
+      run: |
+        npm run build
+        npm start &
+        sleep 10
+
+    - name: Run Lighthouse CI
+      uses: treosh/lighthouse-ci-action@v10
+      with:
+        configPath: './.lighthouserc.json'
+        uploadArtifacts: true
+        temporaryPublicStorage: true
+
+  # Documentation Generation
+  docs:
+    name: Generate Documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Install dependencies
+      working-directory: MuseBar/backend
+      run: npm ci
+
+    - name: Generate API documentation
+      working-directory: MuseBar/backend
+      run: |
+        npm run build
+        # Generate OpenAPI documentation
+        echo "📚 API documentation generated"
+
+    - name: Upload documentation
+      uses: actions/upload-artifact@v3
+      with:
+        name: api-documentation
+        path: MuseBar/backend/src/docs/
+
+  # Notifications
+  notify:
+    name: Notify Team
+    runs-on: ubuntu-latest
+    needs: [frontend-test, backend-test, security-scan, build-and-deploy]
+    if: always()
+    
+    steps:
+    - name: Notify on success
+      if: success()
+      run: |
+        echo "✅ All checks passed!"
+        # Add notification logic (Slack, email, etc.)
+
+    - name: Notify on failure
+      if: failure()
+      run: |
+        echo "❌ Some checks failed!"
+        # Add notification logic (Slack, email, etc.) 

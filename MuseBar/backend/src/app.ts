@@ -56,12 +56,16 @@ import productsRouter from './routes/products';
 import ordersRouter from './routes/orders';
 import legalRouter from './routes/legal';
 import authRouter from './routes/auth';
+import docsRouter from './routes/docs';
 
 app.use('/api/categories', categoriesRouter);
 app.use('/api/products', productsRouter);
 app.use('/api/orders', ordersRouter);
 app.use('/api/legal', legalRouter);
 app.use('/api/auth', authRouter);
+
+// API Documentation
+app.use('/api/docs', docsRouter);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
