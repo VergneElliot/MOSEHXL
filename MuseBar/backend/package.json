@@ -8,7 +8,11 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "ts-node src/app.ts",
     "build": "tsc",
-    "start": "node dist/app.js"
+    "start": "node dist/app.js",
+    "migration:migrate": "ts-node src/migrations/cli.ts migrate",
+    "migration:rollback": "ts-node src/migrations/cli.ts rollback",
+    "migration:status": "ts-node src/migrations/cli.ts status",
+    "migration:create": "ts-node src/migrations/cli.ts create"
   },
   "keywords": [
     "pos",
@@ -20,12 +24,15 @@
   "license": "PROPRIETARY",
   "dependencies": {
     "@types/express": "^4.17.23",
+    "@types/yamljs": "^0.2.34",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^17.0.1",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "swagger-ui-express": "^5.0.1",
+    "yamljs": "^0.3.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
