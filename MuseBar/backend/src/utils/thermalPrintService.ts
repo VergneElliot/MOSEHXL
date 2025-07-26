@@ -1,6 +1,7 @@
 import { spawn } from 'child_process';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as os from 'os';
 
 interface ReceiptData {
   order_id: number;
@@ -72,7 +73,8 @@ interface ClosureBulletinData {
 
 export class ThermalPrintService {
   private static readonly PRINTER_NAME = 'Oxhoo-TP85v-Network';
-  private static readonly TEMP_DIR = '/tmp';
+  private static readonly TEMP_DIR = os.tmpdir(); // Use OS temp directory instead of hardcoded /tmp
+  private static readonly IS_WINDOWS = os.platform() === 'win32';
   
   // ESC/POS Commands
   private static readonly ESC = '\x1B';
@@ -102,12 +104,12 @@ export class ThermalPrintService {
     content += `Tel: ${data.business_info.phone}\n`;
     content += `Email: ${data.business_info.email}\n`;
     
-            if (data.business_info.siret) {
-          content += `SIRET: ${data.business_info.siret}\n`;
-        }
-        if (data.business_info.tax_identification) {
-          content += `TVA: ${data.business_info.tax_identification}\n`;
-        }
+    if (data.business_info.siret) {
+      content += `SIRET: ${data.business_info.siret}\n`;
+    }
+    if (data.business_info.tax_identification) {
+      content += `TVA: ${data.business_info.tax_identification}\n`;
+    }
     
     // Separator
     content += this.LEFT;
@@ -304,10 +306,6 @@ export class ThermalPrintService {
     content += `Ref. legale: Article 286-I-3 bis du CGI\n`;
     content += `Registre: MUSEBAR-REG-001\n`;
     content += `Hash: ${data.closure_hash.substring(0, 16)}...\n`;
-    content += `Cree le: ${new Date(data.created_at).toLocaleString('fr-FR')}\n`;
-    if (data.closed_at) {
-      content += `Cloture le: ${new Date(data.closed_at).toLocaleString('fr-FR')}\n`;
-    }
     
     // Cut paper
     content += '\n\n\n';
@@ -333,11 +331,23 @@ export class ThermalPrintService {
    */
   private static formatClosureType(type: string): string {
     switch (type) {
-      case 'DAILY': return 'QUOTIDIENNE';
-      case 'MONTHLY': return 'MENSUELLE';
-      case 'ANNUAL': return 'ANNUELLE';
+      case 'DAILY': return 'Journaliere';
+      case 'WEEKLY': return 'Hebdomadaire';
+      case 'MONTHLY': return 'Mensuelle';
+      case 'ANNUAL': return 'Annuelle';
       default: return type;
     }
+  }
+
+  /**
+   * Pad line with text on left and right
+   */
+  private static padLine(left: string, right: string, width: number): string {
+    const padding = width - left.length - right.length;
+    if (padding <= 0) {
+      return left + ' ' + right;
+    }
+    return left + ' '.repeat(padding) + right;
   }
   
   /**
@@ -367,20 +377,7 @@ export class ThermalPrintService {
     
     return result;
   }
-  
-  /**
-   * Pad line with spaces to align left and right text
-   */
-  private static padLine(left: string, right: string, width: number): string {
-    const totalLength = left.length + right.length;
-    if (totalLength >= width) {
-      return left + ' ' + right;
-    }
-    
-    const spaces = ' '.repeat(width - totalLength);
-    return left + spaces + right;
-  }
-  
+
   /**
    * Print receipt to thermal printer
    */
@@ -389,11 +386,12 @@ export class ThermalPrintService {
       // Generate receipt content
       const content = this.generateReceiptContent(receiptData);
       
-      // Create temporary file
-      const tempFile = path.join(this.TEMP_DIR, `receipt_${Date.now()}.txt`);
+      // Create temporary file with proper extension for Windows
+      const fileExtension = this.IS_WINDOWS ? '.txt' : '';
+      const tempFile = path.join(this.TEMP_DIR, `receipt_${Date.now()}${fileExtension}`);
       await fs.writeFile(tempFile, content, 'utf8');
       
-      // Print using lp command
+      // Print using appropriate command for the OS
       const result = await this.sendToPrinter(tempFile);
       
       // Clean up temp file
@@ -422,11 +420,12 @@ export class ThermalPrintService {
       // Generate closure bulletin content
       const content = this.generateClosureBulletinContent(bulletinData);
       
-      // Create temporary file
-      const tempFile = path.join(this.TEMP_DIR, `closure_bulletin_${Date.now()}.txt`);
+      // Create temporary file with proper extension for Windows
+      const fileExtension = this.IS_WINDOWS ? '.txt' : '';
+      const tempFile = path.join(this.TEMP_DIR, `closure_bulletin_${Date.now()}${fileExtension}`);
       await fs.writeFile(tempFile, content, 'utf8');
       
-      // Print using lp command
+      // Print using appropriate command for the OS
       const result = await this.sendToPrinter(tempFile);
       
       // Clean up temp file
@@ -448,24 +447,37 @@ export class ThermalPrintService {
   }
   
   /**
-   * Send file to printer using lp command
+   * Send file to printer using appropriate command for the OS
    */
   private static sendToPrinter(filePath: string): Promise<{ success: boolean; message: string }> {
     return new Promise((resolve) => {
-      const lpProcess = spawn('lp', ['-d', this.PRINTER_NAME, filePath]);
+      let command: string;
+      let args: string[];
+      
+      if (this.IS_WINDOWS) {
+        // Use Windows print command
+        command = 'print';
+        args = [filePath];
+      } else {
+        // Use Linux/Unix lp command
+        command = 'lp';
+        args = ['-d', this.PRINTER_NAME, filePath];
+      }
+      
+      const printProcess = spawn(command, args);
       
       let stdout = '';
       let stderr = '';
       
-      lpProcess.stdout.on('data', (data) => {
+      printProcess.stdout.on('data', (data) => {
         stdout += data.toString();
       });
       
-      lpProcess.stderr.on('data', (data) => {
+      printProcess.stderr.on('data', (data) => {
         stderr += data.toString();
       });
       
-      lpProcess.on('close', (code) => {
+      printProcess.on('close', (code) => {
         if (code === 0) {
           resolve({
             success: true,
@@ -479,7 +491,7 @@ export class ThermalPrintService {
         }
       });
       
-      lpProcess.on('error', (error) => {
+      printProcess.on('error', (error) => {
         resolve({
           success: false,
           message: `Print command failed: ${error.message}`
@@ -493,33 +505,62 @@ export class ThermalPrintService {
    */
   static async checkPrinterStatus(): Promise<{ available: boolean; status: string }> {
     return new Promise((resolve) => {
-      const lpstatProcess = spawn('lpstat', ['-p', this.PRINTER_NAME]);
+      let command: string;
+      let args: string[];
+      
+      if (this.IS_WINDOWS) {
+        // Use Windows print command to check printer status
+        command = 'wmic';
+        args = ['printer', 'where', `name="${this.PRINTER_NAME}"`, 'get', 'name,printerstatus', '/format:csv'];
+      } else {
+        // Use Linux/Unix lpstat command
+        command = 'lpstat';
+        args = ['-p', this.PRINTER_NAME];
+      }
+      
+      const statusProcess = spawn(command, args);
       
       let output = '';
       
-      lpstatProcess.stdout.on('data', (data) => {
+      statusProcess.stdout.on('data', (data) => {
         output += data.toString();
       });
       
-      lpstatProcess.stderr.on('data', (data) => {
+      statusProcess.stderr.on('data', (data) => {
         output += data.toString();
       });
       
-      lpstatProcess.on('close', (code) => {
-        if (code === 0 && output.includes('accepting requests')) {
-          resolve({
-            available: true,
-            status: 'Printer is ready'
-          });
+      statusProcess.on('close', (code) => {
+        if (this.IS_WINDOWS) {
+          // Windows: Check if printer exists in the output
+          if (code === 0 && output.includes(this.PRINTER_NAME)) {
+            resolve({
+              available: true,
+              status: 'Printer is available'
+            });
+          } else {
+            resolve({
+              available: false,
+              status: output || 'Printer not found'
+            });
+          }
         } else {
-          resolve({
-            available: false,
-            status: output || 'Printer not found or not ready'
-          });
+          // Linux/Unix: Check for "accepting requests"
+          if (code === 0 && output.includes('accepting requests')) {
+            resolve({
+              available: true,
+              status: 'Printer is ready'
+            });
+          } else {
+            resolve({
+              available: false,
+              status: output || 'Printer not found or not ready'
+            });
+          }
         }
       });
       
-      lpstatProcess.on('error', (error) => {
+      statusProcess.on('error', (error) => {
         resolve({
           available: false,
           status: `Error checking printer: ${error.message}`
