@@ -32,7 +32,7 @@ const HistoryContainer: React.FC = () => {
   // Load data on component mount
   useEffect(() => {
     api.refreshData();
-  }, [api]); // Include api dependency
+  }, []); // Remove api dependency to prevent infinite loop
 
   // Event handlers
   const handleViewOrder = (order: Order) => {
