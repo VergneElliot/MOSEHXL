@@ -1,92 +1,22 @@
-export interface Category {
-  id: string;
-  name: string;
-  description?: string;
-  color?: string;
-  isActive?: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
+// Centralized type exports - organized by domain
 
-export interface Product {
-  id: string;
-  name: string;
-  description?: string;
-  price: number; // Prix TTC en euros
-  taxRate: number; // Taux de taxe (0.20 pour 20%, 0.10 pour 10%)
-  categoryId: string;
-  isHappyHourEligible: boolean; // Si le produit peut bénéficier de l'Happy Hour
-  happyHourDiscountType: 'percentage' | 'fixed'; // Type de réduction Happy Hour
-  happyHourDiscountValue: number; // Valeur de la réduction (pourcentage ex: 0.20 ou montant fixe ex: 1.00)
-  isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
+// Business domain types
+export * from './business';
 
-export interface HappyHourSettings {
-  isEnabled: boolean;
-  startTime: string; // Format "HH:mm"
-  endTime: string; // Format "HH:mm"
-  isManuallyActivated: boolean; // Pour activation/désactivation manuelle
-  discountPercentage?: number; // Ancien champ, pour rétrocompatibilité
-  discountType: 'percentage' | 'fixed';
-  discountValue: number;
-}
+// Order and payment types
+export * from './orders';
 
-export interface Order {
-  id: string;
-  items: OrderItem[];
-  totalAmount: number;
-  taxAmount: number;
-  discountAmount: number;
-  finalAmount: number;
-  createdAt: Date;
-  status: 'pending' | 'completed' | 'cancelled';
-  paymentMethod: PaymentMethod;
-  subBills?: SubBill[];
-  notes?: string;
-  tips?: number;
-  change?: number;
-}
+// Authentication and user types
+export * from './auth';
 
-export interface OrderItem {
-  id: string;
-  productId: string | null; // Allow null for Divers items
-  productName: string;
-  quantity: number;
-  unitPrice: number;
-  totalPrice: number;
-  taxRate: number;
-  taxAmount: number; // Add missing tax amount field
-  isHappyHourApplied: boolean;
-  isManualHappyHour?: boolean; // For manually applied happy hour discounts
-  isOffert?: boolean; // For complimentary items (price = 0)
-  isPerso?: boolean; // For employee complimentary items (price = 0)
-  originalPrice?: number; // Store original price for reverting discounts
-  description?: string; // Description for special items like Divers
-}
+// API related types
+export * from './api';
 
-export type PaymentMethod = 'cash' | 'card' | 'split';
+// UI and component types
+export * from './ui';
 
-export interface Payment {
-  amount: number;
-  method: PaymentMethod;
-}
-
-export interface SubBill {
-  id: string;
-  orderId: string;
-  paymentMethod: 'cash' | 'card';
-  amount: number;
-  status: 'pending' | 'paid';
-  createdAt: Date;
-}
-
-// Local interface for managing split bills in POS component
-export interface LocalSubBill {
-  id: string;
-  items: OrderItem[];
-  total: number;
-  payments: Payment[];
-  tip?: string; // Optional tip value for this part
-} 
+// Re-export commonly used types for convenience
+export type { Category, Product, HappyHourSettings } from './business';
+export type { Order, OrderItem, PaymentMethod } from './orders';
+export type { User, AuthResponse } from './auth';
+export type { ApiResponse, ClosureBulletin } from './api'; 

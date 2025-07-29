@@ -13,6 +13,7 @@ import { Add } from '@mui/icons-material';
 import { useClosureState } from '../../hooks/useClosureState';
 import { useClosureAPI } from '../../hooks/useClosureAPI';
 import ClosureStatusCards from './ClosureStatusCards';
+import BulletinsTable from './BulletinsTable';
 
 const ClosureContainer: React.FC = () => {
   const theme = useTheme();
@@ -52,12 +53,31 @@ const ClosureContainer: React.FC = () => {
     actions.closeSnackbar();
   };
 
+  const handleViewDetails = (bulletin: any) => {
+    actions.setSelectedBulletin(bulletin);
+    actions.setShowDetailsDialog(true);
+  };
+
+  const handlePrint = (bulletin: any) => {
+    actions.setPrintBulletin(bulletin);
+    actions.setPrintDialogOpen(true);
+  };
+
+  const handleDownload = (bulletin: any) => {
+    // TODO: Implement download functionality
+    console.log('Download bulletin:', bulletin.id);
+  };
+
   // Utility functions
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
       currency: 'EUR'
     }).format(amount);
+  };
+
+  const formatDate = (dateString: string): string => {
+    return new Date(dateString).toLocaleDateString('fr-FR');
   };
 
   const formatDateTime = (date: Date | string): string => {
@@ -69,6 +89,16 @@ const ClosureContainer: React.FC = () => {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const getClosureTypeLabel = (type: string): string => {
+    switch (type) {
+      case 'DAILY': return 'Journalière';
+      case 'WEEKLY': return 'Hebdomadaire';
+      case 'MONTHLY': return 'Mensuelle';
+      case 'ANNUAL': return 'Annuelle';
+      default: return type;
+    }
   };
 
   return (
@@ -107,12 +137,18 @@ const ClosureContainer: React.FC = () => {
         formatCurrency={formatCurrency}
       />
 
-      {/* Bulletins Table will go here */}
+      {/* Bulletins Table */}
       <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
-        {/* TODO: Add BulletinsTable component */}
-        <Typography variant="body1" color="textSecondary" align="center" sx={{ py: 4 }}>
-          Table des bulletins à implémenter...
-        </Typography>
+        <BulletinsTable
+          bulletins={state.bulletins}
+          loading={state.loading}
+          onViewDetails={handleViewDetails}
+          onPrint={handlePrint}
+          onDownload={handleDownload}
+          formatCurrency={formatCurrency}
+          formatDate={formatDate}
+          getClosureTypeLabel={getClosureTypeLabel}
+        />
       </Box>
 
       {/* Floating Action Button */}

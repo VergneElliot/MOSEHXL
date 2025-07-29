@@ -395,8 +395,8 @@ const Settings: React.FC = () => {
                   variant="outlined"
                   onClick={async () => {
                     try {
-                      const response = await fetch(apiConfig.getEndpoint('/api/legal/thermal-printer/status'));
-                      const status = await response.json();
+                      const response = await apiService.get<any>('/legal/thermal-printer/status');
+                      const status = response.data;
                       
                       if (status.available) {
                         alert(`✅ Imprimante disponible: ${status.status}`);
@@ -416,10 +416,8 @@ const Settings: React.FC = () => {
                   variant="contained"
                   onClick={async () => {
                     try {
-                      const response = await fetch(apiConfig.getEndpoint('/api/legal/thermal-printer/test'), {
-                        method: 'POST'
-                      });
-                      const result = await response.json();
+                      const response = await apiService.post<any>('/legal/thermal-printer/test', {});
+                      const result = response.data;
                       
                       if (result.success) {
                         alert('✅ Test d\'impression réussi! Vérifiez l\'imprimante.');

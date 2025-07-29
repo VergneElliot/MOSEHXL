@@ -4,6 +4,7 @@ import {
   Button, TextField, Checkbox, FormControlLabel, Dialog, DialogTitle, DialogContent, DialogActions, Alert
 } from '@mui/material';
 import { apiConfig } from '../config/api';
+import { ApiService } from '../services/apiService';
 
 const PERMISSIONS = [
   { key: 'access_pos', label: 'Caisse' },
@@ -18,6 +19,7 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
   const [users, setUsers] = useState<any[]>([]);
   const [, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const apiService = ApiService.getInstance();
   const [showAdd, setShowAdd] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -31,11 +33,8 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(apiConfig.getEndpoint('/api/auth/users'), {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!res.ok) throw new Error('Erreur chargement utilisateurs');
-      setUsers(await res.json());
+      const response = await apiService.get<any[]>('/auth/users');
+      setUsers(response.data);
     } catch (e) {
       setError('Erreur lors du chargement des utilisateurs');
     } finally {
@@ -50,12 +49,11 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
 
   const handleAddUser = async () => {
     try {
-      const res = await fetch(apiConfig.getEndpoint('/api/auth/register'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ email: newEmail, password: newPassword, is_admin: newIsAdmin })
+      await apiService.post<any>('/auth/register', { 
+        email: newEmail, 
+        password: newPassword, 
+        is_admin: newIsAdmin 
       });
-      if (!res.ok) throw new Error('Erreur création utilisateur');
       setShowAdd(false);
       setNewEmail('');
       setNewPassword('');
@@ -71,10 +69,8 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
     setPermError(null);
     setPermSaving(false);
     // Fetch permissions
-          const res = await fetch(apiConfig.getEndpoint(`/api/auth/users/${user.id}/permissions`), {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    const data = await res.json();
+    const response = await apiService.get<any>(`/auth/users/${user.id}/permissions`);
+    const data = response.data;
     const state: { [key: string]: boolean } = {};
     PERMISSIONS.forEach(p => { state[p.key] = data.permissions.includes(p.key); });
     setPermState(state);
@@ -86,12 +82,7 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
     const userId = permDialog.user.id;
     const perms = Object.keys(permState).filter(k => permState[k]);
     try {
-      const res = await fetch(apiConfig.getEndpoint(`/api/auth/users/${userId}/permissions`), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ permissions: perms })
-      });
-      if (!res.ok) throw new Error('Erreur sauvegarde permissions');
+      await apiService.post<any>(`/auth/users/${userId}/permissions`, { permissions: perms });
       setPermDialog({ open: false, user: null });
       fetchUsers();
     } catch {
