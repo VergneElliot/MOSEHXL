@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Table,
   TableBody,
@@ -13,12 +13,13 @@ import {
   Box,
   Button,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
+  TablePagination,
 } from '@mui/material';
 import {
   Visibility as VisibilityIcon,
   Print,
-  SwapHoriz as SwapHorizIcon
+  SwapHoriz as SwapHorizIcon,
 } from '@mui/icons-material';
 import { Order } from '../../types';
 
@@ -31,7 +32,9 @@ interface OrdersTableProps {
   formatCurrency: (amount: number) => string;
   formatDateTime: (date: Date | string) => string;
   getPaymentMethodLabel: (method: string) => string;
-  getStatusColor: (status: string) => 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning';
+  getStatusColor: (
+    status: string
+  ) => 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning';
   getOrderSummary: (order: Order) => string;
 }
 
@@ -50,6 +53,24 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
+  // Pagination state
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
+
+  // Calculate pagination
+  const startIndex = page * rowsPerPage;
+  const endIndex = startIndex + rowsPerPage;
+  const paginatedOrders = orders.slice(startIndex, endIndex);
+
+  const handleChangePage = (_: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
   if (loading) {
     return (
       <Paper>
@@ -64,9 +85,7 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
     return (
       <Paper>
         <Box p={3} textAlign="center">
-          <Typography color="textSecondary">
-            Aucune commande trouvée
-          </Typography>
+          <Typography color="textSecondary">Aucune commande trouvée</Typography>
         </Box>
       </Paper>
     );
@@ -74,7 +93,7 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
 
   return (
     <TableContainer component={Paper}>
-      <Table size={isMobile ? "small" : "medium"}>
+      <Table size={isMobile ? 'small' : 'medium'}>
         <TableHead>
           <TableRow>
             <TableCell>ID</TableCell>
@@ -87,49 +106,47 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
           </TableRow>
         </TableHead>
         <TableBody>
-          {orders.map((order) => (
-            <TableRow 
+          {paginatedOrders.map(order => (
+            <TableRow
               key={order.id}
-              sx={{ 
+              sx={{
                 '&:hover': { backgroundColor: theme.palette.action.hover },
-                cursor: 'pointer'
+                cursor: 'pointer',
               }}
               onClick={() => onViewOrder(order)}
             >
               <TableCell>
-                <Typography 
-                  variant="body2" 
-                  sx={{ 
+                <Typography
+                  variant="body2"
+                  sx={{
                     fontFamily: 'monospace',
-                    fontSize: isMobile ? '0.75rem' : '0.875rem'
+                    fontSize: isMobile ? '0.75rem' : '0.875rem',
                   }}
                 >
                   {order.id.substring(0, 8)}...
                 </Typography>
               </TableCell>
-              
+
               <TableCell>
-                <Typography variant="body2">
-                  {formatDateTime(order.createdAt)}
-                </Typography>
+                <Typography variant="body2">{formatDateTime(order.createdAt)}</Typography>
               </TableCell>
-              
+
               {!isMobile && (
                 <TableCell>
-                  <Typography 
-                    variant="body2" 
-                    sx={{ 
+                  <Typography
+                    variant="body2"
+                    sx={{
                       maxWidth: 200,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
+                      whiteSpace: 'nowrap',
                     }}
                   >
                     {getOrderSummary(order)}
                   </Typography>
                 </TableCell>
               )}
-              
+
               <TableCell>
                 <Typography variant="body2" fontWeight="bold">
                   {formatCurrency(order.totalAmount)}
@@ -140,7 +157,7 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
                   </Typography>
                 )}
               </TableCell>
-              
+
               <TableCell>
                 <Chip
                   label={getPaymentMethodLabel(order.paymentMethod)}
@@ -148,26 +165,27 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
                   variant="outlined"
                 />
               </TableCell>
-              
+
               <TableCell>
                 <Chip
-                  label={order.status === 'completed' ? 'Terminé' : 
-                        order.status === 'pending' ? 'En attente' : 'Annulé'}
+                  label={
+                    order.status === 'completed'
+                      ? 'Terminé'
+                      : order.status === 'pending'
+                        ? 'En attente'
+                        : 'Annulé'
+                  }
                   size="small"
                   color={getStatusColor(order.status)}
                 />
               </TableCell>
-              
-              <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+
+              <TableCell align="center" onClick={e => e.stopPropagation()}>
                 <Box display="flex" gap={0.5} justifyContent="center">
-                  <IconButton
-                    size="small"
-                    onClick={() => onViewOrder(order)}
-                    title="Voir détails"
-                  >
+                  <IconButton size="small" onClick={() => onViewOrder(order)} title="Voir détails">
                     <VisibilityIcon fontSize="small" />
                   </IconButton>
-                  
+
                   <IconButton
                     size="small"
                     onClick={() => onPrintReceipt(order, 'detailed')}
@@ -175,7 +193,7 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
                   >
                     <Print fontSize="small" />
                   </IconButton>
-                  
+
                   {order.status === 'completed' && (
                     <IconButton
                       size="small"
@@ -187,7 +205,7 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
                     </IconButton>
                   )}
                 </Box>
-                
+
                 {/* Mobile: Additional actions as buttons */}
                 {isMobile && (
                   <Box mt={1} display="flex" gap={0.5}>
@@ -199,7 +217,7 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
                     >
                       Reçu
                     </Button>
-                    
+
                     {order.status === 'completed' && (
                       <Button
                         size="small"
@@ -218,8 +236,23 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
           ))}
         </TableBody>
       </Table>
+
+      {/* Pagination Controls */}
+      <TablePagination
+        component="div"
+        count={orders.length}
+        page={page}
+        onPageChange={handleChangePage}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={handleChangeRowsPerPage}
+        rowsPerPageOptions={[25, 50, 100, 200]}
+        labelRowsPerPage="Commandes par page:"
+        labelDisplayedRows={({ from, to, count }) =>
+          `${from}-${to} sur ${count !== -1 ? count : `plus de ${to}`}`
+        }
+      />
     </TableContainer>
   );
 };
 
-export default OrdersTable; 
+export default OrdersTable;

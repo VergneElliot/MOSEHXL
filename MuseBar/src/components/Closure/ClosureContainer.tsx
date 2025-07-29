@@ -7,7 +7,7 @@ import {
   Fab,
   Tooltip,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
 } from '@mui/material';
 import { Add } from '@mui/icons-material';
 import { useClosureState } from '../../hooks/useClosureState';
@@ -21,7 +21,7 @@ const ClosureContainer: React.FC = () => {
 
   // Custom hooks for state management
   const [state, actions] = useClosureState();
-  
+
   // Custom hook for API calls
   const api = useClosureAPI(
     actions.setBulletins,
@@ -42,7 +42,7 @@ const ClosureContainer: React.FC = () => {
   // Load data on component mount
   useEffect(() => {
     api.refreshAllData();
-  }, [api]);
+  }, [api]); // Include api dependency
 
   // Event handlers
   const handleCreateClosure = () => {
@@ -65,14 +65,13 @@ const ClosureContainer: React.FC = () => {
 
   const handleDownload = (bulletin: any) => {
     // TODO: Implement download functionality
-    console.log('Download bulletin:', bulletin.id);
   };
 
   // Utility functions
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
-      currency: 'EUR'
+      currency: 'EUR',
     }).format(amount);
   };
 
@@ -80,24 +79,18 @@ const ClosureContainer: React.FC = () => {
     return new Date(dateString).toLocaleDateString('fr-FR');
   };
 
-  const formatDateTime = (date: Date | string): string => {
-    const dateObj = typeof date === 'string' ? new Date(date) : date;
-    return dateObj.toLocaleString('fr-FR', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
   const getClosureTypeLabel = (type: string): string => {
     switch (type) {
-      case 'DAILY': return 'Journalière';
-      case 'WEEKLY': return 'Hebdomadaire';
-      case 'MONTHLY': return 'Mensuelle';
-      case 'ANNUAL': return 'Annuelle';
-      default: return type;
+      case 'DAILY':
+        return 'Journalière';
+      case 'WEEKLY':
+        return 'Hebdomadaire';
+      case 'MONTHLY':
+        return 'Mensuelle';
+      case 'ANNUAL':
+        return 'Annuelle';
+      default:
+        return type;
     }
   };
 
@@ -105,11 +98,7 @@ const ClosureContainer: React.FC = () => {
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        <Typography 
-          variant={isMobile ? "h5" : "h4"} 
-          component="h1" 
-          gutterBottom
-        >
+        <Typography variant={isMobile ? 'h5' : 'h4'} component="h1" gutterBottom>
           🔒 Bulletins de Clôture
         </Typography>
         <Typography variant="body2" color="textSecondary">
@@ -119,11 +108,7 @@ const ClosureContainer: React.FC = () => {
 
       {/* Error Alert */}
       {state.error && (
-        <Alert 
-          severity="error" 
-          sx={{ mb: 2 }}
-          onClose={() => actions.setError(null)}
-        >
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => actions.setError(null)}>
           {state.error}
         </Alert>
       )}
@@ -193,4 +178,4 @@ const ClosureContainer: React.FC = () => {
   );
 };
 
-export default ClosureContainer; 
+export default ClosureContainer;

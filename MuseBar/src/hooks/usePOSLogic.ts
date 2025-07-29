@@ -1,24 +1,26 @@
 import { useMemo } from 'react';
 import { OrderItem, Product, Category } from '../types';
-import { HappyHourService } from '../services/happyHourService';
 
 // Function to normalize accents for search
 const normalizeAccents = (str: string): string => {
-  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
 };
 
 export interface POSLogic {
   // Filtered data
   filteredProducts: Product[];
-  
+
   // Calculations
   orderTotal: number;
   orderTax: number;
   orderSubtotal: number;
-  
+
   // Validations
   canProcessPayment: boolean;
-  
+
   // Utilities
   calculateProductPrice: (product: Product, isHappyHour: boolean) => number;
   calculateItemTotal: (item: OrderItem) => number;
@@ -33,18 +35,15 @@ export const usePOSLogic = (
   searchQuery: string,
   isHappyHourActive: boolean
 ): POSLogic => {
-  
   // Filter products based on category and search
   const filteredProducts = useMemo(() => {
     let filtered = products.filter(product => product.isActive);
-    
+
     // Filter by category
     if (selectedCategory) {
-      filtered = filtered.filter(product => 
-        product.categoryId?.toString() === selectedCategory
-      );
+      filtered = filtered.filter(product => product.categoryId?.toString() === selectedCategory);
     }
-    
+
     // Filter by search query
     if (searchQuery.trim()) {
       const normalizedQuery = normalizeAccents(searchQuery.trim());
@@ -52,7 +51,7 @@ export const usePOSLogic = (
         normalizeAccents(product.name).includes(normalizedQuery)
       );
     }
-    
+
     return filtered;
   }, [products, selectedCategory, searchQuery]);
 
@@ -61,7 +60,7 @@ export const usePOSLogic = (
     if (!isHappyHour || !product.isHappyHourEligible) {
       return product.price;
     }
-    
+
     // Apply happy hour discount based on product settings
     if (product.happyHourDiscountType === 'percentage') {
       return product.price * (1 - product.happyHourDiscountValue);
@@ -97,7 +96,7 @@ export const usePOSLogic = (
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
-      currency: 'EUR'
+      currency: 'EUR',
     }).format(amount);
   };
 
@@ -111,4 +110,4 @@ export const usePOSLogic = (
     calculateItemTotal,
     formatCurrency,
   };
-}; 
+};

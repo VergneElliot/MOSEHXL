@@ -1,19 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  Card,
-  CardContent,
-  Typography,
-  Button,
-  TextField,
-  Grid,
-  Alert
-} from '@mui/material';
-import {
-  Settings as SettingsIcon
-} from '@mui/icons-material';
-import { apiService } from '../services/apiService';
-import { apiConfig } from '../config/api';
+import { Box, Card, CardContent, Typography, Button, TextField, Grid, Alert } from '@mui/material';
+import { Settings as SettingsIcon } from '@mui/icons-material';
+import { apiService } from '../../services/apiService';
 
 interface ClosureSettings {
   auto_closure_enabled: boolean;
@@ -41,18 +29,18 @@ const Settings: React.FC = () => {
     email: '',
     taxIdentification: '',
     currency: 'EUR',
-    language: 'fr'
+    language: 'fr',
   });
   const [closureSettings, setClosureSettings] = useState<ClosureSettings>({
     auto_closure_enabled: true,
     daily_closure_time: '02:00',
     timezone: 'Europe/Paris',
-    grace_period_minutes: 30
+    grace_period_minutes: 30,
   });
   const [schedulerStatus, setSchedulerStatus] = useState<SchedulerStatus>({
     is_running: false,
     has_interval: false,
-    next_check: 'Not scheduled'
+    next_check: 'Not scheduled',
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -62,7 +50,7 @@ const Settings: React.FC = () => {
     phone: '',
     email: '',
     siret: '',
-    taxIdentification: ''
+    taxIdentification: '',
   });
   const [, setInfoLoading] = useState(true);
   const [, setInfoSaving] = useState(false);
@@ -79,7 +67,11 @@ const Settings: React.FC = () => {
       setClosureSettings(response.data.settings);
       setSchedulerStatus(response.data.scheduler);
     } catch (error) {
-      console.error('Error loading closure settings:', error);
+      setSchedulerStatus({
+        is_running: false,
+        has_interval: false,
+        next_check: 'Error loading status',
+      });
     } finally {
       setLoading(false);
     }
@@ -95,7 +87,7 @@ const Settings: React.FC = () => {
         phone: info.phone || '',
         email: info.email || '',
         siret: info.siret || '',
-        taxIdentification: info.tax_identification || ''
+        taxIdentification: info.tax_identification || '',
       });
     } catch (error) {
       setInfoMessage('Erreur lors du chargement des informations du bar');
@@ -111,7 +103,6 @@ const Settings: React.FC = () => {
       alert('Closure settings saved successfully');
       await loadClosureSettings(); // Reload to get updated data
     } catch (error) {
-      console.error('Error saving closure settings:', error);
       alert('Error saving closure settings');
     } finally {
       setSaving(false);
@@ -128,7 +119,7 @@ const Settings: React.FC = () => {
         phone: businessInfo.phone,
         email: businessInfo.email,
         siret: businessInfo.siret,
-        tax_identification: businessInfo.taxIdentification
+        tax_identification: businessInfo.taxIdentification,
       });
       setInfoMessage('Informations du bar sauvegardées avec succès');
     } catch (error) {
@@ -144,7 +135,6 @@ const Settings: React.FC = () => {
       alert('Manual closure check triggered');
       await loadClosureSettings(); // Reload status
     } catch (error) {
-      console.error('Error triggering manual check:', error);
       alert('Error triggering manual check');
     }
   };
@@ -176,7 +166,7 @@ const Settings: React.FC = () => {
                 label="Nom du bar"
                 fullWidth
                 value={businessInfo.name}
-                onChange={(e) => setBusinessInfo(prev => ({ ...prev, name: e.target.value }))}
+                onChange={e => setBusinessInfo(prev => ({ ...prev, name: e.target.value }))}
                 sx={{ mb: 2 }}
               />
 
@@ -186,7 +176,7 @@ const Settings: React.FC = () => {
                 multiline
                 rows={3}
                 value={businessInfo.address}
-                onChange={(e) => setBusinessInfo(prev => ({ ...prev, address: e.target.value }))}
+                onChange={e => setBusinessInfo(prev => ({ ...prev, address: e.target.value }))}
                 sx={{ mb: 2 }}
               />
 
@@ -194,7 +184,7 @@ const Settings: React.FC = () => {
                 label="Téléphone"
                 fullWidth
                 value={businessInfo.phone}
-                onChange={(e) => setBusinessInfo(prev => ({ ...prev, phone: e.target.value }))}
+                onChange={e => setBusinessInfo(prev => ({ ...prev, phone: e.target.value }))}
                 sx={{ mb: 2 }}
               />
 
@@ -203,7 +193,7 @@ const Settings: React.FC = () => {
                 type="email"
                 fullWidth
                 value={businessInfo.email}
-                onChange={(e) => setBusinessInfo(prev => ({ ...prev, email: e.target.value }))}
+                onChange={e => setBusinessInfo(prev => ({ ...prev, email: e.target.value }))}
                 sx={{ mb: 2 }}
               />
 
@@ -211,14 +201,16 @@ const Settings: React.FC = () => {
                 label="Numéro de TVA"
                 fullWidth
                 value={businessInfo.taxIdentification}
-                onChange={(e) => setBusinessInfo(prev => ({ ...prev, taxIdentification: e.target.value }))}
+                onChange={e =>
+                  setBusinessInfo(prev => ({ ...prev, taxIdentification: e.target.value }))
+                }
                 sx={{ mb: 2 }}
               />
               <TextField
                 label="SIRET"
                 fullWidth
                 value={businessInfo.siret}
-                onChange={(e) => setBusinessInfo(prev => ({ ...prev, siret: e.target.value }))}
+                onChange={e => setBusinessInfo(prev => ({ ...prev, siret: e.target.value }))}
                 sx={{ mb: 2 }}
               />
             </CardContent>
@@ -237,7 +229,7 @@ const Settings: React.FC = () => {
                 label="Devise"
                 fullWidth
                 value={settings.currency}
-                onChange={(e) => setSettings(prev => ({ ...prev, currency: e.target.value }))}
+                onChange={e => setSettings(prev => ({ ...prev, currency: e.target.value }))}
                 sx={{ mb: 2 }}
               />
 
@@ -245,7 +237,7 @@ const Settings: React.FC = () => {
                 label="Langue"
                 fullWidth
                 value={settings.language}
-                onChange={(e) => setSettings(prev => ({ ...prev, language: e.target.value }))}
+                onChange={e => setSettings(prev => ({ ...prev, language: e.target.value }))}
                 sx={{ mb: 2 }}
               />
 
@@ -258,7 +250,10 @@ const Settings: React.FC = () => {
                 Sauvegarder les paramètres
               </Button>
               {infoMessage && (
-                <Alert severity={infoMessage.includes('succès') ? 'success' : 'error'} sx={{ mt: 2 }}>
+                <Alert
+                  severity={infoMessage.includes('succès') ? 'success' : 'error'}
+                  sx={{ mt: 2 }}
+                >
                   {infoMessage}
                 </Alert>
               )}
@@ -277,11 +272,13 @@ const Settings: React.FC = () => {
               <div className="bg-gray-50 p-4 rounded-lg mb-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-gray-600">Scheduler Status:</span>
-                  <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                    schedulerStatus.is_running 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-red-100 text-red-800'
-                  }`}>
+                  <span
+                    className={`px-2 py-1 rounded text-xs font-semibold ${
+                      schedulerStatus.is_running
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                    }`}
+                  >
                     {schedulerStatus.is_running ? 'Running' : 'Stopped'}
                   </span>
                 </div>
@@ -289,7 +286,7 @@ const Settings: React.FC = () => {
                   Next check: {schedulerStatus.next_check}
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -297,17 +294,19 @@ const Settings: React.FC = () => {
                   </label>
                   <select
                     value={closureSettings.auto_closure_enabled ? 'true' : 'false'}
-                    onChange={(e) => setClosureSettings({
-                      ...closureSettings,
-                      auto_closure_enabled: e.target.value === 'true'
-                    })}
+                    onChange={e =>
+                      setClosureSettings({
+                        ...closureSettings,
+                        auto_closure_enabled: e.target.value === 'true',
+                      })
+                    }
                     className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="true">Enabled</option>
                     <option value="false">Disabled</option>
                   </select>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Daily Closure Time
@@ -315,14 +314,16 @@ const Settings: React.FC = () => {
                   <input
                     type="time"
                     value={closureSettings.daily_closure_time}
-                    onChange={(e) => setClosureSettings({
-                      ...closureSettings,
-                      daily_closure_time: e.target.value
-                    })}
+                    onChange={e =>
+                      setClosureSettings({
+                        ...closureSettings,
+                        daily_closure_time: e.target.value,
+                      })
+                    }
                     className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Grace Period (minutes)
@@ -332,27 +333,29 @@ const Settings: React.FC = () => {
                     min="5"
                     max="120"
                     value={closureSettings.grace_period_minutes}
-                    onChange={(e) => setClosureSettings({
-                      ...closureSettings,
-                      grace_period_minutes: parseInt(e.target.value) || 30
-                    })}
+                    onChange={e =>
+                      setClosureSettings({
+                        ...closureSettings,
+                        grace_period_minutes: parseInt(e.target.value) || 30,
+                      })
+                    }
                     className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     Time window after closure time to execute automatic closure
                   </p>
                 </div>
-                
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Timezone
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Timezone</label>
                   <select
                     value={closureSettings.timezone}
-                    onChange={(e) => setClosureSettings({
-                      ...closureSettings,
-                      timezone: e.target.value
-                    })}
+                    onChange={e =>
+                      setClosureSettings({
+                        ...closureSettings,
+                        timezone: e.target.value,
+                      })
+                    }
                     className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="Europe/Paris">Europe/Paris</option>
@@ -361,7 +364,7 @@ const Settings: React.FC = () => {
                   </select>
                 </div>
               </div>
-              
+
               <div className="flex space-x-4">
                 <button
                   onClick={saveClosureSettings}
@@ -370,7 +373,7 @@ const Settings: React.FC = () => {
                 >
                   {saving ? 'Saving...' : 'Save Settings'}
                 </button>
-                
+
                 <button
                   onClick={triggerManualCheck}
                   className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
@@ -389,7 +392,7 @@ const Settings: React.FC = () => {
               <Typography variant="h6" gutterBottom>
                 🖨️ Imprimante Thermique
               </Typography>
-              
+
               <Box sx={{ mb: 2 }}>
                 <Button
                   variant="outlined"
@@ -397,35 +400,38 @@ const Settings: React.FC = () => {
                     try {
                       const response = await apiService.get<any>('/legal/thermal-printer/status');
                       const status = response.data;
-                      
+
                       if (status.available) {
                         alert(`✅ Imprimante disponible: ${status.status}`);
                       } else {
                         alert(`❌ Imprimante non disponible: ${status.status}`);
                       }
                     } catch (error) {
-                      alert('❌ Erreur lors de la vérification du statut de l\'imprimante');
+                      alert("❌ Erreur lors de la vérification du statut de l'imprimante");
                     }
                   }}
                   sx={{ mr: 1, mb: 1 }}
                 >
                   Vérifier le Statut
                 </Button>
-                
+
                 <Button
                   variant="contained"
                   onClick={async () => {
                     try {
-                      const response = await apiService.post<any>('/legal/thermal-printer/test', {});
+                      const response = await apiService.post<any>(
+                        '/legal/thermal-printer/test',
+                        {}
+                      );
                       const result = response.data;
-                      
+
                       if (result.success) {
-                        alert('✅ Test d\'impression réussi! Vérifiez l\'imprimante.');
+                        alert("✅ Test d'impression réussi! Vérifiez l'imprimante.");
                       } else {
                         alert(`❌ Échec du test: ${result.message}`);
                       }
                     } catch (error) {
-                      alert('❌ Erreur lors du test d\'impression');
+                      alert("❌ Erreur lors du test d'impression");
                     }
                   }}
                   sx={{ mb: 1 }}
@@ -433,9 +439,10 @@ const Settings: React.FC = () => {
                   Test d'Impression
                 </Button>
               </Box>
-              
+
               <Alert severity="info" sx={{ fontSize: '0.875rem' }}>
-                <strong>Imprimante configurée:</strong> Oxhoo TP85v Network<br />
+                <strong>Imprimante configurée:</strong> Oxhoo TP85v Network
+                <br />
                 Utilisez ces boutons pour tester la connectivité et l'impression thermique.
               </Alert>
             </CardContent>
@@ -453,10 +460,20 @@ const Settings: React.FC = () => {
                 This system complies with French fiscal regulations (Article 286-I-3 bis du CGI):
               </p>
               <ul className="text-sm text-blue-700 space-y-1">
-                <li>• <strong>Inaltérabilité:</strong> Transactions are immutable and cannot be modified</li>
-                <li>• <strong>Sécurisation:</strong> All data is cryptographically signed and verified</li>
-                <li>• <strong>Conservation:</strong> Daily closure bulletins preserve transaction integrity</li>
-                <li>• <strong>Archivage:</strong> All records are maintained for legal audit purposes</li>
+                <li>
+                  • <strong>Inaltérabilité:</strong> Transactions are immutable and cannot be
+                  modified
+                </li>
+                <li>
+                  • <strong>Sécurisation:</strong> All data is cryptographically signed and verified
+                </li>
+                <li>
+                  • <strong>Conservation:</strong> Daily closure bulletins preserve transaction
+                  integrity
+                </li>
+                <li>
+                  • <strong>Archivage:</strong> All records are maintained for legal audit purposes
+                </li>
               </ul>
             </CardContent>
           </Card>
@@ -466,4 +483,4 @@ const Settings: React.FC = () => {
   );
 };
 
-export default Settings; 
+export default Settings;

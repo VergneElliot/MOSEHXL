@@ -1,13 +1,5 @@
 import React, { useEffect } from 'react';
-import {
-  Box,
-  Typography,
-  Paper,
-  Alert,
-  Snackbar,
-  useTheme,
-  useMediaQuery
-} from '@mui/material';
+import { Box, Typography, Alert, Snackbar, useTheme, useMediaQuery } from '@mui/material';
 import { useHistoryState } from '../../hooks/useHistoryState';
 import { useHistoryAPI } from '../../hooks/useHistoryAPI';
 import { useHistoryLogic } from '../../hooks/useHistoryLogic';
@@ -22,10 +14,10 @@ const HistoryContainer: React.FC = () => {
 
   // Custom hooks for state management
   const [state, actions] = useHistoryState();
-  
+
   // Custom hook for business logic
   const logic = useHistoryLogic(state.orders, state.search);
-  
+
   // Custom hook for API calls
   const api = useHistoryAPI(
     actions.setOrders,
@@ -40,7 +32,7 @@ const HistoryContainer: React.FC = () => {
   // Load data on component mount
   useEffect(() => {
     api.refreshData();
-  }, [api]);
+  }, [api]); // Include api dependency
 
   // Event handlers
   const handleViewOrder = (order: Order) => {
@@ -63,11 +55,7 @@ const HistoryContainer: React.FC = () => {
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        <Typography 
-          variant={isMobile ? "h5" : "h4"} 
-          component="h1" 
-          gutterBottom
-        >
+        <Typography variant={isMobile ? 'h5' : 'h4'} component="h1" gutterBottom>
           📊 Historique des Ventes
         </Typography>
         <Typography variant="body2" color="textSecondary">
@@ -83,10 +71,7 @@ const HistoryContainer: React.FC = () => {
       />
 
       {/* Search Bar */}
-      <SearchBar
-        search={state.search}
-        onSearchChange={actions.setSearch}
-      />
+      <SearchBar search={state.search} onSearchChange={actions.setSearch} />
 
       {/* Orders Table */}
       <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
@@ -108,7 +93,8 @@ const HistoryContainer: React.FC = () => {
       {state.search && !state.loading && (
         <Box mt={2}>
           <Typography variant="body2" color="textSecondary" align="center">
-            {logic.filteredOrders.length} résultat{logic.filteredOrders.length > 1 ? 's' : ''} trouvé{logic.filteredOrders.length > 1 ? 's' : ''} pour "{state.search}"
+            {logic.filteredOrders.length} résultat{logic.filteredOrders.length > 1 ? 's' : ''}{' '}
+            trouvé{logic.filteredOrders.length > 1 ? 's' : ''} pour "{state.search}"
           </Typography>
         </Box>
       )}
@@ -153,4 +139,4 @@ const HistoryContainer: React.FC = () => {
   );
 };
 
-export default HistoryContainer; 
+export default HistoryContainer;

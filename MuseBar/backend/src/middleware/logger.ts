@@ -34,7 +34,7 @@ export class Logger {
 
     // Override response.end to log response
     const originalEnd = res.end.bind(res);
-    res.end = function(...args: any[]) {
+    (res as any).end = function(...args: any[]) {
       const responseTime = Date.now() - startTime;
       
       const responseLog: LogEntry = {
@@ -54,7 +54,7 @@ export class Logger {
       });
 
       // Call original end method
-      return originalEnd.apply(this, args);
+      return (originalEnd as any).apply(this, args);
     };
 
     next();

@@ -5,21 +5,12 @@ import {
   CardContent,
   Typography,
   Box,
-  Chip,
   Alert,
   AlertTitle,
   useTheme,
-  useMediaQuery,
-  CircularProgress
+  CircularProgress,
 } from '@mui/material';
-import {
-  Receipt,
-  Schedule,
-  TrendingUp,
-  Assignment,
-  Security,
-  Lock
-} from '@mui/icons-material';
+import { Receipt, Schedule, TrendingUp, Assignment, Security, Lock } from '@mui/icons-material';
 
 interface ClosureStatusCardsProps {
   todayStatus: any;
@@ -37,7 +28,6 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
   formatCurrency,
 }) => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   if (loading) {
     return (
@@ -60,23 +50,26 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
     <Box sx={{ mb: 3 }}>
       {/* Today Status Alert */}
       {todayStatus && (
-        <Alert 
-          severity={todayStatus.has_daily_closure ? "success" : "warning"}
+        <Alert
+          severity={todayStatus.has_daily_closure ? 'success' : 'warning'}
           sx={{ mb: 2 }}
           icon={todayStatus.has_daily_closure ? <Lock /> : <Schedule />}
         >
           <AlertTitle>
-            {todayStatus.has_daily_closure ? "Clôture journalière effectuée" : "Clôture journalière en attente"}
+            {todayStatus.has_daily_closure
+              ? 'Clôture journalière effectuée'
+              : 'Clôture journalière en attente'}
           </AlertTitle>
           {todayStatus.has_daily_closure ? (
             <Typography variant="body2">
-              Clôture effectuée le {new Date(todayStatus.closure_date).toLocaleDateString('fr-FR')} 
-              - {todayStatus.total_transactions} transactions pour {formatCurrency(todayStatus.total_amount)}
+              Clôture effectuée le {new Date(todayStatus.closure_date).toLocaleDateString('fr-FR')}-{' '}
+              {todayStatus.total_transactions} transactions pour{' '}
+              {formatCurrency(todayStatus.total_amount)}
             </Typography>
           ) : (
             <Typography variant="body2">
-              La clôture journalière n'a pas encore été effectuée pour aujourd'hui. 
-              Période d'activité en cours : {todayStatus.transactions_today} transactions.
+              La clôture journalière n'a pas encore été effectuée pour aujourd'hui. Période
+              d'activité en cours : {todayStatus.transactions_today} transactions.
             </Typography>
           )}
         </Alert>
@@ -222,4 +215,4 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
   );
 };
 
-export default ClosureStatusCards; 
+export default ClosureStatusCards;
