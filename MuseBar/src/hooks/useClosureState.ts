@@ -33,7 +33,7 @@ export interface ClosureState {
   closureSettings: any;
   monthlyStats: any;
   monthlyStatsError: string | null;
-  
+
   // Dialog state
   showCreateDialog: boolean;
   selectedBulletin: ClosureBulletin | null;
@@ -41,12 +41,12 @@ export interface ClosureState {
   settingsOpen: boolean;
   printDialogOpen: boolean;
   printBulletin: ClosureBulletin | null;
-  
+
   // Form state
   selectedDate: string;
   filterType: string;
   selectedClosureType: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL';
-  
+
   // UI state
   snackbar: {
     open: boolean;
@@ -65,7 +65,7 @@ export interface ClosureActions {
   setClosureSettings: (settings: any) => void;
   setMonthlyStats: (stats: any) => void;
   setMonthlyStatsError: (error: string | null) => void;
-  
+
   // Dialog actions
   setShowCreateDialog: (show: boolean) => void;
   setSelectedBulletin: (bulletin: ClosureBulletin | null) => void;
@@ -77,18 +77,22 @@ export interface ClosureActions {
   closeBulletinDetails: () => void;
   openPrintDialog: (bulletin: ClosureBulletin) => void;
   closePrintDialog: () => void;
-  
+
   // Form actions
   setSelectedDate: (date: string) => void;
   setFilterType: (type: string) => void;
   setSelectedClosureType: (type: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL') => void;
-  
+
   // UI actions
-  setSnackbar: (snackbar: { open: boolean; message: string; severity: 'success' | 'error' }) => void;
+  setSnackbar: (snackbar: {
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error';
+  }) => void;
   showSuccess: (message: string) => void;
   showError: (message: string) => void;
   closeSnackbar: () => void;
-  
+
   // Utility actions
   addBulletin: (bulletin: ClosureBulletin) => void;
   clearMessages: () => void;
@@ -104,7 +108,7 @@ export const useClosureState = (): [ClosureState, ClosureActions] => {
   const [closureSettings, setClosureSettings] = useState<any>({});
   const [monthlyStats, setMonthlyStats] = useState<any>(null);
   const [monthlyStatsError, setMonthlyStatsError] = useState<string | null>(null);
-  
+
   // Dialog state
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedBulletin, setSelectedBulletin] = useState<ClosureBulletin | null>(null);
@@ -112,17 +116,19 @@ export const useClosureState = (): [ClosureState, ClosureActions] => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [printBulletin, setPrintBulletin] = useState<ClosureBulletin | null>(null);
-  
+
   // Form state
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [filterType, setFilterType] = useState<string>('ALL');
-  const [selectedClosureType, setSelectedClosureType] = useState<'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL'>('DAILY');
-  
+  const [selectedClosureType, setSelectedClosureType] = useState<
+    'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL'
+  >('DAILY');
+
   // UI state
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
-    severity: 'success' as 'success' | 'error'
+    severity: 'success' as 'success' | 'error',
   });
 
   // Helper actions
@@ -220,4 +226,4 @@ export const useClosureState = (): [ClosureState, ClosureActions] => {
   };
 
   return [state, actions];
-}; 
+};

@@ -1,10 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Button, TextField, Checkbox, FormControlLabel, Dialog, DialogTitle, DialogContent, DialogActions, Alert
+  Box,
+  Typography,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Button,
+  TextField,
+  Checkbox,
+  FormControlLabel,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Alert,
 } from '@mui/material';
-import { apiConfig } from '../config/api';
-import { ApiService } from '../services/apiService';
+import { apiService } from '../../services/apiService';
 
 const PERMISSIONS = [
   { key: 'access_pos', label: 'Caisse' },
@@ -12,19 +27,22 @@ const PERMISSIONS = [
   { key: 'access_happy_hour', label: 'Happy Hour' },
   { key: 'access_history', label: 'Historique' },
   { key: 'access_settings', label: 'Paramètres' },
-  { key: 'access_compliance', label: 'Conformité' }
+  { key: 'access_compliance', label: 'Conformité' },
 ];
 
 const UserManagement: React.FC<{ token: string }> = ({ token }) => {
   const [users, setUsers] = useState<any[]>([]);
   const [, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const apiService = ApiService.getInstance();
+  // Already imported as singleton instance
   const [showAdd, setShowAdd] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newIsAdmin, setNewIsAdmin] = useState(false);
-  const [permDialog, setPermDialog] = useState<{ open: boolean; user: any | null }>({ open: false, user: null });
+  const [permDialog, setPermDialog] = useState<{ open: boolean; user: any | null }>({
+    open: false,
+    user: null,
+  });
   const [permState, setPermState] = useState<{ [key: string]: boolean }>({});
   const [permSaving, setPermSaving] = useState(false);
   const [permError, setPermError] = useState<string | null>(null);
@@ -42,17 +60,17 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
     }
   };
 
-  useEffect(() => { 
-    fetchUsers(); 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const handleAddUser = async () => {
     try {
-      await apiService.post<any>('/auth/register', { 
-        email: newEmail, 
-        password: newPassword, 
-        is_admin: newIsAdmin 
+      await apiService.post<any>('/auth/register', {
+        email: newEmail,
+        password: newPassword,
+        is_admin: newIsAdmin,
       });
       setShowAdd(false);
       setNewEmail('');
@@ -72,7 +90,9 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
     const response = await apiService.get<any>(`/auth/users/${user.id}/permissions`);
     const data = response.data;
     const state: { [key: string]: boolean } = {};
-    PERMISSIONS.forEach(p => { state[p.key] = data.permissions.includes(p.key); });
+    PERMISSIONS.forEach(p => {
+      state[p.key] = data.permissions.includes(p.key);
+    });
     setPermState(state);
   };
 
@@ -94,8 +114,12 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h5" gutterBottom>Gestion des utilisateurs</Typography>
-      <Button variant="contained" onClick={() => setShowAdd(true)} sx={{ mb: 2 }}>Ajouter un utilisateur</Button>
+      <Typography variant="h5" gutterBottom>
+        Gestion des utilisateurs
+      </Typography>
+      <Button variant="contained" onClick={() => setShowAdd(true)} sx={{ mb: 2 }}>
+        Ajouter un utilisateur
+      </Button>
       {error && <Alert severity="error">{error}</Alert>}
       <TableContainer component={Paper}>
         <Table>
@@ -116,7 +140,9 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
                 <TableCell>{user.is_admin ? 'Oui' : 'Non'}</TableCell>
                 <TableCell>{new Date(user.created_at).toLocaleString('fr-FR')}</TableCell>
                 <TableCell>
-                  <Button size="small" onClick={() => openPermDialog(user)}>Permissions</Button>
+                  <Button size="small" onClick={() => openPermDialog(user)}>
+                    Permissions
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -145,13 +171,17 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
             margin="normal"
           />
           <FormControlLabel
-            control={<Checkbox checked={newIsAdmin} onChange={e => setNewIsAdmin(e.target.checked)} />}
+            control={
+              <Checkbox checked={newIsAdmin} onChange={e => setNewIsAdmin(e.target.checked)} />
+            }
             label="Admin"
           />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowAdd(false)}>Annuler</Button>
-          <Button onClick={handleAddUser} variant="contained">Créer</Button>
+          <Button onClick={handleAddUser} variant="contained">
+            Créer
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -175,11 +205,13 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPermDialog({ open: false, user: null })}>Annuler</Button>
-          <Button onClick={handleSavePerms} variant="contained" disabled={permSaving}>Sauvegarder</Button>
+          <Button onClick={handleSavePerms} variant="contained" disabled={permSaving}>
+            Sauvegarder
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
   );
 };
 
-export default UserManagement; 
+export default UserManagement;

@@ -25,7 +25,7 @@ class PerformanceMonitor {
       sampleRate: config.sampleRate || 0.1, // 10% by default
       maxMetrics: config.maxMetrics || 1000,
       sendToAnalytics: config.sendToAnalytics || false,
-      analyticsEndpoint: config.analyticsEndpoint
+      analyticsEndpoint: config.analyticsEndpoint,
     };
 
     if (this.config.enabled) {
@@ -69,8 +69,16 @@ class PerformanceMonitor {
   private observeNavigationTiming(): void {
     const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
     if (navigation) {
-      this.addMetric('navigation.domContentLoaded', navigation.domContentLoadedEventEnd - navigation.domContentLoadedEventStart, 'ms');
-      this.addMetric('navigation.loadComplete', navigation.loadEventEnd - navigation.loadEventStart, 'ms');
+      this.addMetric(
+        'navigation.domContentLoaded',
+        navigation.domContentLoadedEventEnd - navigation.domContentLoadedEventStart,
+        'ms'
+      );
+      this.addMetric(
+        'navigation.loadComplete',
+        navigation.loadEventEnd - navigation.loadEventStart,
+        'ms'
+      );
       this.addMetric('navigation.totalTime', navigation.loadEventEnd - navigation.fetchStart, 'ms');
     }
   }
@@ -79,13 +87,18 @@ class PerformanceMonitor {
    * Observe resource timing
    */
   private observeResourceTiming(): void {
-    const observer = new PerformanceObserver((list) => {
-      list.getEntries().forEach((entry) => {
+    const observer = new PerformanceObserver(list => {
+      list.getEntries().forEach(entry => {
         const resourceEntry = entry as PerformanceResourceTiming;
-        this.addMetric('resource.loadTime', resourceEntry.responseEnd - resourceEntry.requestStart, 'ms', {
-          name: resourceEntry.name,
-          type: resourceEntry.initiatorType
-        });
+        this.addMetric(
+          'resource.loadTime',
+          resourceEntry.responseEnd - resourceEntry.requestStart,
+          'ms',
+          {
+            name: resourceEntry.name,
+            type: resourceEntry.initiatorType,
+          }
+        );
       });
     });
 
@@ -97,11 +110,11 @@ class PerformanceMonitor {
    * Observe long tasks
    */
   private observeLongTasks(): void {
-    const observer = new PerformanceObserver((list) => {
-      list.getEntries().forEach((entry) => {
+    const observer = new PerformanceObserver(list => {
+      list.getEntries().forEach(entry => {
         const longTask = entry as PerformanceEntry;
         this.addMetric('longTask.duration', longTask.duration, 'ms', {
-          startTime: longTask.startTime
+          startTime: longTask.startTime,
         });
       });
     });
@@ -114,11 +127,11 @@ class PerformanceMonitor {
    * Observe layout shifts
    */
   private observeLayoutShifts(): void {
-    const observer = new PerformanceObserver((list) => {
-      list.getEntries().forEach((entry) => {
+    const observer = new PerformanceObserver(list => {
+      list.getEntries().forEach(entry => {
         const layoutShift = entry as any;
         this.addMetric('layoutShift.score', layoutShift.value, 'score', {
-          sources: layoutShift.sources
+          sources: layoutShift.sources,
         });
       });
     });
@@ -131,11 +144,15 @@ class PerformanceMonitor {
    * Observe first input delay
    */
   private observeFirstInput(): void {
-    const observer = new PerformanceObserver((list) => {
-      list.getEntries().forEach((entry) => {
+    const observer = new PerformanceObserver(list => {
+      list.getEntries().forEach(entry => {
         const firstInput = entry as any;
         this.addMetric('firstInput.delay', firstInput.processingStart - firstInput.startTime, 'ms');
-        this.addMetric('firstInput.processingTime', firstInput.processingEnd - firstInput.processingStart, 'ms');
+        this.addMetric(
+          'firstInput.processingTime',
+          firstInput.processingEnd - firstInput.processingStart,
+          'ms'
+        );
       });
     });
 
@@ -156,7 +173,7 @@ class PerformanceMonitor {
       value,
       unit,
       timestamp: Date.now(),
-      metadata
+      metadata,
     };
 
     this.metrics.push(metric);
@@ -235,13 +252,16 @@ class PerformanceMonitor {
     const summary: Record<string, any> = {};
 
     // Group metrics by name
-    const groupedMetrics = this.metrics.reduce((acc, metric) => {
-      if (!acc[metric.name]) {
-        acc[metric.name] = [];
-      }
-      acc[metric.name].push(metric.value);
-      return acc;
-    }, {} as Record<string, number[]>);
+    const groupedMetrics = this.metrics.reduce(
+      (acc, metric) => {
+        if (!acc[metric.name]) {
+          acc[metric.name] = [];
+        }
+        acc[metric.name].push(metric.value);
+        return acc;
+      },
+      {} as Record<string, number[]>
+    );
 
     // Calculate statistics for each metric
     Object.entries(groupedMetrics).forEach(([name, values]) => {
@@ -260,7 +280,7 @@ class PerformanceMonitor {
         median: Math.round(median * 100) / 100,
         min: Math.round(min * 100) / 100,
         max: Math.round(max * 100) / 100,
-        p95: Math.round(p95 * 100) / 100
+        p95: Math.round(p95 * 100) / 100,
       };
     });
 
@@ -291,14 +311,14 @@ class PerformanceMonitor {
       await fetch(this.config.analyticsEndpoint, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           ...metric,
           userAgent: navigator.userAgent,
           url: window.location.href,
-          timestamp: new Date().toISOString()
-        })
+          timestamp: new Date().toISOString(),
+        }),
       });
     } catch (error) {
       console.error('Failed to send performance metric to analytics:', error);
@@ -326,7 +346,7 @@ export const usePerformanceMonitor = () => {
     measureAPICall: performanceMonitor.measureAPICall.bind(performanceMonitor),
     getSummary: performanceMonitor.getSummary.bind(performanceMonitor),
     getMetrics: performanceMonitor.getMetrics.bind(performanceMonitor),
-    clearMetrics: performanceMonitor.clearMetrics.bind(performanceMonitor)
+    clearMetrics: performanceMonitor.clearMetrics.bind(performanceMonitor),
   };
 };
 
@@ -335,4 +355,4 @@ if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
     performanceMonitor.disconnect();
   });
-} 
+}

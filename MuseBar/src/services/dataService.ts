@@ -42,19 +42,26 @@ export class DataService {
     return this.categories.find(cat => cat.id === id);
   }
 
-  public async createCategory(categoryData: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>): Promise<Category> {
+  public async createCategory(
+    categoryData: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>
+  ): Promise<Category> {
     const category = await this.apiService.createCategory(categoryData);
     await this.getCategories();
     return category;
   }
 
-  public async updateCategory(id: string, updates: Partial<Omit<Category, 'id' | 'createdAt'>>): Promise<Category | null> {
+  public async updateCategory(
+    id: string,
+    updates: Partial<Omit<Category, 'id' | 'createdAt'>>
+  ): Promise<Category | null> {
     const category = await this.apiService.updateCategory(id, updates);
     await this.getCategories();
     return category;
   }
 
-  public async deleteCategory(id: string): Promise<{ message: string; action?: string; reason?: string }> {
+  public async deleteCategory(
+    id: string
+  ): Promise<{ message: string; action?: string; reason?: string }> {
     const result = await this.apiService.deleteCategory(id);
     await this.getCategories();
     return result;
@@ -92,13 +99,18 @@ export class DataService {
     return this.products.find(prod => prod.id === id);
   }
 
-  public async createProduct(productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<Product> {
+  public async createProduct(
+    productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>
+  ): Promise<Product> {
     const product = await this.apiService.createProduct(productData);
     await this.getProducts();
     return product;
   }
 
-  public async updateProduct(id: string, updates: Partial<Omit<Product, 'id' | 'createdAt'>>): Promise<Product | null> {
+  public async updateProduct(
+    id: string,
+    updates: Partial<Omit<Product, 'id' | 'createdAt'>>
+  ): Promise<Product | null> {
     const product = await this.apiService.updateProduct(id, updates);
     await this.getProducts();
     return product;
@@ -126,86 +138,86 @@ export class DataService {
   private initializeDefaultData(): void {
     if (this.categories.length === 0) {
       this.createCategory({
-        name: "Bières",
-        description: "Bières pression et bouteilles",
-        color: "#FFD700"
+        name: 'Bières',
+        description: 'Bières pression et bouteilles',
+        color: '#FFD700',
       });
-      
+
       this.createCategory({
-        name: "Cocktails",
-        description: "Cocktails et spiritueux",
-        color: "#FF69B4"
+        name: 'Cocktails',
+        description: 'Cocktails et spiritueux',
+        color: '#FF69B4',
       });
-      
+
       this.createCategory({
-        name: "Softs",
-        description: "Boissons non alcoolisées",
-        color: "#87CEEB"
+        name: 'Softs',
+        description: 'Boissons non alcoolisées',
+        color: '#87CEEB',
       });
-      
+
       this.createCategory({
-        name: "Snacks",
-        description: "Petites faims",
-        color: "#98FB98"
+        name: 'Snacks',
+        description: 'Petites faims',
+        color: '#98FB98',
       });
     }
 
     if (this.products.length === 0) {
-      const biereCategory = this.categories.find(cat => cat.name === "Bières");
-      const cocktailCategory = this.categories.find(cat => cat.name === "Cocktails");
-      const softCategory = this.categories.find(cat => cat.name === "Softs");
+      const biereCategory = this.categories.find(cat => cat.name === 'Bières');
+      const cocktailCategory = this.categories.find(cat => cat.name === 'Cocktails');
+      const softCategory = this.categories.find(cat => cat.name === 'Softs');
 
       if (biereCategory) {
         this.createProduct({
-          name: "Pression Blonde",
-          description: "Biere blonde pression 25cl",
-          price: 6.50,
-          taxRate: 0.20,
+          name: 'Pression Blonde',
+          description: 'Biere blonde pression 25cl',
+          price: 6.5,
+          taxRate: 0.2,
           categoryId: biereCategory.id,
           isHappyHourEligible: true,
           happyHourDiscountType: 'percentage',
-          happyHourDiscountValue: 0.20,
-          isActive: true
+          happyHourDiscountValue: 0.2,
+          isActive: true,
         });
 
         this.createProduct({
-          name: "Pression Brune",
-          description: "Biere brune pression 25cl",
-          price: 6.50,
-          taxRate: 0.20,
+          name: 'Pression Brune',
+          description: 'Biere brune pression 25cl',
+          price: 6.5,
+          taxRate: 0.2,
           categoryId: biereCategory.id,
           isHappyHourEligible: true,
           happyHourDiscountType: 'fixed',
-          happyHourDiscountValue: 1.00,
-          isActive: true
+          happyHourDiscountValue: 1.0,
+          isActive: true,
         });
       }
 
       if (cocktailCategory) {
         this.createProduct({
-          name: "Mojito",
-          description: "Mojito classique",
-          price: 12.00,
-          taxRate: 0.20,
+          name: 'Mojito',
+          description: 'Mojito classique',
+          price: 12.0,
+          taxRate: 0.2,
           categoryId: cocktailCategory.id,
           isHappyHourEligible: true,
           happyHourDiscountType: 'percentage',
           happyHourDiscountValue: 0.25,
-          isActive: true
+          isActive: true,
         });
       }
 
       if (softCategory) {
         this.createProduct({
-          name: "Coca-Cola",
-          description: "Coca-Cola 33cl",
-          price: 4.50,
-          taxRate: 0.10,
+          name: 'Coca-Cola',
+          description: 'Coca-Cola 33cl',
+          price: 4.5,
+          taxRate: 0.1,
           categoryId: softCategory.id,
           isHappyHourEligible: false,
           happyHourDiscountType: 'percentage',
           happyHourDiscountValue: 0,
-          isActive: true
+          isActive: true,
         });
       }
     }
@@ -225,4 +237,4 @@ export class DataService {
     await this.getCategories();
     await this.getProducts();
   }
-} 
+}

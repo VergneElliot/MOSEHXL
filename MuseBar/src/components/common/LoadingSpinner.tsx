@@ -1,12 +1,5 @@
 import React from 'react';
-import {
-  Box,
-  CircularProgress,
-  Typography,
-  Backdrop,
-  SxProps,
-  Theme
-} from '@mui/material';
+import { Box, CircularProgress, Typography, Backdrop, SxProps, Theme } from '@mui/material';
 import { BaseComponentProps } from '../../types/ui';
 
 interface LoadingSpinnerProps extends BaseComponentProps {
@@ -22,16 +15,16 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   backdrop = false,
   variant = 'centered',
   className,
-  'data-testid': testId
+  'data-testid': testId,
 }) => {
   let containerStyles: SxProps<Theme>;
-  
+
   switch (variant) {
     case 'inline':
       containerStyles = { display: 'inline-flex', alignItems: 'center', gap: 1 };
       break;
     case 'overlay':
-      containerStyles = { 
+      containerStyles = {
         position: 'absolute',
         top: 0,
         left: 0,
@@ -41,7 +34,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: 'rgba(255, 255, 255, 0.8)',
-        zIndex: 1000
+        zIndex: 1000,
       };
       break;
     case 'centered':
@@ -52,17 +45,13 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 2,
-        py: 4
+        py: 4,
       };
       break;
   }
 
   const spinner = (
-    <Box 
-      sx={containerStyles}
-      className={className}
-      data-testid={testId}
-    >
+    <Box sx={containerStyles} className={className} data-testid={testId}>
       <CircularProgress size={size} />
       {message && variant !== 'inline' && (
         <Typography variant="body2" color="text.secondary">
@@ -79,7 +68,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 
   if (backdrop) {
     return (
-      <Backdrop open sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+      <Backdrop open sx={{ color: '#fff', zIndex: theme => theme.zIndex.drawer + 1 }}>
         {spinner}
       </Backdrop>
     );
@@ -88,4 +77,4 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   return spinner;
 };
 
-export default LoadingSpinner; 
+export default LoadingSpinner;

@@ -10,7 +10,7 @@ import {
   Box,
   Typography,
   IconButton,
-  Tooltip
+  Tooltip,
 } from '@mui/material';
 import { TableColumn, BaseComponentProps } from '../../types/ui';
 import LoadingSpinner from './LoadingSpinner';
@@ -36,7 +36,7 @@ function DataTable<T extends Record<string, any>>({
   renderActions,
   keyField = 'id' as keyof T,
   className,
-  'data-testid': testId
+  'data-testid': testId,
 }: DataTableProps<T>) {
   if (loading) {
     return <LoadingSpinner message="Chargement des données..." />;
@@ -59,15 +59,11 @@ function DataTable<T extends Record<string, any>>({
   }
 
   return (
-    <TableContainer 
-      component={Paper} 
-      className={className}
-      data-testid={testId}
-    >
+    <TableContainer component={Paper} className={className} data-testid={testId}>
       <Table>
         <TableHead>
           <TableRow>
-            {columns.map((column) => (
+            {columns.map(column => (
               <TableCell
                 key={String(column.id)}
                 align={column.align || 'left'}
@@ -76,9 +72,7 @@ function DataTable<T extends Record<string, any>>({
                 {column.label}
               </TableCell>
             ))}
-            {renderActions && (
-              <TableCell align="center">Actions</TableCell>
-            )}
+            {renderActions && <TableCell align="center">Actions</TableCell>}
           </TableRow>
         </TableHead>
         <TableBody>
@@ -89,15 +83,12 @@ function DataTable<T extends Record<string, any>>({
               onClick={onRowClick ? () => onRowClick(row, index) : undefined}
               sx={{ cursor: onRowClick ? 'pointer' : 'default' }}
             >
-              {columns.map((column) => {
+              {columns.map(column => {
                 const value = row[column.id];
                 const formattedValue = column.format ? column.format(value) : value;
-                
+
                 return (
-                  <TableCell
-                    key={String(column.id)}
-                    align={column.align || 'left'}
-                  >
+                  <TableCell key={String(column.id)} align={column.align || 'left'}>
                     {formattedValue}
                   </TableCell>
                 );
@@ -117,4 +108,4 @@ function DataTable<T extends Record<string, any>>({
   );
 }
 
-export default DataTable; 
+export default DataTable;

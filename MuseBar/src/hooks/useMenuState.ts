@@ -24,16 +24,16 @@ export interface MenuState {
   productDialogOpen: boolean;
   editingCategory: Category | null;
   editingProduct: Product | null;
-  
+
   // Archive states
   showArchived: boolean;
   archivedProducts: Product[];
   archivedCategories: Category[];
-  
+
   // Form states
   categoryForm: CategoryFormData;
   productForm: ProductFormData;
-  
+
   // UI states
   snackbar: {
     open: boolean;
@@ -52,21 +52,25 @@ export interface MenuActions {
   closeCategoryDialog: () => void;
   openProductDialog: (product?: Product) => void;
   closeProductDialog: () => void;
-  
+
   // Archive actions
   setShowArchived: (show: boolean) => void;
   setArchivedProducts: (products: Product[]) => void;
   setArchivedCategories: (categories: Category[]) => void;
-  
+
   // Form actions
   setCategoryForm: (form: CategoryFormData) => void;
   setProductForm: (form: ProductFormData) => void;
   updateCategoryForm: (field: keyof CategoryFormData, value: string) => void;
   updateProductForm: (field: keyof ProductFormData, value: any) => void;
   resetForms: () => void;
-  
+
   // UI actions
-  setSnackbar: (snackbar: { open: boolean; message: string; severity: 'success' | 'error' }) => void;
+  setSnackbar: (snackbar: {
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error';
+  }) => void;
   showSuccess: (message: string) => void;
   showError: (message: string) => void;
   closeSnackbar: () => void;
@@ -75,18 +79,18 @@ export interface MenuActions {
 const initialCategoryForm: CategoryFormData = {
   name: '',
   description: '',
-  color: '#1976d2'
+  color: '#1976d2',
 };
 
 const initialProductForm: ProductFormData = {
   name: '',
   description: '',
   price: '',
-  taxRate: 0.20,
+  taxRate: 0.2,
   categoryId: '',
   isHappyHourEligible: false,
   happyHourDiscountType: 'percentage',
-  happyHourDiscountValue: '0'
+  happyHourDiscountValue: '0',
 };
 
 export const useMenuState = (): [MenuState, MenuActions] => {
@@ -95,21 +99,21 @@ export const useMenuState = (): [MenuState, MenuActions] => {
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  
+
   // Archive states
   const [showArchived, setShowArchived] = useState(false);
   const [archivedProducts, setArchivedProducts] = useState<Product[]>([]);
   const [archivedCategories, setArchivedCategories] = useState<Category[]>([]);
-  
+
   // Form states
   const [categoryForm, setCategoryForm] = useState<CategoryFormData>(initialCategoryForm);
   const [productForm, setProductForm] = useState<ProductFormData>(initialProductForm);
-  
+
   // UI states
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
-    severity: 'success' as 'success' | 'error'
+    severity: 'success' as 'success' | 'error',
   });
 
   // Dialog helper actions
@@ -119,7 +123,7 @@ export const useMenuState = (): [MenuState, MenuActions] => {
       setCategoryForm({
         name: category.name,
         description: category.description || '',
-        color: category.color || '#1976d2'
+        color: category.color || '#1976d2',
       });
     } else {
       setEditingCategory(null);
@@ -145,7 +149,7 @@ export const useMenuState = (): [MenuState, MenuActions] => {
         categoryId: product.categoryId,
         isHappyHourEligible: product.isHappyHourEligible,
         happyHourDiscountType: product.happyHourDiscountType,
-        happyHourDiscountValue: product.happyHourDiscountValue.toString()
+        happyHourDiscountValue: product.happyHourDiscountValue.toString(),
       });
     } else {
       setEditingProduct(null);
@@ -224,4 +228,4 @@ export const useMenuState = (): [MenuState, MenuActions] => {
   };
 
   return [state, actions];
-}; 
+};

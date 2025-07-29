@@ -17,12 +17,12 @@ export interface HistoryState {
   selectedOrder: Order | null;
   loading: boolean;
   stats: HistoryStats;
-  
+
   // Receipt dialog state
   receiptDialogOpen: boolean;
   currentReceipt: any;
   receiptType: 'detailed' | 'summary';
-  
+
   // Return dialog state
   returnDialogOpen: boolean;
   orderToReturn: Order | null;
@@ -42,14 +42,14 @@ export interface HistoryActions {
   setSelectedOrder: (order: Order | null) => void;
   setLoading: (loading: boolean) => void;
   setStats: (stats: HistoryStats) => void;
-  
+
   // Receipt actions
   setReceiptDialogOpen: (open: boolean) => void;
   setCurrentReceipt: (receipt: any) => void;
   setReceiptType: (type: 'detailed' | 'summary') => void;
   openReceiptDialog: (order: Order, type: 'detailed' | 'summary') => void;
   closeReceiptDialog: () => void;
-  
+
   // Return actions
   setReturnDialogOpen: (open: boolean) => void;
   setOrderToReturn: (order: Order | null) => void;
@@ -62,7 +62,7 @@ export interface HistoryActions {
   setReturnError: (error: string) => void;
   openReturnDialog: (order: Order) => void;
   closeReturnDialog: () => void;
-  
+
   // Utility actions
   clearMessages: () => void;
 }
@@ -79,14 +79,14 @@ export const useHistoryState = (): [HistoryState, HistoryActions] => {
     topProduits: [],
     cardTotal: 0,
     cashTotal: 0,
-    businessDayPeriod: null
+    businessDayPeriod: null,
   });
-  
+
   // Receipt dialog state
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   const [currentReceipt, setCurrentReceipt] = useState<any>(null);
   const [receiptType, setReceiptType] = useState<'detailed' | 'summary'>('detailed');
-  
+
   // Return dialog state
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [orderToReturn, setOrderToReturn] = useState<Order | null>(null);
@@ -113,7 +113,7 @@ export const useHistoryState = (): [HistoryState, HistoryActions] => {
   // Return helper actions
   const openReturnDialog = (order: Order) => {
     if (order.status !== 'completed') {
-      setReturnError('Seules les commandes terminées peuvent faire l\'objet d\'un retour');
+      setReturnError("Seules les commandes terminées peuvent faire l'objet d'un retour");
       return;
     }
     setOrderToReturn(order);
@@ -189,4 +189,4 @@ export const useHistoryState = (): [HistoryState, HistoryActions] => {
   };
 
   return [state, actions];
-}; 
+};

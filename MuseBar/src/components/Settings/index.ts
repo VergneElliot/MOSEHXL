@@ -1,2 +1,2 @@
 // Export all Settings components
-export { default } from './Settings'; 
+export { default } from './Settings';

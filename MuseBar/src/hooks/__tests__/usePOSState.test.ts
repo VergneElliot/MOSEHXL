@@ -6,14 +6,14 @@ import { OrderItem } from '../../types';
 const mockProduct = {
   id: 1,
   name: 'Test Product',
-  price: 10.00,
+  price: 10.0,
   categoryId: 1,
   isActive: true,
   isHappyHourEligible: false,
   happyHourDiscountType: 'percentage',
   happyHourDiscountValue: 0,
-  taxRate: 0.20,
-  description: 'Test product'
+  taxRate: 0.2,
+  description: 'Test product',
 };
 
 const mockOrderItem: OrderItem = {
@@ -21,11 +21,11 @@ const mockOrderItem: OrderItem = {
   productId: '1',
   productName: 'Test Product',
   quantity: 2,
-  unitPrice: 10.00,
-  totalPrice: 20.00,
-  taxAmount: 4.00,
-  taxRate: 0.20,
-  isHappyHourApplied: false
+  unitPrice: 10.0,
+  totalPrice: 20.0,
+  taxAmount: 4.0,
+  taxRate: 0.2,
+  isHappyHourApplied: false,
 };
 
 describe('usePOSState', () => {
@@ -57,7 +57,7 @@ describe('usePOSState', () => {
     expect(state.snackbar).toEqual({
       open: false,
       message: '',
-      severity: 'success'
+      severity: 'success',
     });
   });
 
@@ -328,14 +328,14 @@ describe('usePOSState', () => {
       actions.setSnackbar({
         open: true,
         message: 'Test message',
-        severity: 'success'
+        severity: 'success',
       });
     });
 
     expect(result.current[0].snackbar).toEqual({
       open: true,
       message: 'Test message',
-      severity: 'success'
+      severity: 'success',
     });
   });
 
@@ -348,7 +348,7 @@ describe('usePOSState', () => {
       actions.setSnackbar({
         open: true,
         message: 'Test message',
-        severity: 'success'
+        severity: 'success',
       });
     });
 
@@ -359,7 +359,7 @@ describe('usePOSState', () => {
       actions.setSnackbar({
         open: false,
         message: '',
-        severity: 'success'
+        severity: 'success',
       });
     });
 
@@ -377,7 +377,7 @@ describe('usePOSState', () => {
     expect(result.current[0].snackbar).toEqual({
       open: true,
       message: 'Operation successful',
-      severity: 'success'
+      severity: 'success',
     });
   });
 
@@ -392,7 +392,7 @@ describe('usePOSState', () => {
     expect(result.current[0].snackbar).toEqual({
       open: true,
       message: 'Operation failed',
-      severity: 'error'
+      severity: 'error',
     });
   });
 
@@ -404,14 +404,14 @@ describe('usePOSState', () => {
       actions.setSnackbar({
         open: true,
         message: 'Information message',
-        severity: 'info'
+        severity: 'info',
       });
     });
 
     expect(result.current[0].snackbar).toEqual({
       open: true,
       message: 'Information message',
-      severity: 'info'
+      severity: 'info',
     });
   });
-}); 
+});

@@ -13,7 +13,7 @@ import {
   AccordionDetails,
   Divider,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -24,7 +24,7 @@ import {
   Archive as ArchiveIcon,
   Restore as RestoreIcon,
   EuroSymbol,
-  LocalOffer as DiscountIcon
+  LocalOffer as DiscountIcon,
 } from '@mui/icons-material';
 import { Product, Category } from '../../types';
 
@@ -83,17 +83,17 @@ const ProductSection: React.FC<ProductSectionProps> = ({
           <Button
             variant="contained"
             startIcon={<AddIcon />}
-            onClick={(e) => {
+            onClick={e => {
               e.stopPropagation();
               onCreateProduct();
             }}
-            size={isMobile ? "small" : "medium"}
+            size={isMobile ? 'small' : 'medium'}
           >
             Nouveau Produit
           </Button>
         </Box>
       </AccordionSummary>
-      
+
       <AccordionDetails>
         {activeProducts.length === 0 ? (
           <Box textAlign="center" py={3}>
@@ -103,18 +103,27 @@ const ProductSection: React.FC<ProductSectionProps> = ({
           </Box>
         ) : (
           <Grid container spacing={2}>
-            {activeProducts.map((product) => (
+            {activeProducts.map(product => (
               <Grid item xs={12} sm={6} md={4} lg={3} key={product.id}>
-                <Card 
-                  sx={{ 
+                <Card
+                  sx={{
                     height: '100%',
                     borderLeft: `4px solid ${getCategoryColor(product.categoryId)}`,
-                    '&:hover': { boxShadow: 3 }
+                    '&:hover': { boxShadow: 3 },
                   }}
                 >
                   <CardContent>
-                    <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
-                      <Typography variant="h6" component="h3" sx={{ flexGrow: 1, fontSize: '1rem' }}>
+                    <Box
+                      display="flex"
+                      justifyContent="space-between"
+                      alignItems="flex-start"
+                      mb={1}
+                    >
+                      <Typography
+                        variant="h6"
+                        component="h3"
+                        sx={{ flexGrow: 1, fontSize: '1rem' }}
+                      >
                         {product.name}
                       </Typography>
                       <Box>
@@ -143,20 +152,20 @@ const ProductSection: React.FC<ProductSectionProps> = ({
                         </IconButton>
                       </Box>
                     </Box>
-                    
+
                     {product.description && (
                       <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
                         {product.description}
                       </Typography>
                     )}
-                    
+
                     <Box display="flex" alignItems="center" gap={1} mb={1}>
                       <EuroSymbol fontSize="small" color="primary" />
                       <Typography variant="h6" color="primary" fontWeight="bold">
                         {formatCurrency(product.price)}
                       </Typography>
                     </Box>
-                    
+
                     <Box display="flex" flexWrap="wrap" gap={0.5} mb={1}>
                       <Chip
                         size="small"
@@ -166,13 +175,13 @@ const ProductSection: React.FC<ProductSectionProps> = ({
                           color: getCategoryColor(product.categoryId),
                         }}
                       />
-                      
+
                       <Chip
                         size="small"
                         label={`TVA ${Math.round(product.taxRate * 100)}%`}
                         variant="outlined"
                       />
-                      
+
                       {product.isHappyHourEligible && (
                         <Chip
                           size="small"
@@ -182,13 +191,13 @@ const ProductSection: React.FC<ProductSectionProps> = ({
                         />
                       )}
                     </Box>
-                    
+
                     {product.isHappyHourEligible && (
                       <Typography variant="caption" color="textSecondary">
-                        Réduction: {product.happyHourDiscountType === 'percentage' 
+                        Réduction:{' '}
+                        {product.happyHourDiscountType === 'percentage'
                           ? `${Math.round(product.happyHourDiscountValue * 100)}%`
-                          : formatCurrency(product.happyHourDiscountValue)
-                        }
+                          : formatCurrency(product.happyHourDiscountValue)}
                       </Typography>
                     )}
                   </CardContent>
@@ -206,18 +215,27 @@ const ProductSection: React.FC<ProductSectionProps> = ({
               📁 Produits Archivés ({archivedProducts.length})
             </Typography>
             <Grid container spacing={2}>
-              {archivedProducts.map((product) => (
+              {archivedProducts.map(product => (
                 <Grid item xs={12} sm={6} md={4} lg={3} key={product.id}>
-                  <Card 
-                    sx={{ 
+                  <Card
+                    sx={{
                       height: '100%',
                       opacity: 0.7,
                       borderLeft: `4px solid ${theme.palette.grey[400]}`,
                     }}
                   >
                     <CardContent>
-                      <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
-                        <Typography variant="h6" component="h3" sx={{ flexGrow: 1, fontSize: '1rem' }}>
+                      <Box
+                        display="flex"
+                        justifyContent="space-between"
+                        alignItems="flex-start"
+                        mb={1}
+                      >
+                        <Typography
+                          variant="h6"
+                          component="h3"
+                          sx={{ flexGrow: 1, fontSize: '1rem' }}
+                        >
                           {product.name}
                         </Typography>
                         <Box>
@@ -239,17 +257,12 @@ const ProductSection: React.FC<ProductSectionProps> = ({
                           </IconButton>
                         </Box>
                       </Box>
-                      
+
                       <Typography variant="h6" color="textSecondary">
                         {formatCurrency(product.price)}
                       </Typography>
-                      
-                      <Chip
-                        size="small"
-                        label="Archivé"
-                        color="default"
-                        variant="outlined"
-                      />
+
+                      <Chip size="small" label="Archivé" color="default" variant="outlined" />
                     </CardContent>
                   </Card>
                 </Grid>
@@ -262,4 +275,4 @@ const ProductSection: React.FC<ProductSectionProps> = ({
   );
 };
 
-export default ProductSection; 
+export default ProductSection;

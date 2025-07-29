@@ -89,73 +89,78 @@ export const useClosureAPI = (
     }
   }, [apiService, setMonthlyStats, setMonthlyStatsError]);
 
-  const createClosure = useCallback(async (closureData: CreateClosureData) => {
-    try {
-      setCreating(true);
-      setError(null);
-      
-      const response = await fetch(apiConfig.getEndpoint('/api/legal/closure/create'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          date: closureData.date, 
-          type: closureData.type 
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create closure');
-      }
-      
-      const result = await response.json();
-      addBulletin(result.closure);
-      setShowCreateDialog(false);
-      setSelectedDate(new Date().toISOString().split('T')[0]);
-      showSuccess('Bulletin de clôture créé avec succès');
-      
-      // Refresh today status
-      loadTodayStatus();
-      
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
-      showError(errorMessage);
-    } finally {
-      setCreating(false);
-    }
-  }, [
-    setCreating, 
-    setError, 
-    addBulletin, 
-    setShowCreateDialog, 
-    setSelectedDate, 
-    showSuccess, 
-    showError, 
-    loadTodayStatus
-  ]);
+  const createClosure = useCallback(
+    async (closureData: CreateClosureData) => {
+      try {
+        setCreating(true);
+        setError(null);
 
-  const updateClosureSettings = useCallback(async (newSettings: any) => {
-    try {
-      const response = await fetch(apiConfig.getEndpoint('/api/legal/closure-settings'), {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newSettings),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to update closure settings');
+        const response = await fetch(apiConfig.getEndpoint('/api/legal/closure/create'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            date: closureData.date,
+            type: closureData.type,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to create closure');
+        }
+
+        const result = await response.json();
+        addBulletin(result.closure);
+        setShowCreateDialog(false);
+        setSelectedDate(new Date().toISOString().split('T')[0]);
+        showSuccess('Bulletin de clôture créé avec succès');
+
+        // Refresh today status
+        loadTodayStatus();
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        setError(errorMessage);
+        showError(errorMessage);
+      } finally {
+        setCreating(false);
       }
-      
-      const updatedSettings = await response.json();
-      setClosureSettings(updatedSettings);
-      showSuccess('Paramètres de clôture mis à jour avec succès');
-      
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la mise à jour des paramètres';
-      showError(errorMessage);
-    }
-  }, [setClosureSettings, showSuccess, showError]);
+    },
+    [
+      setCreating,
+      setError,
+      addBulletin,
+      setShowCreateDialog,
+      setSelectedDate,
+      showSuccess,
+      showError,
+      loadTodayStatus,
+    ]
+  );
+
+  const updateClosureSettings = useCallback(
+    async (newSettings: any) => {
+      try {
+        const response = await fetch(apiConfig.getEndpoint('/api/legal/closure-settings'), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newSettings),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update closure settings');
+        }
+
+        const updatedSettings = await response.json();
+        setClosureSettings(updatedSettings);
+        showSuccess('Paramètres de clôture mis à jour avec succès');
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Erreur lors de la mise à jour des paramètres';
+        showError(errorMessage);
+      }
+    },
+    [setClosureSettings, showSuccess, showError]
+  );
 
   const refreshAllData = useCallback(async () => {
     await Promise.all([
@@ -175,4 +180,4 @@ export const useClosureAPI = (
     updateClosureSettings,
     refreshAllData,
   };
-}; 
+};

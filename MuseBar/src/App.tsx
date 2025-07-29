@@ -1,20 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import {
-  AppBar,
-  Toolbar,
-  Typography,
-  Container,
-  Box,
-  Chip,
-  Button
-} from '@mui/material';
+import { AppBar, Toolbar, Typography, Container, Box, Chip, Button } from '@mui/material';
 import { Restaurant as RestaurantIcon } from '@mui/icons-material';
 import { HappyHourService } from './services/happyHourService';
 import { DataService } from './services/dataService';
 import { Category, Product } from './types';
 import AppRouter from './components/common/AppRouter';
 import { Login } from './components/Auth';
-import { ApiService } from './services/apiService';
+import { apiService, ApiService } from './services/apiService';
 import { apiConfig } from './config/api';
 
 // TabPanel logic moved to AppRouter
@@ -50,7 +42,7 @@ function App() {
       const storedToken = localStorage.getItem('auth_token');
       const storedRememberMe = localStorage.getItem('remember_me') === 'true';
       const storedExpiresIn = localStorage.getItem('token_expires_in') || '12h';
-      
+
       if (storedToken) {
         setToken(storedToken);
         setRememberMe(storedRememberMe);
@@ -71,8 +63,8 @@ function App() {
           if (!apiConfig.isReady()) {
             await apiConfig.initialize();
           }
-          
-          const response = await ApiService.getInstance().get<any>('/auth/me');
+
+          const response = await apiService.get<any>('/auth/me');
           const data = response.data;
           setUser(data);
           setPermissions(data.permissions || []);
@@ -81,7 +73,7 @@ function App() {
           handleLogout();
         }
       };
-      
+
       checkAuthStatus();
     } else {
       setUser(null);
@@ -93,28 +85,29 @@ function App() {
   useEffect(() => {
     if (!token || !user) return;
 
-    const refreshInterval = tokenExpiresIn === '7d' ? 
-      6 * 24 * 60 * 60 * 1000 : // Refresh every 6 days for 7-day tokens
-      10 * 60 * 60 * 1000;      // Refresh every 10 hours for 12-hour tokens
+    const refreshInterval =
+      tokenExpiresIn === '7d'
+        ? 6 * 24 * 60 * 60 * 1000 // Refresh every 6 days for 7-day tokens
+        : 10 * 60 * 60 * 1000; // Refresh every 10 hours for 12-hour tokens
 
     const intervalId = setInterval(async () => {
       try {
         // Auto-refreshing token
-        
+
         // Ensure API config is ready
         if (!apiConfig.isReady()) {
           await apiConfig.initialize();
         }
-        
-        const response = await ApiService.getInstance().post<any>('/auth/refresh', { rememberMe });
+
+        const response = await apiService.post<any>('/auth/refresh', { rememberMe });
         const data = response.data;
         setToken(data.token);
         setTokenExpiresIn(data.expiresIn);
-        
+
         // Update localStorage
         localStorage.setItem('auth_token', data.token);
         localStorage.setItem('token_expires_in', data.expiresIn);
-        
+
         // Token refreshed successfully
       } catch (error) {
         console.error('Token refresh failed:', error);
@@ -130,12 +123,12 @@ function App() {
     setUser(userObj);
     setRememberMe(rememberMeFlag);
     setTokenExpiresIn(expiresIn);
-    
+
     // Store in localStorage
     localStorage.setItem('auth_token', jwt);
     localStorage.setItem('remember_me', rememberMeFlag.toString());
     localStorage.setItem('token_expires_in', expiresIn);
-    
+
     // Permissions will be loaded by useEffect
   };
 
@@ -145,7 +138,7 @@ function App() {
     setPermissions([]);
     setRememberMe(false);
     setTokenExpiresIn('12h');
-    
+
     // Clear localStorage
     localStorage.removeItem('auth_token');
     localStorage.removeItem('remember_me');
@@ -165,14 +158,14 @@ function App() {
     }, 60000);
 
     return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const updateData = async () => {
     try {
       const [categoriesData, productsData] = await Promise.all([
         dataService.getCategories(),
-        dataService.getProducts()
+        dataService.getProducts(),
       ]);
       setCategories(categoriesData);
       setProducts(productsData);
@@ -196,45 +189,47 @@ function App() {
       <AppBar position="static">
         <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }}>
           <RestaurantIcon sx={{ mr: { xs: 1, sm: 2 } }} />
-          <Typography 
-            variant="h6" 
-            component="div" 
-            sx={{ 
+          <Typography
+            variant="h6"
+            component="div"
+            sx={{
               flexGrow: 1,
               fontSize: { xs: '1.1rem', sm: '1.25rem' },
-              display: { xs: 'none', sm: 'block' }
+              display: { xs: 'none', sm: 'block' },
             }}
           >
             MuseBar - Système de Caisse
           </Typography>
-          <Typography 
-            variant="h6" 
-            component="div" 
-            sx={{ 
+          <Typography
+            variant="h6"
+            component="div"
+            sx={{
               flexGrow: 1,
               fontSize: '1rem',
-              display: { xs: 'block', sm: 'none' }
+              display: { xs: 'block', sm: 'none' },
             }}
           >
             MuseBar
           </Typography>
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: { xs: 1, sm: 2 },
-            flexWrap: 'nowrap',
-            overflow: 'hidden'
-          }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: { xs: 1, sm: 2 },
+              flexWrap: 'nowrap',
+              overflow: 'hidden',
+            }}
+          >
             {isHappyHourActive ? (
               <Chip
                 label="HAPPY HOUR ACTIF"
                 color="success"
                 variant="filled"
-                sx={{ 
+                sx={{
                   fontWeight: 'bold',
                   fontSize: { xs: '0.7rem', sm: '0.875rem' },
                   height: { xs: 24, sm: 32 },
-                  '& .MuiChip-label': { px: { xs: 1, sm: 1.5 } }
+                  '& .MuiChip-label': { px: { xs: 1, sm: 1.5 } },
                 }}
               />
             ) : (
@@ -242,52 +237,48 @@ function App() {
                 label={`HH ${timeUntilHappyHour}`}
                 color="warning"
                 variant="outlined"
-                sx={{ 
+                sx={{
                   fontSize: { xs: '0.7rem', sm: '0.875rem' },
                   height: { xs: 24, sm: 32 },
                   '& .MuiChip-label': { px: { xs: 1, sm: 1.5 } },
-                  display: { xs: timeUntilHappyHour ? 'flex' : 'none', sm: 'flex' }
+                  display: { xs: timeUntilHappyHour ? 'flex' : 'none', sm: 'flex' },
                 }}
               />
             )}
             {/* User info and logout */}
             {user && (
-              <Chip 
-                label={user?.email?.split('@')[0] || user?.email} 
-                color="info" 
-                sx={{ 
+              <Chip
+                label={user?.email?.split('@')[0] || user?.email}
+                color="info"
+                sx={{
                   fontSize: { xs: '0.7rem', sm: '0.875rem' },
                   height: { xs: 24, sm: 32 },
                   '& .MuiChip-label': { px: { xs: 1, sm: 1.5 } },
-                  maxWidth: { xs: 100, sm: 200 }
+                  maxWidth: { xs: 100, sm: 200 },
                 }}
               />
             )}
             {user && (
-              <Button 
-                color="inherit" 
+              <Button
+                color="inherit"
                 onClick={handleLogout}
-                sx={{ 
+                sx={{
                   fontSize: { xs: '0.8rem', sm: '0.875rem' },
                   px: { xs: 1, sm: 2 },
                   py: { xs: 0.5, sm: 1 },
-                  minWidth: { xs: 'auto', sm: 'auto' }
+                  minWidth: { xs: 'auto', sm: 'auto' },
                 }}
               >
                 {/* Show full text on desktop, icon on mobile */}
-                <Typography sx={{ display: { xs: 'none', sm: 'block' } }}>
-                  Déconnexion
-                </Typography>
-                <Typography sx={{ display: { xs: 'block', sm: 'none' } }}>
-                  Sortir
-                </Typography>
+                <Typography sx={{ display: { xs: 'none', sm: 'block' } }}>Déconnexion</Typography>
+                <Typography sx={{ display: { xs: 'block', sm: 'none' } }}>Sortir</Typography>
               </Button>
             )}
           </Box>
         </Toolbar>
       </AppBar>
       <Container maxWidth="xl" sx={{ mt: 3 }}>
-        {(!token || !user) ? (
+        {!token || !user ? (
           <Login onLogin={handleLogin} />
         ) : (
           <AppRouter
@@ -306,4 +297,4 @@ function App() {
   );
 }
 
-export default App; 
+export default App;

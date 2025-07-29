@@ -4,12 +4,12 @@ export class HappyHourService {
   private static instance: HappyHourService;
   private settings: HappyHourSettings = {
     isEnabled: true,
-    startTime: "16:00",
-    endTime: "19:00",
+    startTime: '16:00',
+    endTime: '19:00',
     isManuallyActivated: false,
     discountType: 'percentage',
-    discountValue: 0.20,
-    discountPercentage: 0.20 // Pour rétrocompatibilité
+    discountValue: 0.2,
+    discountPercentage: 0.2, // Pour rétrocompatibilité
   };
 
   private constructor() {
@@ -36,7 +36,10 @@ export class HappyHourService {
       return {
         ...this.settings,
         discountType: 'percentage',
-        discountValue: typeof this.settings.discountPercentage === 'number' ? this.settings.discountPercentage : 0.20
+        discountValue:
+          typeof this.settings.discountPercentage === 'number'
+            ? this.settings.discountPercentage
+            : 0.2,
       };
     }
     return { ...this.settings };
@@ -47,7 +50,8 @@ export class HappyHourService {
     if (settings.discountType && typeof settings.discountValue === 'number') {
       this.settings.discountType = settings.discountType;
       this.settings.discountValue = settings.discountValue;
-      this.settings.discountPercentage = settings.discountType === 'percentage' ? settings.discountValue : undefined;
+      this.settings.discountPercentage =
+        settings.discountType === 'percentage' ? settings.discountValue : undefined;
     }
     this.settings = { ...this.settings, ...settings };
     // Sauvegarde dans localStorage
@@ -72,7 +76,7 @@ export class HappyHourService {
     // Vérification automatique basée sur l'heure
     const now = new Date();
     const currentTime = now.toTimeString().slice(0, 5); // Format "HH:mm"
-    
+
     return this.isTimeInRange(currentTime, this.settings.startTime, this.settings.endTime);
   }
 
@@ -86,7 +90,9 @@ export class HappyHourService {
       return typeof this.settings.discountValue === 'number' ? this.settings.discountValue : 0;
     }
     // fallback rétrocompatibilité
-    return typeof this.settings.discountPercentage === 'number' ? this.settings.discountPercentage : 0;
+    return typeof this.settings.discountPercentage === 'number'
+      ? this.settings.discountPercentage
+      : 0;
   }
 
   private isTimeInRange(currentTime: string, startTime: string, endTime: string): boolean {
@@ -113,16 +119,16 @@ export class HappyHourService {
     const currentTime = now.toTimeString().slice(0, 5);
     const startMinutes = this.timeToMinutes(this.settings.startTime);
     const currentMinutes = this.timeToMinutes(currentTime);
-    
+
     let minutesUntil = startMinutes - currentMinutes;
-    
+
     if (minutesUntil <= 0) {
       minutesUntil += 24 * 60; // Ajouter 24h si c'est déjà passé aujourd'hui
     }
-    
+
     const hours = Math.floor(minutesUntil / 60);
     const minutes = minutesUntil % 60;
-    
+
     return `${hours < 10 ? '0' : ''}${hours}:${minutes < 10 ? '0' : ''}${minutes}`;
   }
-} 
+}

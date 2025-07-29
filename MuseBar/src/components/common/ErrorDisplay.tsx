@@ -1,18 +1,10 @@
 import React from 'react';
-import {
-  Alert,
-  AlertTitle,
-  Box,
-  Button,
-  Typography,
-  Paper,
-  Collapse
-} from '@mui/material';
+import { Alert, AlertTitle, Box, Button, Typography, Paper, Collapse } from '@mui/material';
 import {
   Refresh as RefreshIcon,
   BugReport as BugReportIcon,
   ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon
+  ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 import { BaseComponentProps } from '../../types/ui';
 import { ErrorInfo } from '../../hooks/useErrorHandler';
@@ -38,15 +30,14 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
   onReport,
   variant = 'alert',
   className,
-  'data-testid': testId
+  'data-testid': testId,
 }) => {
   const [detailsOpen, setDetailsOpen] = React.useState(false);
 
   if (!error) return null;
 
-  const errorInfo: ErrorInfo = typeof error === 'string' 
-    ? { message: error, timestamp: new Date() }
-    : error;
+  const errorInfo: ErrorInfo =
+    typeof error === 'string' ? { message: error, timestamp: new Date() } : error;
 
   const renderContent = () => (
     <>
@@ -55,7 +46,7 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
           <Typography variant="body1" sx={{ mb: 1 }}>
             {errorInfo.message}
           </Typography>
-          
+
           {errorInfo.context && (
             <Typography variant="caption" color="text.secondary">
               Contexte: {errorInfo.context}
@@ -74,18 +65,13 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
                 Détails
               </Button>
             )}
-            
+
             {showRetry && onRetry && (
-              <Button
-                size="small"
-                startIcon={<RefreshIcon />}
-                onClick={onRetry}
-                variant="outlined"
-              >
+              <Button size="small" startIcon={<RefreshIcon />} onClick={onRetry} variant="outlined">
                 Réessayer
               </Button>
             )}
-            
+
             {showReport && onReport && (
               <Button
                 size="small"
@@ -107,12 +93,16 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
             <Typography variant="caption" color="text.secondary" gutterBottom>
               Détails techniques:
             </Typography>
-            <Typography variant="body2" component="pre" sx={{ fontSize: '0.75rem', overflow: 'auto' }}>
-              {typeof errorInfo.details === 'string' 
-                ? errorInfo.details 
+            <Typography
+              variant="body2"
+              component="pre"
+              sx={{ fontSize: '0.75rem', overflow: 'auto' }}
+            >
+              {typeof errorInfo.details === 'string'
+                ? errorInfo.details
                 : JSON.stringify(errorInfo.details, null, 2)}
             </Typography>
-            
+
             {errorInfo.timestamp && (
               <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
                 Horodatage: {errorInfo.timestamp.toLocaleString('fr-FR')}
@@ -127,8 +117,8 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
   switch (variant) {
     case 'card':
       return (
-        <Paper 
-          elevation={1} 
+        <Paper
+          elevation={1}
           sx={{ p: 2, borderLeft: 4, borderLeftColor: `${severity}.main` }}
           className={className}
           data-testid={testId}
@@ -136,26 +126,18 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
           {renderContent()}
         </Paper>
       );
-      
+
     case 'inline':
       return (
-        <Box 
-          sx={{ p: 1 }}
-          className={className}
-          data-testid={testId}
-        >
+        <Box sx={{ p: 1 }} className={className} data-testid={testId}>
           {renderContent()}
         </Box>
       );
-      
+
     case 'alert':
     default:
       return (
-        <Alert 
-          severity={severity}
-          className={className}
-          data-testid={testId}
-        >
+        <Alert severity={severity} className={className} data-testid={testId}>
           <AlertTitle>Erreur</AlertTitle>
           {renderContent()}
         </Alert>
@@ -163,4 +145,4 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
   }
 };
 
-export default ErrorDisplay; 
+export default ErrorDisplay;

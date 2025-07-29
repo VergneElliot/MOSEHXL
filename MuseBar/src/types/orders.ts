@@ -60,4 +60,4 @@ export interface LocalSubBill {
 
 // Order status and utility types
 export type OrderStatus = 'pending' | 'completed' | 'cancelled';
-export type SubBillStatus = 'pending' | 'paid'; 
+export type SubBillStatus = 'pending' | 'paid';

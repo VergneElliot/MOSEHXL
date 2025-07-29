@@ -7,4 +7,4 @@ export { default as OrdersTable } from './OrdersTable';
 // Export types
 export type { HistoryState, HistoryActions, HistoryStats } from '../../hooks/useHistoryState';
 export type { HistoryLogic } from '../../hooks/useHistoryLogic';
-export type { HistoryAPIActions, ProcessReturnData } from '../../hooks/useHistoryAPI'; 
+export type { HistoryAPIActions, ProcessReturnData } from '../../hooks/useHistoryAPI';

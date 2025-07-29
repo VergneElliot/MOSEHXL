@@ -19,9 +19,7 @@ const theme = createTheme({
   },
 });
 
-const root = ReactDOM.createRoot(
-  document.getElementById('root') as HTMLElement
-);
+const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 
 root.render(
   <React.StrictMode>
@@ -30,4 +28,4 @@ root.render(
       <App />
     </ThemeProvider>
   </React.StrictMode>
-); 
+);

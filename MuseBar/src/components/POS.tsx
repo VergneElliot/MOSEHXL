@@ -20,4 +20,4 @@ const POS: React.FC<POSProps> = ({ categories, products, isHappyHourActive, onDa
   );
 };
 
-export default POS; 
+export default POS;

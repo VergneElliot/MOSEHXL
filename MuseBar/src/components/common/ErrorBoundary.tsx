@@ -7,13 +7,13 @@ import {
   AlertTitle,
   Paper,
   Container,
-  useTheme
+  useTheme,
 } from '@mui/material';
 import {
   Error as ErrorIcon,
   Refresh as RefreshIcon,
   Home as HomeIcon,
-  BugReport as BugReportIcon
+  BugReport as BugReportIcon,
 } from '@mui/icons-material';
 
 interface Props {
@@ -36,18 +36,18 @@ export class ErrorBoundary extends Component<Props, State> {
       hasError: false,
       error: null,
       errorInfo: null,
-      errorId: null
+      errorId: null,
     };
   }
 
   static getDerivedStateFromError(error: Error): Partial<State> {
     // Generate unique error ID for tracking
     const errorId = `error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     return {
       hasError: true,
       error,
-      errorId
+      errorId,
     };
   }
 
@@ -60,7 +60,7 @@ export class ErrorBoundary extends Component<Props, State> {
       errorId: this.state.errorId,
       timestamp: new Date().toISOString(),
       url: window.location.href,
-      userAgent: navigator.userAgent
+      userAgent: navigator.userAgent,
     });
 
     // Call custom error handler if provided
@@ -70,7 +70,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
     // Update state with error info
     this.setState({
-      errorInfo
+      errorInfo,
     });
 
     // In production, you might want to send this to an error reporting service
@@ -82,7 +82,7 @@ export class ErrorBoundary extends Component<Props, State> {
       hasError: false,
       error: null,
       errorInfo: null,
-      errorId: null
+      errorId: null,
     });
   };
 
@@ -98,7 +98,7 @@ export class ErrorBoundary extends Component<Props, State> {
       errorId: this.state.errorId,
       url: window.location.href,
       userAgent: navigator.userAgent,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     // Create a mailto link with error details
@@ -134,14 +134,16 @@ Please provide any additional context about what you were doing when this error 
       }
 
       // Default error UI
-      return <ErrorFallback
-        error={this.state.error}
-        errorInfo={this.state.errorInfo}
-        errorId={this.state.errorId}
-        onRetry={this.handleRetry}
-        onGoHome={this.handleGoHome}
-        onReportBug={this.handleReportBug}
-      />;
+      return (
+        <ErrorFallback
+          error={this.state.error}
+          errorInfo={this.state.errorInfo}
+          errorId={this.state.errorId}
+          onRetry={this.handleRetry}
+          onGoHome={this.handleGoHome}
+          onReportBug={this.handleReportBug}
+        />
+      );
     }
 
     return this.props.children;
@@ -163,7 +165,7 @@ const ErrorFallback: React.FC<ErrorFallbackProps> = ({
   errorId,
   onRetry,
   onGoHome,
-  onReportBug
+  onReportBug,
 }) => {
   const theme = useTheme();
 
@@ -171,14 +173,14 @@ const ErrorFallback: React.FC<ErrorFallbackProps> = ({
     <Container maxWidth="md" sx={{ py: 4 }}>
       <Paper elevation={3} sx={{ p: 4, textAlign: 'center' }}>
         <ErrorIcon sx={{ fontSize: 64, color: 'error.main', mb: 2 }} />
-        
+
         <Typography variant="h4" component="h1" gutterBottom color="error.main">
           Oups ! Une erreur s'est produite
         </Typography>
-        
+
         <Typography variant="body1" color="textSecondary" sx={{ mb: 3 }}>
-          Une erreur inattendue s'est produite dans l'application. 
-          Notre équipe a été notifiée et travaille à résoudre le problème.
+          Une erreur inattendue s'est produite dans l'application. Notre équipe a été notifiée et
+          travaille à résoudre le problème.
         </Typography>
 
         <Alert severity="info" sx={{ mb: 3, textAlign: 'left' }}>
@@ -193,24 +195,14 @@ const ErrorFallback: React.FC<ErrorFallbackProps> = ({
         </Alert>
 
         <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Button
-            variant="contained"
-            startIcon={<RefreshIcon />}
-            onClick={onRetry}
-            size="large"
-          >
+          <Button variant="contained" startIcon={<RefreshIcon />} onClick={onRetry} size="large">
             Réessayer
           </Button>
-          
-          <Button
-            variant="outlined"
-            startIcon={<HomeIcon />}
-            onClick={onGoHome}
-            size="large"
-          >
+
+          <Button variant="outlined" startIcon={<HomeIcon />} onClick={onGoHome} size="large">
             Retour à l'accueil
           </Button>
-          
+
           <Button
             variant="outlined"
             startIcon={<BugReportIcon />}
@@ -228,15 +220,15 @@ const ErrorFallback: React.FC<ErrorFallbackProps> = ({
             <Typography variant="h6" gutterBottom>
               Détails de développement:
             </Typography>
-            <Paper 
-              variant="outlined" 
-              sx={{ 
-                p: 2, 
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 2,
                 bgcolor: 'grey.50',
                 maxHeight: 300,
                 overflow: 'auto',
                 fontFamily: 'monospace',
-                fontSize: '0.875rem'
+                fontSize: '0.875rem',
               }}
             >
               <Typography variant="body2" component="pre" sx={{ whiteSpace: 'pre-wrap' }}>
@@ -250,4 +242,4 @@ const ErrorFallback: React.FC<ErrorFallbackProps> = ({
   );
 };
 
-export default ErrorBoundary; 
+export default ErrorBoundary;

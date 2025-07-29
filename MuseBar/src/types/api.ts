@@ -101,4 +101,4 @@ export interface ApiEndpoints {
     closures: string;
     journal: string;
   };
-} 
+}

@@ -22,7 +22,7 @@ export class ApiService {
     if (!apiConfig.isReady()) {
       await apiConfig.initialize();
     }
-    
+
     const url = apiConfig.getEndpoint(`/api${endpoint}`);
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -30,7 +30,11 @@ export class ApiService {
     if (ApiService.token) {
       headers['Authorization'] = `Bearer ${ApiService.token}`;
     }
-    if (options.headers && typeof options.headers === 'object' && !(options.headers instanceof Headers)) {
+    if (
+      options.headers &&
+      typeof options.headers === 'object' &&
+      !(options.headers instanceof Headers)
+    ) {
       Object.assign(headers, options.headers);
     }
     const config: RequestInit = {
@@ -40,11 +44,11 @@ export class ApiService {
 
     try {
       const response = await fetch(url, config);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       return await response.json();
     } catch (error) {
       console.error(`API request failed: ${endpoint}`, error);
@@ -67,7 +71,7 @@ export class ApiService {
       color: cat.color || '#1976d2',
       isActive: cat.is_active !== false,
       createdAt: new Date(cat.created_at),
-      updatedAt: new Date(cat.updated_at)
+      updatedAt: new Date(cat.updated_at),
     }));
   }
 
@@ -80,7 +84,7 @@ export class ApiService {
       color: cat.color || '#1976d2',
       isActive: false,
       createdAt: new Date(cat.created_at),
-      updatedAt: new Date(cat.updated_at)
+      updatedAt: new Date(cat.updated_at),
     }));
   }
 
@@ -93,17 +97,19 @@ export class ApiService {
       color: cat.color || '#1976d2',
       isActive: cat.is_active !== false,
       createdAt: new Date(cat.created_at),
-      updatedAt: new Date(cat.updated_at)
+      updatedAt: new Date(cat.updated_at),
     }));
   }
 
-  async createCategory(category: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>): Promise<Category> {
+  async createCategory(
+    category: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>
+  ): Promise<Category> {
     const result = await this.request<any>('/categories', {
       method: 'POST',
       body: JSON.stringify({
         name: category.name,
         default_tax_rate: 20.0,
-        color: category.color || '#1976d2'
+        color: category.color || '#1976d2',
       }),
     });
 
@@ -114,7 +120,7 @@ export class ApiService {
       color: result.color || '#1976d2',
       isActive: result.is_active !== false,
       createdAt: new Date(result.created_at),
-      updatedAt: new Date(result.updated_at)
+      updatedAt: new Date(result.updated_at),
     };
   }
 
@@ -124,7 +130,7 @@ export class ApiService {
       body: JSON.stringify({
         name: category.name,
         default_tax_rate: 20.0,
-        color: category.color || '#1976d2'
+        color: category.color || '#1976d2',
       }),
     });
 
@@ -135,14 +141,17 @@ export class ApiService {
       color: result.color || '#1976d2',
       isActive: result.is_active !== false,
       createdAt: new Date(result.created_at),
-      updatedAt: new Date(result.updated_at)
+      updatedAt: new Date(result.updated_at),
     };
   }
 
   async deleteCategory(id: string): Promise<{ message: string; action?: string; reason?: string }> {
-    const result = await this.request<{ message: string; action?: string; reason?: string }>(`/categories/${id}`, {
-      method: 'DELETE',
-    });
+    const result = await this.request<{ message: string; action?: string; reason?: string }>(
+      `/categories/${id}`,
+      {
+        method: 'DELETE',
+      }
+    );
     return result;
   }
 
@@ -164,10 +173,11 @@ export class ApiService {
       categoryId: prod.category_id.toString(),
       isHappyHourEligible: prod.is_happy_hour_eligible,
       happyHourDiscountType: prod.happy_hour_discount_percent ? 'percentage' : 'fixed',
-      happyHourDiscountValue: parseFloat(prod.happy_hour_discount_percent || prod.happy_hour_discount_fixed || '0') / 100,
+      happyHourDiscountValue:
+        parseFloat(prod.happy_hour_discount_percent || prod.happy_hour_discount_fixed || '0') / 100,
       isActive: true, // Default to active
       createdAt: new Date(prod.created_at),
-      updatedAt: new Date(prod.updated_at)
+      updatedAt: new Date(prod.updated_at),
     }));
   }
 
@@ -182,10 +192,11 @@ export class ApiService {
       categoryId: prod.category_id.toString(),
       isHappyHourEligible: prod.is_happy_hour_eligible,
       happyHourDiscountType: prod.happy_hour_discount_percent ? 'percentage' : 'fixed',
-      happyHourDiscountValue: parseFloat(prod.happy_hour_discount_percent || prod.happy_hour_discount_fixed || '0') / 100,
+      happyHourDiscountValue:
+        parseFloat(prod.happy_hour_discount_percent || prod.happy_hour_discount_fixed || '0') / 100,
       isActive: false, // Archived products
       createdAt: new Date(prod.created_at),
-      updatedAt: new Date(prod.updated_at)
+      updatedAt: new Date(prod.updated_at),
     }));
   }
 
@@ -200,10 +211,11 @@ export class ApiService {
       categoryId: prod.category_id.toString(),
       isHappyHourEligible: prod.is_happy_hour_eligible,
       happyHourDiscountType: prod.happy_hour_discount_percent ? 'percentage' : 'fixed',
-      happyHourDiscountValue: parseFloat(prod.happy_hour_discount_percent || prod.happy_hour_discount_fixed || '0') / 100,
+      happyHourDiscountValue:
+        parseFloat(prod.happy_hour_discount_percent || prod.happy_hour_discount_fixed || '0') / 100,
       isActive: prod.is_active !== false, // Handle archived products
       createdAt: new Date(prod.created_at),
-      updatedAt: new Date(prod.updated_at)
+      updatedAt: new Date(prod.updated_at),
     }));
   }
 
@@ -215,9 +227,13 @@ export class ApiService {
         price: product.price,
         tax_rate: product.taxRate * 100, // Convert to percentage
         category_id: parseInt(product.categoryId),
-        happy_hour_discount_percent: product.happyHourDiscountType === 'percentage' ? product.happyHourDiscountValue * 100 : null,
-        happy_hour_discount_fixed: product.happyHourDiscountType === 'fixed' ? product.happyHourDiscountValue : null,
-        is_happy_hour_eligible: product.isHappyHourEligible
+        happy_hour_discount_percent:
+          product.happyHourDiscountType === 'percentage'
+            ? product.happyHourDiscountValue * 100
+            : null,
+        happy_hour_discount_fixed:
+          product.happyHourDiscountType === 'fixed' ? product.happyHourDiscountValue : null,
+        is_happy_hour_eligible: product.isHappyHourEligible,
       }),
     });
 
@@ -233,23 +249,30 @@ export class ApiService {
       happyHourDiscountValue: product.happyHourDiscountValue,
       isActive: true,
       createdAt: new Date(result.created_at),
-      updatedAt: new Date(result.updated_at)
+      updatedAt: new Date(result.updated_at),
     };
   }
 
   async updateProduct(id: string, product: Partial<Product>): Promise<Product> {
     const updateData: any = {};
-    
+
     if (product.name !== undefined) updateData.name = product.name;
     if (product.price !== undefined) updateData.price = product.price;
     if (product.taxRate !== undefined) updateData.tax_rate = product.taxRate * 100;
     if (product.categoryId !== undefined) updateData.category_id = parseInt(product.categoryId);
-    if (product.isHappyHourEligible !== undefined) updateData.is_happy_hour_eligible = product.isHappyHourEligible;
-    
-    if (product.happyHourDiscountType === 'percentage' && product.happyHourDiscountValue !== undefined) {
+    if (product.isHappyHourEligible !== undefined)
+      updateData.is_happy_hour_eligible = product.isHappyHourEligible;
+
+    if (
+      product.happyHourDiscountType === 'percentage' &&
+      product.happyHourDiscountValue !== undefined
+    ) {
       updateData.happy_hour_discount_percent = product.happyHourDiscountValue * 100;
       updateData.happy_hour_discount_fixed = null;
-    } else if (product.happyHourDiscountType === 'fixed' && product.happyHourDiscountValue !== undefined) {
+    } else if (
+      product.happyHourDiscountType === 'fixed' &&
+      product.happyHourDiscountValue !== undefined
+    ) {
       updateData.happy_hour_discount_fixed = product.happyHourDiscountValue;
       updateData.happy_hour_discount_percent = null;
     }
@@ -271,7 +294,7 @@ export class ApiService {
       happyHourDiscountValue: product.happyHourDiscountValue || 0,
       isActive: true,
       createdAt: new Date(result.created_at),
-      updatedAt: new Date(result.updated_at)
+      updatedAt: new Date(result.updated_at),
     };
   }
 
@@ -304,7 +327,7 @@ export class ApiService {
         isHappyHourApplied: item.happy_hour_applied || false,
         isManualHappyHour: item.happy_hour_applied || false,
         isOffert: parseFloat(item.total_price || '0') === 0,
-        originalPrice: parseFloat(item.unit_price || '0')
+        originalPrice: parseFloat(item.unit_price || '0'),
       })),
       totalAmount: parseFloat(order.total_amount),
       taxAmount: parseFloat(order.total_tax),
@@ -319,11 +342,11 @@ export class ApiService {
         paymentMethod: subBill.payment_method as 'cash' | 'card',
         amount: parseFloat(subBill.amount),
         status: subBill.status as 'pending' | 'paid',
-        createdAt: new Date(subBill.created_at)
+        createdAt: new Date(subBill.created_at),
       })),
       notes: order.notes,
       tips: order.tips || 0,
-      change: order.change || 0
+      change: order.change || 0,
     }));
   }
 
@@ -349,19 +372,26 @@ export class ApiService {
         tips: order.tips || 0,
         change: order.change || 0,
         items: order.items.map(item => ({
-          product_id: item.productId ? (isNaN(parseInt(item.productId)) ? null : parseInt(item.productId)) : null,
+          product_id: item.productId
+            ? isNaN(parseInt(item.productId))
+              ? null
+              : parseInt(item.productId)
+            : null,
           product_name: item.productName,
           quantity: item.quantity,
           unit_price: item.unitPrice,
           total_price: item.totalPrice,
           tax_rate: item.taxRate, // Keep as decimal, don't multiply by 100
-          tax_amount: item.taxAmount || (item.totalPrice * item.taxRate / (1 + item.taxRate)), // Use provided taxAmount or calculate
+          tax_amount: item.taxAmount || (item.totalPrice * item.taxRate) / (1 + item.taxRate), // Use provided taxAmount or calculate
           happy_hour_applied: item.isHappyHourApplied,
-          happy_hour_discount_amount: item.isHappyHourApplied ? 
-            (item.originalPrice ? ((item.originalPrice - item.unitPrice) * item.quantity) : 0) : 0,
-          description: item.description || null
+          happy_hour_discount_amount: item.isHappyHourApplied
+            ? item.originalPrice
+              ? (item.originalPrice - item.unitPrice) * item.quantity
+              : 0
+            : 0,
+          description: item.description || null,
         })),
-        ...(order.sub_bills ? { sub_bills: order.sub_bills } : {})
+        ...(order.sub_bills ? { sub_bills: order.sub_bills } : {}),
       }),
     });
 
@@ -381,8 +411,8 @@ export class ApiService {
         paymentMethod: subBill.payment_method as 'cash' | 'card',
         amount: parseFloat(subBill.amount),
         status: subBill.status as 'pending' | 'paid',
-        createdAt: new Date(subBill.created_at)
-      }))
+        createdAt: new Date(subBill.created_at),
+      })),
     };
   }
 
@@ -423,7 +453,7 @@ export class ApiService {
   async updateBusinessInfo(data: any): Promise<any> {
     return this.request<any>('/legal/business-info', {
       method: 'PUT',
-      body: JSON.stringify(data)
+      body: JSON.stringify(data),
     });
   }
 

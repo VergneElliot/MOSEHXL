@@ -8,7 +8,7 @@ import {
   Chip,
   useTheme,
   useMediaQuery,
-  Box
+  Box,
 } from '@mui/material';
 import { Product, OrderItem } from '../../types';
 
@@ -29,11 +29,11 @@ const ProductGrid: React.FC<ProductGridProps> = ({
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  
+
   const handleAddProduct = (product: Product) => {
     const currentPrice = calculateProductPrice(product, isHappyHourActive);
     const taxAmount = currentPrice * (product.taxRate / (1 + product.taxRate));
-    
+
     const orderItem: OrderItem = {
       id: `${Date.now()}-${Math.random()}`,
       productId: product.id,
@@ -46,36 +46,35 @@ const ProductGrid: React.FC<ProductGridProps> = ({
       isHappyHourApplied: isHappyHourActive && product.isHappyHourEligible,
       isOffert: false,
       isPerso: false,
-      originalPrice: product.price
+      originalPrice: product.price,
     };
-    
+
     onAddToOrder(orderItem);
   };
 
   if (products.length === 0) {
     return (
       <Box p={3} textAlign="center">
-        <Typography color="textSecondary">
-          Aucun produit trouvé
-        </Typography>
+        <Typography color="textSecondary">Aucun produit trouvé</Typography>
       </Box>
     );
   }
 
   return (
     <Grid container spacing={2}>
-      {products.map((product) => {
+      {products.map(product => {
         const currentPrice = calculateProductPrice(product, isHappyHourActive);
-        const isDiscounted = isHappyHourActive && product.isHappyHourEligible && currentPrice < product.price;
-        
+        const isDiscounted =
+          isHappyHourActive && product.isHappyHourEligible && currentPrice < product.price;
+
         return (
           <Grid item xs={6} sm={4} md={3} lg={2} key={product.id}>
-            <Card 
-              sx={{ 
-                height: '100%', 
+            <Card
+              sx={{
+                height: '100%',
                 cursor: 'pointer',
                 '&:hover': { boxShadow: 3 },
-                position: 'relative'
+                position: 'relative',
               }}
               onClick={() => handleAddProduct(product)}
             >
@@ -88,16 +87,16 @@ const ProductGrid: React.FC<ProductGridProps> = ({
                     position: 'absolute',
                     top: 8,
                     right: 8,
-                    zIndex: 1
+                    zIndex: 1,
                   }}
                 />
               )}
-              
+
               <CardContent sx={{ p: isMobile ? 1 : 2 }}>
-                <Typography 
-                  variant={isMobile ? "body2" : "h6"} 
-                  component="h3" 
-                  sx={{ 
+                <Typography
+                  variant={isMobile ? 'body2' : 'h6'}
+                  component="h3"
+                  sx={{
                     fontWeight: 'bold',
                     mb: 1,
                     fontSize: isMobile ? '0.875rem' : '1.1rem',
@@ -106,12 +105,12 @@ const ProductGrid: React.FC<ProductGridProps> = ({
                     overflow: 'hidden',
                     display: '-webkit-box',
                     WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical'
+                    WebkitBoxOrient: 'vertical',
                   }}
                 >
                   {product.name}
                 </Typography>
-                
+
                 <Box display="flex" flexDirection="column" alignItems="center" gap={1}>
                   {isDiscounted && (
                     <Typography
@@ -119,32 +118,32 @@ const ProductGrid: React.FC<ProductGridProps> = ({
                       sx={{
                         textDecoration: 'line-through',
                         color: 'text.secondary',
-                        fontSize: '0.75rem'
+                        fontSize: '0.75rem',
                       }}
                     >
                       {formatCurrency(product.price)}
                     </Typography>
                   )}
-                  
+
                   <Typography
-                    variant={isMobile ? "h6" : "h5"}
-                    color={isDiscounted ? "secondary" : "primary"}
-                    sx={{ 
+                    variant={isMobile ? 'h6' : 'h5'}
+                    color={isDiscounted ? 'secondary' : 'primary'}
+                    sx={{
                       fontWeight: 'bold',
-                      fontSize: isMobile ? '1rem' : '1.2rem'
+                      fontSize: isMobile ? '1rem' : '1.2rem',
                     }}
                   >
                     {formatCurrency(currentPrice)}
                   </Typography>
-                  
+
                   <Button
                     variant="contained"
-                    size={isMobile ? "small" : "medium"}
+                    size={isMobile ? 'small' : 'medium'}
                     fullWidth
                     sx={{
                       mt: 1,
                       minHeight: isMobile ? 32 : 36,
-                      fontSize: isMobile ? '0.75rem' : '0.875rem'
+                      fontSize: isMobile ? '0.75rem' : '0.875rem',
                     }}
                   >
                     Ajouter
@@ -159,4 +158,4 @@ const ProductGrid: React.FC<ProductGridProps> = ({
   );
 };
 
-export default ProductGrid; 
+export default ProductGrid;

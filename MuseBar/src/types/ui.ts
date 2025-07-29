@@ -80,4 +80,4 @@ export interface TableProps<T = any> {
 
 // Form field types
 export type InputType = 'text' | 'email' | 'password' | 'number' | 'tel' | 'url' | 'search';
-export type FieldVariant = 'outlined' | 'filled' | 'standard'; 
+export type FieldVariant = 'outlined' | 'filled' | 'standard';
