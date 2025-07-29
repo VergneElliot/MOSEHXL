@@ -11,13 +11,9 @@ import {
   IconButton,
   Tooltip,
   Box,
-  Typography
+  Typography,
 } from '@mui/material';
-import {
-  Visibility,
-  Print,
-  Download
-} from '@mui/icons-material';
+import { Visibility, Print, Download } from '@mui/icons-material';
 import { ClosureBulletin } from '../../hooks/useClosureState';
 
 interface BulletinsTableProps {
@@ -39,7 +35,7 @@ const BulletinsTable: React.FC<BulletinsTableProps> = ({
   onDownload,
   formatCurrency,
   formatDate,
-  getClosureTypeLabel
+  getClosureTypeLabel,
 }) => {
   if (loading) {
     return (
@@ -52,9 +48,7 @@ const BulletinsTable: React.FC<BulletinsTableProps> = ({
   if (bulletins.length === 0) {
     return (
       <Box sx={{ p: 3, textAlign: 'center' }}>
-        <Typography color="textSecondary">
-          Aucun bulletin de clôture trouvé
-        </Typography>
+        <Typography color="textSecondary">Aucun bulletin de clôture trouvé</Typography>
       </Box>
     );
   }
@@ -73,10 +67,10 @@ const BulletinsTable: React.FC<BulletinsTableProps> = ({
           </TableRow>
         </TableHead>
         <TableBody>
-          {bulletins.map((bulletin) => (
+          {bulletins.map(bulletin => (
             <TableRow key={bulletin.id} hover>
               <TableCell>
-                <Chip 
+                <Chip
                   label={getClosureTypeLabel(bulletin.closure_type)}
                   size="small"
                   color="primary"
@@ -84,16 +78,12 @@ const BulletinsTable: React.FC<BulletinsTableProps> = ({
                 />
               </TableCell>
               <TableCell>
-                <Typography variant="body2">
-                  {formatDate(bulletin.period_start)}
-                </Typography>
+                <Typography variant="body2">{formatDate(bulletin.period_start)}</Typography>
                 <Typography variant="caption" color="textSecondary">
                   au {formatDate(bulletin.period_end)}
                 </Typography>
               </TableCell>
-              <TableCell align="right">
-                {bulletin.total_transactions}
-              </TableCell>
+              <TableCell align="right">{bulletin.total_transactions}</TableCell>
               <TableCell align="right">
                 <Typography variant="body2" fontWeight="medium">
                   {formatCurrency(bulletin.total_amount)}
@@ -109,26 +99,17 @@ const BulletinsTable: React.FC<BulletinsTableProps> = ({
               <TableCell align="center">
                 <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
                   <Tooltip title="Voir les détails">
-                    <IconButton 
-                      size="small" 
-                      onClick={() => onViewDetails(bulletin)}
-                    >
+                    <IconButton size="small" onClick={() => onViewDetails(bulletin)}>
                       <Visibility />
                     </IconButton>
                   </Tooltip>
                   <Tooltip title="Imprimer">
-                    <IconButton 
-                      size="small" 
-                      onClick={() => onPrint(bulletin)}
-                    >
+                    <IconButton size="small" onClick={() => onPrint(bulletin)}>
                       <Print />
                     </IconButton>
                   </Tooltip>
                   <Tooltip title="Télécharger">
-                    <IconButton 
-                      size="small" 
-                      onClick={() => onDownload(bulletin)}
-                    >
+                    <IconButton size="small" onClick={() => onDownload(bulletin)}>
                       <Download />
                     </IconButton>
                   </Tooltip>
@@ -142,4 +123,4 @@ const BulletinsTable: React.FC<BulletinsTableProps> = ({
   );
 };
 
-export default BulletinsTable; 
+export default BulletinsTable;

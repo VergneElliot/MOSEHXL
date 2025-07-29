@@ -37,4 +37,4 @@ export interface HappyHourSettings {
 
 // Utility types for business logic
 export type DiscountType = 'percentage' | 'fixed';
-export type ProductStatus = 'active' | 'inactive' | 'archived'; 
+export type ProductStatus = 'active' | 'inactive' | 'archived';

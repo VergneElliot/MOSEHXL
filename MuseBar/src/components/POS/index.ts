@@ -7,4 +7,4 @@ export { default as CategoryFilter } from './CategoryFilter';
 // Export types
 export type { POSState, POSActions } from '../../hooks/usePOSState';
 export type { POSLogic } from '../../hooks/usePOSLogic';
-export type { POSAPIActions, CreateOrderData, RetourData, ChangeData } from '../../hooks/usePOSAPI'; 
+export type { POSAPIActions, CreateOrderData, RetourData, ChangeData } from '../../hooks/usePOSAPI';

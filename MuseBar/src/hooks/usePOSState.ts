@@ -6,7 +6,7 @@ export interface POSState {
   selectedCategory: string;
   searchQuery: string;
   currentOrder: OrderItem[];
-  
+
   // Payment states
   paymentDialogOpen: boolean;
   checkoutMode: 'simple' | 'split-equal' | 'split-items';
@@ -16,11 +16,11 @@ export interface POSState {
   cashAmount: string;
   cardAmount: string;
   tips: string;
-  
+
   // UI states
   mobileView: 'menu' | 'order';
   itemQuantities: { [productId: string]: number };
-  
+
   // Dialog states
   retourDialogOpen: boolean;
   retourItem: OrderItem | null;
@@ -30,7 +30,7 @@ export interface POSState {
   changeDialogOpen: boolean;
   changeAmount: string;
   changeDirection: 'card-to-cash' | 'cash-to-card';
-  
+
   // Notification state
   snackbar: {
     open: boolean;
@@ -47,7 +47,7 @@ export interface POSActions {
   addToOrder: (item: OrderItem) => void;
   removeFromOrder: (index: number) => void;
   clearOrder: () => void;
-  
+
   // Payment actions
   setPaymentDialogOpen: (open: boolean) => void;
   setCheckoutMode: (mode: 'simple' | 'split-equal' | 'split-items') => void;
@@ -57,11 +57,11 @@ export interface POSActions {
   setCashAmount: (amount: string) => void;
   setCardAmount: (amount: string) => void;
   setTips: (tips: string) => void;
-  
+
   // UI actions
   setMobileView: (view: 'menu' | 'order') => void;
   setItemQuantities: (quantities: { [productId: string]: number }) => void;
-  
+
   // Dialog actions
   setRetourDialogOpen: (open: boolean) => void;
   setRetourItem: (item: OrderItem | null) => void;
@@ -71,9 +71,13 @@ export interface POSActions {
   setChangeDialogOpen: (open: boolean) => void;
   setChangeAmount: (amount: string) => void;
   setChangeDirection: (direction: 'card-to-cash' | 'cash-to-card') => void;
-  
+
   // Notification actions
-  setSnackbar: (snackbar: { open: boolean; message: string; severity: 'success' | 'error' | 'info' }) => void;
+  setSnackbar: (snackbar: {
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'info';
+  }) => void;
   showSuccess: (message: string) => void;
   showError: (message: string) => void;
 }
@@ -83,21 +87,25 @@ export const usePOSState = (): [POSState, POSActions] => {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [currentOrder, setCurrentOrder] = useState<OrderItem[]>([]);
-  
+
   // Payment states
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const [checkoutMode, setCheckoutMode] = useState<'simple' | 'split-equal' | 'split-items'>('simple');
+  const [checkoutMode, setCheckoutMode] = useState<'simple' | 'split-equal' | 'split-items'>(
+    'simple'
+  );
   const [splitCount, setSplitCount] = useState(2);
   const [subBills, setSubBills] = useState<LocalSubBill[]>([]);
-  const [currentPaymentMethod, setCurrentPaymentMethod] = useState<'cash' | 'card' | 'split'>('card');
+  const [currentPaymentMethod, setCurrentPaymentMethod] = useState<'cash' | 'card' | 'split'>(
+    'card'
+  );
   const [cashAmount, setCashAmount] = useState('');
   const [cardAmount, setCardAmount] = useState('');
   const [tips, setTips] = useState('');
-  
+
   // UI states
   const [mobileView, setMobileView] = useState<'menu' | 'order'>('menu');
   const [itemQuantities, setItemQuantities] = useState<{ [productId: string]: number }>({});
-  
+
   // Dialog states
   const [retourDialogOpen, setRetourDialogOpen] = useState(false);
   const [retourItem, setRetourItem] = useState<OrderItem | null>(null);
@@ -106,13 +114,15 @@ export const usePOSState = (): [POSState, POSActions] => {
   const [retourLoading, setRetourLoading] = useState(false);
   const [changeDialogOpen, setChangeDialogOpen] = useState(false);
   const [changeAmount, setChangeAmount] = useState('');
-  const [changeDirection, setChangeDirection] = useState<'card-to-cash' | 'cash-to-card'>('card-to-cash');
-  
+  const [changeDirection, setChangeDirection] = useState<'card-to-cash' | 'cash-to-card'>(
+    'card-to-cash'
+  );
+
   // Notification state
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
-    severity: 'success' as 'success' | 'error' | 'info'
+    severity: 'success' as 'success' | 'error' | 'info',
   });
 
   // Order actions
@@ -198,4 +208,4 @@ export const usePOSState = (): [POSState, POSActions] => {
   };
 
   return [state, actions];
-}; 
+};

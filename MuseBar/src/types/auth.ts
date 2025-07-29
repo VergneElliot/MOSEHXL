@@ -36,7 +36,7 @@ export const PERMISSIONS = {
   ACCESS_SETTINGS: 'access_settings',
   ACCESS_COMPLIANCE: 'access_compliance',
   ADMIN_USERS: 'admin_users',
-  ADMIN_AUDIT: 'admin_audit'
+  ADMIN_AUDIT: 'admin_audit',
 } as const;
 
-export type PermissionKey = typeof PERMISSIONS[keyof typeof PERMISSIONS]; 
+export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

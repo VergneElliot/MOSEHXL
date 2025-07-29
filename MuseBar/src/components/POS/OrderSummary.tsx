@@ -11,14 +11,14 @@ import {
   Box,
   Chip,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
   Add as AddIcon,
   Remove as RemoveIcon,
   Receipt as ReceiptIcon,
-  Clear as ClearIcon
+  Clear as ClearIcon,
 } from '@mui/icons-material';
 import { OrderItem } from '../../types';
 
@@ -64,29 +64,22 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
             Commande ({currentOrder.length} article{currentOrder.length > 1 ? 's' : ''})
           </Typography>
           {currentOrder.length > 0 && (
-            <IconButton
-              onClick={onClearOrder}
-              color="error"
-              size="small"
-              title="Vider la commande"
-            >
+            <IconButton onClick={onClearOrder} color="error" size="small" title="Vider la commande">
               <ClearIcon />
             </IconButton>
           )}
         </Box>
 
         {currentOrder.length === 0 ? (
-          <Box 
-            display="flex" 
-            alignItems="center" 
-            justifyContent="center" 
+          <Box
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
             flexGrow={1}
             textAlign="center"
             py={4}
           >
-            <Typography color="textSecondary">
-              Aucun article sélectionné
-            </Typography>
+            <Typography color="textSecondary">Aucun article sélectionné</Typography>
           </Box>
         ) : (
           <>
@@ -95,7 +88,12 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
                 <React.Fragment key={`${item.id}-${index}`}>
                   <ListItem sx={{ px: 0, py: 1 }}>
                     <Box sx={{ width: '100%' }}>
-                      <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
+                      <Box
+                        display="flex"
+                        justifyContent="space-between"
+                        alignItems="flex-start"
+                        mb={1}
+                      >
                         <Typography variant="body2" sx={{ fontWeight: 'medium', flexGrow: 1 }}>
                           {item.productName}
                         </Typography>
@@ -118,15 +116,15 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
                           >
                             <RemoveIcon fontSize="small" />
                           </IconButton>
-                          
-                          <Typography variant="body2" sx={{ minWidth: '20px', textAlign: 'center' }}>
+
+                          <Typography
+                            variant="body2"
+                            sx={{ minWidth: '20px', textAlign: 'center' }}
+                          >
                             {item.quantity}
                           </Typography>
-                          
-                          <IconButton
-                            onClick={() => handleQuantityChange(index, 1)}
-                            size="small"
-                          >
+
+                          <IconButton onClick={() => handleQuantityChange(index, 1)} size="small">
                             <AddIcon fontSize="small" />
                           </IconButton>
                         </Box>
@@ -142,30 +140,15 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
                       </Box>
 
                       {item.isHappyHourApplied && (
-                        <Chip
-                          label="Happy Hour"
-                          size="small"
-                          color="secondary"
-                          sx={{ mt: 0.5 }}
-                        />
+                        <Chip label="Happy Hour" size="small" color="secondary" sx={{ mt: 0.5 }} />
                       )}
 
                       {item.isOffert && (
-                        <Chip
-                          label="Offert"
-                          size="small"
-                          color="success"
-                          sx={{ mt: 0.5 }}
-                        />
+                        <Chip label="Offert" size="small" color="success" sx={{ mt: 0.5 }} />
                       )}
 
                       {item.isPerso && (
-                        <Chip
-                          label="Personnel"
-                          size="small"
-                          color="info"
-                          sx={{ mt: 0.5 }}
-                        />
+                        <Chip label="Personnel" size="small" color="info" sx={{ mt: 0.5 }} />
                       )}
                     </Box>
                   </ListItem>
@@ -179,20 +162,16 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
             <Box>
               <Box display="flex" justifyContent="space-between" mb={1}>
                 <Typography variant="body2">Sous-total HT:</Typography>
-                <Typography variant="body2">
-                  {formatCurrency(orderSubtotal - orderTax)}
-                </Typography>
+                <Typography variant="body2">{formatCurrency(orderSubtotal - orderTax)}</Typography>
               </Box>
-              
+
               <Box display="flex" justifyContent="space-between" mb={1}>
                 <Typography variant="body2">TVA:</Typography>
-                <Typography variant="body2">
-                  {formatCurrency(orderTax)}
-                </Typography>
+                <Typography variant="body2">{formatCurrency(orderTax)}</Typography>
               </Box>
-              
+
               <Divider sx={{ my: 1 }} />
-              
+
               <Box display="flex" justifyContent="space-between" mb={2}>
                 <Typography variant="h6" fontWeight="bold">
                   Total TTC:
@@ -212,7 +191,7 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
                 sx={{
                   py: isMobile ? 1.5 : 2,
                   fontSize: isMobile ? '1rem' : '1.1rem',
-                  fontWeight: 'bold'
+                  fontWeight: 'bold',
                 }}
               >
                 Encaisser
@@ -225,4 +204,4 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
   );
 };
 
-export default OrderSummary; 
+export default OrderSummary;

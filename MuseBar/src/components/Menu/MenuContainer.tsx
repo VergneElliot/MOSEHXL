@@ -7,7 +7,7 @@ import {
   Snackbar,
   Alert,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
 } from '@mui/material';
 import { Category, Product } from '../../types';
 import { useMenuState } from '../../hooks/useMenuState';
@@ -23,17 +23,13 @@ interface MenuContainerProps {
   onDataUpdate: () => void;
 }
 
-const MenuContainer: React.FC<MenuContainerProps> = ({
-  categories,
-  products,
-  onDataUpdate,
-}) => {
+const MenuContainer: React.FC<MenuContainerProps> = ({ categories, products, onDataUpdate }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   // Custom hooks for state management
   const [state, actions] = useMenuState();
-  
+
   // Custom hook for API calls
   const api = useMenuAPI(
     actions.setArchivedProducts,
@@ -94,7 +90,7 @@ const MenuContainer: React.FC<MenuContainerProps> = ({
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
-      currency: 'EUR'
+      currency: 'EUR',
     }).format(amount);
   };
 
@@ -102,11 +98,7 @@ const MenuContainer: React.FC<MenuContainerProps> = ({
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        <Typography 
-          variant={isMobile ? "h5" : "h4"} 
-          component="h1" 
-          gutterBottom
-        >
+        <Typography variant={isMobile ? 'h5' : 'h4'} component="h1" gutterBottom>
           🍽️ Gestion du Menu
         </Typography>
         <Box display="flex" justifyContent="space-between" alignItems="center">
@@ -117,7 +109,7 @@ const MenuContainer: React.FC<MenuContainerProps> = ({
             control={
               <Switch
                 checked={state.showArchived}
-                onChange={(e) => actions.setShowArchived(e.target.checked)}
+                onChange={e => actions.setShowArchived(e.target.checked)}
               />
             }
             label="Afficher les éléments archivés"
@@ -201,4 +193,4 @@ const MenuContainer: React.FC<MenuContainerProps> = ({
   );
 };
 
-export default MenuContainer; 
+export default MenuContainer;

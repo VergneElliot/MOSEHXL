@@ -19,4 +19,4 @@ export * from './ui';
 export type { Category, Product, HappyHourSettings } from './business';
 export type { Order, OrderItem, PaymentMethod } from './orders';
 export type { User, AuthResponse } from './auth';
-export type { ApiResponse, ClosureBulletin } from './api'; 
+export type { ApiResponse, ClosureBulletin } from './api';

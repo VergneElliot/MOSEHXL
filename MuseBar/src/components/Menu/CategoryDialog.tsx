@@ -13,7 +13,7 @@ import {
   Select,
   MenuItem,
   Alert,
-  CircularProgress
+  CircularProgress,
 } from '@mui/material';
 import { Category } from '../../types';
 import { CategoryFormData } from '../../hooks/useMenuState';
@@ -37,7 +37,7 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
   onFormChange,
   editingCategory,
   loading,
-  error
+  error,
 }) => {
   const isEditing = !!editingCategory;
 
@@ -71,7 +71,7 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
             <TextField
               label="Nom de la catégorie"
               value={form.name}
-              onChange={(e) => onFormChange('name', e.target.value)}
+              onChange={e => onFormChange('name', e.target.value)}
               required
               fullWidth
               autoFocus
@@ -82,7 +82,7 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
             <TextField
               label="Description (optionnel)"
               value={form.description}
-              onChange={(e) => onFormChange('description', e.target.value)}
+              onChange={e => onFormChange('description', e.target.value)}
               fullWidth
               multiline
               rows={3}
@@ -94,49 +94,70 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
               <InputLabel>Couleur de la catégorie</InputLabel>
               <Select
                 value={form.color}
-                onChange={(e) => onFormChange('color', e.target.value)}
+                onChange={e => onFormChange('color', e.target.value)}
                 label="Couleur de la catégorie"
               >
                 <MenuItem value="#1976d2">
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Box sx={{ width: 20, height: 20, backgroundColor: '#1976d2', borderRadius: 1 }} />
+                    <Box
+                      sx={{ width: 20, height: 20, backgroundColor: '#1976d2', borderRadius: 1 }}
+                    />
                     Bleu (Défaut)
                   </Box>
                 </MenuItem>
                 <MenuItem value="#2e7d32">
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Box sx={{ width: 20, height: 20, backgroundColor: '#2e7d32', borderRadius: 1 }} />
+                    <Box
+                      sx={{ width: 20, height: 20, backgroundColor: '#2e7d32', borderRadius: 1 }}
+                    />
                     Vert
                   </Box>
                 </MenuItem>
                 <MenuItem value="#ed6c02">
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Box sx={{ width: 20, height: 20, backgroundColor: '#ed6c02', borderRadius: 1 }} />
+                    <Box
+                      sx={{ width: 20, height: 20, backgroundColor: '#ed6c02', borderRadius: 1 }}
+                    />
                     Orange
                   </Box>
                 </MenuItem>
                 <MenuItem value="#d32f2f">
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Box sx={{ width: 20, height: 20, backgroundColor: '#d32f2f', borderRadius: 1 }} />
+                    <Box
+                      sx={{ width: 20, height: 20, backgroundColor: '#d32f2f', borderRadius: 1 }}
+                    />
                     Rouge
                   </Box>
                 </MenuItem>
                 <MenuItem value="#7b1fa2">
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Box sx={{ width: 20, height: 20, backgroundColor: '#7b1fa2', borderRadius: 1 }} />
+                    <Box
+                      sx={{ width: 20, height: 20, backgroundColor: '#7b1fa2', borderRadius: 1 }}
+                    />
                     Violet
                   </Box>
                 </MenuItem>
                 <MenuItem value="#0288d1">
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Box sx={{ width: 20, height: 20, backgroundColor: '#0288d1', borderRadius: 1 }} />
+                    <Box
+                      sx={{ width: 20, height: 20, backgroundColor: '#0288d1', borderRadius: 1 }}
+                    />
                     Bleu clair
                   </Box>
                 </MenuItem>
               </Select>
             </FormControl>
 
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                p: 2,
+                bgcolor: 'grey.50',
+                borderRadius: 1,
+              }}
+            >
               <Typography variant="body2" color="textSecondary">
                 Aperçu:
               </Typography>
@@ -147,7 +168,7 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
                   backgroundColor: form.color,
                   color: 'white',
                   borderRadius: 1,
-                  fontWeight: 'bold'
+                  fontWeight: 'bold',
                 }}
               >
                 {form.name || 'Nom de la catégorie'}
@@ -166,7 +187,7 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
             disabled={loading || !form.name.trim()}
             startIcon={loading ? <CircularProgress size={20} /> : undefined}
           >
-            {loading ? 'Enregistrement...' : (isEditing ? 'Modifier' : 'Créer')}
+            {loading ? 'Enregistrement...' : isEditing ? 'Modifier' : 'Créer'}
           </Button>
         </DialogActions>
       </form>
@@ -174,4 +195,4 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
   );
 };
 
-export default CategoryDialog; 
+export default CategoryDialog;

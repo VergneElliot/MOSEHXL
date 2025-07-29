@@ -24,6 +24,6 @@ export function mapBusinessInfoFromBackend(backendInfo: BusinessInfoBackend): Bu
     phone: backendInfo.phone || '',
     email: backendInfo.email || '',
     siret: backendInfo.siret || '',
-    taxIdentification: backendInfo.tax_identification || ''
+    taxIdentification: backendInfo.tax_identification || '',
   };
-} 
+}

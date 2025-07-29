@@ -7,7 +7,7 @@ import {
   Button,
   Typography,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
 } from '@mui/material';
 import { BaseComponentProps } from '../../types/ui';
 
@@ -34,7 +34,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onCancel,
   loading = false,
   className,
-  'data-testid': testId
+  'data-testid': testId,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -51,21 +51,14 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     >
       <DialogTitle>{title}</DialogTitle>
       <DialogContent>
-        <Typography variant="body1">
-          {message}
-        </Typography>
+        <Typography variant="body1">{message}</Typography>
       </DialogContent>
       <DialogActions sx={{ p: 2, gap: 1 }}>
-        <Button 
-          onClick={onCancel} 
-          variant="outlined"
-          disabled={loading}
-          sx={{ minWidth: 100 }}
-        >
+        <Button onClick={onCancel} variant="outlined" disabled={loading} sx={{ minWidth: 100 }}>
           {cancelText}
         </Button>
-        <Button 
-          onClick={onConfirm} 
+        <Button
+          onClick={onConfirm}
           variant="contained"
           color={confirmColor}
           disabled={loading}
@@ -78,4 +71,4 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   );
 };
 
-export default ConfirmDialog; 
+export default ConfirmDialog;

@@ -7,14 +7,9 @@ import {
   Box,
   Chip,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
 } from '@mui/material';
-import {
-  BarChart,
-  CreditCard,
-  Money,
-  TrendingUp
-} from '@mui/icons-material';
+import { BarChart, CreditCard, Money, TrendingUp } from '@mui/icons-material';
 import { HistoryStats } from '../../hooks/useHistoryState';
 
 interface StatsCardsProps {
@@ -23,11 +18,7 @@ interface StatsCardsProps {
   formatCurrency: (amount: number) => string;
 }
 
-const StatsCards: React.FC<StatsCardsProps> = ({
-  stats,
-  loading,
-  formatCurrency,
-}) => {
+const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, formatCurrency }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -37,29 +28,29 @@ const StatsCards: React.FC<StatsCardsProps> = ({
       value: formatCurrency(stats.caJour),
       icon: <TrendingUp />,
       color: theme.palette.success.main,
-      description: 'Chiffre d\'affaires total'
+      description: "Chiffre d'affaires total",
     },
     {
       title: 'Ventes du Jour',
       value: stats.ventesJour.toString(),
       icon: <BarChart />,
       color: theme.palette.primary.main,
-      description: 'Nombre de transactions'
+      description: 'Nombre de transactions',
     },
     {
       title: 'Paiements Carte',
       value: formatCurrency(stats.cardTotal),
       icon: <CreditCard />,
       color: theme.palette.info.main,
-      description: 'Total paiements par carte'
+      description: 'Total paiements par carte',
     },
     {
       title: 'Paiements Espèces',
       value: formatCurrency(stats.cashTotal),
       icon: <Money />,
       color: theme.palette.warning.main,
-      description: 'Total paiements en espèces'
-    }
+      description: 'Total paiements en espèces',
+    },
   ];
 
   if (loading) {
@@ -69,7 +60,14 @@ const StatsCards: React.FC<StatsCardsProps> = ({
           <Grid item xs={6} md={3} key={index}>
             <Card>
               <CardContent>
-                <Box sx={{ height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Box
+                  sx={{
+                    height: 80,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
                   <Typography color="textSecondary">Chargement...</Typography>
                 </Box>
               </CardContent>
@@ -86,14 +84,14 @@ const StatsCards: React.FC<StatsCardsProps> = ({
       <Grid container spacing={2} sx={{ mb: 2 }}>
         {statsData.map((stat, index) => (
           <Grid item xs={6} md={3} key={index}>
-            <Card 
-              sx={{ 
+            <Card
+              sx={{
                 height: '100%',
                 transition: 'transform 0.2s',
                 '&:hover': {
                   transform: 'translateY(-2px)',
-                  boxShadow: 3
-                }
+                  boxShadow: 3,
+                },
               }}
             >
               <CardContent>
@@ -107,15 +105,15 @@ const StatsCards: React.FC<StatsCardsProps> = ({
                       mr: 2,
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
                     }}
                   >
                     {stat.icon}
                   </Box>
-                  
+
                   <Box flexGrow={1}>
-                    <Typography 
-                      variant="body2" 
+                    <Typography
+                      variant="body2"
                       color="textSecondary"
                       sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}
                     >
@@ -123,21 +121,21 @@ const StatsCards: React.FC<StatsCardsProps> = ({
                     </Typography>
                   </Box>
                 </Box>
-                
-                <Typography 
-                  variant={isMobile ? "h6" : "h5"} 
+
+                <Typography
+                  variant={isMobile ? 'h6' : 'h5'}
                   component="p"
-                  sx={{ 
+                  sx={{
                     fontWeight: 'bold',
                     color: stat.color,
-                    mb: 0.5
+                    mb: 0.5,
                   }}
                 >
                   {stat.value}
                 </Typography>
-                
-                <Typography 
-                  variant="caption" 
+
+                <Typography
+                  variant="caption"
                   color="textSecondary"
                   sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}
                 >
@@ -162,7 +160,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
                   key={index}
                   label={`${product.name} (${product.qty})`}
                   variant="outlined"
-                  size={isMobile ? "small" : "medium"}
+                  size={isMobile ? 'small' : 'medium'}
                   sx={{
                     backgroundColor: index === 0 ? theme.palette.primary.light : 'transparent',
                     color: index === 0 ? theme.palette.primary.contrastText : 'inherit',
@@ -178,7 +176,9 @@ const StatsCards: React.FC<StatsCardsProps> = ({
       {stats.businessDayPeriod && (
         <Box mt={2}>
           <Typography variant="body2" color="textSecondary" align="center">
-            📅 Période d'activité: {new Date(stats.businessDayPeriod.start).toLocaleDateString('fr-FR')} - {new Date(stats.businessDayPeriod.end).toLocaleDateString('fr-FR')}
+            📅 Période d'activité:{' '}
+            {new Date(stats.businessDayPeriod.start).toLocaleDateString('fr-FR')} -{' '}
+            {new Date(stats.businessDayPeriod.end).toLocaleDateString('fr-FR')}
           </Typography>
         </Box>
       )}
@@ -186,4 +186,4 @@ const StatsCards: React.FC<StatsCardsProps> = ({
   );
 };
 
-export default StatsCards; 
+export default StatsCards;

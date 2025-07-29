@@ -26,73 +26,73 @@ export const useErrorHandler = (
   const [state, setState] = useState<ErrorHandlerState>({
     error: null,
     hasError: false,
-    isRetrying: false
+    isRetrying: false,
   });
 
-  const setError = useCallback((
-    error: string | Error | ErrorInfo, 
-    context = defaultContext
-  ) => {
-    let errorInfo: ErrorInfo;
+  const setError = useCallback(
+    (error: string | Error | ErrorInfo, context = defaultContext) => {
+      let errorInfo: ErrorInfo;
 
-    if (typeof error === 'string') {
-      errorInfo = {
-        message: error,
-        timestamp: new Date(),
-        context
-      };
-    } else if (error instanceof Error) {
-      errorInfo = {
-        message: error.message,
-        details: error.stack,
-        timestamp: new Date(),
-        context
-      };
-    } else {
-      errorInfo = {
-        ...error,
-        timestamp: error.timestamp || new Date(),
-        context: error.context || context
-      };
-    }
+      if (typeof error === 'string') {
+        errorInfo = {
+          message: error,
+          timestamp: new Date(),
+          context,
+        };
+      } else if (error instanceof Error) {
+        errorInfo = {
+          message: error.message,
+          details: error.stack,
+          timestamp: new Date(),
+          context,
+        };
+      } else {
+        errorInfo = {
+          ...error,
+          timestamp: error.timestamp || new Date(),
+          context: error.context || context,
+        };
+      }
 
-    setState({
-      error: errorInfo,
-      hasError: true,
-      isRetrying: false
-    });
+      setState({
+        error: errorInfo,
+        hasError: true,
+        isRetrying: false,
+      });
 
-    // Log to console in development
-    if (process.env.NODE_ENV === 'development') {
-      console.error('Error caught by useErrorHandler:', errorInfo);
-    }
-  }, [defaultContext]);
+      // Log to console in development
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error caught by useErrorHandler:', errorInfo);
+      }
+    },
+    [defaultContext]
+  );
 
   const clearError = useCallback(() => {
     setState({
       error: null,
       hasError: false,
-      isRetrying: false
+      isRetrying: false,
     });
   }, []);
 
-  const retry = useCallback(async (retryFn: () => Promise<void> | void) => {
-    setState(prev => ({ ...prev, isRetrying: true }));
-    
-    try {
-      await retryFn();
-      clearError();
-    } catch (error) {
-      setError(error as Error, 'Retry failed');
-    } finally {
-      setState(prev => ({ ...prev, isRetrying: false }));
-    }
-  }, [setError, clearError]);
+  const retry = useCallback(
+    async (retryFn: () => Promise<void> | void) => {
+      setState(prev => ({ ...prev, isRetrying: true }));
 
-  return [
-    state,
-    { setError, clearError, retry }
-  ];
+      try {
+        await retryFn();
+        clearError();
+      } catch (error) {
+        setError(error as Error, 'Retry failed');
+      } finally {
+        setState(prev => ({ ...prev, isRetrying: false }));
+      }
+    },
+    [setError, clearError]
+  );
+
+  return [state, { setError, clearError, retry }];
 };
 
 // Utility functions for common error scenarios
@@ -105,7 +105,7 @@ export const createApiErrorHandler = (apiName: string) => {
         code: error.response.status,
         details: error.response.data,
         timestamp: new Date(),
-        context: apiName
+        context: apiName,
       };
     } else if (error.request) {
       // Network error
@@ -114,7 +114,7 @@ export const createApiErrorHandler = (apiName: string) => {
         code: 'NETWORK_ERROR',
         details: error.request,
         timestamp: new Date(),
-        context: apiName
+        context: apiName,
       };
     } else {
       // Other error
@@ -122,7 +122,7 @@ export const createApiErrorHandler = (apiName: string) => {
         message: error.message || `Erreur inconnue dans ${apiName}`,
         details: error,
         timestamp: new Date(),
-        context: apiName
+        context: apiName,
       };
     }
   };
@@ -134,7 +134,7 @@ export const createFormErrorHandler = (formName: string) => {
       message: `Erreur de validation dans ${formName}: ${error.message}`,
       details: error.errors || error,
       timestamp: new Date(),
-      context: formName
+      context: formName,
     };
   };
-}; 
+};

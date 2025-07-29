@@ -1,17 +1,12 @@
 import React, { useState } from 'react';
-import {
-  Box,
-  Tabs,
-  Tab,
-  Paper
-} from '@mui/material';
+import { Box, Tabs, Tab, Paper } from '@mui/material';
 import {
   RestaurantMenu as MenuIcon,
   PointOfSale as POSIcon,
   Schedule as ScheduleIcon,
   Settings as SettingsIcon,
   History as HistoryIcon,
-  Gavel as GavelIcon
+  Gavel as GavelIcon,
 } from '@mui/icons-material';
 
 // Component imports
@@ -75,18 +70,38 @@ const AppRouter: React.FC<AppRouterProps> = ({
   isHappyHourActive,
   timeUntilHappyHour,
   onDataUpdate,
-  onHappyHourStatusUpdate
+  onHappyHourStatusUpdate,
 }) => {
   const [tabValue, setTabValue] = useState(0);
 
   const TABS: TabConfig[] = [
     { label: 'Caisse', icon: <POSIcon />, value: 'pos', permission: 'access_pos' },
     { label: 'Menu', icon: <MenuIcon />, value: 'menu', permission: 'access_menu' },
-    { label: 'Happy Hour', icon: <ScheduleIcon />, value: 'happy_hour', permission: 'access_happy_hour' },
+    {
+      label: 'Happy Hour',
+      icon: <ScheduleIcon />,
+      value: 'happy_hour',
+      permission: 'access_happy_hour',
+    },
     { label: 'Historique', icon: <HistoryIcon />, value: 'history', permission: 'access_history' },
-    { label: 'Paramètres', icon: <SettingsIcon />, value: 'settings', permission: 'access_settings' },
-    { label: 'Conformité Légale', icon: <GavelIcon />, value: 'compliance', permission: 'access_compliance' },
-    { label: 'Bulletins de Clôture', icon: <GavelIcon />, value: 'closures', permission: 'access_compliance' },
+    {
+      label: 'Paramètres',
+      icon: <SettingsIcon />,
+      value: 'settings',
+      permission: 'access_settings',
+    },
+    {
+      label: 'Conformité Légale',
+      icon: <GavelIcon />,
+      value: 'compliance',
+      permission: 'access_compliance',
+    },
+    {
+      label: 'Bulletins de Clôture',
+      icon: <GavelIcon />,
+      value: 'closures',
+      permission: 'access_compliance',
+    },
     { label: 'Gestion utilisateurs', value: 'user_management', adminOnly: true },
     { label: 'Journal de Sécurité', value: 'audit_trail', adminOnly: true },
   ];
@@ -112,71 +127,67 @@ const AppRouter: React.FC<AppRouterProps> = ({
         allowScrollButtonsMobile
         sx={{
           '& .MuiTabs-scrollButtons': {
-            color: 'primary.main'
+            color: 'primary.main',
           },
           '& .MuiTab-root': {
             minWidth: { xs: 'auto', sm: 90 },
             fontSize: { xs: '0.75rem', sm: '0.875rem' },
             px: { xs: 1, sm: 2 },
-            py: { xs: 1.5, sm: 2 }
+            py: { xs: 1.5, sm: 2 },
           },
           '& .MuiTab-iconWrapper': {
-            fontSize: { xs: 18, sm: 20 }
-          }
+            fontSize: { xs: 18, sm: 20 },
+          },
         }}
       >
         {filteredTabs.map((tab, idx) => (
-          <Tab 
-            key={idx} 
+          <Tab
+            key={idx}
             icon={tab.icon}
-            iconPosition={tab.icon ? "start" : undefined}
+            iconPosition={tab.icon ? 'start' : undefined}
             label={tab.label}
             sx={{
               textTransform: 'none',
-              fontWeight: tabValue === idx ? 600 : 400
+              fontWeight: tabValue === idx ? 600 : 400,
             }}
           />
         ))}
       </Tabs>
-      
+
       {filteredTabs.map((tab, i) => (
         <TabPanel value={tabValue} index={i} key={tab.value}>
           {tab.value === 'pos' && (
-            <POS 
-              categories={categories} 
-              products={products} 
-              isHappyHourActive={isHappyHourActive} 
-              onDataUpdate={onDataUpdate} 
+            <POS
+              categories={categories}
+              products={products}
+              isHappyHourActive={isHappyHourActive}
+              onDataUpdate={onDataUpdate}
             />
           )}
           {tab.value === 'menu' && (
-            <MenuContainer 
-              categories={categories} 
-              products={products} 
-              onDataUpdate={onDataUpdate} 
+            <MenuContainer
+              categories={categories}
+              products={products}
+              onDataUpdate={onDataUpdate}
             />
           )}
           {tab.value === 'happy_hour' && (
-            <HappyHourControl 
-              isActive={isHappyHourActive} 
-              timeUntil={timeUntilHappyHour} 
-              onStatusUpdate={onHappyHourStatusUpdate} 
+            <HappyHourControl
+              isActive={isHappyHourActive}
+              timeUntil={timeUntilHappyHour}
+              onStatusUpdate={onHappyHourStatusUpdate}
             />
           )}
           {tab.value === 'history' && <HistoryContainer />}
           {tab.value === 'settings' && <Settings />}
           {tab.value === 'compliance' && <LegalComplianceDashboard />}
           {tab.value === 'closures' && <ClosureContainer />}
-          {tab.value === 'user_management' && user?.is_admin && (
-            <UserManagement token={token} />
-          )}
-          {tab.value === 'audit_trail' && user?.is_admin && (
-            <AuditTrailDashboard token={token} />
-          )}
+          {tab.value === 'user_management' && user?.is_admin && <UserManagement token={token} />}
+          {tab.value === 'audit_trail' && user?.is_admin && <AuditTrailDashboard token={token} />}
         </TabPanel>
       ))}
     </Paper>
   );
 };
 
-export default AppRouter; 
+export default AppRouter;

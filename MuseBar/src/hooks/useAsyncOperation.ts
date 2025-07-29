@@ -22,33 +22,36 @@ export const useAsyncOperation = <T = any>(
   const [state, setState] = useState<Omit<AsyncState<T>, 'error'>>({
     data: null,
     loading: false,
-    success: false
+    success: false,
   });
 
-  const execute = useCallback(async (...args: any[]): Promise<T> => {
-    setState(prev => ({ ...prev, loading: true, success: false }));
-    errorActions.clearError();
+  const execute = useCallback(
+    async (...args: any[]): Promise<T> => {
+      setState(prev => ({ ...prev, loading: true, success: false }));
+      errorActions.clearError();
 
-    try {
-      const result = await asyncFn(...args);
-      setState({
-        data: result,
-        loading: false,
-        success: true
-      });
-      return result;
-    } catch (error) {
-      setState(prev => ({ ...prev, loading: false, success: false }));
-      errorActions.setError(error as Error);
-      throw error;
-    }
-  }, [asyncFn, errorActions]);
+      try {
+        const result = await asyncFn(...args);
+        setState({
+          data: result,
+          loading: false,
+          success: true,
+        });
+        return result;
+      } catch (error) {
+        setState(prev => ({ ...prev, loading: false, success: false }));
+        errorActions.setError(error as Error);
+        throw error;
+      }
+    },
+    [asyncFn, errorActions]
+  );
 
   const reset = useCallback(() => {
     setState({
       data: null,
       loading: false,
-      success: false
+      success: false,
     });
     errorActions.clearError();
   }, [errorActions]);
@@ -60,21 +63,18 @@ export const useAsyncOperation = <T = any>(
   return [
     {
       ...state,
-      error: errorState.error
+      error: errorState.error,
     },
     {
       execute,
       reset,
-      setData
-    }
+      setData,
+    },
   ];
 };
 
 // Specialized hooks for common patterns
-export const useApiCall = <T = any>(
-  apiCall: (...args: any[]) => Promise<T>,
-  apiName: string
-) => {
+export const useApiCall = <T = any>(apiCall: (...args: any[]) => Promise<T>, apiName: string) => {
   return useAsyncOperation(apiCall, `API: ${apiName}`);
 };
 
@@ -85,9 +85,6 @@ export const useFormSubmission = <T = any>(
   return useAsyncOperation(submitFn, `Form: ${formName}`);
 };
 
-export const useDataFetching = <T = any>(
-  fetchFn: () => Promise<T>,
-  resourceName: string
-) => {
+export const useDataFetching = <T = any>(fetchFn: () => Promise<T>, resourceName: string) => {
   return useAsyncOperation(fetchFn, `Fetch: ${resourceName}`);
-}; 
+};

@@ -13,7 +13,7 @@ import {
   AccordionDetails,
   Divider,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -22,7 +22,7 @@ import {
   ExpandMore as ExpandMoreIcon,
   Category as CategoryIcon,
   Archive as ArchiveIcon,
-  Restore as RestoreIcon
+  Restore as RestoreIcon,
 } from '@mui/icons-material';
 import { Category } from '../../types';
 
@@ -67,17 +67,17 @@ const CategorySection: React.FC<CategorySectionProps> = ({
           <Button
             variant="contained"
             startIcon={<AddIcon />}
-            onClick={(e) => {
+            onClick={e => {
               e.stopPropagation();
               onCreateCategory();
             }}
-            size={isMobile ? "small" : "medium"}
+            size={isMobile ? 'small' : 'medium'}
           >
             Nouvelle Catégorie
           </Button>
         </Box>
       </AccordionSummary>
-      
+
       <AccordionDetails>
         {activeCategories.length === 0 ? (
           <Box textAlign="center" py={3}>
@@ -87,17 +87,22 @@ const CategorySection: React.FC<CategorySectionProps> = ({
           </Box>
         ) : (
           <Grid container spacing={2}>
-            {activeCategories.map((category) => (
+            {activeCategories.map(category => (
               <Grid item xs={12} sm={6} md={4} key={category.id}>
-                <Card 
-                  sx={{ 
+                <Card
+                  sx={{
                     height: '100%',
                     borderLeft: `4px solid ${category.color || theme.palette.primary.main}`,
-                    '&:hover': { boxShadow: 3 }
+                    '&:hover': { boxShadow: 3 },
                   }}
                 >
                   <CardContent>
-                    <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
+                    <Box
+                      display="flex"
+                      justifyContent="space-between"
+                      alignItems="flex-start"
+                      mb={1}
+                    >
                       <Typography variant="h6" component="h3" sx={{ flexGrow: 1 }}>
                         {category.name}
                       </Typography>
@@ -127,20 +132,22 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                         </IconButton>
                       </Box>
                     </Box>
-                    
+
                     {category.description && (
                       <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
                         {category.description}
                       </Typography>
                     )}
-                    
+
                     <Box display="flex" justifyContent="space-between" alignItems="center">
                       <Chip
                         size="small"
                         label={category.color || '#1976d2'}
                         sx={{
                           backgroundColor: category.color || theme.palette.primary.main,
-                          color: theme.palette.getContrastText(category.color || theme.palette.primary.main),
+                          color: theme.palette.getContrastText(
+                            category.color || theme.palette.primary.main
+                          ),
                         }}
                       />
                       <Typography variant="caption" color="textSecondary">
@@ -162,17 +169,22 @@ const CategorySection: React.FC<CategorySectionProps> = ({
               📁 Catégories Archivées ({archivedCategories.length})
             </Typography>
             <Grid container spacing={2}>
-              {archivedCategories.map((category) => (
+              {archivedCategories.map(category => (
                 <Grid item xs={12} sm={6} md={4} key={category.id}>
-                  <Card 
-                    sx={{ 
+                  <Card
+                    sx={{
                       height: '100%',
                       opacity: 0.7,
                       borderLeft: `4px solid ${category.color || theme.palette.grey[400]}`,
                     }}
                   >
                     <CardContent>
-                      <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
+                      <Box
+                        display="flex"
+                        justifyContent="space-between"
+                        alignItems="flex-start"
+                        mb={1}
+                      >
                         <Typography variant="h6" component="h3" sx={{ flexGrow: 1 }}>
                           {category.name}
                         </Typography>
@@ -195,19 +207,14 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                           </IconButton>
                         </Box>
                       </Box>
-                      
+
                       {category.description && (
                         <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
                           {category.description}
                         </Typography>
                       )}
-                      
-                      <Chip
-                        size="small"
-                        label="Archivée"
-                        color="default"
-                        variant="outlined"
-                      />
+
+                      <Chip size="small" label="Archivée" color="default" variant="outlined" />
                     </CardContent>
                   </Card>
                 </Grid>
@@ -220,4 +227,4 @@ const CategorySection: React.FC<CategorySectionProps> = ({
   );
 };
 
-export default CategorySection; 
+export default CategorySection;

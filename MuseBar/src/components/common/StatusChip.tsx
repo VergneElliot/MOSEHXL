@@ -21,12 +21,12 @@ const StatusChip: React.FC<StatusChipProps> = ({
   size = 'small',
   icon,
   className,
-  'data-testid': testId
+  'data-testid': testId,
 }) => {
   const config = statusConfig[status] || {
     label: status,
     color: 'default',
-    variant: 'outlined'
+    variant: 'outlined',
   };
 
   return (
@@ -46,19 +46,19 @@ const StatusChip: React.FC<StatusChipProps> = ({
 export const ORDER_STATUS_CONFIG: Record<string, StatusConfig> = {
   pending: { label: 'En attente', color: 'warning' },
   completed: { label: 'Terminé', color: 'success' },
-  cancelled: { label: 'Annulé', color: 'error' }
+  cancelled: { label: 'Annulé', color: 'error' },
 };
 
 export const PAYMENT_STATUS_CONFIG: Record<string, StatusConfig> = {
   paid: { label: 'Payé', color: 'success' },
   pending: { label: 'En attente', color: 'warning' },
-  failed: { label: 'Échec', color: 'error' }
+  failed: { label: 'Échec', color: 'error' },
 };
 
 export const CLOSURE_STATUS_CONFIG: Record<string, StatusConfig> = {
   open: { label: 'Ouvert', color: 'info' },
   closed: { label: 'Clôturé', color: 'success' },
-  locked: { label: 'Verrouillé', color: 'default' }
+  locked: { label: 'Verrouillé', color: 'default' },
 };
 
-export default StatusChip; 
+export default StatusChip;

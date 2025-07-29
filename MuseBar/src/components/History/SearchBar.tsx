@@ -1,16 +1,6 @@
 import React from 'react';
-import {
-  Box,
-  TextField,
-  InputAdornment,
-  IconButton,
-  useTheme,
-  useMediaQuery
-} from '@mui/material';
-import {
-  Search as SearchIcon,
-  Clear as ClearIcon
-} from '@mui/icons-material';
+import { Box, TextField, InputAdornment, IconButton, useTheme, useMediaQuery } from '@mui/material';
+import { Search as SearchIcon, Clear as ClearIcon } from '@mui/icons-material';
 
 interface SearchBarProps {
   search: string;
@@ -21,7 +11,7 @@ interface SearchBarProps {
 const SearchBar: React.FC<SearchBarProps> = ({
   search,
   onSearchChange,
-  placeholder = "Rechercher par ID, date, produit, montant...",
+  placeholder = 'Rechercher par ID, date, produit, montant...',
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -36,8 +26,8 @@ const SearchBar: React.FC<SearchBarProps> = ({
         fullWidth
         placeholder={placeholder}
         value={search}
-        onChange={(e) => onSearchChange(e.target.value)}
-        size={isMobile ? "small" : "medium"}
+        onChange={e => onSearchChange(e.target.value)}
+        size={isMobile ? 'small' : 'medium'}
         InputProps={{
           startAdornment: (
             <InputAdornment position="start">
@@ -46,11 +36,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
           ),
           endAdornment: search && (
             <InputAdornment position="end">
-              <IconButton
-                onClick={handleClear}
-                size="small"
-                edge="end"
-              >
+              <IconButton onClick={handleClear} size="small" edge="end">
                 <ClearIcon />
               </IconButton>
             </InputAdornment>
@@ -68,4 +54,4 @@ const SearchBar: React.FC<SearchBarProps> = ({
   );
 };
 
-export default SearchBar; 
+export default SearchBar;

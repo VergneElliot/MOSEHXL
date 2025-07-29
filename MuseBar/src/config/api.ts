@@ -26,12 +26,12 @@ class ApiConfig {
 
     // Get the current host (works for both localhost and network IPs)
     const currentHost = window.location.hostname;
-    
+
     // Define possible backend URLs to test
     const possibleUrls = [
       `http://${currentHost}:3001`, // Same host as frontend
-      'http://localhost:3001',      // Local fallback
-      'http://127.0.0.1:3001'       // IP fallback
+      'http://localhost:3001', // Local fallback
+      'http://127.0.0.1:3001', // IP fallback
     ];
 
     // Add custom backend URL from environment if available
@@ -40,22 +40,22 @@ class ApiConfig {
     }
 
     console.log('🔍 Testing backend connectivity...');
-    
+
     for (const url of possibleUrls) {
       try {
         console.log(`Testing: ${url}`);
-        
+
         // Create AbortController for timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3000);
-        
+
         const response = await fetch(`${url}/api/health`, {
           method: 'GET',
-          signal: controller.signal
+          signal: controller.signal,
         });
-        
+
         clearTimeout(timeoutId);
-        
+
         if (response.ok) {
           const data = await response.json();
           if (data.status === 'OK') {
@@ -120,9 +120,9 @@ class ApiConfig {
     return {
       baseURL: this.baseURL,
       isInitialized: this.isInitialized,
-      currentHost: window.location.hostname
+      currentHost: window.location.hostname,
     };
   }
 }
 
-export const apiConfig = ApiConfig.getInstance(); 
+export const apiConfig = ApiConfig.getInstance();

@@ -16,7 +16,7 @@ import {
   CircularProgress,
   FormControlLabel,
   Switch,
-  Divider
+  Divider,
 } from '@mui/material';
 import { Product, Category } from '../../types';
 import { ProductFormData } from '../../hooks/useMenuState';
@@ -42,7 +42,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   editingProduct,
   categories,
   loading,
-  error
+  error,
 }) => {
   const isEditing = !!editingProduct;
 
@@ -84,7 +84,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                 <TextField
                   label="Nom du produit"
                   value={form.name}
-                  onChange={(e) => onFormChange('name', e.target.value)}
+                  onChange={e => onFormChange('name', e.target.value)}
                   required
                   fullWidth
                   autoFocus
@@ -95,7 +95,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                 <TextField
                   label="Description (optionnel)"
                   value={form.description}
-                  onChange={(e) => onFormChange('description', e.target.value)}
+                  onChange={e => onFormChange('description', e.target.value)}
                   fullWidth
                   multiline
                   rows={2}
@@ -108,7 +108,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                     label="Prix (€)"
                     type="number"
                     value={form.price}
-                    onChange={(e) => onFormChange('price', e.target.value)}
+                    onChange={e => onFormChange('price', e.target.value)}
                     required
                     fullWidth
                     inputProps={{ min: 0, step: 0.01 }}
@@ -120,11 +120,11 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                     <InputLabel>Taux de TVA</InputLabel>
                     <Select
                       value={form.taxRate}
-                      onChange={(e) => onFormChange('taxRate', e.target.value)}
+                      onChange={e => onFormChange('taxRate', e.target.value)}
                       label="Taux de TVA"
                     >
-                      <MenuItem value={0.10}>10% (Réduit)</MenuItem>
-                      <MenuItem value={0.20}>20% (Normal)</MenuItem>
+                      <MenuItem value={0.1}>10% (Réduit)</MenuItem>
+                      <MenuItem value={0.2}>20% (Normal)</MenuItem>
                       <MenuItem value={0.05}>5.5% (Très réduit)</MenuItem>
                     </Select>
                   </FormControl>
@@ -134,11 +134,11 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                   <InputLabel>Catégorie</InputLabel>
                   <Select
                     value={form.categoryId}
-                    onChange={(e) => onFormChange('categoryId', e.target.value)}
+                    onChange={e => onFormChange('categoryId', e.target.value)}
                     label="Catégorie"
                     required
                   >
-                    {activeCategories.map((category) => (
+                    {activeCategories.map(category => (
                       <MenuItem key={category.id} value={category.id}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Box
@@ -146,7 +146,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                               width: 16,
                               height: 16,
                               backgroundColor: category.color || '#1976d2',
-                              borderRadius: 0.5
+                              borderRadius: 0.5,
                             }}
                           />
                           {category.name}
@@ -170,7 +170,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                   control={
                     <Switch
                       checked={form.isHappyHourEligible}
-                      onChange={(e) => onFormChange('isHappyHourEligible', e.target.checked)}
+                      onChange={e => onFormChange('isHappyHourEligible', e.target.checked)}
                     />
                   }
                   label="Éligible aux réductions Happy Hour"
@@ -182,7 +182,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                       <InputLabel>Type de réduction</InputLabel>
                       <Select
                         value={form.happyHourDiscountType}
-                        onChange={(e) => onFormChange('happyHourDiscountType', e.target.value)}
+                        onChange={e => onFormChange('happyHourDiscountType', e.target.value)}
                         label="Type de réduction"
                       >
                         <MenuItem value="percentage">Pourcentage (%)</MenuItem>
@@ -191,15 +191,19 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                     </FormControl>
 
                     <TextField
-                      label={form.happyHourDiscountType === 'percentage' ? 'Réduction (%)' : 'Réduction (€)'}
+                      label={
+                        form.happyHourDiscountType === 'percentage'
+                          ? 'Réduction (%)'
+                          : 'Réduction (€)'
+                      }
                       type="number"
                       value={form.happyHourDiscountValue}
-                      onChange={(e) => onFormChange('happyHourDiscountValue', e.target.value)}
+                      onChange={e => onFormChange('happyHourDiscountValue', e.target.value)}
                       fullWidth
                       inputProps={{
                         min: 0,
                         max: form.happyHourDiscountType === 'percentage' ? 100 : undefined,
-                        step: form.happyHourDiscountType === 'percentage' ? 1 : 0.01
+                        step: form.happyHourDiscountType === 'percentage' ? 1 : 0.01,
                       }}
                       placeholder={form.happyHourDiscountType === 'percentage' ? '20' : '2.00'}
                       helperText={
@@ -222,7 +226,8 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                 <Typography variant="body2">
                   Prix HT: {parseFloat(form.price) / (1 + form.taxRate)}€
                   <br />
-                  TVA ({Math.round(form.taxRate * 100)}%): {(parseFloat(form.price) * form.taxRate) / (1 + form.taxRate)}€
+                  TVA ({Math.round(form.taxRate * 100)}%):{' '}
+                  {(parseFloat(form.price) * form.taxRate) / (1 + form.taxRate)}€
                   <br />
                   <strong>Prix TTC: {form.price}€</strong>
                 </Typography>
@@ -241,7 +246,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
             disabled={loading || !form.name.trim() || !form.price || !form.categoryId}
             startIcon={loading ? <CircularProgress size={20} /> : undefined}
           >
-            {loading ? 'Enregistrement...' : (isEditing ? 'Modifier' : 'Créer')}
+            {loading ? 'Enregistrement...' : isEditing ? 'Modifier' : 'Créer'}
           </Button>
         </DialogActions>
       </form>
@@ -249,4 +254,4 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   );
 };
 
-export default ProductDialog; 
+export default ProductDialog;
