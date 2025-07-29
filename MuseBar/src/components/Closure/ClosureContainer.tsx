@@ -42,7 +42,7 @@ const ClosureContainer: React.FC = () => {
   // Load data on component mount
   useEffect(() => {
     api.refreshAllData();
-  }, [api]); // Include api dependency
+  }, []); // Remove api dependency to prevent infinite loop
 
   // Event handlers
   const handleCreateClosure = () => {

@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { ApiService } from '../services/apiService';
 import { Order } from '../types';
 import { HistoryStats } from './useHistoryState';
@@ -27,7 +27,7 @@ export const useHistoryAPI = (
   setReturnError: (error: string) => void,
   closeReturnDialog: () => void
 ): HistoryAPIActions => {
-  const apiService = ApiService.getInstance();
+  const apiService = useMemo(() => ApiService.getInstance(), []);
 
   const loadOrders = useCallback(async () => {
     try {

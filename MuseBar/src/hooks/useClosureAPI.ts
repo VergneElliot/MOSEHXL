@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { ApiService } from '../services/apiService';
 import { apiConfig } from '../config/api';
 import { ClosureBulletin } from './useClosureState';
@@ -33,7 +33,7 @@ export const useClosureAPI = (
   setShowCreateDialog: (show: boolean) => void,
   setSelectedDate: (date: string) => void
 ): ClosureAPIActions => {
-  const apiService = ApiService.getInstance();
+  const apiService = useMemo(() => ApiService.getInstance(), []);
 
   const loadBulletins = useCallback(async () => {
     try {

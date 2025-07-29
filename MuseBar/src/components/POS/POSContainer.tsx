@@ -6,6 +6,7 @@ import { usePOSLogic } from '../../hooks/usePOSLogic';
 import CategoryFilter from './CategoryFilter';
 import ProductGrid from './ProductGrid';
 import OrderSummary from './OrderSummary';
+import PaymentDialog from './PaymentDialog';
 
 interface POSContainerProps {
   categories: Category[];
@@ -70,6 +71,18 @@ const POSContainer: React.FC<POSContainerProps> = ({
     actions.setSnackbar({ ...state.snackbar, open: false });
   };
 
+  const handlePaymentComplete = (message: string) => {
+    actions.setSnackbar({ open: true, message, severity: 'success' });
+  };
+
+  const handlePaymentError = (message: string) => {
+    actions.setSnackbar({ open: true, message, severity: 'error' });
+  };
+
+  const handleClosePaymentDialog = () => {
+    actions.setPaymentDialogOpen(false);
+  };
+
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Grid container spacing={2} sx={{ flexGrow: 1 }}>
@@ -132,7 +145,20 @@ const POSContainer: React.FC<POSContainerProps> = ({
         </Alert>
       </Snackbar>
 
-      {/* TODO: Add Payment Dialog Component */}
+      {/* Payment Dialog */}
+      <PaymentDialog
+        open={state.paymentDialogOpen}
+        onClose={handleClosePaymentDialog}
+        currentOrder={state.currentOrder}
+        orderTotal={logic.orderTotal}
+        orderTax={logic.orderTax}
+        orderSubtotal={logic.orderSubtotal}
+        onOrderComplete={handlePaymentComplete}
+        onOrderError={handlePaymentError}
+        onDataUpdate={onDataUpdate}
+        onClearOrder={actions.clearOrder}
+      />
+
       {/* TODO: Add other dialog components (retour, change, etc.) */}
     </Box>
   );

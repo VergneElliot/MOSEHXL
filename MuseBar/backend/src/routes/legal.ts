@@ -644,8 +644,8 @@ router.post('/audit/log', async (req, res) => {
   }
 });
 
-// GET legal compliance status overview
-router.get('/compliance/status', async (req, res) => {
+// GET legal compliance status overview (main endpoint)
+router.get('/compliance/status', requireAuth, async (req, res) => {
   try {
     // Get journal integrity
     const integrity = await LegalJournalModel.verifyJournalIntegrity();
