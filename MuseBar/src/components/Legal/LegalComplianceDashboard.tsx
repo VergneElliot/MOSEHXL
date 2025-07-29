@@ -39,9 +39,7 @@ import {
   VerifiedUser,
   Gavel
 } from '@mui/icons-material';
-import { ApiService } from '../services/apiService';
-
-const apiService = ApiService.getInstance();
+import { useLegalCompliance, useLegalComplianceUtils } from '../../hooks/useLegalCompliance';
 
 interface ComplianceStatus {
   compliance_status: {
@@ -93,53 +91,10 @@ interface ClosureBulletin {
 }
 
 const LegalComplianceDashboard: React.FC = () => {
-  const [complianceStatus, setComplianceStatus] = useState<ComplianceStatus | null>(null);
-  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
-  const [closureBulletins, setClosureBulletins] = useState<ClosureBulletin[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showJournalDialog, setShowJournalDialog] = useState(false);
-  const [showClosuresDialog, setShowClosuresDialog] = useState(false);
+  const [state, actions] = useLegalCompliance();
+  const { formatDate, getIntegrityStatusColor } = useLegalComplianceUtils();
 
-  useEffect(() => {
-    loadComplianceData();
-  }, []);
-
-  const loadComplianceData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Load compliance status
-      const statusResponse = await apiService.get<ComplianceStatus>('/legal/compliance/status');
-      setComplianceStatus(statusResponse.data);
-
-      // Load recent journal entries
-      const journalResponse = await apiService.get<{ entries: JournalEntry[] }>('/legal/journal/entries?limit=10');
-      setJournalEntries(journalResponse.data.entries);
-
-      // Load closure bulletins
-      const closuresResponse = await apiService.get<{ bulletins: ClosureBulletin[] }>('/legal/closure/bulletins?type=DAILY');
-      setClosureBulletins(closuresResponse.data.bulletins);
-
-    } catch (err) {
-      setError('Failed to load compliance data');
-      console.error('Error loading compliance data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getIntegrityStatusColor = (status: string) => {
-    switch (status) {
-      case 'VALID':
-        return 'success';
-      case 'COMPROMISED':
-        return 'error';
-      default:
-        return 'warning';
-    }
-  };
+  // Business logic is now handled by the custom hook
 
   const getIntegrityStatusIcon = (status: string) => {
     switch (status) {
@@ -159,11 +114,7 @@ const LegalComplianceDashboard: React.FC = () => {
     }).format(amount);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('fr-FR');
-  };
-
-  if (loading) {
+  if (state.loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
         <CircularProgress />

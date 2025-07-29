@@ -5,59 +5,21 @@ import {
   Typography,
   Container,
   Box,
-  Tabs,
-  Tab,
-  Paper,
   Chip,
   Button
 } from '@mui/material';
-import {
-  Restaurant as RestaurantIcon,
-  LocalBar as BarIcon,
-  Schedule as ScheduleIcon,
-  Settings as SettingsIcon,
-  Gavel as GavelIcon
-} from '@mui/icons-material';
+import { Restaurant as RestaurantIcon } from '@mui/icons-material';
 import { HappyHourService } from './services/happyHourService';
 import { DataService } from './services/dataService';
 import { Category, Product } from './types';
-import MenuManagement from './components/MenuManagement';
-import POS from './components/POS';
-import HappyHourControl from './components/HappyHourControl';
-import Settings from './components/Settings';
-import HistoryDashboard from './components/HistoryDashboard';
-import LegalComplianceDashboard from './components/LegalComplianceDashboard';
-import ClosureBulletinDashboard from './components/ClosureBulletinDashboard';
-import Login from './components/Login';
-import UserManagement from './components/UserManagement';
-import AuditTrailDashboard from './components/AuditTrailDashboard';
+import AppRouter from './components/common/AppRouter';
+import { Login } from './components/Auth';
 import { ApiService } from './services/apiService';
 import { apiConfig } from './config/api';
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`simple-tabpanel-${index}`}
-      aria-labelledby={`simple-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
-    </div>
-  );
-}
+// TabPanel logic moved to AppRouter
 
 function App() {
-  const [tabValue, setTabValue] = useState(0);
   const [isHappyHourActive, setIsHappyHourActive] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -104,31 +66,23 @@ function App() {
     ApiService.setToken(token);
     if (token) {
       const checkAuthStatus = async () => {
-        // Ensure API config is ready
-        if (!apiConfig.isReady()) {
-          await apiConfig.initialize();
-        }
-        
-        return fetch(apiConfig.getEndpoint('/api/auth/me'), {
-        headers: { Authorization: `Bearer ${token}` }
-        });
-      };
-      
-      checkAuthStatus()
-        .then(res => {
-          if (!res.ok) {
-            throw new Error('Token invalid');
+        try {
+          // Ensure API config is ready
+          if (!apiConfig.isReady()) {
+            await apiConfig.initialize();
           }
-          return res.json();
-        })
-        .then(data => {
+          
+          const response = await ApiService.getInstance().get<any>('/auth/me');
+          const data = response.data;
           setUser(data);
           setPermissions(data.permissions || []);
-        })
-        .catch(() => {
+        } catch (error) {
           // Token expired, logout required
           handleLogout();
-        });
+        }
+      };
+      
+      checkAuthStatus();
     } else {
       setUser(null);
       setPermissions([]);
@@ -152,28 +106,16 @@ function App() {
           await apiConfig.initialize();
         }
         
-        const response = await fetch(apiConfig.getEndpoint('/api/auth/refresh'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ rememberMe })
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setToken(data.token);
-          setTokenExpiresIn(data.expiresIn);
-          
-          // Update localStorage
-          localStorage.setItem('auth_token', data.token);
-          localStorage.setItem('token_expires_in', data.expiresIn);
-          
-          // Token refreshed successfully
-        } else {
-          throw new Error('Failed to refresh token');
-        }
+        const response = await ApiService.getInstance().post<any>('/auth/refresh', { rememberMe });
+        const data = response.data;
+        setToken(data.token);
+        setTokenExpiresIn(data.expiresIn);
+        
+        // Update localStorage
+        localStorage.setItem('auth_token', data.token);
+        localStorage.setItem('token_expires_in', data.expiresIn);
+        
+        // Token refreshed successfully
       } catch (error) {
         console.error('Token refresh failed:', error);
         handleLogout();
@@ -210,24 +152,7 @@ function App() {
     localStorage.removeItem('token_expires_in');
   };
 
-  // Tab permission mapping
-  const TABS = [
-    { label: 'Caisse', icon: <RestaurantIcon />, value: 'pos', permission: 'access_pos' },
-    { label: 'Gestion Menu', icon: <BarIcon />, value: 'menu', permission: 'access_menu' },
-    { label: 'Happy Hour', icon: <ScheduleIcon />, value: 'happy_hour', permission: 'access_happy_hour' },
-    { label: 'Historique', icon: <ScheduleIcon />, value: 'history', permission: 'access_history' },
-    { label: 'Paramètres', icon: <SettingsIcon />, value: 'settings', permission: 'access_settings' },
-    { label: 'Conformité', icon: <GavelIcon />, value: 'compliance', permission: 'access_compliance' },
-    { label: 'Bulletins de Clôture', icon: <GavelIcon />, value: 'closures', permission: 'access_compliance' },
-    { label: 'Gestion utilisateurs', value: 'user_management', adminOnly: true },
-    { label: 'Journal de Sécurité', value: 'audit_trail', adminOnly: true },
-  ];
-
-  const filteredTabs = TABS.filter(tab => {
-    if (tab.adminOnly) return user?.is_admin;
-    if (tab.permission) return user?.permissions?.includes(tab.permission);
-    return true;
-  });
+  // Tab logic moved to AppRouter component
 
   useEffect(() => {
     // Mise à jour initiale
@@ -264,15 +189,13 @@ function App() {
     setTimeUntilHappyHour(happyHourService.getTimeUntilHappyHour());
   };
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
-  };
+  // Tab change handler moved to AppRouter component
 
   return (
     <Box sx={{ flexGrow: 1 }}>
       <AppBar position="static">
         <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }}>
-          <BarIcon sx={{ mr: { xs: 1, sm: 2 } }} />
+          <RestaurantIcon sx={{ mr: { xs: 1, sm: 2 } }} />
           <Typography 
             variant="h6" 
             component="div" 
@@ -364,66 +287,20 @@ function App() {
         </Toolbar>
       </AppBar>
       <Container maxWidth="xl" sx={{ mt: 3 }}>
-        <Paper sx={{ width: '100%' }}>
-          {(!token || !user) ? (
-            <Login onLogin={handleLogin} />
-          ) : (
-            <>
-              <Tabs
-                value={tabValue}
-                onChange={handleTabChange}
-                aria-label="Navigation principale"
-                variant="scrollable"
-                scrollButtons="auto"
-                allowScrollButtonsMobile
-                sx={{
-                  '& .MuiTabs-scrollButtons': {
-                    color: 'primary.main'
-                  },
-                  '& .MuiTab-root': {
-                    minWidth: { xs: 'auto', sm: 90 },
-                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                    px: { xs: 1, sm: 2 },
-                    py: { xs: 1.5, sm: 2 }
-                  },
-                  '& .MuiTab-iconWrapper': {
-                    fontSize: { xs: 18, sm: 20 }
-                  }
-                }}
-              >
-                {filteredTabs.map((tab, idx) => (
-                  <Tab 
-                    key={idx} 
-                    icon={tab.icon} 
-                    label={tab.label}
-                    iconPosition="start"
-                    sx={{
-                      textTransform: 'none',
-                      fontWeight: tabValue === idx ? 600 : 400
-                    }}
-                  />
-                ))}
-              </Tabs>
-              {filteredTabs.map((tab, i) => (
-                <TabPanel value={tabValue} index={i} key={tab.value}>
-                  {tab.value === 'pos' && <POS categories={categories} products={products} isHappyHourActive={isHappyHourActive} onDataUpdate={updateData} />}
-                  {tab.value === 'menu' && <MenuManagement categories={categories} products={products} onDataUpdate={updateData} />}
-                  {tab.value === 'happy_hour' && <HappyHourControl isActive={isHappyHourActive} timeUntil={timeUntilHappyHour} onStatusUpdate={updateHappyHourStatus} />}
-                  {tab.value === 'history' && <HistoryDashboard />}
-                  {tab.value === 'settings' && <Settings />}
-                  {tab.value === 'compliance' && <LegalComplianceDashboard />}
-                  {tab.value === 'closures' && <ClosureBulletinDashboard />}
-                  {tab.value === 'user_management' && user?.is_admin && (
-                    <UserManagement token={token} />
-                  )}
-                  {tab.value === 'audit_trail' && user?.is_admin && (
-                    <AuditTrailDashboard token={token} />
-                  )}
-                </TabPanel>
-              ))}
-            </>
-          )}
-        </Paper>
+        {(!token || !user) ? (
+          <Login onLogin={handleLogin} />
+        ) : (
+          <AppRouter
+            user={user}
+            token={token}
+            categories={categories}
+            products={products}
+            isHappyHourActive={isHappyHourActive}
+            timeUntilHappyHour={timeUntilHappyHour}
+            onDataUpdate={updateData}
+            onHappyHourStatusUpdate={updateHappyHourStatus}
+          />
+        )}
       </Container>
     </Box>
   );
