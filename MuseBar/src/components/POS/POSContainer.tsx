@@ -1,16 +1,8 @@
 import React from 'react';
-import {
-  Box,
-  Grid,
-  Snackbar,
-  Alert,
-  useTheme,
-  useMediaQuery,
-} from '@mui/material';
+import { Box, Grid, Snackbar, Alert } from '@mui/material';
 import { Category, Product, OrderItem } from '../../types';
 import { usePOSState } from '../../hooks/usePOSState';
 import { usePOSLogic } from '../../hooks/usePOSLogic';
-import { usePOSAPI } from '../../hooks/usePOSAPI';
 import CategoryFilter from './CategoryFilter';
 import ProductGrid from './ProductGrid';
 import OrderSummary from './OrderSummary';
@@ -28,12 +20,9 @@ const POSContainer: React.FC<POSContainerProps> = ({
   isHappyHourActive,
   onDataUpdate,
 }) => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-
   // Custom hooks for state management
   const [state, actions] = usePOSState();
-  
+
   // Custom hook for business logic
   const logic = usePOSLogic(
     products,
@@ -44,19 +33,13 @@ const POSContainer: React.FC<POSContainerProps> = ({
     isHappyHourActive
   );
 
-  // Custom hook for API calls
-  const api = usePOSAPI(
-    actions.showSuccess,
-    actions.showError,
-    onDataUpdate
-  );
-
   // Event handlers
   const handleAddToOrder = (item: OrderItem) => {
     // Check if item already exists in order
     const existingIndex = state.currentOrder.findIndex(
-      orderItem => orderItem.productId === item.productId && 
-                   orderItem.isHappyHourApplied === item.isHappyHourApplied
+      orderItem =>
+        orderItem.productId === item.productId &&
+        orderItem.isHappyHourApplied === item.isHappyHourApplied
     );
 
     if (existingIndex >= 0) {
@@ -71,36 +54,16 @@ const POSContainer: React.FC<POSContainerProps> = ({
   const handleUpdateQuantity = (index: number, newQuantity: number) => {
     const updatedOrder = [...state.currentOrder];
     const item = updatedOrder[index];
-    
+
     item.quantity = newQuantity;
     item.totalPrice = item.unitPrice * newQuantity;
     item.taxAmount = item.totalPrice * (item.taxRate / (1 + item.taxRate));
-    
+
     actions.setCurrentOrder(updatedOrder);
   };
 
   const handleCheckout = () => {
     actions.setPaymentDialogOpen(true);
-  };
-
-  const handleProcessPayment = async () => {
-    try {
-      await api.createOrder({
-        totalAmount: logic.orderTotal,
-        totalTax: logic.orderTax,
-        paymentMethod: state.currentPaymentMethod,
-        items: state.currentOrder,
-        tips: parseFloat(state.tips) || 0,
-        change: parseFloat(state.cashAmount) || 0,
-      });
-
-      // Clear order after successful payment
-      actions.clearOrder();
-      actions.setPaymentDialogOpen(false);
-    } catch (error) {
-      // Error is handled by the API hook
-      console.error('Payment processing failed:', error);
-    }
   };
 
   const handleCloseSnackbar = () => {
@@ -175,4 +138,4 @@ const POSContainer: React.FC<POSContainerProps> = ({
   );
 };
 
-export default POSContainer; 
+export default POSContainer;

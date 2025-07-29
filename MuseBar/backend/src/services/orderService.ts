@@ -24,6 +24,7 @@ export interface OrderItemData {
   tax_rate: number;
   tax_amount: number;
   happy_hour_applied?: boolean;
+  happy_hour_discount_amount?: number;
   sub_bill_id?: number;
 }
 
@@ -121,6 +122,7 @@ export class OrderService {
           tax_rate: item.tax_rate,
           tax_amount: item.tax_amount,
           happy_hour_applied: item.happy_hour_applied || false,
+          happy_hour_discount_amount: item.happy_hour_discount_amount || 0,
           sub_bill_id: item.sub_bill_id
         });
         createdItems.push(createdItem);

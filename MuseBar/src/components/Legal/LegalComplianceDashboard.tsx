@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   Box,
   Card,
@@ -25,7 +25,7 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemIcon
+  ListItemIcon,
 } from '@mui/material';
 import {
   CheckCircle,
@@ -37,64 +37,26 @@ import {
   Timeline,
   Receipt,
   VerifiedUser,
-  Gavel
+  Gavel,
 } from '@mui/icons-material';
 import { useLegalCompliance, useLegalComplianceUtils } from '../../hooks/useLegalCompliance';
-
-interface ComplianceStatus {
-  compliance_status: {
-    journal_integrity: string;
-    integrity_errors: string[];
-    last_closure: string | null;
-    certification_required_by: string;
-    certification_bodies: string[];
-    fine_risk: string;
-  };
-  journal_statistics: {
-    total_entries: number;
-    sale_transactions: number;
-    first_entry: string | null;
-    last_entry: string | null;
-  };
-  isca_pillars: {
-    inaltérabilité: string;
-    sécurisation: string;
-    conservation: string;
-    archivage: string;
-  };
-  legal_reference: string;
-  checked_at: string;
-}
-
-interface JournalEntry {
-  id: number;
-  sequence_number: number;
-  transaction_type: string;
-  order_id: number | null;
-  amount: number;
-  vat_amount: number;
-  payment_method: string;
-  timestamp: string;
-  register_id: string;
-}
-
-interface ClosureBulletin {
-  id: number;
-  closure_type: string;
-  period_start: string;
-  period_end: string;
-  total_transactions: number;
-  total_amount: number;
-  total_vat: number;
-  is_closed: boolean;
-  closed_at: string | null;
-}
 
 const LegalComplianceDashboard: React.FC = () => {
   const [state, actions] = useLegalCompliance();
   const { formatDate, getIntegrityStatusColor } = useLegalComplianceUtils();
 
-  // Business logic is now handled by the custom hook
+  // Destructure state for easier access
+  const {
+    loading,
+    error,
+    complianceStatus,
+    journalEntries,
+    closureBulletins,
+    showJournalDialog,
+    showClosuresDialog,
+  } = state;
+
+  const { loadComplianceData, setShowJournalDialog, setShowClosuresDialog } = actions;
 
   const getIntegrityStatusIcon = (status: string) => {
     switch (status) {
@@ -110,11 +72,11 @@ const LegalComplianceDashboard: React.FC = () => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
-      currency: 'EUR'
+      currency: 'EUR',
     }).format(amount);
   };
 
-  if (state.loading) {
+  if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
         <CircularProgress />
@@ -146,7 +108,7 @@ const LegalComplianceDashboard: React.FC = () => {
         <Gavel />
         Conformité Légale Française
       </Typography>
-      
+
       <Typography variant="subtitle1" color="text.secondary" gutterBottom>
         Article 286-I-3 bis du CGI - Système de caisse sécurisé
       </Typography>
@@ -156,23 +118,34 @@ const LegalComplianceDashboard: React.FC = () => {
         <Grid item xs={12} md={6}>
           <Card>
             <CardContent>
-              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography
+                variant="h6"
+                gutterBottom
+                sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+              >
                 <Security />
                 Statut de Conformité
               </Typography>
-              
+
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                 <Chip
-                  icon={getIntegrityStatusIcon(complianceStatus.compliance_status.journal_integrity)}
+                  icon={getIntegrityStatusIcon(
+                    complianceStatus.compliance_status.journal_integrity
+                  )}
                   label={`Intégrité: ${complianceStatus.compliance_status.journal_integrity}`}
-                  color={getIntegrityStatusColor(complianceStatus.compliance_status.journal_integrity) as any}
+                  color={
+                    getIntegrityStatusColor(
+                      complianceStatus.compliance_status.journal_integrity
+                    ) as any
+                  }
                   variant="outlined"
                 />
               </Box>
 
               <Alert severity="warning" sx={{ mb: 2 }}>
                 <AlertTitle>Certification Requise</AlertTitle>
-                Certification obligatoire avant le {complianceStatus.compliance_status.certification_required_by}
+                Certification obligatoire avant le{' '}
+                {complianceStatus.compliance_status.certification_required_by}
                 <br />
                 <strong>Risque d'amende:</strong> {complianceStatus.compliance_status.fine_risk}
               </Alert>
@@ -192,11 +165,15 @@ const LegalComplianceDashboard: React.FC = () => {
         <Grid item xs={12} md={6}>
           <Card>
             <CardContent>
-              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography
+                variant="h6"
+                gutterBottom
+                sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+              >
                 <Timeline />
                 Statistiques du Journal
               </Typography>
-              
+
               <Grid container spacing={2}>
                 <Grid item xs={6}>
                   <Typography variant="h4" color="primary">
@@ -219,10 +196,16 @@ const LegalComplianceDashboard: React.FC = () => {
               <Divider sx={{ my: 2 }} />
 
               <Typography variant="body2" color="text.secondary">
-                <strong>Première entrée:</strong> {complianceStatus.journal_statistics.first_entry ? formatDate(complianceStatus.journal_statistics.first_entry) : 'Aucune'}
+                <strong>Première entrée:</strong>{' '}
+                {complianceStatus.journal_statistics.first_entry
+                  ? formatDate(complianceStatus.journal_statistics.first_entry)
+                  : 'Aucune'}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                <strong>Dernière entrée:</strong> {complianceStatus.journal_statistics.last_entry ? formatDate(complianceStatus.journal_statistics.last_entry) : 'Aucune'}
+                <strong>Dernière entrée:</strong>{' '}
+                {complianceStatus.journal_statistics.last_entry
+                  ? formatDate(complianceStatus.journal_statistics.last_entry)
+                  : 'Aucune'}
               </Typography>
             </CardContent>
           </Card>
@@ -232,11 +215,15 @@ const LegalComplianceDashboard: React.FC = () => {
       {/* ISCA Pillars */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography
+            variant="h6"
+            gutterBottom
+            sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+          >
             <VerifiedUser />
             Piliers ISCA
           </Typography>
-          
+
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6} md={3}>
               <Box sx={{ textAlign: 'center', p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
@@ -247,7 +234,7 @@ const LegalComplianceDashboard: React.FC = () => {
                 </Typography>
               </Box>
             </Grid>
-            
+
             <Grid item xs={12} sm={6} md={3}>
               <Box sx={{ textAlign: 'center', p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
                 <Security color="primary" sx={{ fontSize: 40, mb: 1 }} />
@@ -257,7 +244,7 @@ const LegalComplianceDashboard: React.FC = () => {
                 </Typography>
               </Box>
             </Grid>
-            
+
             <Grid item xs={12} sm={6} md={3}>
               <Box sx={{ textAlign: 'center', p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
                 <Receipt color="primary" sx={{ fontSize: 40, mb: 1 }} />
@@ -267,7 +254,7 @@ const LegalComplianceDashboard: React.FC = () => {
                 </Typography>
               </Box>
             </Grid>
-            
+
             <Grid item xs={12} sm={6} md={3}>
               <Box sx={{ textAlign: 'center', p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
                 <Archive color="primary" sx={{ fontSize: 40, mb: 1 }} />
@@ -302,11 +289,7 @@ const LegalComplianceDashboard: React.FC = () => {
           </Button>
         </Grid>
         <Grid item>
-          <Button
-            variant="contained"
-            startIcon={<CheckCircle />}
-            onClick={loadComplianceData}
-          >
+          <Button variant="contained" startIcon={<CheckCircle />} onClick={loadComplianceData}>
             Actualiser
           </Button>
         </Grid>
@@ -364,19 +347,19 @@ const LegalComplianceDashboard: React.FC = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  journalEntries.map((entry) => (
+                  journalEntries.map(entry => (
                     <TableRow key={entry.id}>
                       <TableCell>{entry.sequence_number}</TableCell>
                       <TableCell>
-                        <Chip 
-                          label={entry.transaction_type} 
+                        <Chip
+                          label={entry.transaction_type}
                           size="small"
                           color={entry.transaction_type === 'SALE' ? 'success' : 'default'}
                         />
                       </TableCell>
                       <TableCell>{entry.order_id || '-'}</TableCell>
                       <TableCell>{formatCurrency(entry.amount)}</TableCell>
-                      <TableCell>{formatCurrency(entry.vat_amount)}</TableCell>
+                      <TableCell>{formatCurrency(entry.vat_amount || 0)}</TableCell>
                       <TableCell>{entry.payment_method}</TableCell>
                       <TableCell>{formatDate(entry.timestamp)}</TableCell>
                     </TableRow>
@@ -425,18 +408,19 @@ const LegalComplianceDashboard: React.FC = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  closureBulletins.map((bulletin) => (
+                  closureBulletins.map(bulletin => (
                     <TableRow key={bulletin.id}>
                       <TableCell>{bulletin.closure_type}</TableCell>
                       <TableCell>
-                        {formatDate(bulletin.period_start)} - {formatDate(bulletin.period_end)}
+                        {bulletin.period_start ? formatDate(bulletin.period_start) : 'N/A'} -{' '}
+                        {bulletin.period_end ? formatDate(bulletin.period_end) : 'N/A'}
                       </TableCell>
                       <TableCell>{bulletin.total_transactions}</TableCell>
                       <TableCell>{formatCurrency(bulletin.total_amount)}</TableCell>
-                      <TableCell>{formatCurrency(bulletin.total_vat)}</TableCell>
+                      <TableCell>{formatCurrency(bulletin.total_vat || 0)}</TableCell>
                       <TableCell>
-                        <Chip 
-                          label={bulletin.is_closed ? 'Clôturé' : 'En cours'} 
+                        <Chip
+                          label={bulletin.is_closed ? 'Clôturé' : 'En cours'}
                           size="small"
                           color={bulletin.is_closed ? 'success' : 'warning'}
                         />
@@ -456,7 +440,7 @@ const LegalComplianceDashboard: React.FC = () => {
       {/* Footer */}
       <Box sx={{ mt: 4, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
         <Typography variant="body2" color="text.secondary" align="center">
-          <strong>Référence légale:</strong> {complianceStatus.legal_reference} | 
+          <strong>Référence légale:</strong> {complianceStatus.legal_reference} |
           <strong>Dernière vérification:</strong> {formatDate(complianceStatus.checked_at)}
         </Typography>
       </Box>
@@ -464,4 +448,4 @@ const LegalComplianceDashboard: React.FC = () => {
   );
 };
 
-export default LegalComplianceDashboard; 
+export default LegalComplianceDashboard;
