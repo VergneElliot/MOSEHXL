@@ -26,7 +26,7 @@ export class ClosureScheduler {
         await AuditTrailModel.logAction({
           action_type: 'AUTO_CLOSURE_ERROR',
           action_details: { error: error instanceof Error ? error.message : 'Unknown error' },
-          ip_address: 'system',
+          ip_address: undefined, // Fixed: use undefined instead of null for TypeScript compatibility
           user_agent: 'ClosureScheduler'
         });
       }
@@ -57,10 +57,12 @@ export class ClosureScheduler {
       }
 
       const now = new Date();
-      const today = now.toISOString().split('T')[0];
       
-      // Check if today has already been closed
-      const closureQuery = `
+      // Determine which business day we might need to close
+      const businessDay = this.calculateBusinessDayToClose(now, settings.daily_closure_time, settings.timezone);
+      
+      // Check if this business day has already been closed
+      const existingClosureQuery = `
         SELECT * FROM closure_bulletins 
         WHERE closure_type = 'DAILY' 
         AND DATE(period_start) = $1
@@ -68,23 +70,122 @@ export class ClosureScheduler {
         ORDER BY created_at DESC
         LIMIT 1
       `;
-      const closureResult = await pool.query(closureQuery, [today]);
+      const existingResult = await pool.query(existingClosureQuery, [businessDay.toISOString().split('T')[0]]);
       
-      if (closureResult.rows.length > 0) {
-        // Already closed today
+      if (existingResult.rows.length > 0) {
+        // Business day already closed - no action needed
         return;
       }
 
       // Check if it's time to close
-      const shouldClose = await this.shouldExecuteClosure(settings, now);
+      const shouldClose = this.shouldExecuteClosure(settings, now, businessDay);
       
       if (shouldClose) {
-        console.log('🔒 Executing automatic daily closure...');
-        await this.executeAutomaticClosure(now);
+        console.log(`🔒 Executing automatic daily closure for business day ${businessDay.toISOString().split('T')[0]}...`);
+        await this.executeAutomaticClosure(now, businessDay);
       }
       
     } catch (error) {
       console.error('❌ Error checking closure conditions:', error);
+      throw error;
+    }
+  }
+
+  // Calculate which business day should be closed based on current time
+  private static calculateBusinessDayToClose(now: Date, closureTime: string, timezone: string): Date {
+    const [hours, minutes] = closureTime.split(':').map(Number);
+    const nowTz = moment.tz(now, timezone);
+    
+    // Create closure time for today
+    const todayClosureTime = nowTz.clone().set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
+    
+    // If current time is past today's closure time, we should close "yesterday's" business day
+    // Example: If it's 2:05 AM on July 30th, we should close business day July 29th
+    if (nowTz.isAfter(todayClosureTime)) {
+      // We're past closure time, so close the business day that just ended
+      return nowTz.clone().subtract(1, 'day').startOf('day').toDate();
+    } else {
+      // We're before closure time, so close the previous business day
+      return nowTz.clone().subtract(2, 'day').startOf('day').toDate();
+    }
+  }
+
+  // Determine if closure should be executed
+  static shouldExecuteClosure(settings: any, now: Date, businessDayToClose: Date): boolean {
+    const [hours, minutes] = settings.daily_closure_time.split(':').map(Number);
+    const timezone = settings.timezone || 'Europe/Paris';
+    const gracePeriodinMinutes = parseInt(settings.grace_period_minutes) || 30; // Default 30 minutes grace period
+    
+    const nowTz = moment.tz(now, timezone);
+    
+    // Calculate when the closure should have happened for this business day
+    // Business day July 29th should close at July 30th 2:00 AM
+    const businessDayEnd = moment.tz(businessDayToClose, timezone)
+      .add(1, 'day')
+      .set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
+    
+    // Check if we're within the grace period after the intended closure time
+    const timeSinceClosureTime = nowTz.diff(businessDayEnd, 'minutes');
+    
+    // Execute if we're past closure time but within grace period
+    return timeSinceClosureTime >= 0 && timeSinceClosureTime <= gracePeriodinMinutes;
+  }
+
+  // Execute automatic closure
+  static async executeAutomaticClosure(now: Date, businessDayToClose?: Date) {
+    try {
+      // Fetch closure settings
+      const settings = await this.getClosureSettings();
+      const closureTime = settings.daily_closure_time || '02:00';
+      const timezone = settings.timezone || 'Europe/Paris';
+
+      // Use provided business day or calculate it
+      const businessDay = businessDayToClose || this.calculateBusinessDayToClose(now, closureTime, timezone);
+
+      console.log(`🔒 Creating closure for business day: ${businessDay.toISOString().split('T')[0]}`);
+      
+      // Create closure bulletin for the correct business day
+      const closureBulletin = await LegalJournalModel.createDailyClosure(businessDay);
+      
+      // Log the automatic closure
+      await AuditTrailModel.logAction({
+        action_type: 'AUTO_CLOSURE_EXECUTED',
+        resource_type: 'CLOSURE_BULLETIN',
+        resource_id: closureBulletin.id.toString(),
+        action_details: {
+          closure_type: 'DAILY',
+          business_day: businessDay.toISOString().split('T')[0],
+          period_start: closureBulletin.period_start,
+          period_end: closureBulletin.period_end,
+          transaction_count: closureBulletin.total_transactions,
+          total_amount: closureBulletin.total_amount,
+          closure_time: now.toISOString(),
+          trigger: 'AUTOMATIC'
+        },
+        ip_address: undefined, // Fixed: use undefined instead of 'system' for inet compatibility
+        user_agent: 'ClosureScheduler'
+      });
+
+      console.log(`✅ Automatic closure completed for business day ${businessDay.toISOString().split('T')[0]}`);
+      console.log(`   - Period: ${closureBulletin.period_start} to ${closureBulletin.period_end}`);
+      console.log(`   - Transactions: ${closureBulletin.total_transactions}`);
+      console.log(`   - Total amount: €${closureBulletin.total_amount}`);
+      console.log(`   - Bulletin ID: ${closureBulletin.id}`);
+      
+      return closureBulletin;
+      
+    } catch (error) {
+      console.error('❌ Failed to execute automatic closure:', error);
+      await AuditTrailModel.logAction({
+        action_type: 'AUTO_CLOSURE_FAILED',
+        action_details: { 
+          error: error instanceof Error ? error.message : 'Unknown error',
+          business_day: businessDayToClose ? businessDayToClose.toISOString().split('T')[0] : 'unknown',
+          closure_time: now.toISOString()
+        },
+        ip_address: undefined, // Fixed: use undefined instead of 'system' for inet compatibility
+        user_agent: 'ClosureScheduler'
+      });
       throw error;
     }
   }
@@ -105,89 +206,6 @@ export class ClosureScheduler {
       timezone: settings.timezone || 'Europe/Paris',
       grace_period_minutes: parseInt(settings.closure_grace_period_minutes || '30')
     };
-  }
-
-  // Determine if closure should be executed
-  static async shouldExecuteClosure(settings: any, now: Date) {
-    const [hours, minutes] = settings.daily_closure_time.split(':').map(Number);
-    
-    // Create target closure time for today
-    const targetTime = new Date(now);
-    targetTime.setHours(hours, minutes, 0, 0);
-    
-    // If the target time has passed today, check if we're within grace period
-    if (now >= targetTime) {
-      const timeDiff = now.getTime() - targetTime.getTime();
-      const gracePeriodinMs = settings.grace_period_minutes * 60 * 1000;
-      
-      // Execute if within grace period
-      return timeDiff <= gracePeriodinMs;
-    }
-    
-    return false;
-  }
-
-  // Execute automatic closure
-  static async executeAutomaticClosure(now: Date) {
-    try {
-      // Fetch closure settings
-      const settings = await this.getClosureSettings();
-      const closureTime = settings.daily_closure_time || '02:00';
-      const timezone = settings.timezone || 'Europe/Paris';
-
-      // Determine which business day to close
-      // If closure time is in the AM and now is after closure time, close previous day
-      const nowTz = moment.tz(now, timezone);
-      const closureHour = parseInt(closureTime.split(':')[0], 10);
-      let businessDay = nowTz.clone();
-      if (closureHour < 12 && nowTz.hour() < closureHour) {
-        // Before closure time, close previous day
-        businessDay = businessDay.subtract(1, 'day');
-      }
-      businessDay.set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
-
-      // Create closure bulletin for the correct business day
-      const closureBulletin = await LegalJournalModel.createDailyClosure(businessDay.toDate());
-      
-      // Log the automatic closure
-      await AuditTrailModel.logAction({
-        action_type: 'AUTO_CLOSURE_EXECUTED',
-        resource_type: 'CLOSURE_BULLETIN',
-        resource_id: closureBulletin.id.toString(),
-        action_details: {
-          closure_type: 'DAILY',
-          period_start: businessDay.toISOString(),
-          transaction_count: closureBulletin.total_transactions,
-          total_amount: closureBulletin.total_amount,
-          closure_time: now.toISOString(),
-          trigger: 'AUTOMATIC'
-        },
-        ip_address: 'system',
-        user_agent: 'ClosureScheduler'
-      });
-
-      console.log(`✅ Automatic closure completed for ${businessDay.format('YYYY-MM-DD')}`);
-      console.log(`   - Transactions: ${closureBulletin.total_transactions}`);
-      console.log(`   - Total amount: €${closureBulletin.total_amount}`);
-      console.log(`   - Bulletin ID: ${closureBulletin.id}`);
-      
-      return closureBulletin;
-      
-    } catch (error) {
-      console.error('❌ Failed to execute automatic closure:', error);
-      
-      await AuditTrailModel.logAction({
-        action_type: 'AUTO_CLOSURE_FAILED',
-        action_details: { 
-          error: error instanceof Error ? error.message : 'Unknown error',
-          closure_time: now.toISOString()
-        },
-        ip_address: 'system',
-        user_agent: 'ClosureScheduler'
-      });
-      
-      throw error;
-    }
   }
 
   // Get scheduler status

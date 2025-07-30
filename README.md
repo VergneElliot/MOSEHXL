@@ -27,6 +27,25 @@ MOSEHXL/
 - **main** - Production branch (stable, legally compliant)
 - **development** - Development branch (new features, testing)
 
+## 🚀 Quick Deployment to Production
+
+For detailed step-by-step deployment instructions, see **[DEPLOYMENT-GUIDE-STEP-BY-STEP.md](./DEPLOYMENT-GUIDE-STEP-BY-STEP.md)**.
+
+### Option 1: DigitalOcean (Recommended - $27/month)
+- 2 months FREE with $200 credit
+- Automated deployment script included
+- Professional SSL setup
+- Managed database with backups
+
+### Option 2: Railway ($5-15/month)
+- Git-based deployment
+- Auto-scaling
+- Built-in database
+
+### Option 3: Free Tier (Render + Supabase)
+- Start free, scale when needed
+- Great for testing and development
+
 ## 🛠️ Development Setup
 
 ### Prerequisites
