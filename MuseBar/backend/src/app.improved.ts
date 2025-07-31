@@ -1,181 +1,439 @@
+/**
+ * Professional MuseBar Backend Application
+ * Enhanced with comprehensive security, logging, monitoring, and error handling
+ */
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
-import { Pool } from 'pg';
-import config from '../config';
-import { ClosureScheduler } from './utils/closureScheduler';
 
-// Import middleware
-import { errorHandler, notFound } from './middleware/errorHandler';
-import { Logger } from './middleware/logger';
+// Import our professional modules
+import { initializeEnvironment, EnvironmentConfig } from './config/environment';
+import { initializeLogger, requestLoggerMiddleware } from './utils/logger';
+import { DatabaseManager, getDatabaseHealth } from './config/database';
+import { createSecurityMiddleware, createCorsOptions } from './middleware/security';
+import { createErrorHandler, notFound } from './middleware/errorHandler';
 
-// Load environment variables
-dotenv.config();
-
-const app = express();
-
-// Get environment configuration
-const NODE_ENV = process.env.NODE_ENV || 'production';
-const currentConfig = config[NODE_ENV as keyof typeof config];
-const PORT = currentConfig.server.port;
-
-console.log(`🌍 Starting ${currentConfig.app.name} in ${NODE_ENV} mode`);
-
-// Trust proxy for accurate IP addresses
-app.set('trust proxy', 1);
-
-// Security middleware
-app.use(cors({
-  origin: currentConfig.server.corsOrigin.split(',').map((origin: string) => origin.trim()),
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
-
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Request logging middleware
-app.use(Logger.logRequest);
-
-// Database connection with environment-specific configuration
-export const pool = new Pool({
-  user: currentConfig.database.user,
-  host: currentConfig.database.host,
-  database: currentConfig.database.database,
-  password: currentConfig.database.password,
-  port: currentConfig.database.port,
-  // Connection pool settings
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
-
-// Test database connection
-pool.connect()
-  .then(client => {
-    console.log(`📊 Connected to database: ${currentConfig.database.database}`);
-    client.release();
-  })
-  .catch(err => {
-    console.error('❌ Database connection failed:', err);
-    process.exit(1);
-  });
-
-// Health check route with detailed status
-app.get('/api/health', async (req, res) => {
-  try {
-    // Test database connection
-    const client = await pool.connect();
-    await client.query('SELECT NOW()');
-    client.release();
-
-    res.status(200).json({
-      success: true,
-      status: 'OK',
-      message: `${currentConfig.app.name} API is running`,
-      environment: NODE_ENV,
-      version: currentConfig.app.version,
-      timestamp: new Date().toISOString(),
-      database: 'connected'
-    });
-  } catch (error) {
-    res.status(503).json({
-      success: false,
-      status: 'ERROR',
-      message: 'Service unavailable',
-      error: 'Database connection failed'
-    });
-  }
-});
-
-// API Routes
+// Import routes
 import categoriesRouter from './routes/categories';
 import productsRouter from './routes/products';
-// import ordersRouter from './routes/orders.new'; // Use improved orders route
-import ordersRouter from './routes/orders'; // Keep existing for now
+import ordersRouter from './routes/orders';
 import legalRouter from './routes/legal';
 import authRouter from './routes/auth';
+import docsRouter from './routes/docs';
 
-// Mount routes with API versioning
-app.use('/api/v1/categories', categoriesRouter);
-app.use('/api/v1/products', productsRouter);
-app.use('/api/v1/orders', ordersRouter);
-app.use('/api/v1/legal', legalRouter);
-app.use('/api/v1/auth', authRouter);
+// Import utilities
+import { ClosureScheduler } from './utils/closureScheduler';
 
-// Maintain backward compatibility with non-versioned routes
-app.use('/api/categories', categoriesRouter);
-app.use('/api/products', productsRouter);
-app.use('/api/orders', ordersRouter);
-app.use('/api/legal', legalRouter);
-app.use('/api/auth', authRouter);
+/**
+ * Professional Application Class
+ */
+class MuseBarApplication {
+  private app: express.Application;
+  private config!: EnvironmentConfig; // Initialized in initializeApplication()
+  private logger!: any; // Initialized in initializeApplication()
+  private database!: DatabaseManager; // Initialized in initializeApplication()
+  private securityMiddleware: any;
 
-// Handle 404 for unknown routes
-app.use(notFound);
-
-// Global error handling middleware (must be last)
-app.use(errorHandler);
-
-// Graceful shutdown handling
-const gracefulShutdown = () => {
-  console.log('🔄 Received shutdown signal, closing HTTP server...');
-  
-  pool.end(() => {
-    console.log('📊 Database connection pool closed');
-  });
-
-  if (NODE_ENV === 'production') {
-    ClosureScheduler.stop();
-    console.log('⏸️ Closure scheduler stopped');
+  constructor() {
+    this.app = express();
+    this.initializeApplication();
   }
 
-  process.exit(0);
-};
+  /**
+   * Initialize the complete application
+   */
+  private async initializeApplication(): Promise<void> {
+    try {
+      // 1. Initialize environment and configuration
+      this.config = initializeEnvironment();
+      
+      // 2. Initialize logging system
+      this.logger = initializeLogger(this.config);
+      this.logger.info('Application initialization started', {}, 'STARTUP');
 
-process.on('SIGTERM', gracefulShutdown);
-process.on('SIGINT', gracefulShutdown);
+      // 3. Initialize database connection
+      this.database = DatabaseManager.getInstance(this.config, this.logger);
+      await this.database.performHealthCheck();
 
-// Start the server
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 ${currentConfig.app.name} API Server running on port ${PORT}`);
-  console.log(`🔧 Environment: ${NODE_ENV}`);
-  console.log(`🌐 Server accessible on:`);
-  console.log(`   - Local: http://localhost:${PORT}`);
-  console.log(`   - Health: http://localhost:${PORT}/api/health`);
-  console.log(`   - API v1: http://localhost:${PORT}/api/v1/`);
-  
-  if (currentConfig.debug?.enabled) {
-    console.log(`🐛 Debug mode enabled (${currentConfig.debug.logLevel})`);
+      // 4. Setup middleware stack
+      this.setupMiddleware();
+
+      // 5. Setup routes
+      this.setupRoutes();
+
+      // 6. Setup error handling
+      this.setupErrorHandling();
+
+      // 7. Start server
+      this.startServer();
+
+      this.logger.info('Application initialization completed successfully', {}, 'STARTUP');
+
+    } catch (error) {
+      console.error('❌ Failed to initialize application:', error);
+      process.exit(1);
+    }
   }
 
-  // Start the automatic closure scheduler (only in production)
-  if (NODE_ENV === 'production' && currentConfig.legal.journalEnabled) {
-    ClosureScheduler.start().catch(error => {
-      console.error('❌ Failed to start closure scheduler:', error);
+  /**
+   * Setup comprehensive middleware stack
+   */
+  private setupMiddleware(): void {
+    this.logger.info('Setting up middleware stack', {}, 'STARTUP');
+
+    // Trust proxy for production deployments
+    if (this.config.server.trustProxy) {
+      this.app.set('trust proxy', 1);
+    }
+
+    // Request ID and logging middleware
+    this.app.use(requestLoggerMiddleware(this.logger));
+
+    // CORS configuration
+    this.app.use(cors(createCorsOptions(this.config)));
+
+    // Body parsing middleware
+    this.app.use(express.json({ 
+      limit: '10mb',
+      verify: (req, res, buf) => {
+        // Store raw body for webhook verification if needed
+        (req as any).rawBody = buf;
+      }
+    }));
+    this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+    // Security middleware stack
+    this.securityMiddleware = createSecurityMiddleware(this.config, this.logger, {
+      enableRateLimit: this.config.app.environment === 'production',
+      enableInputSanitization: true,
+      enableSecurityHeaders: true,
+      enableRequestSizeLimit: true,
+      maxRequestSizeKB: 10 * 1024, // 10MB
     });
-    console.log('⏰ Automatic closure scheduler started');
-  } else {
-    console.log('⏸️ Automatic closure scheduler disabled');
+    this.app.use(this.securityMiddleware);
+
+    this.logger.info('Middleware stack configured successfully', {}, 'STARTUP');
   }
 
-  Logger.logSystemEvent('SERVER_START', {
-    port: PORT,
-    environment: NODE_ENV,
-    version: currentConfig.app.version
-  });
-});
+  /**
+   * Setup API routes
+   */
+  private setupRoutes(): void {
+    this.logger.info('Setting up API routes', {}, 'STARTUP');
 
-// Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-  console.error('💥 Uncaught Exception:', error);
-  gracefulShutdown();
-});
+    // Health check endpoints
+    this.app.get('/health', this.createHealthCheckHandler());
+    this.app.get('/api/health', this.createHealthCheckHandler());
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
-  gracefulShutdown();
-});
+    // System status endpoint
+    this.app.get('/api/status', this.createStatusHandler());
 
-export default app; 
+    // API routes
+    this.app.use('/api/categories', categoriesRouter);
+    this.app.use('/api/products', productsRouter);
+    this.app.use('/api/orders', ordersRouter);
+    this.app.use('/api/legal', legalRouter);
+    this.app.use('/api/auth', authRouter);
+
+    // API Documentation (if enabled)
+    if (this.config.features.swaggerEnabled) {
+      this.app.use('/api/docs', docsRouter);
+      this.logger.info('API documentation enabled at /api/docs', {}, 'STARTUP');
+    }
+
+    // API metrics endpoint (development only)
+    if (this.config.app.environment === 'development') {
+      this.app.get('/api/metrics', this.createMetricsHandler());
+    }
+
+    this.logger.info('API routes configured successfully', {}, 'STARTUP');
+  }
+
+  /**
+   * Setup error handling
+   */
+  private setupErrorHandling(): void {
+    this.logger.info('Setting up error handling', {}, 'STARTUP');
+
+    // 404 handler for unknown routes
+    this.app.use(notFound);
+
+    // Global error handler
+    this.app.use(createErrorHandler(this.logger));
+
+    // Process-level error handlers
+    process.on('unhandledRejection', (reason, promise) => {
+      this.logger.error(
+        'Unhandled Promise Rejection',
+        reason instanceof Error ? reason : new Error(String(reason)),
+        { promise: promise.toString() },
+        'PROCESS'
+      );
+    });
+
+    process.on('uncaughtException', (error) => {
+      this.logger.error(
+        'Uncaught Exception - Application will exit',
+        error,
+        {},
+        'PROCESS'
+      );
+      
+      // Graceful shutdown
+      this.gracefulShutdown('UNCAUGHT_EXCEPTION');
+    });
+
+    // Graceful shutdown handlers
+    process.on('SIGTERM', () => this.gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => this.gracefulShutdown('SIGINT'));
+
+    this.logger.info('Error handling configured successfully', {}, 'STARTUP');
+  }
+
+  /**
+   * Start the server
+   */
+  private startServer(): void {
+    const server = this.app.listen(this.config.server.port, this.config.server.host, () => {
+      this.logger.info('🚀 MuseBar API Server started successfully', {
+        port: this.config.server.port,
+        host: this.config.server.host,
+        environment: this.config.app.environment,
+        nodeVersion: process.version,
+        platform: process.platform,
+      }, 'STARTUP');
+
+      console.log(`🌐 Server accessible on:`);
+      console.log(`   - Local: http://localhost:${this.config.server.port}`);
+      console.log(`   - Network: http://[YOUR-LOCAL-IP]:${this.config.server.port}`);
+      
+      if (this.config.features.swaggerEnabled) {
+        console.log(`📚 API Documentation: http://localhost:${this.config.server.port}/api/docs`);
+      }
+    });
+
+    // Setup server error handling
+    server.on('error', (error: any) => {
+      if (error.code === 'EADDRINUSE') {
+        this.logger.error(
+          `Port ${this.config.server.port} is already in use`,
+          error,
+          { port: this.config.server.port },
+          'STARTUP'
+        );
+      } else {
+        this.logger.error(
+          'Server error occurred',
+          error,
+          {},
+          'STARTUP'
+        );
+      }
+      process.exit(1);
+    });
+
+    // Start background services
+    this.startBackgroundServices();
+
+    // Store server reference for graceful shutdown
+    (this as any).server = server;
+  }
+
+  /**
+   * Start background services
+   */
+  private startBackgroundServices(): void {
+    // Start automatic closure scheduler (only in production)
+    if (this.config.features.autoClosureEnabled) {
+      ClosureScheduler.start().then(() => {
+        this.logger.info('Automatic closure scheduler started', {}, 'SCHEDULER');
+      }).catch(error => {
+        this.logger.error(
+          'Failed to start closure scheduler',
+          error,
+          {},
+          'SCHEDULER'
+        );
+      });
+    } else {
+      this.logger.info('Automatic closure scheduler disabled', {}, 'SCHEDULER');
+    }
+  }
+
+  /**
+   * Create health check handler
+   */
+  private createHealthCheckHandler() {
+    return async (req: express.Request, res: express.Response) => {
+      const startTime = Date.now();
+
+      try {
+        const dbHealth = getDatabaseHealth(this.database);
+        const duration = Date.now() - startTime;
+
+        const health = {
+          status: dbHealth.status === 'healthy' ? 'OK' : 'DEGRADED',
+          timestamp: new Date().toISOString(),
+          uptime: process.uptime(),
+          environment: this.config.app.environment,
+          version: this.config.app.version,
+          checks: {
+            database: dbHealth,
+            memory: {
+              used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+              total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
+              external: Math.round(process.memoryUsage().external / 1024 / 1024),
+            },
+            responseTime: duration,
+          },
+        };
+
+        const statusCode = health.status === 'OK' ? 200 : 503;
+        res.status(statusCode).json(health);
+
+      } catch (error) {
+        this.logger.error(
+          'Health check failed',
+          error as Error,
+          {},
+          'HEALTH_CHECK',
+          (req as any).requestId
+        );
+
+        res.status(503).json({
+          status: 'ERROR',
+          timestamp: new Date().toISOString(),
+          error: 'Health check failed',
+        });
+      }
+    };
+  }
+
+  /**
+   * Create system status handler
+   */
+  private createStatusHandler() {
+    return async (req: express.Request, res: express.Response) => {
+      try {
+        const dbStats = this.database.getStats();
+        const securityStats = this.securityMiddleware?.getStats();
+
+        const status = {
+          application: {
+            name: this.config.app.name,
+            version: this.config.app.version,
+            environment: this.config.app.environment,
+            uptime: process.uptime(),
+            pid: process.pid,
+            nodeVersion: process.version,
+          },
+          database: {
+            ...this.database.getInfo(),
+            statistics: dbStats,
+          },
+          security: securityStats,
+          system: {
+            platform: process.platform,
+            arch: process.arch,
+            memory: process.memoryUsage(),
+            cpuUsage: process.cpuUsage(),
+          },
+          features: this.config.features,
+        };
+
+        res.json(status);
+
+      } catch (error) {
+        this.logger.error(
+          'Status endpoint failed',
+          error as Error,
+          {},
+          'STATUS',
+          (req as any).requestId
+        );
+
+        res.status(500).json({
+          error: 'Failed to retrieve system status',
+        });
+      }
+    };
+  }
+
+  /**
+   * Create metrics handler (development only)
+   */
+  private createMetricsHandler() {
+    return (req: express.Request, res: express.Response) => {
+      // This would integrate with a metrics collection system
+      // For now, return basic metrics
+      const metrics = {
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        cpu: process.cpuUsage(),
+        database: this.database.getStats(),
+        security: this.securityMiddleware?.getStats(),
+      };
+
+      res.json(metrics);
+    };
+  }
+
+  /**
+   * Graceful shutdown handler
+   */
+  private async gracefulShutdown(signal: string): Promise<void> {
+    this.logger.info(`Received ${signal}. Starting graceful shutdown...`, {}, 'SHUTDOWN');
+
+    const shutdownTimeout = setTimeout(() => {
+      this.logger.error('Shutdown timeout exceeded. Forcing exit.', undefined, {}, 'SHUTDOWN');
+      process.exit(1);
+    }, 30000); // 30 seconds timeout
+
+    try {
+      // Stop accepting new connections
+      if ((this as any).server) {
+        (this as any).server.close(() => {
+          this.logger.info('HTTP server closed', {}, 'SHUTDOWN');
+        });
+      }
+
+      // Cleanup security middleware
+      if (this.securityMiddleware?.destroy) {
+        this.securityMiddleware.destroy();
+        this.logger.info('Security middleware cleaned up', {}, 'SHUTDOWN');
+      }
+
+      // Close database connections
+      if (this.database) {
+        await this.database.close();
+        this.logger.info('Database connections closed', {}, 'SHUTDOWN');
+      }
+
+      clearTimeout(shutdownTimeout);
+      this.logger.info('Graceful shutdown completed', {}, 'SHUTDOWN');
+      process.exit(0);
+
+    } catch (error) {
+      clearTimeout(shutdownTimeout);
+      this.logger.error(
+        'Error during shutdown',
+        error as Error,
+        {},
+        'SHUTDOWN'
+      );
+      process.exit(1);
+    }
+  }
+
+  /**
+   * Get Express app instance
+   */
+  public getApp(): express.Application {
+    return this.app;
+  }
+}
+
+// Create and export the application
+const museBarApp = new MuseBarApplication();
+export default museBarApp.getApp(); 
