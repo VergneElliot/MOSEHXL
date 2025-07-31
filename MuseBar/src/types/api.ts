@@ -1,62 +1,118 @@
-// API request and response types
+/**
+ * API Response Types
+ * Proper TypeScript definitions for all API responses
+ */
 
+// Base API response structure
 export interface ApiResponse<T = any> {
-  data: T;
   success: boolean;
   message?: string;
+  data?: T;
   error?: string;
 }
 
-export interface ApiError {
-  error: string;
-  details?: string;
-  code?: string | number;
-}
-
-export interface PaginatedResponse<T> {
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
-
-export interface BusinessInfo {
+// Establishment types
+export interface Establishment {
+  id: string;
   name: string;
-  address: string;
-  phone: string;
   email: string;
-  siret: string;
-  tax_identification: string;
+  phone?: string;
+  address?: string;
+  schema_name: string;
+  subscription_plan: 'basic' | 'premium' | 'enterprise';
+  subscription_status: 'active' | 'suspended' | 'cancelled';
+  created_at: string;
+  updated_at: string;
+  stats?: {
+    totalOrders: number;
+    totalRevenue: number;
+    activeUsers: number;
+    subscriptionStatus: string;
+  };
 }
 
-export interface LegalComplianceStatus {
-  compliance_status: {
-    journal_integrity: string;
-    integrity_errors: string[];
-    last_closure: string | null;
-    certification_required_by: string;
-    certification_bodies: string[];
-    fine_risk: string;
-  };
-  journal_statistics: {
-    total_entries: number;
-    sale_transactions: number;
-    first_entry: string | null;
-    last_entry: string | null;
-  };
-  isca_pillars: {
-    inaltérabilité: string;
-    sécurisation: string;
-    conservation: string;
-    archivage: string;
-  };
-  legal_reference: string;
-  checked_at: string;
+export interface CreateEstablishmentData {
+  name: string;
+  email: string;
+  phone?: string;
+  address?: string;
+  subscription_plan?: 'basic' | 'premium' | 'enterprise';
 }
 
+export interface EstablishmentResponse extends ApiResponse<Establishment> {}
+export interface EstablishmentsResponse extends ApiResponse<Establishment[]> {
+  count: number;
+}
+
+// User invitation types
+export interface UserInvitation {
+  id: string;
+  email: string;
+  establishment_id: string;
+  establishment_name: string;
+  role: string;
+  first_name?: string;
+  last_name?: string;
+  invitation_token: string;
+  expires_at: string;
+  status: 'pending' | 'accepted' | 'expired' | 'cancelled';
+  created_at: string;
+}
+
+export interface InvitationResponse extends ApiResponse<UserInvitation> {}
+export interface InvitationsResponse extends ApiResponse<UserInvitation[]> {
+  count: number;
+}
+
+// User management types
+export interface SendInvitationData {
+  email: string;
+  role: string;
+  first_name?: string;
+  last_name?: string;
+  establishment_id?: string;
+}
+
+export interface SendEstablishmentInvitationData {
+  name: string;
+  email: string;
+  phone?: string;
+  address?: string;
+  subscription_plan?: 'basic' | 'premium' | 'enterprise';
+}
+
+// Authentication types
+export interface LoginResponse extends ApiResponse<{
+  token: string;
+  user: {
+    id: number;
+    email: string;
+    is_admin: boolean;
+  };
+  expiresIn: string;
+}> {}
+
+export interface UserProfile {
+  id: number;
+  email: string;
+  is_admin: boolean;
+  permissions: string[];
+}
+
+export interface UserProfileResponse extends ApiResponse<UserProfile> {}
+
+// Generic success/error responses
+export interface SuccessResponse extends ApiResponse {
+  success: true;
+  message: string;
+}
+
+export interface ErrorResponse extends ApiResponse {
+  success: false;
+  error: string;
+}
+
+// Closure bulletin types
 export interface ClosureBulletin {
   id: number;
   closure_type: 'DAILY' | 'MONTHLY' | 'ANNUAL';
@@ -80,25 +136,13 @@ export interface ClosureBulletin {
   change_total?: number;
 }
 
-// HTTP method types
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-
-// Common API endpoint patterns
-export interface ApiEndpoints {
-  auth: {
-    login: string;
-    logout: string;
-    me: string;
-    refresh: string;
-  };
-  business: {
-    categories: string;
-    products: string;
-    orders: string;
-  };
-  legal: {
-    compliance: string;
-    closures: string;
-    journal: string;
-  };
-}
+// Union type for all possible API responses
+export type ApiResponseType = 
+  | EstablishmentResponse
+  | EstablishmentsResponse
+  | InvitationResponse
+  | InvitationsResponse
+  | LoginResponse
+  | UserProfileResponse
+  | SuccessResponse
+  | ErrorResponse;
