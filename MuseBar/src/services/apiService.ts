@@ -418,8 +418,8 @@ export class ApiService {
 
   // Generic HTTP methods for other components
   async get<T>(endpoint: string): Promise<{ data: T }> {
-    const data = await this.request<T>(endpoint);
-    return { data };
+    const result = await this.request<T>(endpoint);
+    return { data: result };
   }
 
   async post<T>(endpoint: string, data?: any): Promise<{ data: T }> {

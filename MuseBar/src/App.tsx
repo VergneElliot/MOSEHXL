@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import { AppBar, Toolbar, Typography, Container, Box, Chip, Button } from '@mui/material';
 import { Restaurant as RestaurantIcon } from '@mui/icons-material';
 import { HappyHourService } from './services/happyHourService';
@@ -6,6 +7,7 @@ import { DataService } from './services/dataService';
 import { Category, Product } from './types';
 import AppRouter from './components/common/AppRouter';
 import { Login } from './components/Auth';
+import InvitationAcceptance from './components/InvitationAcceptance';
 import { apiService, ApiService } from './services/apiService';
 import { apiConfig } from './config/api';
 
@@ -279,20 +281,35 @@ function App() {
         </Toolbar>
       </AppBar>
       <Container maxWidth="xl" sx={{ mt: 3 }}>
-        {!token || !user ? (
-          <Login onLogin={handleLogin} />
-        ) : (
-          <AppRouter
-            user={user}
-            token={token}
-            categories={categories}
-            products={products}
-            isHappyHourActive={isHappyHourActive}
-            timeUntilHappyHour={timeUntilHappyHour}
-            onDataUpdate={updateData}
-            onHappyHourStatusUpdate={updateHappyHourStatus}
+        <Routes>
+          <Route 
+            path="/accept-invitation" 
+            element={<InvitationAcceptance />} 
           />
-        )}
+          <Route 
+            path="/accept-establishment-invitation" 
+            element={<InvitationAcceptance />} 
+          />
+          <Route 
+            path="*" 
+            element={
+              !token || !user ? (
+                <Login onLogin={handleLogin} />
+              ) : (
+                <AppRouter
+                  user={user}
+                  token={token}
+                  categories={categories}
+                  products={products}
+                  isHappyHourActive={isHappyHourActive}
+                  timeUntilHappyHour={timeUntilHappyHour}
+                  onDataUpdate={updateData}
+                  onHappyHourStatusUpdate={updateHappyHourStatus}
+                />
+              )
+            } 
+          />
+        </Routes>
       </Container>
     </Box>
   );

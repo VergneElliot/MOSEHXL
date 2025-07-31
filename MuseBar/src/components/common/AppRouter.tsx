@@ -17,7 +17,7 @@ import { HistoryContainer } from '../History';
 import Settings from '../Settings';
 import { LegalComplianceDashboard } from '../Legal';
 import { ClosureContainer } from '../Closure';
-import { UserManagement, AuditTrailDashboard } from '../Admin';
+import { UserManagement, AuditTrailDashboard, EstablishmentManagement } from '../Admin';
 
 // Types
 import { Category, Product } from '../../types';
@@ -104,6 +104,7 @@ const AppRouter: React.FC<AppRouterProps> = ({
     },
     { label: 'Gestion utilisateurs', value: 'user_management', adminOnly: true },
     { label: 'Journal de Sécurité', value: 'audit_trail', adminOnly: true },
+    { label: 'Gestion Établissements', value: 'establishment_management', adminOnly: true },
   ];
 
   const filteredTabs = TABS.filter(tab => {
@@ -184,6 +185,7 @@ const AppRouter: React.FC<AppRouterProps> = ({
           {tab.value === 'closures' && <ClosureContainer />}
           {tab.value === 'user_management' && user?.is_admin && <UserManagement token={token} />}
           {tab.value === 'audit_trail' && user?.is_admin && <AuditTrailDashboard token={token} />}
+          {tab.value === 'establishment_management' && user?.is_admin && <EstablishmentManagement token={token} />}
         </TabPanel>
       ))}
     </Paper>

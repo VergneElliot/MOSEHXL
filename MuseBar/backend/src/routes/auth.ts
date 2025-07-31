@@ -226,4 +226,39 @@ router.post('/logout', requireAuth, async (req, res) => {
   res.json({ message: 'Logged out' });
 });
 
+// POST /api/auth/setup (temporary endpoint for initial setup)
+router.post('/setup', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password required' });
+    }
+    
+    // Check if any admin user already exists
+    const existingAdmin = await pool.query('SELECT COUNT(*) FROM users WHERE is_admin = true');
+    if (parseInt(existingAdmin.rows[0].count) > 0) {
+      return res.status(400).json({ error: 'Admin user already exists' });
+    }
+    
+    // Create admin user
+    const user = await UserModel.createUser(email, password, true);
+    
+    // Update user with additional fields
+    await pool.query(`
+      UPDATE users 
+      SET first_name = 'System', last_name = 'Administrator', role = 'system_admin', email_verified = true
+      WHERE id = $1
+    `, [user.id]);
+    
+    res.status(201).json({ 
+      message: 'Admin user created successfully',
+      user: { id: user.id, email: user.email, is_admin: user.is_admin }
+    });
+  } catch (error) {
+    console.error('Setup error:', error);
+    res.status(500).json({ error: 'Failed to create admin user' });
+  }
+});
+
 export default router; 

@@ -28,7 +28,7 @@ This guide walks you through setting up the **SendGrid email service** and **use
 
 Create/update your `.env` file in `MuseBar/backend/`:
 
-```env
+```env@
 # Email Service Configuration
 SENDGRID_API_KEY=SG.your_actual_sendgrid_api_key_here
 FROM_EMAIL=noreply@yourdomain.com

@@ -3,6 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { Pool } from 'pg';
 import { ClosureScheduler } from './utils/closureScheduler';
+import { Logger } from './utils/logger';
+import { EnvironmentConfig, getEnvironmentConfig } from './config/environment';
 
 // Load environment variables
 dotenv.config();
@@ -58,6 +60,7 @@ import legalRouter from './routes/legal/index';
 import authRouter from './routes/auth';
 import docsRouter from './routes/docs';
 import userManagementRouter from './routes/userManagement';
+import establishmentsRouter from './routes/establishments';
 
 app.use('/api/categories', categoriesRouter);
 app.use('/api/products', productsRouter);
@@ -65,6 +68,7 @@ app.use('/api/orders', ordersRouter);
 app.use('/api/legal', legalRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/user-management', userManagementRouter);
+app.use('/api/establishments', establishmentsRouter);
 
 // API Documentation
 app.use('/api/docs', docsRouter);
@@ -74,6 +78,17 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   console.error(err.stack);
   res.status(500).json({ error: 'Something went wrong!' });
 });
+
+// Initialize services
+const config = getEnvironmentConfig();
+const logger = Logger.getInstance(config);
+
+// Initialize route services
+import { initializeUserManagementRoutes } from './routes/userManagement';
+import { initializeEstablishmentRoutes } from './routes/establishments';
+
+initializeUserManagementRoutes(config, logger);
+initializeEstablishmentRoutes(config, logger);
 
 // Start the server on all network interfaces
 app.listen(PORT, '0.0.0.0', () => {
