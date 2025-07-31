@@ -2101,7 +2101,8 @@ router.post('/receipt/:orderId/thermal-print', async (req, res) => {
       res.json({ 
         success: true, 
         message: printResult.message,
-        receipt_data: thermalPrintData
+        receipt_data: thermalPrintData,
+        receipt_content: printResult.receipt_content
       });
     } else {
       res.status(500).json({ 
@@ -2176,7 +2177,8 @@ router.post('/closure/:bulletinId/thermal-print', async (req, res) => {
       res.json({ 
         success: true, 
         message: printResult.message,
-        bulletin_data: thermalPrintData
+        bulletin_data: thermalPrintData,
+        bulletin_content: printResult.bulletin_content
       });
     } else {
       res.status(500).json({ 

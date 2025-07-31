@@ -1,0 +1,3 @@
+id,email,password_hash,is_admin,created_at
+1,elliot.vergne@gmail.com,$2b$12$5mAJ5bPkIWDS5yOplk8tIeoSve1P8SpU9hYozdDB5C/Hnn1JUM4VK,t,2025-07-03 16:46:25.850559
+4,hugo.martins.76000@gmail.com,$2b$12$3Ir/DzNYRt52K6QE1CME.eEe2lQd0Nqw/.VOuDhxZKfoCYL3LwUAS,t,2025-07-23 16:47:20.565683
