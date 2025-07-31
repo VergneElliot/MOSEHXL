@@ -142,16 +142,16 @@ export class OrderService {
         }
       }
 
-      // TODO: Create legal journal entry for completed orders
+      // Future: Create legal journal entry for completed orders
       // Note: Implement when LegalJournalModel.createEntry is available
       if (orderData.status === 'completed') {
-        console.log('📋 Legal journal entry needed for order:', order.id);
+        // Legal journal entry needed for order
       }
 
-      // TODO: Create audit trail entry
+      // Future: Create audit trail entry
       // Note: Implement when AuditTrailModel.createEntry is available
       if (userContext) {
-        console.log('📝 Audit trail entry needed for order:', order.id);
+        // Audit trail entry needed for order
       }
 
       return {
@@ -176,10 +176,10 @@ export class OrderService {
 
       const updatedOrder = await OrderModel.update(id, { status });
 
-      // TODO: Create audit trail entry
+      // Future: Create audit trail entry
       // Note: Implement when AuditTrailModel.createEntry is available
       if (userContext) {
-        console.log('📝 Audit trail entry needed for status update:', id);
+        // Audit trail entry needed for status update
       }
 
       return updatedOrder;

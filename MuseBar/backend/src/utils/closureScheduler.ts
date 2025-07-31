@@ -10,19 +10,19 @@ export class ClosureScheduler {
   // Start the scheduler
   static async start() {
     if (this.isRunning) {
-      console.log('⏰ Closure scheduler already running');
+      // Closure scheduler already running
       return;
     }
 
     this.isRunning = true;
-    console.log('🕐 Starting automatic closure scheduler...');
+    // Starting automatic closure scheduler
 
     // Check every 5 minutes
     this.interval = setInterval(async () => {
       try {
         await this.checkAndExecuteClosure();
       } catch (error) {
-        console.error('❌ Error in closure scheduler:', error);
+        // Error in closure scheduler
         await AuditTrailModel.logAction({
           action_type: 'AUTO_CLOSURE_ERROR',
           action_details: { error: error instanceof Error ? error.message : 'Unknown error' },
@@ -32,7 +32,7 @@ export class ClosureScheduler {
       }
     }, 5 * 60 * 1000); // Check every 5 minutes
 
-    console.log('✅ Closure scheduler started');
+    // Closure scheduler started
   }
 
   // Stop the scheduler
@@ -42,7 +42,7 @@ export class ClosureScheduler {
       this.interval = null;
     }
     this.isRunning = false;
-    console.log('🛑 Closure scheduler stopped');
+    // Closure scheduler stopped
   }
 
   // Check if closure should be executed
@@ -79,12 +79,12 @@ export class ClosureScheduler {
       const shouldClose = await this.shouldExecuteClosure(settings, now);
       
       if (shouldClose) {
-        console.log('🔒 Executing automatic daily closure...');
+        // Executing automatic daily closure
         await this.executeAutomaticClosure(now);
       }
       
     } catch (error) {
-      console.error('❌ Error checking closure conditions:', error);
+      // Error checking closure conditions
       throw error;
     }
   }
@@ -166,15 +166,12 @@ export class ClosureScheduler {
         user_agent: 'ClosureScheduler'
       });
 
-      console.log(`✅ Automatic closure completed for ${businessDay.format('YYYY-MM-DD')}`);
-      console.log(`   - Transactions: ${closureBulletin.total_transactions}`);
-      console.log(`   - Total amount: €${closureBulletin.total_amount}`);
-      console.log(`   - Bulletin ID: ${closureBulletin.id}`);
+      // Automatic closure completed successfully
       
       return closureBulletin;
       
     } catch (error) {
-      console.error('❌ Failed to execute automatic closure:', error);
+      // Failed to execute automatic closure
       
       await AuditTrailModel.logAction({
         action_type: 'AUTO_CLOSURE_FAILED',
@@ -201,7 +198,7 @@ export class ClosureScheduler {
 
   // Manual trigger for testing
   static async triggerManualCheck() {
-    console.log('🔍 Manual closure check triggered');
+    // Manual closure check triggered
     await this.checkAndExecuteClosure();
   }
 } 

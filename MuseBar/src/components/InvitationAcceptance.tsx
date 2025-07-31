@@ -686,7 +686,6 @@ const InvitationAcceptance: React.FC = () => {
                   variant="contained"
                   onClick={handleSubmit}
                   size="large"
-                  sx={{ minWidth: 140 }}
                 >
                   Create Account
                 </LoadingButton>

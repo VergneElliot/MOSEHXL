@@ -42,7 +42,7 @@ export const useHistoryAPI = (
 
       setOrders(mappedOrders);
     } catch (error) {
-      console.error('Failed to load orders:', error);
+      // Failed to load orders
       setReturnError('Erreur lors du chargement des commandes');
     } finally {
       setLoading(false);
@@ -63,7 +63,7 @@ export const useHistoryAPI = (
         businessDayPeriod: businessDayData.business_day_period || null,
       });
     } catch (error) {
-      console.error('Failed to load business day stats:', error);
+      // Failed to load business day stats
       setReturnError('Erreur lors du chargement des statistiques');
     }
   }, [apiService, setStats, setReturnError]);
@@ -161,7 +161,7 @@ export const useHistoryAPI = (
           loadStats();
         }, 1500);
       } catch (error: any) {
-        console.error('Return processing failed:', error);
+        // Return processing failed
         const errorMessage =
           error.response?.data?.error || error.message || 'Erreur lors du traitement du retour';
         setReturnError(errorMessage);

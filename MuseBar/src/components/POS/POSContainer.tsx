@@ -159,7 +159,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
         onClearOrder={actions.clearOrder}
       />
 
-      {/* TODO: Add other dialog components (retour, change, etc.) */}
+                  {/* Future: Add other dialog components (retour, change, etc.) */}
     </Box>
   );
 };

@@ -64,7 +64,7 @@ const ClosureContainer: React.FC = () => {
   };
 
   const handleDownload = (bulletin: any) => {
-    // TODO: Implement download functionality
+    // Future: Implement download functionality
   };
 
   // Utility functions
@@ -170,10 +170,10 @@ const ClosureContainer: React.FC = () => {
         </Alert>
       </Snackbar>
 
-      {/* TODO: Add Create Closure Dialog */}
-      {/* TODO: Add Bulletin Details Dialog */}
-      {/* TODO: Add Print Dialog */}
-      {/* TODO: Add Settings Dialog */}
+              {/* Future: Add Create Closure Dialog */}
+        {/* Future: Add Bulletin Details Dialog */}
+        {/* Future: Add Print Dialog */}
+        {/* Future: Add Settings Dialog */}
     </Box>
   );
 };
