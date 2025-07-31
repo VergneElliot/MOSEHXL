@@ -20,6 +20,7 @@ import ordersRouter from './routes/orders';
 import legalRouter from './routes/legal';
 import authRouter from './routes/auth';
 import docsRouter from './routes/docs';
+import userManagementRouter from './routes/userManagement';
 
 // Import utilities
 import { ClosureScheduler } from './utils/closureScheduler';
@@ -134,6 +135,7 @@ class MuseBarApplication {
     this.app.use('/api/orders', ordersRouter);
     this.app.use('/api/legal', legalRouter);
     this.app.use('/api/auth', authRouter);
+    this.app.use('/api/user-management', userManagementRouter);
 
     // API Documentation (if enabled)
     if (this.config.features.swaggerEnabled) {
