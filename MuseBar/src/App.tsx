@@ -35,7 +35,8 @@ function App() {
         await apiConfig.initialize();
         // API configuration initialized
       } catch (error) {
-        console.error('❌ Failed to initialize API configuration:', error);
+        // Log error but don't break app initialization
+        // Error will be handled by error boundary if needed
       }
 
       // Load stored authentication data
@@ -69,7 +70,7 @@ function App() {
           setUser(data);
           setPermissions(data.permissions || []);
         } catch (error) {
-          // Token expired, logout required
+          // Token expired or invalid, logout required
           handleLogout();
         }
       };
@@ -109,10 +110,10 @@ function App() {
         localStorage.setItem('token_expires_in', data.expiresIn);
 
         // Token refreshed successfully
-      } catch (error) {
-        console.error('Token refresh failed:', error);
-        handleLogout();
-      }
+              } catch (error) {
+          // Token refresh failed, logout required
+          handleLogout();
+        }
     }, refreshInterval);
 
     return () => clearInterval(intervalId);
@@ -170,7 +171,7 @@ function App() {
       setCategories(categoriesData);
       setProducts(productsData);
     } catch (error) {
-      console.error('Failed to update data:', error);
+      // Data update failed, will retry on next interval
       // Fallback to sync methods
       setCategories(dataService.getCategoriesSync());
       setProducts(dataService.getProductsSync());

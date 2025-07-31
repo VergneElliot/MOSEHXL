@@ -423,7 +423,8 @@ export const useAsyncOperation = <T = any>(
   });
 
   const { showGlobalLoading = false, loadingMessage = 'Chargement...', onSuccess, onError } = options;
-  const globalLoading = showGlobalLoading ? useLoading() : null;
+  const loadingContext = useLoading();
+  const globalLoading = showGlobalLoading ? loadingContext : null;
 
   const execute = async (...args: any[]) => {
     setState(prev => ({ ...prev, loading: true, error: null }));

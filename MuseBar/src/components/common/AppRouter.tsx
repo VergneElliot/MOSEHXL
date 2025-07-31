@@ -11,7 +11,7 @@ import {
 
 // Component imports
 import { MenuContainer } from '../Menu';
-import POS from '../POS';
+import POSContainer from '../POS/POSContainer';
 import { HappyHourControl } from '../HappyHour';
 import { HistoryContainer } from '../History';
 import Settings from '../Settings';
@@ -157,7 +157,7 @@ const AppRouter: React.FC<AppRouterProps> = ({
       {filteredTabs.map((tab, i) => (
         <TabPanel value={tabValue} index={i} key={tab.value}>
           {tab.value === 'pos' && (
-            <POS
+            <POSContainer
               categories={categories}
               products={products}
               isHappyHourActive={isHappyHourActive}

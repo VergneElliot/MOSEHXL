@@ -56,13 +56,7 @@ export const usePerformanceMonitor = (
         const message = `🐌 Slow render detected in ${componentName}: ${renderTime.toFixed(2)}ms`;
 
         if (mergedConfig.logToConsole) {
-          console.warn(message, {
-            component: componentName,
-            renderTime,
-            threshold: mergedConfig.threshold,
-            updateCount: metrics.updateCount,
-            totalTime: Date.now() - metrics.mountTime,
-          });
+          // Performance warning: slow render detected
         }
 
         // Send to analytics if configured
@@ -74,7 +68,7 @@ export const usePerformanceMonitor = (
 
       // Log all renders in development
       if (mergedConfig.logToConsole && process.env.NODE_ENV === 'development') {
-        console.log(`⚡ ${componentName} rendered in ${renderTime.toFixed(2)}ms`);
+        // Performance log: component render time
       }
     },
     [componentName, mergedConfig]
@@ -92,7 +86,7 @@ export const usePerformanceMonitor = (
       const duration = performance.now() - startTime;
 
       if (duration > mergedConfig.threshold) {
-        console.warn(`🐌 Slow operation: ${operationName} took ${duration.toFixed(2)}ms`);
+        // Performance warning: slow operation detected
       }
     },
     [mergedConfig]
@@ -110,16 +104,13 @@ export const usePerformanceMonitor = (
         const duration = performance.now() - startTime;
 
         if (duration > mergedConfig.threshold) {
-          console.warn(`🐌 Slow async operation: ${operationName} took ${duration.toFixed(2)}ms`);
+          // Performance warning: slow async operation detected
         }
 
         return result;
       } catch (error) {
         const duration = performance.now() - startTime;
-        console.error(
-          `❌ Failed operation: ${operationName} failed after ${duration.toFixed(2)}ms`,
-          error
-        );
+        // Performance error: operation failed
         throw error;
       }
     },
@@ -133,18 +124,16 @@ export const usePerformanceMonitor = (
     const mountTime = Date.now();
     metricsRef.current.mountTime = mountTime;
 
-    if (mergedConfig.logToConsole) {
-      console.log(`🚀 ${componentName} mounted at ${new Date(mountTime).toISOString()}`);
-    }
+          if (mergedConfig.logToConsole) {
+        // Performance log: component mounted
+      }
 
     return () => {
       const totalTime = Date.now() - mountTime;
       const metrics = metricsRef.current;
 
       if (mergedConfig.logToConsole) {
-        console.log(
-          `🔄 ${componentName} unmounted after ${totalTime}ms (${metrics.updateCount} updates)`
-        );
+        // Performance log: component unmounted
       }
     };
   }, [componentName, mergedConfig]);

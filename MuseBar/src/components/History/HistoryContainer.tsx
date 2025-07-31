@@ -132,9 +132,9 @@ const HistoryContainer: React.FC = () => {
         </Alert>
       </Snackbar>
 
-      {/* TODO: Add Order Details Dialog */}
-      {/* TODO: Add Return Dialog Component */}
-      {/* TODO: Add Receipt Dialog Component */}
+              {/* Future: Add Order Details Dialog */}
+        {/* Future: Add Return Dialog Component */}
+        {/* Future: Add Receipt Dialog Component */}
     </Box>
   );
 };

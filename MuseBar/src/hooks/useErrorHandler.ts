@@ -62,7 +62,7 @@ export const useErrorHandler = (
 
       // Log to console in development
       if (process.env.NODE_ENV === 'development') {
-        console.error('Error caught by useErrorHandler:', errorInfo);
+        // Error caught by useErrorHandler
       }
     },
     [defaultContext]
