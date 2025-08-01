@@ -10,7 +10,7 @@ export interface SystemUser {
   created_at: string;
 }
 
-export interface Establishment {
+export interface SystemEstablishment {
   id: string;
   name: string;
   email: string;

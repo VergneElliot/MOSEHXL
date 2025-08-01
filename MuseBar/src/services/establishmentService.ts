@@ -1,5 +1,5 @@
 import { apiService } from './apiService';
-import { CreateEstablishmentRequest, Establishment } from '../types/system';
+import { CreateEstablishmentRequest, SystemEstablishment } from '../types/system';
 
 export interface CreateEstablishmentResponse {
   message: string;
@@ -14,7 +14,7 @@ export interface CreateEstablishmentResponse {
 }
 
 export interface GetEstablishmentsResponse {
-  establishments: Establishment[];
+  establishments: SystemEstablishment[];
   total: number;
 }
 
@@ -29,8 +29,8 @@ export class EstablishmentService {
     return response.data;
   }
 
-  static async getEstablishment(id: string): Promise<{ establishment: Establishment; invitations: any[] }> {
-    const response = await apiService.get<{ establishment: Establishment; invitations: any[] }>(`/establishments/${id}`);
+  static async getEstablishment(id: string): Promise<{ establishment: SystemEstablishment; invitations: any[] }> {
+    const response = await apiService.get<{ establishment: SystemEstablishment; invitations: any[] }>(`/establishments/${id}`);
     return response.data;
   }
 }

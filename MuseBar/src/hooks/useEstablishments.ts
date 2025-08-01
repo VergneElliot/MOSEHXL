@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Establishment, CreateEstablishmentRequest } from '../types/system';
+import { SystemEstablishment, CreateEstablishmentRequest } from '../types/system';
 import { EstablishmentService } from '../services/establishmentService';
 
 export const useEstablishments = () => {
-  const [establishments, setEstablishments] = useState<Establishment[]>([]);
+  const [establishments, setEstablishments] = useState<SystemEstablishment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
