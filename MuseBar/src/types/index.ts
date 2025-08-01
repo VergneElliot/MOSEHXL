@@ -15,6 +15,12 @@ export * from './api';
 // UI and component types
 export * from './ui';
 
+// System admin types
+export * from './system';
+
+// Setup wizard types
+export * from './setup';
+
 // Re-export commonly used types for convenience
 export type { Category, Product, HappyHourSettings } from './business';
 export type { Order, OrderItem, PaymentMethod } from './orders';

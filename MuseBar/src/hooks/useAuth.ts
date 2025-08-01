@@ -5,7 +5,11 @@ import { apiConfig } from '../config/api';
 interface User {
   id: string;
   email: string;
-  name: string;
+  name?: string;
+  role?: string;
+  first_name?: string;
+  last_name?: string;
+  is_admin?: boolean;
   permissions: string[];
   [key: string]: any;
 }
@@ -45,31 +49,19 @@ export const useAuth = (): AuthState & AuthActions => {
     }
   }, []);
 
-  // Check authentication status when token changes
-  useEffect(() => {
-    ApiService.setToken(token);
-    
-    if (token) {
-      checkAuthStatus();
-    } else {
-      setUser(null);
-      setPermissions([]);
-    }
-  }, [token]);
+  // Declare functions first
+  const logout = useCallback(() => {
+    setToken(null);
+    setUser(null);
+    setPermissions([]);
+    setRememberMe(false);
+    setTokenExpiresIn('12h');
 
-  // Auto-refresh token before expiration
-  useEffect(() => {
-    if (!token || !user) return;
-
-    const refreshInterval =
-      tokenExpiresIn === '7d'
-        ? 6 * 24 * 60 * 60 * 1000 // Refresh every 6 days for 7-day tokens
-        : 10 * 60 * 60 * 1000; // Refresh every 10 hours for 12-hour tokens
-
-    const intervalId = setInterval(refreshToken, refreshInterval);
-
-    return () => clearInterval(intervalId);
-  }, [token, user, tokenExpiresIn]);
+    // Clear localStorage
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('remember_me');
+    localStorage.removeItem('token_expires_in');
+  }, []);
 
   const checkAuthStatus = useCallback(async () => {
     try {
@@ -86,7 +78,7 @@ export const useAuth = (): AuthState & AuthActions => {
       // Token expired or invalid, logout required
       logout();
     }
-  }, []);
+  }, [logout]);
 
   const refreshToken = useCallback(async () => {
     try {
@@ -104,7 +96,33 @@ export const useAuth = (): AuthState & AuthActions => {
       // Refresh failed, logout required
       logout();
     }
-  }, []);
+  }, [logout]);
+
+  // Check authentication status when token changes
+  useEffect(() => {
+    ApiService.setToken(token);
+    
+    if (token) {
+      checkAuthStatus();
+    } else {
+      setUser(null);
+      setPermissions([]);
+    }
+  }, [token, checkAuthStatus]);
+
+  // Auto-refresh token before expiration
+  useEffect(() => {
+    if (!token || !user) return;
+
+    const refreshInterval =
+      tokenExpiresIn === '7d'
+        ? 6 * 24 * 60 * 60 * 1000 // Refresh every 6 days for 7-day tokens
+        : 10 * 60 * 60 * 1000; // Refresh every 10 hours for 12-hour tokens
+
+    const intervalId = setInterval(refreshToken, refreshInterval);
+
+    return () => clearInterval(intervalId);
+  }, [token, user, tokenExpiresIn, refreshToken]);
 
   const login = useCallback((jwt: string, userObj: User, rememberMeFlag: boolean, expiresIn: string) => {
     setToken(jwt);
@@ -117,19 +135,6 @@ export const useAuth = (): AuthState & AuthActions => {
     localStorage.setItem('auth_token', jwt);
     localStorage.setItem('remember_me', rememberMeFlag.toString());
     localStorage.setItem('token_expires_in', expiresIn);
-  }, []);
-
-  const logout = useCallback(() => {
-    setToken(null);
-    setUser(null);
-    setPermissions([]);
-    setRememberMe(false);
-    setTokenExpiresIn('12h');
-
-    // Clear localStorage
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('remember_me');
-    localStorage.removeItem('token_expires_in');
   }, []);
 
   return {

@@ -10,7 +10,7 @@ interface HappyHourActions {
   updateHappyHourStatus: () => void;
 }
 
-export const useHappyHour = (): HappyHourState & HappyHourActions => {
+export const useHappyHour = (enabled: boolean = true): HappyHourState & HappyHourActions => {
   const [isHappyHourActive, setIsHappyHourActive] = useState(false);
   const [timeUntilHappyHour, setTimeUntilHappyHour] = useState('');
 
@@ -18,22 +18,30 @@ export const useHappyHour = (): HappyHourState & HappyHourActions => {
 
   // Update happy hour status
   const updateHappyHourStatus = useCallback(() => {
+    if (!enabled) {
+      setIsHappyHourActive(false);
+      setTimeUntilHappyHour('');
+      return;
+    }
+
     const isActive = happyHourService.isHappyHourActive();
     const timeUntil = happyHourService.getTimeUntilHappyHour();
 
     setIsHappyHourActive(isActive);
     setTimeUntilHappyHour(timeUntil);
-  }, [happyHourService]);
+  }, [happyHourService, enabled]);
 
   // Initialize and update happy hour status
   useEffect(() => {
-    updateHappyHourStatus();
+    if (enabled) {
+      updateHappyHourStatus();
 
-    // Update every minute
-    const intervalId = setInterval(updateHappyHourStatus, 60000);
+      // Update every minute
+      const intervalId = setInterval(updateHappyHourStatus, 60000);
 
-    return () => clearInterval(intervalId);
-  }, [updateHappyHourStatus]);
+      return () => clearInterval(intervalId);
+    }
+  }, [updateHappyHourStatus, enabled]);
 
   return {
     isHappyHourActive,

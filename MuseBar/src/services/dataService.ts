@@ -10,7 +10,7 @@ export class DataService {
 
   private constructor() {
     this.apiService = ApiService.getInstance();
-    this.loadData();
+    // Remove automatic data loading - let components control when to load data
   }
 
   public static getInstance(): DataService {

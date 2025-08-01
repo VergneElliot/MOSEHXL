@@ -139,7 +139,22 @@ router.post('/login', async (req, res) => {
     ip_address: ip,
     user_agent: userAgent
   });
-  res.json({ token, user: { id: user.id, email: user.email, is_admin: user.is_admin }, expiresIn: rememberMe ? '7d' : '12h' });
+  // Get additional user fields for login response
+  const userDetails = await pool.query('SELECT first_name, last_name, role FROM users WHERE id = $1', [user.id]);
+  const details = userDetails.rows[0] || {};
+  
+  res.json({ 
+    token, 
+    user: { 
+      id: user.id, 
+      email: user.email, 
+      is_admin: user.is_admin,
+      role: details.role,
+      first_name: details.first_name,
+      last_name: details.last_name
+    }, 
+    expiresIn: rememberMe ? '7d' : '12h' 
+  });
 });
 
 // GET /api/auth/me
@@ -147,7 +162,20 @@ router.get('/me', requireAuth, async (req, res) => {
   const user = await UserModel.findById((req as any).user.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
   const permissions = await UserModel.getUserPermissions(user.id);
-  res.json({ id: user.id, email: user.email, is_admin: user.is_admin, permissions });
+  
+  // Get additional user fields from database
+  const userDetails = await pool.query('SELECT first_name, last_name, role FROM users WHERE id = $1', [user.id]);
+  const details = userDetails.rows[0] || {};
+  
+  res.json({ 
+    id: user.id, 
+    email: user.email, 
+    is_admin: user.is_admin, 
+    role: details.role,
+    first_name: details.first_name,
+    last_name: details.last_name,
+    permissions 
+  });
 });
 
 // POST /api/auth/refresh

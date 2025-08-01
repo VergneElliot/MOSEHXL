@@ -5,7 +5,7 @@
 
 import { randomUUID } from 'crypto';
 import { pool } from '../app';
-import { EmailService } from './emailService';
+import { EmailService } from './email';
 import { EstablishmentModel, CreateEstablishmentData } from '../models/establishment';
 import { Logger } from '../utils/logger';
 import { EnvironmentConfig } from '../config/environment';

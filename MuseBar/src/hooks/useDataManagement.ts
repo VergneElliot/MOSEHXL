@@ -14,7 +14,7 @@ interface DataActions {
   refreshData: () => Promise<void>;
 }
 
-export const useDataManagement = (): DataState & DataActions => {
+export const useDataManagement = (enabled: boolean = true): DataState & DataActions => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -23,6 +23,12 @@ export const useDataManagement = (): DataState & DataActions => {
   const dataService = DataService.getInstance();
 
   const updateData = useCallback(async () => {
+    if (!enabled) {
+      setIsLoading(false);
+      setError(null);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -39,16 +45,18 @@ export const useDataManagement = (): DataState & DataActions => {
     } finally {
       setIsLoading(false);
     }
-  }, [dataService]);
+  }, [dataService, enabled]);
 
   const refreshData = useCallback(async () => {
     await updateData();
   }, [updateData]);
 
-  // Initialize data on mount
+  // Initialize data on mount (only if enabled)
   useEffect(() => {
-    updateData();
-  }, [updateData]);
+    if (enabled) {
+      updateData();
+    }
+  }, [updateData, enabled]);
 
   return {
     categories,
