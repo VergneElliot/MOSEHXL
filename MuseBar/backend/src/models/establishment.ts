@@ -6,6 +6,7 @@
 import { pool } from '../app';
 import { randomUUID } from 'crypto';
 import { Logger } from '../utils/logger';
+import { SchemaManager } from '../services/SchemaManager';
 
 /**
  * Establishment interface
@@ -94,11 +95,9 @@ export class EstablishmentModel {
       const establishmentResult = await client.query(establishmentQuery, establishmentValues);
       const establishment = establishmentResult.rows[0];
 
-      // Create isolated schema for this establishment
-      await client.query(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`);
-      
-      // Create establishment-specific tables in the new schema
-      await this.createEstablishmentTables(client, schemaName);
+      // Create isolated schema and tables for this establishment
+      SchemaManager.initialize(EstablishmentModel.logger);
+      await SchemaManager.createEstablishmentSchema(client, schemaName);
 
       await client.query('COMMIT');
 
@@ -129,106 +128,6 @@ export class EstablishmentModel {
     } finally {
       client.release();
     }
-  }
-
-  /**
-   * Create establishment-specific tables in isolated schema
-   */
-  private static async createEstablishmentTables(client: any, schemaName: string): Promise<void> {
-    // Create orders table for this establishment
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS "${schemaName}".orders (
-        id SERIAL PRIMARY KEY,
-        total_amount DECIMAL(10,2) NOT NULL,
-        total_tax DECIMAL(10,2) NOT NULL,
-        payment_method VARCHAR(50) NOT NULL,
-        status VARCHAR(50) NOT NULL DEFAULT 'pending',
-        notes TEXT,
-        tips DECIMAL(10,2) DEFAULT 0,
-        change DECIMAL(10,2) DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Create order_items table for this establishment
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS "${schemaName}".order_items (
-        id SERIAL PRIMARY KEY,
-        order_id INTEGER REFERENCES "${schemaName}".orders(id) ON DELETE CASCADE,
-        product_id INTEGER NOT NULL,
-        product_name VARCHAR(200) NOT NULL,
-        quantity INTEGER NOT NULL,
-        unit_price DECIMAL(10,2) NOT NULL,
-        total_price DECIMAL(10,2) NOT NULL,
-        tax_rate DECIMAL(5,2) NOT NULL,
-        tax_amount DECIMAL(10,2) NOT NULL,
-        happy_hour_applied BOOLEAN DEFAULT FALSE,
-        happy_hour_discount_amount DECIMAL(10,2) DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Create products table for this establishment
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS "${schemaName}".products (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(200) NOT NULL,
-        description TEXT,
-        price DECIMAL(10,2) NOT NULL,
-        category_id INTEGER,
-        is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Create categories table for this establishment
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS "${schemaName}".categories (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
-        description TEXT,
-        color VARCHAR(7) DEFAULT '#1976d2',
-        is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Create legal_journal table for this establishment
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS "${schemaName}".legal_journal (
-        id SERIAL PRIMARY KEY,
-        order_id INTEGER REFERENCES "${schemaName}".orders(id),
-        entry_type VARCHAR(50) NOT NULL,
-        amount DECIMAL(10,2) NOT NULL,
-        tax_amount DECIMAL(10,2) NOT NULL,
-        payment_method VARCHAR(50) NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Create audit_trail table for this establishment
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS "${schemaName}".audit_trail (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER,
-        action_type VARCHAR(100) NOT NULL,
-        resource_type VARCHAR(50),
-        resource_id VARCHAR(100),
-        action_details JSONB,
-        ip_address INET,
-        user_agent TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Create indexes for performance
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_${schemaName}_orders_created_at ON "${schemaName}".orders(created_at)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_${schemaName}_orders_status ON "${schemaName}".orders(status)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_${schemaName}_products_category ON "${schemaName}".products(category_id)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_${schemaName}_audit_trail_user ON "${schemaName}".audit_trail(user_id)`);
   }
 
   /**
@@ -382,8 +281,8 @@ export class EstablishmentModel {
       // Delete establishment record
       await client.query('DELETE FROM establishments WHERE id = $1', [id]);
 
-      // Drop establishment schema (this will delete all data)
-      await client.query(`DROP SCHEMA IF EXISTS "${establishment.schema_name}" CASCADE`);
+      // Drop establishment schema (this will delete all data) using SchemaManager
+      await SchemaManager.dropEstablishmentSchema(client, establishment.schema_name);
 
       await client.query('COMMIT');
 

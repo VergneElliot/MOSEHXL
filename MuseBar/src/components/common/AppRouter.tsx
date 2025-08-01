@@ -17,7 +17,7 @@ import { HistoryContainer } from '../History';
 import Settings from '../Settings';
 import { LegalComplianceDashboard } from '../Legal';
 import { ClosureContainer } from '../Closure';
-import { UserManagement, AuditTrailDashboard, EstablishmentManagement } from '../Admin';
+import { UserManagement, AuditTrailDashboard } from '../Admin';
 
 // Types
 import { Category, Product } from '../../types';
@@ -104,11 +104,11 @@ const AppRouter: React.FC<AppRouterProps> = ({
     },
     { label: 'Gestion utilisateurs', value: 'user_management', adminOnly: true },
     { label: 'Journal de Sécurité', value: 'audit_trail', adminOnly: true },
-    { label: 'Gestion Établissements', value: 'establishment_management', adminOnly: true },
   ];
 
   const filteredTabs = TABS.filter(tab => {
-    if (tab.adminOnly) return user?.is_admin;
+    // Filter out system admin tabs - they should only see business admin tabs
+    if (tab.adminOnly) return user?.is_admin && user?.role !== 'system_admin';
     if (tab.permission) return user?.permissions?.includes(tab.permission);
     return true;
   });
@@ -185,7 +185,6 @@ const AppRouter: React.FC<AppRouterProps> = ({
           {tab.value === 'closures' && <ClosureContainer />}
           {tab.value === 'user_management' && user?.is_admin && <UserManagement token={token} />}
           {tab.value === 'audit_trail' && user?.is_admin && <AuditTrailDashboard token={token} />}
-          {tab.value === 'establishment_management' && user?.is_admin && <EstablishmentManagement token={token} />}
         </TabPanel>
       ))}
     </Paper>

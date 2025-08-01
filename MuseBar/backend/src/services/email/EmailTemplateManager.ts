@@ -1,12 +1,9 @@
 /**
- * Professional Email Service
- * Handles all email communications with template management and delivery tracking
+ * Email Template Manager
+ * Handles email template storage, management, and variable replacement
  */
 
-import sgMail from '@sendgrid/mail';
-import { randomUUID } from 'crypto';
-import { Logger } from '../utils/logger';
-import { EnvironmentConfig } from '../config/environment';
+import { Logger } from '../../utils/logger';
 
 /**
  * Email template interface
@@ -21,101 +18,15 @@ export interface EmailTemplate {
 }
 
 /**
- * Email sending options
+ * Email Template Manager Class
  */
-export interface EmailOptions {
-  to: string | string[];
-  subject: string;
-  html: string;
-  text?: string;
-  from?: string;
-  replyTo?: string;
-  attachments?: Array<{
-    content: string;
-    filename: string;
-    type: string;
-  }>;
-  templateData?: Record<string, any>;
-  trackingId?: string;
-}
-
-/**
- * Email status tracking
- */
-export interface EmailLog {
-  id: string;
-  recipientEmail: string;
-  templateName?: string;
-  subject: string;
-  status: 'pending' | 'sent' | 'failed' | 'delivered' | 'bounced';
-  providerMessageId?: string;
-  errorMessage?: string;
-  sentAt?: Date;
-  createdAt: Date;
-}
-
-/**
- * Professional Email Service Class
- */
-export class EmailService {
-  private static instance: EmailService;
+export class EmailTemplateManager {
   private logger: Logger;
-  private config: EnvironmentConfig;
-  private isConfigured: boolean = false;
-  private emailLogs: Map<string, EmailLog> = new Map();
-
-  // Built-in email templates
   private templates: Map<string, EmailTemplate> = new Map();
 
-  private constructor(config: EnvironmentConfig, logger: Logger) {
-    this.config = config;
+  constructor(logger: Logger) {
     this.logger = logger;
-    this.initializeEmailService();
     this.loadBuiltInTemplates();
-  }
-
-  /**
-   * Get singleton instance
-   */
-  public static getInstance(config?: EnvironmentConfig, logger?: Logger): EmailService {
-    if (!EmailService.instance && config && logger) {
-      EmailService.instance = new EmailService(config, logger);
-    }
-    return EmailService.instance;
-  }
-
-  /**
-   * Initialize email service with provider
-   */
-  private initializeEmailService(): void {
-    try {
-      const apiKey = process.env.SENDGRID_API_KEY;
-      
-      if (!apiKey) {
-        this.logger.warn(
-          'SendGrid API key not configured. Email service will be disabled.',
-          {},
-          'EMAIL_SERVICE'
-        );
-        return;
-      }
-
-      sgMail.setApiKey(apiKey);
-      this.isConfigured = true;
-
-      this.logger.info(
-        'Email service initialized successfully',
-        { provider: 'SendGrid' },
-        'EMAIL_SERVICE'
-      );
-    } catch (error) {
-      this.logger.error(
-        'Failed to initialize email service',
-        error as Error,
-        {},
-        'EMAIL_SERVICE'
-      );
-    }
   }
 
   /**
@@ -375,142 +286,152 @@ If you didn't create this account, you can safely ignore this email.
 `
     });
 
+    // Establishment owner setup template
+    this.templates.set('establishment_setup', {
+      id: 'establishment_setup',
+      name: 'Establishment Setup Invitation',
+      subject: 'Set up your business POS system - {{establishmentName}}',
+      variables: ['ownerName', 'establishmentName', 'inviterName', 'setupUrl', 'expirationDate'],
+      htmlBody: `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Business Setup Invitation</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #1976d2; color: white; padding: 20px; text-align: center; }
+        .content { padding: 30px; background: #f9f9f9; }
+        .button { 
+            display: inline-block; 
+            background: #4caf50; 
+            color: white; 
+            padding: 15px 40px; 
+            text-decoration: none; 
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .highlight { background: #e3f2fd; padding: 20px; border-radius: 5px; border-left: 4px solid #1976d2; margin: 20px 0; }
+        .features { background: #f1f8e9; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .footer { padding: 20px; text-align: center; color: #666; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏪 Welcome to MOSEHXL</h1>
+            <p>Professional POS Management System</p>
+        </div>
+        <div class="content">
+            <h2>Your Business POS System is Ready!</h2>
+            <p>Hello {{ownerName}},</p>
+            
+            <div class="highlight">
+                <p><strong>{{inviterName}}</strong> has created a dedicated POS management system for <strong>{{establishmentName}}</strong>.</p>
+            </div>
+            
+            <p>You're just one step away from accessing your complete business management solution!</p>
+            
+            <div class="features">
+                <h3>🎯 What's included in your system:</h3>
+                <ul>
+                    <li><strong>Point of Sale (POS)</strong> - Process orders and payments</li>
+                    <li><strong>Menu Management</strong> - Add products, categories, and pricing</li>
+                    <li><strong>Happy Hour Settings</strong> - Automated promotions</li>
+                    <li><strong>User Management</strong> - Add staff and manage permissions</li>
+                    <li><strong>Transaction History</strong> - Complete sales reporting</li>
+                    <li><strong>Legal Compliance</strong> - French regulations compliance</li>
+                </ul>
+            </div>
+            
+            <p>Click the button below to complete your business setup:</p>
+            
+            <p style="text-align: center; margin: 30px 0;">
+                <a href="{{setupUrl}}" class="button">Complete Business Setup</a>
+            </p>
+            
+            <div class="highlight">
+                <p><strong>⏰ Important:</strong> This setup link expires on {{expirationDate}}.</p>
+                <p><strong>📝 You'll need to provide:</strong></p>
+                <ul>
+                    <li>Business legal name and contact information</li>
+                    <li>TVA number (if applicable)</li>
+                    <li>SIRET number</li>
+                    <li>Your secure password for the system</li>
+                </ul>
+            </div>
+            
+            <p>Once setup is complete, you'll have your own dedicated business management platform with all the tools you need to run your establishment efficiently.</p>
+            
+            <p>If you have any questions or need assistance, please contact our support team.</p>
+            
+            <p>Best regards,<br>The MOSEHXL Team</p>
+        </div>
+        <div class="footer">
+            <p>© 2025 MOSEHXL Professional POS System. All rights reserved.</p>
+            <p>If you didn't expect this invitation, please contact the sender directly.</p>
+        </div>
+    </div>
+</body>
+</html>`,
+      textBody: `
+Your Business POS System is Ready! - {{establishmentName}}
+
+Hello {{ownerName}},
+
+{{inviterName}} has created a dedicated POS management system for {{establishmentName}}.
+
+You're just one step away from accessing your complete business management solution!
+
+What's included in your system:
+- Point of Sale (POS) - Process orders and payments
+- Menu Management - Add products, categories, and pricing  
+- Happy Hour Settings - Automated promotions
+- User Management - Add staff and manage permissions
+- Transaction History - Complete sales reporting
+- Legal Compliance - French regulations compliance
+
+Please visit the following link to complete your business setup:
+{{setupUrl}}
+
+Important: This setup link expires on {{expirationDate}}.
+
+You'll need to provide:
+- Business legal name and contact information
+- TVA number (if applicable)
+- SIRET number
+- Your secure password for the system
+
+Once setup is complete, you'll have your own dedicated business management platform with all the tools you need to run your establishment efficiently.
+
+If you have any questions or need assistance, please contact our support team.
+
+Best regards,
+The MOSEHXL Team
+
+© 2025 MOSEHXL Professional POS System. All rights reserved.
+If you didn't expect this invitation, please contact the sender directly.
+`
+    });
+
     this.logger.info(
       'Built-in email templates loaded',
       { templateCount: this.templates.size },
-      'EMAIL_SERVICE'
+      'EMAIL_TEMPLATE_MANAGER'
     );
   }
 
   /**
-   * Send email using template
+   * Get template by name
    */
-  public async sendTemplateEmail(
-    templateName: string,
-    to: string,
-    templateData: Record<string, any>,
-    options: Partial<EmailOptions> = {}
-  ): Promise<string> {
-    const template = this.templates.get(templateName);
-    
-    if (!template) {
-      throw new Error(`Email template '${templateName}' not found`);
-    }
-
-    // Replace template variables
-    const subject = this.replaceTemplateVariables(template.subject, templateData);
-    const htmlBody = this.replaceTemplateVariables(template.htmlBody, templateData);
-    const textBody = template.textBody 
-      ? this.replaceTemplateVariables(template.textBody, templateData)
-      : undefined;
-
-    return this.sendEmail({
-      to,
-      subject,
-      html: htmlBody,
-      text: textBody,
-      ...options
-    });
+  public getTemplate(templateName: string): EmailTemplate | null {
+    return this.templates.get(templateName) || null;
   }
 
   /**
-   * Send basic email
-   */
-  public async sendEmail(options: EmailOptions): Promise<string> {
-    if (!this.isConfigured) {
-      throw new Error('Email service not configured. Please set SENDGRID_API_KEY.');
-    }
-
-    const trackingId = options.trackingId || randomUUID();
-    const recipients = Array.isArray(options.to) ? options.to : [options.to];
-
-    // Create email log
-    const emailLog: EmailLog = {
-      id: trackingId,
-      recipientEmail: recipients.join(', '),
-      subject: options.subject,
-      status: 'pending',
-      createdAt: new Date(),
-    };
-
-    this.emailLogs.set(trackingId, emailLog);
-
-    try {
-      const msg = {
-        to: options.to,
-        from: options.from || process.env.FROM_EMAIL || 'noreply@musebar.com',
-        replyTo: options.replyTo,
-        subject: options.subject,
-        text: options.text,
-        html: options.html,
-        attachments: options.attachments,
-        trackingSettings: {
-          clickTracking: { enable: true },
-          openTracking: { enable: true },
-        },
-        customArgs: {
-          trackingId: trackingId,
-        },
-      };
-
-      const response = await sgMail.send(msg);
-      
-      // Update email log
-      emailLog.status = 'sent';
-      emailLog.sentAt = new Date();
-      emailLog.providerMessageId = response[0].headers['x-message-id'];
-
-      this.logger.info(
-        'Email sent successfully',
-        {
-          trackingId,
-          recipients: recipients.length,
-          subject: options.subject,
-          messageId: emailLog.providerMessageId,
-        },
-        'EMAIL_SERVICE'
-      );
-
-      return trackingId;
-
-    } catch (error) {
-      // Update email log with error
-      emailLog.status = 'failed';
-      emailLog.errorMessage = error instanceof Error ? error.message : String(error);
-
-      this.logger.error(
-        'Failed to send email',
-        error as Error,
-        {
-          trackingId,
-          recipients: recipients.length,
-          subject: options.subject,
-        },
-        'EMAIL_SERVICE'
-      );
-
-      throw error;
-    }
-  }
-
-  /**
-   * Replace template variables in text
-   */
-  private replaceTemplateVariables(text: string, data: Record<string, any>): string {
-    return text.replace(/\{\{(\w+)\}\}/g, (match, key) => {
-      return data[key] !== undefined ? String(data[key]) : match;
-    });
-  }
-
-  /**
-   * Get email status
-   */
-  public getEmailStatus(trackingId: string): EmailLog | null {
-    return this.emailLogs.get(trackingId) || null;
-  }
-
-  /**
-   * Get available templates
+   * Get all available templates
    */
   public getAvailableTemplates(): EmailTemplate[] {
     return Array.from(this.templates.values());
@@ -525,70 +446,39 @@ If you didn't create this account, you can safely ignore this email.
     this.logger.info(
       'Custom email template added',
       { templateId: template.id, templateName: template.name },
-      'EMAIL_SERVICE'
+      'EMAIL_TEMPLATE_MANAGER'
     );
   }
 
   /**
-   * Validate email configuration
+   * Process template with data
    */
-  public validateConfiguration(): { isValid: boolean; issues: string[] } {
-    const issues: string[] = [];
-
-    if (!process.env.SENDGRID_API_KEY) {
-      issues.push('SENDGRID_API_KEY environment variable not set');
-    }
-
-    if (!process.env.FROM_EMAIL) {
-      issues.push('FROM_EMAIL environment variable not set');
-    }
-
-    return {
-      isValid: issues.length === 0,
-      issues,
-    };
-  }
-
-  /**
-   * Test email configuration
-   */
-  public async testConfiguration(testEmail: string): Promise<boolean> {
-    try {
-      await this.sendEmail({
-        to: testEmail,
-        subject: 'MuseBar Email Service Test',
-        html: '<h1>Email Service Test</h1><p>This is a test email to verify your email configuration is working correctly.</p>',
-        text: 'Email Service Test\n\nThis is a test email to verify your email configuration is working correctly.',
-      });
-
-      return true;
-    } catch (error) {
-      this.logger.error(
-        'Email configuration test failed',
-        error as Error,
-        { testEmail },
-        'EMAIL_SERVICE'
-      );
-      return false;
-    }
-  }
-
-  /**
-   * Get email statistics
-   */
-  public getEmailStats(): {
-    totalEmails: number;
-    sentEmails: number;
-    failedEmails: number;
-    pendingEmails: number;
+  public processTemplate(templateName: string, templateData: Record<string, any>): {
+    subject: string;
+    htmlBody: string;
+    textBody?: string;
   } {
-    const logs = Array.from(this.emailLogs.values());
+    const template = this.getTemplate(templateName);
     
+    if (!template) {
+      throw new Error(`Email template '${templateName}' not found`);
+    }
+
     return {
-      totalEmails: logs.length,
-      sentEmails: logs.filter(log => log.status === 'sent').length,
-      failedEmails: logs.filter(log => log.status === 'failed').length,
-      pendingEmails: logs.filter(log => log.status === 'pending').length,
+      subject: this.replaceTemplateVariables(template.subject, templateData),
+      htmlBody: this.replaceTemplateVariables(template.htmlBody, templateData),
+      textBody: template.textBody 
+        ? this.replaceTemplateVariables(template.textBody, templateData)
+        : undefined
     };
   }
-} 
+
+  /**
+   * Replace template variables in text
+   */
+  private replaceTemplateVariables(text: string, data: Record<string, any>): string {
+    return text.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+      return data[key] !== undefined ? String(data[key]) : match;
+    });
+  }
+}

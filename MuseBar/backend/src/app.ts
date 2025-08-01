@@ -61,6 +61,7 @@ import authRouter from './routes/auth';
 import docsRouter from './routes/docs';
 import userManagementRouter from './routes/userManagement';
 import establishmentsRouter from './routes/establishments';
+import setupRouter from './routes/setup';
 
 app.use('/api/categories', categoriesRouter);
 app.use('/api/products', productsRouter);
@@ -69,6 +70,7 @@ app.use('/api/legal', legalRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/user-management', userManagementRouter);
 app.use('/api/establishments', establishmentsRouter);
+app.use('/api/setup', setupRouter);
 
 // API Documentation
 app.use('/api/docs', docsRouter);
