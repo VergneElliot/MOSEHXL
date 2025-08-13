@@ -15,7 +15,7 @@ function generateToken(user: { id: number; email: string; is_admin: boolean }, r
 }
 
 // Middleware: require auth
-export function requireAuth(req: any, res: any, next: any) {
+export function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) {
     AuditTrailModel.logAction({
@@ -27,8 +27,8 @@ export function requireAuth(req: any, res: any, next: any) {
     return res.status(401).json({ error: 'Missing token' });
   }
   try {
-    const payload = jwt.verify(auth.slice(7), JWT_SECRET);
-    (req as any).user = payload;
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as { id: number; email: string; is_admin: boolean };
+    (req as any).user = payload as any;
     next();
   } catch {
     AuditTrailModel.logAction({
@@ -42,16 +42,16 @@ export function requireAuth(req: any, res: any, next: any) {
 }
 
 // Middleware: require admin
-export function requireAdmin(req: any, res: any, next: any) {
-  if (!(req as any).user?.is_admin) return res.status(403).json({ error: 'Admin only' });
+export function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (!req.user?.is_admin) return res.status(403).json({ error: 'Admin only' });
   next();
 }
 
 // Middleware: require permission
 export function requirePermission(permission: string) {
-  return async (req: any, res: any, next: any) => {
-    if ((req as any).user?.is_admin) return next();
-    const perms = await UserModel.getUserPermissions((req as any).user.id);
+  return async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (req.user?.is_admin) return next();
+    const perms = await UserModel.getUserPermissions(Number(req.user?.id));
     if (!perms.includes(permission)) return res.status(403).json({ error: 'Permission denied' });
     next();
   };
