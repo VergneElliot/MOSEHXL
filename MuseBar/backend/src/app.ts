@@ -3,14 +3,19 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { Pool } from 'pg';
 import { ClosureScheduler } from './utils/closureScheduler';
-import { Logger } from './utils/logger';
+import { Logger, requestLoggerMiddleware } from './utils/logger';
 import { EnvironmentConfig, getEnvironmentConfig } from './config/environment';
+import { createSecurityMiddleware } from './middleware/security';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001');
+
+// Initialize environment config and logger
+const config = getEnvironmentConfig();
+const logger = Logger.getInstance(config);
 
 // Environment-specific configuration
 const NODE_ENV = process.env.NODE_ENV || 'production';
@@ -35,6 +40,10 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+
+// Request logging and security middleware
+app.use(requestLoggerMiddleware(logger));
+app.use(createSecurityMiddleware(config, logger));
 
 // Database connection with environment-specific defaults
 export const pool = new Pool({
@@ -83,12 +92,10 @@ app.use('/api/docs', docsRouter);
 
 // Error handling middleware
 import { createErrorHandler } from './middleware/errorHandler';
-const errorHandler = createErrorHandler(Logger.getInstance(getEnvironmentConfig()));
+const errorHandler = createErrorHandler(logger);
 app.use(errorHandler);
 
 // Initialize services
-const config = getEnvironmentConfig();
-const logger = Logger.getInstance(config);
 
 // Initialize route services
 import { initializeUserManagementRoutes } from './routes/userManagement';
