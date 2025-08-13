@@ -76,7 +76,7 @@ router.delete('/:id', requireAuth, requireAdmin, validateParams([paramValidation
 });
 
 // Initialize establishment routes
-export function initializeEstablishmentRoutes(config: any, logger: any) {
+export function initializeEstablishmentRoutes(config: unknown, logger: Logger) {
   // Any initialization logic can go here
   logger.info('Establishment routes initialized');
 }

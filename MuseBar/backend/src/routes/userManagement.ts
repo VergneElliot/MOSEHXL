@@ -335,7 +335,7 @@ router.get('/pending-invitations', requireAuth, async (req, res, next) => {
  * DELETE /api/user-management/cancel-invitation/:invitationId
  * Cancel invitation (Establishment Admin only)
  */
-router.delete('/cancel-invitation/:invitationId', requireAuth, validateParams([{ param: 'invitationId', validator: (v:any)=> typeof v === 'string' && v.length > 0 }]), async (req, res, next) => {
+router.delete('/cancel-invitation/:invitationId', requireAuth, validateParams([{ param: 'invitationId', validator: (v: string)=> typeof v === 'string' && v.length > 0 }]), async (req, res, next) => {
   try {
     const { invitationId } = req.params;
     const user = req.user!;

@@ -24,9 +24,10 @@ export const BusinessSettingsModel = {
     const fields = Object.keys(settings).filter(key => key !== 'id');
     const setClause = fields.map((field, index) => `${field} = $${index + 2}`).join(', ');
     const query = `UPDATE business_settings SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = 1 RETURNING *`;
-    const values = [1, ...fields.map(field => (settings as any)[field])];
+    const record = settings as Record<string, unknown>;
+    const values = [1, ...fields.map(field => record[field])];
 
-    const result = await pool.query(query, values);
+    const result = await pool.query(query, values as any[]);
     return result.rows[0] || null;
   }
 }; 

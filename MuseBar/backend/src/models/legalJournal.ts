@@ -10,7 +10,7 @@ export interface JournalEntry {
   amount: number;
   vat_amount: number;
   payment_method: string;
-  transaction_data: any; // Complete transaction details
+  transaction_data: Record<string, unknown>; // Complete transaction details
   previous_hash: string;
   current_hash: string;
   timestamp: Date;
@@ -27,8 +27,8 @@ export interface ClosureBulletin {
   total_transactions: number;
   total_amount: number;
   total_vat: number;
-  vat_breakdown: any; // VAT by rate (10%, 20%)
-  payment_methods_breakdown: any; // Totals by payment method
+  vat_breakdown: Record<string, { amount: number; vat: number }>;
+  payment_methods_breakdown: Record<string, number>;
   tips_total?: number; // Total pourboires
   change_total?: number; // Total monnaie rendue
   first_sequence: number;
@@ -752,7 +752,7 @@ export class LegalJournalModel {
   }
 
   // Log transaction in legal journal (called after order creation)
-  static async logTransaction(order: any, userId?: string): Promise<JournalEntry> {
+  static async logTransaction(order: { id: number; total_amount?: number | string; total_tax?: number | string; taxAmount?: number | string; payment_method?: string; items?: unknown[]; created_at?: Date }, userId?: string): Promise<JournalEntry> {
     const amount = parseFloat(order.total_amount || order.finalAmount);
     const vatAmount = parseFloat(order.total_tax || order.taxAmount);
     
