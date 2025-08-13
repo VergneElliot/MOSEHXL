@@ -2,6 +2,7 @@ import express from 'express';
 import { CategoryModel } from '../models';
 import { AuditTrailModel } from '../models/auditTrail';
 import { requireAuth } from './auth';
+import { validateBody, validateParams, commonValidations, paramValidations } from '../middleware/validation';
 
 const router = express.Router();
 
@@ -39,12 +40,9 @@ router.get('/all', async (req, res) => {
 });
 
 // GET category by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', validateParams([paramValidations.id]), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid category ID' });
-    }
 
     const category = await CategoryModel.getById(id);
     if (!category) {
@@ -59,17 +57,9 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST create new category
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, validateBody(commonValidations.categoryCreate), async (req, res) => {
   try {
     const { name, default_tax_rate, color } = req.body;
-
-    if (!name || typeof name !== 'string') {
-      return res.status(400).json({ error: 'Category name is required' });
-    }
-
-    if (default_tax_rate === undefined || typeof default_tax_rate !== 'number') {
-      return res.status(400).json({ error: 'Default tax rate is required and must be a number' });
-    }
 
     const category = await CategoryModel.create(name, default_tax_rate, color || '#1976d2');
 
@@ -95,22 +85,11 @@ router.post('/', requireAuth, async (req, res) => {
 });
 
 // PUT update category
-router.put('/:id', requireAuth, async (req, res) => {
+router.put('/:id', requireAuth, validateParams([paramValidations.id]), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid category ID' });
-    }
 
     const { name, default_tax_rate, color } = req.body;
-
-    if (!name || typeof name !== 'string') {
-      return res.status(400).json({ error: 'Category name is required' });
-    }
-
-    if (default_tax_rate === undefined || typeof default_tax_rate !== 'number') {
-      return res.status(400).json({ error: 'Default tax rate is required and must be a number' });
-    }
 
     const category = await CategoryModel.update(id, name, default_tax_rate, color || '#1976d2');
     if (!category) {
@@ -139,12 +118,9 @@ router.put('/:id', requireAuth, async (req, res) => {
 });
 
 // DELETE category
-router.delete('/:id', requireAuth, async (req, res) => {
+router.delete('/:id', requireAuth, validateParams([paramValidations.id]), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid category ID' });
-    }
 
     const result = await CategoryModel.delete(id);
     if (!result.deleted) {
@@ -207,12 +183,9 @@ router.delete('/:id', requireAuth, async (req, res) => {
 });
 
 // POST restore category
-router.post('/:id/restore', requireAuth, async (req, res) => {
+router.post('/:id/restore', requireAuth, validateParams([paramValidations.id]), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid category ID' });
-    }
 
     const restored = await CategoryModel.restore(id);
     if (!restored) {

@@ -2,6 +2,7 @@ import express from 'express';
 import { ProductModel } from '../models';
 import { AuditTrailModel } from '../models/auditTrail';
 import { requireAuth } from './auth';
+import { validateBody, validateParams, commonValidations, paramValidations } from '../middleware/validation';
 import { pool } from '../app';
 
 const router = express.Router();
@@ -40,12 +41,9 @@ router.get('/all', async (req, res) => {
 });
 
 // GET products by category
-router.get('/category/:categoryId', async (req, res) => {
+router.get('/category/:categoryId', validateParams([{ param: 'categoryId', validator: (v: any) => !isNaN(parseInt(v)), message: 'Invalid category ID' }]), async (req, res) => {
   try {
     const categoryId = parseInt(req.params.categoryId);
-    if (isNaN(categoryId)) {
-      return res.status(400).json({ error: 'Invalid category ID' });
-    }
 
     const products = await ProductModel.getByCategory(categoryId);
     res.json(products);
@@ -56,12 +54,9 @@ router.get('/category/:categoryId', async (req, res) => {
 });
 
 // GET product by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', validateParams([paramValidations.id]), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid product ID' });
-    }
 
     const product = await ProductModel.getById(id);
     if (!product) {
@@ -137,12 +132,9 @@ router.post('/', requireAuth, async (req, res) => {
 });
 
 // PUT update product
-router.put('/:id', requireAuth, async (req, res) => {
+router.put('/:id', requireAuth, validateParams([paramValidations.id]), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid product ID' });
-    }
 
     const updateData: any = {};
     
@@ -185,12 +177,9 @@ router.put('/:id', requireAuth, async (req, res) => {
 });
 
 // DELETE product
-router.delete('/:id', requireAuth, async (req, res) => {
+router.delete('/:id', requireAuth, validateParams([paramValidations.id]), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid product ID' });
-    }
 
     // Check if product is referenced in order_items to determine deletion type
     const orderItemsResult = await pool.query('SELECT COUNT(*) FROM order_items WHERE product_id = $1', [id]);
@@ -246,12 +235,9 @@ router.delete('/:id', requireAuth, async (req, res) => {
 });
 
 // PUT restore archived product
-router.put('/:id/restore', requireAuth, async (req, res) => {
+router.put('/:id/restore', requireAuth, validateParams([paramValidations.id]), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid product ID' });
-    }
 
     const restored = await ProductModel.restore(id);
     if (!restored) {
