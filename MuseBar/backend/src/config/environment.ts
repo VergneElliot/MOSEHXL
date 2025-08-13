@@ -209,17 +209,19 @@ export const getEnvironmentConfig = (): EnvironmentConfig => {
  * Call this at the start of your application
  */
 export const initializeEnvironment = (): EnvironmentConfig => {
-  console.log('🔧 Initializing environment configuration...');
+  // Initialize environment configuration
   
   validateEnvironment();
   const config = getEnvironmentConfig();
   
-  console.log(`🌍 Environment: ${config.app.environment}`);
-  console.log(`📱 Application: ${config.app.name} v${config.app.version}`);
-  console.log(`🚀 Server: ${config.server.host}:${config.server.port}`);
-  console.log(`📊 Database: ${config.database.host}:${config.database.port}/${config.database.database}`);
-  console.log(`🔐 Security: JWT (${config.security.jwtExpiresIn}), BCrypt (${config.security.bcryptRounds} rounds)`);
-  console.log(`📝 Logging: ${config.logging.level} level`);
+  if (process.env.NODE_ENV !== 'test') {
+    console.log(`🌍 Environment: ${config.app.environment}`);
+    console.log(`📱 Application: ${config.app.name} v${config.app.version}`);
+    console.log(`🚀 Server: ${config.server.host}:${config.server.port}`);
+    console.log(`📊 Database: ${config.database.host}:${config.database.port}/${config.database.database}`);
+    console.log(`🔐 Security: JWT (${config.security.jwtExpiresIn}), BCrypt (${config.security.bcryptRounds} rounds)`);
+    console.log(`📝 Logging: ${config.logging.level} level`);
+  }
   
   return config;
 }; 
