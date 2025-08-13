@@ -92,7 +92,12 @@ A comprehensive, legally compliant POS system built with **enterprise-grade arch
 │   │
 │   └── common/             # Shared Components
 │       ├── ErrorBoundary.tsx
-│       ├── LoadingStates.tsx
+│       ├── LoadingProvider.tsx
+│       ├── LoadingSpinner.tsx
+│       ├── LoadingButton.tsx
+│       ├── LazyLoad.tsx
+│       ├── ProgressiveLoading.tsx
+│       ├── Skeletons.tsx
 │       └── test-utils.tsx
 │
 ├── 🎣 hooks/               # Custom Hooks
