@@ -9,7 +9,7 @@ import userEvent from '@testing-library/user-event';
 import { ThemeProvider } from '@mui/material/styles';
 import { CssBaseline } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
-import { LoadingProvider } from '../components/common/LoadingStates';
+import { LoadingProvider } from '../components/common/LoadingProvider';
 import { ErrorBoundary } from '../components/common/ErrorBoundary';
 
 /**
