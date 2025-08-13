@@ -34,11 +34,11 @@ export const SystemUsersList: React.FC = () => {
     }
   ]; // Mock data
 
-  const getRoleColor = (role: string) => {
+  const getRoleColor = (role: string): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' => {
     return role === 'system_admin' ? 'error' : 'primary';
   };
 
-  const getStatusColor = (isActive: boolean) => {
+  const getStatusColor = (isActive: boolean): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' => {
     return isActive ? 'success' : 'default';
   };
 
@@ -89,14 +89,14 @@ export const SystemUsersList: React.FC = () => {
               <TableCell>
                 <Chip 
                   label={getRoleLabel(user.role)} 
-                  color={getRoleColor(user.role) as any}
+                  color={getRoleColor(user.role)}
                   size="small"
                 />
               </TableCell>
               <TableCell>
                 <Chip 
                   label={user.is_active ? 'Actif' : 'Inactif'} 
-                  color={getStatusColor(user.is_active) as any}
+                  color={getStatusColor(user.is_active)}
                   size="small"
                 />
               </TableCell>

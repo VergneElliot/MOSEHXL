@@ -48,7 +48,9 @@ export const SecurityLogsList: React.FC<SecurityLogsListProps> = ({ filters }) =
     }
   ]; // Mock data
 
-  const getSeverityColor = (severity: string) => {
+  const getSeverityColor = (
+    severity: string
+  ): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' => {
     switch (severity) {
       case 'critical': return 'error';
       case 'high': return 'warning';
@@ -124,7 +126,7 @@ export const SecurityLogsList: React.FC<SecurityLogsListProps> = ({ filters }) =
               <TableCell>
                 <Chip 
                   label={log.severity} 
-                  color={getSeverityColor(log.severity) as any}
+                  color={getSeverityColor(log.severity)}
                   size="small"
                 />
               </TableCell>
