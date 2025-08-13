@@ -23,8 +23,6 @@ import {
 } from '@mui/material';
 import {
   Payment as PaymentIcon,
-  Calculate as CalculateIcon,
-  Receipt as ReceiptIcon,
 } from '@mui/icons-material';
 import LoadingButton from '../common/LoadingButton';
 

@@ -2,19 +2,7 @@ import { renderHook, act } from '@testing-library/react';
 import { usePOSState } from '../usePOSState';
 import { OrderItem } from '../../types';
 
-// Mock data
-const mockProduct = {
-  id: 1,
-  name: 'Test Product',
-  price: 10.0,
-  categoryId: 1,
-  isActive: true,
-  isHappyHourEligible: false,
-  happyHourDiscountType: 'percentage',
-  happyHourDiscountValue: 0,
-  taxRate: 0.2,
-  description: 'Test product',
-};
+// Mock data not needed currently
 
 const mockOrderItem: OrderItem = {
   id: '1',

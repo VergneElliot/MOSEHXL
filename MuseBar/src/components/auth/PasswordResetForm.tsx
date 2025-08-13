@@ -68,7 +68,7 @@ export const PasswordResetForm: React.FC<PasswordResetFormProps> = ({
         lowercase: /[a-z]/.test(newPassword),
         uppercase: /[A-Z]/.test(newPassword),
         number: /\d/.test(newPassword),
-        special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newPassword),
+        special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]/.test(newPassword),
       });
     }
   }, [newPassword]);

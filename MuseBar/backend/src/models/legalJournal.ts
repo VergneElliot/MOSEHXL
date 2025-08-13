@@ -159,7 +159,7 @@ export class LegalJournalModel {
       if (entry.previous_hash !== expectedPreviousHash) {
         if ((isDocumentedIssue || isCorrectionEntry) && hasCorrectionEntry) {
           // This is a documented issue or correction entry - don't add to errors
-          console.log(`Documented hash chain issue at sequence ${entry.sequence_number} - correction entry exists`);
+          // Optional debug log suppressed in production; use logger if needed
         } else {
           errors.push(`Hash chain broken at sequence ${entry.sequence_number}: expected previous hash ${expectedPreviousHash}, got ${entry.previous_hash}`);
         }
@@ -184,7 +184,7 @@ export class LegalJournalModel {
       if (entry.current_hash !== expectedCurrentHash) {
         if ((isDocumentedIssue || isCorrectionEntry) && hasCorrectionEntry) {
           // This is a documented issue or correction entry - don't add to errors
-          console.log(`Documented hash verification issue at sequence ${entry.sequence_number} - correction entry exists`);
+          // Optional debug log suppressed in production; use logger if needed
         } else {
           errors.push(`Hash verification failed at sequence ${entry.sequence_number}: data may have been tampered with`);
         }
@@ -294,8 +294,7 @@ export class LegalJournalModel {
 
       // Debug logging for tips
       if (tips > 0) {
-        console.log(`Processing tips for order ${order.id}: ${tips}€`);
-        console.log(`Before tips - Card: ${paymentBreakdown.card}, Cash: ${paymentBreakdown.cash}`);
+        // Optional debug log suppressed in production; use logger if needed
       }
 
       // Calculate VAT breakdown from items
@@ -343,7 +342,7 @@ export class LegalJournalModel {
           // Tips: customer pays extra on card, we take cash out to give to staff
           paymentBreakdown.card += tips;  // + on card (customer pays)
           paymentBreakdown.cash -= tips;  // - from cash (we take out)
-          console.log(`After tips (split) - Card: ${paymentBreakdown.card}, Cash: ${paymentBreakdown.cash}`);
+          // Optional debug log suppressed in production; use logger if needed
         }
       } else {
         paymentBreakdown[order.payment_method] += amount;
@@ -351,7 +350,7 @@ export class LegalJournalModel {
         if (tips > 0) {
           paymentBreakdown.card += tips;  // + on card (customer pays)
           paymentBreakdown.cash -= tips;  // - from cash (we take out)
-          console.log(`After tips (${order.payment_method}) - Card: ${paymentBreakdown.card}, Cash: ${paymentBreakdown.cash}`);
+          // Optional debug log suppressed in production; use logger if needed
         }
       }
 

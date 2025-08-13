@@ -15,7 +15,6 @@ import {
   Alert,
   Card,
   CardContent,
-  Chip,
   InputAdornment,
   Divider,
 } from '@mui/material';
@@ -23,7 +22,6 @@ import {
   Payment as PaymentIcon,
   CreditCard as CardIcon,
   LocalAtm as CashIcon,
-  Calculate as CalculateIcon,
 } from '@mui/icons-material';
 import LoadingButton from '../common/LoadingButton';
 

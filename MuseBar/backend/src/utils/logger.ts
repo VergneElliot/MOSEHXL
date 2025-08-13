@@ -6,6 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import { EnvironmentConfig } from '../config/environment';
+import { Request, Response, NextFunction } from 'express';
 
 /**
  * Log levels in order of severity
@@ -184,7 +185,7 @@ export class Logger {
     metadata?: Record<string, any>,
     context?: string,
     requestId?: string,
-    userId?: string,
+    userId?: string | number,
     duration?: number,
     error?: Error
   ): LogEntry {
@@ -195,7 +196,7 @@ export class Logger {
       metadata,
       context,
       requestId,
-      userId,
+      userId: userId !== undefined ? String(userId) : undefined,
       duration,
       error: error ? {
         name: error.name,
@@ -242,7 +243,7 @@ export class Logger {
     metadata?: Record<string, any>,
     context?: string,
     requestId?: string,
-    userId?: string
+    userId?: string | number
   ): void {
     const entry = this.createLogEntry('INFO', message, metadata, context, requestId, userId);
     this.writeLog(entry);
@@ -256,7 +257,7 @@ export class Logger {
     metadata?: Record<string, any>,
     context?: string,
     requestId?: string,
-    userId?: string
+    userId?: string | number
   ): void {
     const entry = this.createLogEntry('DEBUG', message, metadata, context, requestId, userId);
     this.writeLog(entry);
@@ -285,7 +286,7 @@ export class Logger {
     url: string,
     statusCode: number,
     duration: number,
-    userId?: string,
+    userId?: string | number,
     ip?: string,
     userAgent?: string,
     requestId?: string
@@ -440,7 +441,7 @@ export class PerformanceMonitor {
  * Express middleware for request logging
  */
 export const requestLoggerMiddleware = (logger: Logger) => {
-  return (req: any, res: any, next: any) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     const startTime = Date.now();
     const requestId = Math.random().toString(36).substring(2, 15);
     
@@ -448,24 +449,26 @@ export const requestLoggerMiddleware = (logger: Logger) => {
     req.requestId = requestId;
     
     // Log request start
+    const userAgentHeader = req.headers['user-agent'];
+    const userAgent = Array.isArray(userAgentHeader) ? userAgentHeader.join(', ') : userAgentHeader;
     logger.debug(
       `Request started: ${req.method} ${req.originalUrl}`,
       {
         method: req.method,
         url: req.originalUrl,
         ip: req.ip,
-        userAgent: req.headers['user-agent'],
+        userAgent,
       },
       'HTTP',
       requestId,
       req.user?.id
     );
     
-    // Override res.end to log completion
-    const originalEnd = res.end;
-    res.end = function(...args: any[]) {
+    // Log on response finish
+    res.on('finish', () => {
       const duration = Date.now() - startTime;
-      
+      const finishUserAgentHeader = req.headers['user-agent'];
+      const finishUserAgent = Array.isArray(finishUserAgentHeader) ? finishUserAgentHeader.join(', ') : finishUserAgentHeader;
       logger.httpRequest(
         req.method,
         req.originalUrl,
@@ -473,12 +476,10 @@ export const requestLoggerMiddleware = (logger: Logger) => {
         duration,
         req.user?.id,
         req.ip,
-        req.headers['user-agent'],
+        finishUserAgent,
         requestId
       );
-      
-      originalEnd.apply(this, args);
-    };
+    });
     
     next();
   };

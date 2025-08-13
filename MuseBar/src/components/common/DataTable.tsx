@@ -9,8 +9,6 @@ import {
   Paper,
   Box,
   Typography,
-  IconButton,
-  Tooltip,
 } from '@mui/material';
 import { TableColumn, BaseComponentProps } from '../../types/ui';
 import LoadingSpinner from './LoadingSpinner';
