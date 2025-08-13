@@ -116,7 +116,7 @@ export const createErrorHandler = (logger?: Logger) => {
         },
         'ERROR_HANDLER',
         requestId,
-        userId
+        userId ? String(userId) : undefined
       );
     } else {
       console.error('❌ Error:', {

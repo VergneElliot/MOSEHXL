@@ -42,7 +42,7 @@ const ClosureContainer: React.FC = () => {
   // Load data on component mount
   useEffect(() => {
     api.refreshAllData();
-  }, []); // Remove api dependency to prevent infinite loop
+  }, [api]);
 
   // Event handlers
   const handleCreateClosure = () => {
@@ -115,8 +115,8 @@ const ClosureContainer: React.FC = () => {
 
       {/* Status Cards */}
       <ClosureStatusCards
-        todayStatus={state.todayStatus}
-        monthlyStats={state.monthlyStats}
+        todayStatus={state.todayStatus as any}
+        monthlyStats={state.monthlyStats as any}
         monthlyStatsError={state.monthlyStatsError}
         loading={state.loading}
         formatCurrency={formatCurrency}

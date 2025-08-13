@@ -63,7 +63,7 @@ router.post('/send-establishment-invitation', requireAuth, requireAdmin, validat
       address,
       subscription_plan,
       inviterUserId: String(user.id),
-      inviterName: user.email
+      inviterName: user.email || 'unknown'
     });
 
     if (!result.success) {
@@ -168,7 +168,7 @@ router.post('/send-user-invitation', requireAuth, validateBody([
       establishmentId,
       establishmentName: establishment.name,
       inviterUserId: String(user.id),
-      inviterName: user.email
+      inviterName: user.email || 'unknown'
     });
 
     if (!result.success) {

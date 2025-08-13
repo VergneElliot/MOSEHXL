@@ -182,7 +182,7 @@ router.post(
     // Calculate cancellation amounts
     let cancellationAmount = 0;
     let cancellationTax = 0;
-    const cancelledItems: typeof originalItems = [];
+    let cancelledItems: typeof originalItems = [];
     
     if (cancellationType === 'full') {
       cancellationAmount = originalOrder.total_amount;

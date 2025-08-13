@@ -103,13 +103,13 @@ const handleSimplePayment = async (paymentData: {
 
     try {
       const orderData = {
-        totalAmount: paymentData.total,
-        totalTax: orderTax,
-        paymentMethod: paymentData.method as 'cash' | 'card',
-        notes: `Paiement par ${paymentData.method === 'cash' ? 'espèces' : 'carte'}: ${paymentData.total}€`,
+        totalAmount: paymentData.totalAmount,
+        totalTax: paymentData.totalTax ?? orderTax,
+        paymentMethod: paymentData.paymentMethod,
+        notes: paymentData.notes,
         tips: paymentData.tips,
         change: paymentData.change,
-        items: currentOrder,
+        items: paymentData.items ?? currentOrder,
       };
 
       await api.createOrder(orderData);

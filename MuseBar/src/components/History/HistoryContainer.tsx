@@ -29,10 +29,10 @@ const HistoryContainer: React.FC = () => {
     actions.closeReturnDialog
   );
 
-  // Load data on component mount
+  // Load data on component mount using stable callback
   useEffect(() => {
     api.refreshData();
-  }, []); // Remove api dependency to prevent infinite loop
+  }, [api]);
 
   // Event handlers
   const handleViewOrder = (order: Order) => {

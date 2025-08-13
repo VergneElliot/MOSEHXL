@@ -753,8 +753,8 @@ export class LegalJournalModel {
 
   // Log transaction in legal journal (called after order creation)
   static async logTransaction(order: { id: number; total_amount?: number | string; total_tax?: number | string; taxAmount?: number | string; payment_method?: string; items?: unknown[]; created_at?: Date }, userId?: string): Promise<JournalEntry> {
-    const amount = parseFloat(order.total_amount || order.finalAmount);
-    const vatAmount = parseFloat(order.total_tax || order.taxAmount);
+    const amount = parseFloat(String(order.total_amount ?? 0));
+    const vatAmount = parseFloat(String(order.total_tax ?? order.taxAmount ?? 0));
     
     return await this.addEntry(
       'SALE',

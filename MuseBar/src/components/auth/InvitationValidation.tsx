@@ -3,7 +3,7 @@
  * Handles invitation token validation and initial setup
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { apiService } from '../../services/apiService';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -55,7 +55,7 @@ export const InvitationValidation: React.FC<InvitationValidationProps> = ({
   const [invitation, setInvitation] = useState<InvitationData | null>(null);
   const [error, setError] = useState<string>('');
 
-  const validateInvitation = async () => {
+  const validateInvitation = useCallback(async () => {
     if (!token) {
       setError('Invalid invitation link');
       setValidating(false);
@@ -73,11 +73,11 @@ export const InvitationValidation: React.FC<InvitationValidationProps> = ({
     } finally {
       setValidating(false);
     }
-  };
+  }, [token, onValidationComplete, onError]);
 
   useEffect(() => {
     validateInvitation();
-  }, [token]);
+  }, [validateInvitation]);
 
   if (validating) {
     return (

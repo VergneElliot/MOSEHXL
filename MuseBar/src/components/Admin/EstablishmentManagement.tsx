@@ -47,8 +47,7 @@ import {
 import { apiService } from '../../services/apiService';
 import { 
   EstablishmentsResponse, 
-  SuccessResponse, 
-  SendEstablishmentInvitationData 
+  SuccessResponse 
 } from '../../types/api';
 
 interface Establishment {
@@ -99,12 +98,18 @@ const EstablishmentManagement: React.FC<{ token: string }> = ({ token }) => {
     subscription_plan: 'basic'
   });
 
-  const [inviteForm, setInviteForm] = useState({
+  const [inviteForm, setInviteForm] = useState<{
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
+    subscription_plan: 'basic' | 'premium' | 'enterprise';
+  }>({
     name: '',
     email: '',
     phone: '',
     address: '',
-    subscription_plan: 'basic' as const
+    subscription_plan: 'basic'
   });
 
   const fetchEstablishments = async () => {

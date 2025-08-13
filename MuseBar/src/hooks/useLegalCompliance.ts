@@ -81,11 +81,6 @@ export const useLegalCompliance = (): [LegalComplianceState, LegalComplianceActi
     showClosuresDialog: false,
   });
 
-  // Auto-load compliance data on component mount
-  useEffect(() => {
-    loadComplianceData();
-  }, []); // Empty dependency array to run only on mount
-
   const loadComplianceData = useCallback(async () => {
     setState(prev => ({ ...prev, loading: true, error: null }));
     try {
@@ -106,6 +101,11 @@ export const useLegalCompliance = (): [LegalComplianceState, LegalComplianceActi
       }));
     }
   }, []);
+
+  // Auto-load compliance data on component mount
+  useEffect(() => {
+    loadComplianceData();
+  }, [loadComplianceData]);
 
   const loadJournalEntries = useCallback(async () => {
     try {
