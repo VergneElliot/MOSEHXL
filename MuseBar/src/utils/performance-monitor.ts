@@ -129,8 +129,8 @@ class PerformanceMonitor {
   private observeLayoutShifts(): void {
     const observer = new PerformanceObserver(list => {
       list.getEntries().forEach(entry => {
-        const layoutShift = entry as any;
-        this.addMetric('layoutShift.score', layoutShift.value, 'score', {
+        const layoutShift = entry as PerformanceEntry & { value?: number; sources?: unknown[] };
+        this.addMetric('layoutShift.score', layoutShift.value ?? 0, 'score', {
           sources: layoutShift.sources,
         });
       });
@@ -146,13 +146,9 @@ class PerformanceMonitor {
   private observeFirstInput(): void {
     const observer = new PerformanceObserver(list => {
       list.getEntries().forEach(entry => {
-        const firstInput = entry as any;
-        this.addMetric('firstInput.delay', firstInput.processingStart - firstInput.startTime, 'ms');
-        this.addMetric(
-          'firstInput.processingTime',
-          firstInput.processingEnd - firstInput.processingStart,
-          'ms'
-        );
+        const firstInput = entry as PerformanceEventTiming;
+        this.addMetric('firstInput.delay', (firstInput.processingStart || 0) - (firstInput.startTime || 0), 'ms');
+        this.addMetric('firstInput.processingTime', (firstInput.processingEnd || 0) - (firstInput.processingStart || 0), 'ms');
       });
     });
 

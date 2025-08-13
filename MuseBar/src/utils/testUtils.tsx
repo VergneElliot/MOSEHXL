@@ -298,7 +298,7 @@ export const customRender = (
 
   // Setup API mocks if provided
   if (apiMocks) {
-    global.fetch = mockFetch(apiMocks) as any;
+    global.fetch = mockFetch(apiMocks) as unknown as typeof fetch;
   }
 
   // Setup initial route
@@ -545,12 +545,12 @@ export const performanceUtils = {
    */
   checkMemoryLeaks: () => {
     if ('gc' in window && typeof window.gc === 'function') {
-      const initialMemory = (performance as any).memory?.usedJSHeapSize;
+      const initialMemory = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0;
       
       return {
         check: () => {
           window.gc!();
-          const finalMemory = (performance as any).memory?.usedJSHeapSize;
+          const finalMemory = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0;
           const difference = finalMemory - initialMemory;
           
           if (difference > 1024 * 1024) { // 1MB threshold
