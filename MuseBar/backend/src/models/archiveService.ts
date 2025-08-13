@@ -41,7 +41,8 @@ export class ArchiveService {
 
   // Create HMAC signature for file integrity
   private static createDigitalSignature(data: string): string {
-    return crypto.createHmac('sha256', this.SECRET_KEY).update(data).digest('hex');
+    const key = process.env.ARCHIVE_SECRET_KEY || this.SECRET_KEY;
+    return crypto.createHmac('sha256', key).update(data).digest('hex');
   }
 
   // Verify HMAC signature
