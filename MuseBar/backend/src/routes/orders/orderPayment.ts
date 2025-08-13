@@ -8,6 +8,7 @@ import { OrderModel, OrderItemModel, SubBillModel } from '../../models';
 import { LegalJournalModel } from '../../models/legalJournal';
 import { AuditTrailModel } from '../../models/auditTrail';
 import { requireAuth } from '../auth';
+import { validateBody } from '../../middleware/validation';
 
 const router = express.Router();
 
@@ -15,20 +16,35 @@ const router = express.Router();
  * POST quick item return (retour)
  * POST /api/orders/payment/retour
  */
-router.post('/retour', requireAuth, async (req, res) => {
+router.post(
+  '/retour',
+  requireAuth,
+  validateBody([
+    { field: 'item', required: true },
+    { field: 'reason', required: true },
+  ]),
+  async (req, res) => {
   try {
-    const { item, reason, paymentMethod = 'cash' } = req.body;
-    if (!item || !reason || typeof reason !== 'string' || !reason.trim()) {
-      return res.status(400).json({ error: 'Item and return reason are required' });
-    }
+    const { item, reason, paymentMethod = 'cash' } = req.body as {
+      item: {
+        productId?: number;
+        productName: string;
+        quantity?: number;
+        unitPrice: number;
+        totalPrice: number;
+        taxRate: number; // decimal 0-1
+      };
+      reason: string;
+      paymentMethod?: 'cash' | 'card';
+    };
     
     if (!['cash', 'card'].includes(paymentMethod)) {
       return res.status(400).json({ error: 'Payment method must be either "cash" or "card"' });
     }
     
     // Calculate negative amounts
-    const totalPrice = parseFloat(item.totalPrice);
-    const taxRate = parseFloat(item.taxRate);
+    const totalPrice = Number(item.totalPrice);
+    const taxRate = Number(item.taxRate);
     const itemTaxAmount = totalPrice * taxRate / (1 + taxRate);
     const netAmount = totalPrice - itemTaxAmount;
     
@@ -49,7 +65,7 @@ router.post('/retour', requireAuth, async (req, res) => {
       quantity: -Math.abs(item.quantity || 1),
       unit_price: item.unitPrice,
       total_price: -totalPrice,
-      tax_rate: taxRate * 100,
+      tax_rate: taxRate, // keep decimal for storage consistency
       tax_amount: -itemTaxAmount,
       happy_hour_applied: false,
       happy_hour_discount_amount: 0
@@ -106,15 +122,29 @@ router.post('/retour', requireAuth, async (req, res) => {
     console.error('Error processing retour:', error);
     res.status(500).json({ error: 'Erreur lors du retour de l\'article', details: error.message });
   }
-});
+}
+);
 
 /**
  * POST unified cancellation function - handles all cancellation scenarios
  * POST /api/orders/payment/cancel-unified
  */
-router.post('/cancel-unified', requireAuth, async (req, res) => {
+router.post(
+  '/cancel-unified',
+  requireAuth,
+  validateBody([
+    { field: 'orderId', required: true },
+    { field: 'reason', required: true },
+  ]),
+  async (req, res) => {
   try {
-    const { orderId, reason, cancellationType = 'full', itemsToCancel, includeTipReversal = false } = req.body;
+    const { orderId, reason, cancellationType = 'full', itemsToCancel, includeTipReversal = false } = req.body as {
+      orderId: number;
+      reason: string;
+      cancellationType?: 'full' | 'partial' | 'items-only';
+      itemsToCancel?: number[];
+      includeTipReversal?: boolean;
+    };
     
     if (!orderId || !reason || typeof reason !== 'string' || !reason.trim()) {
       return res.status(400).json({ error: 'Order ID and cancellation reason are required' });
@@ -152,7 +182,7 @@ router.post('/cancel-unified', requireAuth, async (req, res) => {
     // Calculate cancellation amounts
     let cancellationAmount = 0;
     let cancellationTax = 0;
-    let cancelledItems: any[] = [];
+    const cancelledItems: typeof originalItems = [];
     
     if (cancellationType === 'full') {
       cancellationAmount = originalOrder.total_amount;
@@ -267,6 +297,7 @@ router.post('/cancel-unified', requireAuth, async (req, res) => {
     console.error('Error processing cancellation:', error);
     res.status(500).json({ error: 'Erreur lors de l\'annulation', details: error.message });
   }
-});
+}
+);
 
 export default router; 
