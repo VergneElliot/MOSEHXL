@@ -1,6 +1,5 @@
 import { useCallback, useMemo } from 'react';
 import { ApiService } from '../services/apiService';
-import { apiConfig } from '../config/api';
 import { ClosureBulletin } from './useClosureState';
 
 export interface ClosureAPIActions {
@@ -39,11 +38,7 @@ export const useClosureAPI = (
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(apiConfig.getEndpoint('/api/legal/closures'));
-      if (!response.ok) {
-        throw new Error('Failed to load closure bulletins');
-      }
-      const data = await response.json();
+      const { data } = await apiService.get<ClosureBulletin[]>('/legal/closures');
       setBulletins(data || []);
     } catch (err) {
       const errorMessage = 'Erreur lors du chargement des bulletins de clôture';
@@ -56,11 +51,8 @@ export const useClosureAPI = (
 
   const loadTodayStatus = useCallback(async () => {
     try {
-      const response = await fetch(apiConfig.getEndpoint('/api/legal/closure/today-status'));
-      if (response.ok) {
-        const data = await response.json();
-        setTodayStatus(data);
-      }
+      const { data } = await apiService.get<any>('/legal/closure/today-status');
+      setTodayStatus(data);
     } catch (err) {
       console.error('Error loading today status:', err);
     }
@@ -68,11 +60,8 @@ export const useClosureAPI = (
 
   const loadClosureSettings = useCallback(async () => {
     try {
-      const response = await fetch(apiConfig.getEndpoint('/api/legal/closure-settings'));
-      if (response.ok) {
-        const data = await response.json();
-        setClosureSettings(data);
-      }
+      const { data } = await apiService.get<any>('/legal/closure-settings');
+      setClosureSettings(data);
     } catch (err) {
       console.error('Error loading closure settings:', err);
     }
@@ -94,23 +83,11 @@ export const useClosureAPI = (
       try {
         setCreating(true);
         setError(null);
-
-        const response = await fetch(apiConfig.getEndpoint('/api/legal/closure/create'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            date: closureData.date,
-            type: closureData.type,
-          }),
+        const { data: result } = await apiService.post<any>('/legal/closure/create', {
+          date: closureData.date,
+          type: closureData.type,
         });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to create closure');
-        }
-
-        const result = await response.json();
-        addBulletin(result.closure);
+        addBulletin((result as any).closure ?? result);
         setShowCreateDialog(false);
         setSelectedDate(new Date().toISOString().split('T')[0]);
         showSuccess('Bulletin de clôture créé avec succès');
@@ -140,17 +117,10 @@ export const useClosureAPI = (
   const updateClosureSettings = useCallback(
     async (newSettings: any) => {
       try {
-        const response = await fetch(apiConfig.getEndpoint('/api/legal/closure-settings'), {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newSettings),
+        const { data: updatedSettings } = await apiService.put<any>('/legal/closure-settings', {
+          settings: newSettings,
+          updated_by: 'UI',
         });
-
-        if (!response.ok) {
-          throw new Error('Failed to update closure settings');
-        }
-
-        const updatedSettings = await response.json();
         setClosureSettings(updatedSettings);
         showSuccess('Paramètres de clôture mis à jour avec succès');
       } catch (err) {
