@@ -136,7 +136,7 @@ const LegalComplianceDashboard: React.FC = () => {
                   color={
                     getIntegrityStatusColor(
                       complianceStatus.compliance_status.journal_integrity
-                    ) as any
+                    ) as 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning'
                   }
                   variant="outlined"
                 />
