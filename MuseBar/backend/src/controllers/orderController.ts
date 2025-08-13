@@ -38,7 +38,7 @@ export class OrderController {
 
     // Get user context for audit trail
     const userContext = {
-      id: (req as any).user?.id || 'anonymous',
+      id: req.user?.id || 'anonymous',
       ip: req.ip || 'unknown',
       userAgent: req.headers['user-agent'] || 'unknown'
     };
@@ -58,7 +58,7 @@ export class OrderController {
 
     // Get user context for audit trail
     const userContext = {
-      id: (req as any).user?.id || 'anonymous',
+      id: req.user?.id || 'anonymous',
       ip: req.ip || 'unknown',
       userAgent: req.headers['user-agent'] || 'unknown'
     };

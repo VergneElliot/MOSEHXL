@@ -26,7 +26,7 @@ router.post('/create', requireAuth, requireAdmin, async (req, res) => {
       period_start: new Date(startDate),
       period_end: new Date(endDate),
       format: 'JSON',
-      created_by: (req as any).user?.id || 'system'
+      created_by: req.user?.id || 'system'
     });
     
     res.status(201).json({

@@ -36,7 +36,7 @@ router.post('/send-establishment-invitation', requireAuth, requireAdmin, validat
 ]), async (req, res, next) => {
   try {
     const { name, email, phone, address, subscription_plan } = req.body;
-    const user = req.user as any;
+    const user = req.user!;
 
     // Validate required fields
     if (!name || !email) {
@@ -99,7 +99,7 @@ router.post('/send-establishment-invitation', requireAuth, requireAdmin, validat
     logger?.error(
       'Failed to send establishment invitation',
       error as Error,
-      { invitationData: req.body, userId: (req as any).user.id },
+      { invitationData: req.body, userId: req.user?.id },
       'USER_MANAGEMENT_ROUTES'
     );
     next(error);
@@ -119,7 +119,7 @@ router.post('/send-user-invitation', requireAuth, validateBody([
 ]), async (req, res, next) => {
   try {
     const { email, firstName, lastName, role, establishmentId } = req.body;
-    const user = req.user as any;
+    const user = req.user!;
 
     // Validate required fields
     if (!email || !firstName || !lastName || !role || !establishmentId) {
@@ -206,7 +206,7 @@ router.post('/send-user-invitation', requireAuth, validateBody([
     logger?.error(
       'Failed to send user invitation',
       error as Error,
-      { invitationData: req.body, userId: (req.user as any).id },
+      { invitationData: req.body, userId: req.user?.id },
       'USER_MANAGEMENT_ROUTES'
     );
     next(error);
@@ -292,7 +292,7 @@ router.post('/accept-invitation', validateBody([
  */
 router.get('/pending-invitations', requireAuth, async (req, res, next) => {
   try {
-    const user = req.user as any;
+    const user = req.user!;
     const establishmentId = user.establishment_id;
 
     if (!establishmentId) {
@@ -324,7 +324,7 @@ router.get('/pending-invitations', requireAuth, async (req, res, next) => {
     logger?.error(
       'Failed to get pending invitations',
       error as Error,
-      { userId: (req as any).user.id },
+      { userId: req.user?.id },
       'USER_MANAGEMENT_ROUTES'
     );
     next(error);
@@ -338,7 +338,7 @@ router.get('/pending-invitations', requireAuth, async (req, res, next) => {
 router.delete('/cancel-invitation/:invitationId', requireAuth, validateParams([{ param: 'invitationId', validator: (v:any)=> typeof v === 'string' && v.length > 0 }]), async (req, res, next) => {
   try {
     const { invitationId } = req.params;
-    const user = req.user as any;
+    const user = req.user!;
 
     const success = await userInvitationService.cancelInvitation(invitationId, String(user.id));
 
@@ -367,7 +367,7 @@ router.delete('/cancel-invitation/:invitationId', requireAuth, validateParams([{
     logger?.error(
       'Failed to cancel invitation',
       error as Error,
-      { invitationId: req.params.invitationId, userId: (req as any).user.id },
+      { invitationId: req.params.invitationId, userId: req.user?.id },
       'USER_MANAGEMENT_ROUTES'
     );
     next(error);
@@ -380,7 +380,7 @@ router.delete('/cancel-invitation/:invitationId', requireAuth, validateParams([{
  */
 router.get('/establishment-users', requireAuth, async (req, res, next) => {
   try {
-    const user = (req as any).user;
+    const user = req.user!;
     const establishmentId = user.establishment_id;
 
     if (!establishmentId) {
@@ -418,7 +418,7 @@ router.get('/establishment-users', requireAuth, async (req, res, next) => {
     logger?.error(
       'Failed to get establishment users',
       error as Error,
-      { userId: (req.user as any).id },
+      { userId: req.user?.id },
       'USER_MANAGEMENT_ROUTES'
     );
     next(error);
@@ -432,7 +432,7 @@ router.get('/establishment-users', requireAuth, async (req, res, next) => {
 router.post('/test-email', requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { testEmail } = req.body;
-    const user = req.user as any;
+    const user = req.user!;
 
     if (!testEmail) {
       return res.status(400).json({ 
@@ -479,7 +479,7 @@ router.post('/test-email', requireAuth, requireAdmin, async (req, res, next) => 
     logger?.error(
       'Email test failed',
       error as Error,
-      { testEmail: req.body.testEmail, userId: (req.user as any).id },
+      { testEmail: req.body.testEmail, userId: req.user?.id },
       'USER_MANAGEMENT_ROUTES'
     );
     next(error);
@@ -492,7 +492,7 @@ router.post('/test-email', requireAuth, requireAdmin, async (req, res, next) => 
  */
 router.get('/stats', requireAuth, requireAdmin, async (req, res, next) => {
   try {
-    const user = req.user as any;
+    const user = req.user!;
 
     // Get email service stats
     const emailService = userInvitationService['emailService'];
@@ -539,7 +539,7 @@ router.get('/stats', requireAuth, requireAdmin, async (req, res, next) => {
     logger?.error(
       'Failed to get user management stats',
       error as Error,
-      { userId: (req.user as any).id },
+      { userId: req.user?.id },
       'USER_MANAGEMENT_ROUTES'
     );
     next(error);

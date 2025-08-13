@@ -197,7 +197,7 @@ export const getEnvironmentConfig = (): EnvironmentConfig => {
     },
 
     logging: {
-      level: (process.env.LOG_LEVEL as any) || (isDevelopment ? 'debug' : 'info'),
+      level: (process.env.LOG_LEVEL as 'error' | 'warn' | 'info' | 'debug') || (isDevelopment ? 'debug' : 'info'),
       enableFileLogging: process.env.ENABLE_FILE_LOGGING === 'true',
       enableDatabaseLogging: process.env.ENABLE_DB_LOGGING === 'true',
     },

@@ -89,7 +89,7 @@ router.post(
           total_amount: -totalPrice,
           payment_method: paymentMethod
         },
-        (req as any).user ? String((req as any).user.id) : undefined
+        req.user ? String(req.user.id) : undefined
       );
     } catch (journalError) {
       console.error('Legal journal error (retour):', journalError);
@@ -98,7 +98,7 @@ router.post(
     // Log audit trail
     const ip = req.ip;
     const userAgent = req.headers['user-agent'];
-    const userId = (req as any).user ? String((req as any).user.id) : undefined;
+    const userId = req.user ? String(req.user.id) : undefined;
     try {
       await AuditTrailModel.logAction({
         user_id: userId,
@@ -257,7 +257,7 @@ router.post(
           total_cancelled: -cancellationAmount,
           tax_cancelled: -cancellationTax
         },
-        (req as any).user ? String((req as any).user.id) : undefined
+        req.user ? String(req.user.id) : undefined
       );
     } catch (journalError) {
       console.error('Legal journal error (cancellation):', journalError);
@@ -266,7 +266,7 @@ router.post(
     // Log audit trail
     const ip = req.ip;
     const userAgent = req.headers['user-agent'];
-    const userId = (req as any).user ? String((req as any).user.id) : undefined;
+    const userId = req.user ? String(req.user.id) : undefined;
     try {
       await AuditTrailModel.logAction({
         user_id: userId,
