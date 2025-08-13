@@ -13,8 +13,20 @@ import {
 import { Receipt, Schedule, TrendingUp, Assignment, Security, Lock } from '@mui/icons-material';
 
 interface ClosureStatusCardsProps {
-  todayStatus: any;
-  monthlyStats: any;
+  todayStatus: {
+    has_daily_closure?: boolean;
+    closure_date?: string;
+    total_transactions?: number;
+    total_amount?: number;
+    transactions_today?: number;
+  } | null;
+  monthlyStats: {
+    total_amount?: number;
+    total_transactions?: number;
+    avg_daily_amount?: number;
+    avg_daily_transactions?: number;
+    closure_count?: number;
+  } | null;
   monthlyStatsError: string | null;
   loading: boolean;
   formatCurrency: (amount: number) => string;

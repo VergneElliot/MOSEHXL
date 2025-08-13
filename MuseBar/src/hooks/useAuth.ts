@@ -11,7 +11,6 @@ interface User {
   last_name?: string;
   is_admin?: boolean;
   permissions: string[];
-  [key: string]: any;
 }
 
 interface AuthState {
