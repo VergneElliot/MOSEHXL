@@ -9,6 +9,7 @@ import { Box, Alert } from '@mui/material';
 import { InvitationValidation } from './auth/InvitationValidation';
 import { AccountSetupForm } from './auth/AccountSetupForm';
 import { InvitationSuccess } from './auth/InvitationSuccess';
+import { apiService } from '../services/apiService';
 
 interface InvitationData {
   email: string;
@@ -50,23 +51,10 @@ const InvitationAcceptance: React.FC = () => {
     setLoading(true);
     
     try {
-      // Simulate API call - replace with actual API
-      const response = await fetch('/api/invitations/accept', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          token: new URLSearchParams(window.location.search).get('token'),
-          ...accountData,
-        }),
+      await apiService.post('/invitations/accept', {
+        token: new URLSearchParams(window.location.search).get('token'),
+        ...accountData,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create account');
-      }
-
       setActiveStep(2);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create account';

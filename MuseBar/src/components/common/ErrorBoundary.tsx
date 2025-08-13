@@ -270,7 +270,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     if (process.env.NODE_ENV === 'production') {
       // Sentry.captureException(errorReport);
       // or
-      // fetch('/api/errors', { method: 'POST', body: JSON.stringify(errorReport) });
+      // apiService.post('/errors', errorReport);
     }
 
     // For development, just log it

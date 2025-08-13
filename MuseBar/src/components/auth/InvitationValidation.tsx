@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { apiService } from '../../services/apiService';
 import { useSearchParams } from 'react-router-dom';
 import {
   Box,
@@ -62,14 +63,7 @@ export const InvitationValidation: React.FC<InvitationValidationProps> = ({
     }
 
     try {
-      // Simulate API call - replace with actual API
-      const response = await fetch(`/api/invitations/validate?token=${token}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Invalid invitation');
-      }
-
+      const { data } = await apiService.get<InvitationData>(`/invitations/validate?token=${token}`);
       setInvitation(data);
       onValidationComplete(data);
     } catch (err) {

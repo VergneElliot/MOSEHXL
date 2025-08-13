@@ -34,7 +34,7 @@ BACKEND_PID=$!
 
 echo "🌐 Starting Frontend Server..."
 cd ../
-node serve-frontend.js &
+serve -s build -l 3000 &
 FRONTEND_PID=$!
 
 echo ""

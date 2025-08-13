@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { apiService } from '../services/apiService';
 import { useSearchParams } from 'react-router-dom';
 import { PasswordResetRequest } from './auth/PasswordResetRequest';
 import { PasswordResetForm } from './auth/PasswordResetForm';
@@ -28,21 +29,11 @@ const PasswordReset: React.FC = () => {
     setError('');
 
     try {
-      const response = await fetch('/api/user-management/request-password-reset', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setSuccess(true);
-      } else {
-        setError(data.error || 'Failed to send reset email');
-      }
+      await apiService.post<{
+        success: boolean;
+        message?: string;
+      }>('/user-management/request-password-reset', { email });
+      setSuccess(true);
     } catch (err) {
       setError('Network error. Please try again.');
     } finally {
@@ -60,24 +51,14 @@ const PasswordReset: React.FC = () => {
     setError('');
 
     try {
-      const response = await fetch('/api/user-management/reset-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          token,
-          newPassword: password,
-        }),
+      await apiService.post<{
+        success: boolean;
+        message?: string;
+      }>('/user-management/reset-password', {
+        token,
+        newPassword: password,
       });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setSuccess(true);
-      } else {
-        setError(data.error || 'Failed to reset password');
-      }
+      setSuccess(true);
     } catch (err) {
       setError('Network error. Please try again.');
     } finally {
