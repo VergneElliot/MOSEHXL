@@ -42,7 +42,8 @@ export const OrderModel = {
     const fields = Object.keys(order).filter(key => key !== 'id');
     const setClause = fields.map((field, index) => `${field} = $${index + 2}`).join(', ');
     const query = `UPDATE orders SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *`;
-    const values = [id, ...fields.map(field => (order as any)[field])];
+    const rec = order as Record<string, unknown>;
+    const values = [id, ...fields.map(field => rec[field])];
 
     const result = await pool.query(query, values);
     return result.rows[0] || null;
@@ -90,7 +91,8 @@ export const OrderItemModel = {
     const fields = Object.keys(item).filter(key => key !== 'id');
     const setClause = fields.map((field, index) => `${field} = $${index + 2}`).join(', ');
     const query = `UPDATE order_items SET ${setClause} WHERE id = $1 RETURNING *`;
-    const values = [id, ...fields.map(field => (item as any)[field])];
+    const rec = item as Record<string, unknown>;
+    const values = [id, ...fields.map(field => rec[field])];
 
     const result = await pool.query(query, values);
     return result.rows[0] || null;
@@ -124,7 +126,8 @@ export const SubBillModel = {
     const fields = Object.keys(subBill).filter(key => key !== 'id');
     const setClause = fields.map((field, index) => `${field} = $${index + 2}`).join(', ');
     const query = `UPDATE sub_bills SET ${setClause} WHERE id = $1 RETURNING *`;
-    const values = [id, ...fields.map(field => (subBill as any)[field])];
+    const rec = subBill as Record<string, unknown>;
+    const values = [id, ...fields.map(field => rec[field])];
 
     const result = await pool.query(query, values);
     return result.rows[0] || null;

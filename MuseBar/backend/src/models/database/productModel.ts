@@ -139,7 +139,8 @@ export const ProductModel = {
     const fields = Object.keys(product).filter(key => key !== 'id');
     const setClause = fields.map((field, index) => `${field} = $${index + 2}`).join(', ');
     const query = `UPDATE products SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND is_active = TRUE RETURNING *`;
-    const values = [id, ...fields.map(field => (product as any)[field])];
+    const rec = product as Record<string, unknown>;
+    const values = [id, ...fields.map(field => rec[field])];
 
     const result = await pool.query(query, values);
     return result.rows[0] || null;
