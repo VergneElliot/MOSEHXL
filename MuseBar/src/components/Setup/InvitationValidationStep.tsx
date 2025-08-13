@@ -9,7 +9,6 @@ import {
   Card,
   CardContent,
   Button,
-  Chip,
   Alert
 } from '@mui/material';
 import { CheckCircle, Business, Schedule } from '@mui/icons-material';

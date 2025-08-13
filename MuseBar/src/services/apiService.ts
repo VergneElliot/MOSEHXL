@@ -447,7 +447,7 @@ export class ApiService {
 
   // Business Info
   async getBusinessInfo() {
-    return this.request('/legal/business-info');
+    return this.request<{ name?: string; address?: string; phone?: string; email?: string; siret?: string; tax_identification?: string }>('/legal/business-info');
   }
 
   async updateBusinessInfo(data: Record<string, unknown>) {

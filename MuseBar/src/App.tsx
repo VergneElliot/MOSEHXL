@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import { Container } from '@mui/material';
 import { apiConfig } from './config/api';
 import { useAuth } from './hooks/useAuth';
@@ -13,7 +13,7 @@ import { AppHeader } from './components/common/AppHeader';
 import { BusinessSetupWizard } from './components/Setup';
 
 function App() {
-  const location = useLocation();
+  // const location = useLocation();
   const {
     user,
     token,
@@ -22,8 +22,7 @@ function App() {
     logout,
   } = useAuth();
 
-  // Check if this is a setup route (no authentication required)
-  const isSetupRoute = location.pathname.startsWith('/setup/');
+  // Setup routes are handled via dedicated route below
 
   // Determine interface based on user role
   const isSystemAdmin = user?.role === 'system_admin';

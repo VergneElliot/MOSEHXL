@@ -74,9 +74,9 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
           </AlertTitle>
           {todayStatus.has_daily_closure ? (
             <Typography variant="body2">
-              Clôture effectuée le {new Date(todayStatus.closure_date).toLocaleDateString('fr-FR')}-{' '}
+              Clôture effectuée le {todayStatus.closure_date ? new Date(todayStatus.closure_date).toLocaleDateString('fr-FR') : 'N/A'}-{' '}
               {todayStatus.total_transactions} transactions pour{' '}
-              {formatCurrency(todayStatus.total_amount)}
+              {formatCurrency(todayStatus.total_amount || 0)}
             </Typography>
           ) : (
             <Typography variant="body2">

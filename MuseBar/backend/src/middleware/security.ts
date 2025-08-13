@@ -87,7 +87,7 @@ export class RateLimitMiddleware {
             limit: maxRequests,
             resetTime: resetTime.toISOString(),
           },
-          req.user?.id,
+          req.user?.id ? String(req.user.id) : undefined,
           req.ip,
           req.requestId
         );
@@ -335,7 +335,7 @@ export const requestSizeLimit = (maxSizeKB: number, logger?: Logger) => {
             url: req.originalUrl,
             method: req.method,
           },
-          req.user?.id,
+          req.user?.id ? String(req.user.id) : undefined,
           req.ip,
           req.requestId
         );

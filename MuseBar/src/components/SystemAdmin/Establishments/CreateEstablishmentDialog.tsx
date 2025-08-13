@@ -43,7 +43,7 @@ export const CreateEstablishmentDialog: React.FC<CreateEstablishmentDialogProps>
       
     // console.debug('Creating establishment with data:', formData);
       
-      const response = await createEstablishment(formData);
+      await createEstablishment(formData);
       
     // console.debug('Establishment created successfully:', response);
       

@@ -48,7 +48,7 @@ export const useClosureAPI = (
     } finally {
       setLoading(false);
     }
-  }, [setBulletins, setLoading, setError]);
+  }, [setBulletins, setLoading, setError, apiService]);
 
   const loadTodayStatus = useCallback(async () => {
     try {
@@ -57,7 +57,7 @@ export const useClosureAPI = (
     } catch (err) {
       console.error('Error loading today status:', err);
     }
-  }, [setTodayStatus]);
+  }, [setTodayStatus, apiService]);
 
   const loadClosureSettings = useCallback(async () => {
     try {
@@ -66,7 +66,7 @@ export const useClosureAPI = (
     } catch (err) {
       console.error('Error loading closure settings:', err);
     }
-  }, [setClosureSettings]);
+  }, [setClosureSettings, apiService]);
 
   const loadMonthlyStats = useCallback(async () => {
     try {
@@ -74,7 +74,7 @@ export const useClosureAPI = (
       const stats = await apiService.getLiveMonthlyStats();
       setMonthlyStats(stats as LiveMonthlyStats);
     } catch (err) {
-      setMonthlyStats(null);
+      setMonthlyStats({} as LiveMonthlyStats);
       setMonthlyStatsError('Impossible de charger les statistiques mensuelles en direct.');
     }
   }, [apiService, setMonthlyStats, setMonthlyStatsError]);
@@ -115,6 +115,7 @@ export const useClosureAPI = (
       showSuccess,
       showError,
       loadTodayStatus,
+      apiService,
     ]
   );
 
@@ -133,7 +134,7 @@ export const useClosureAPI = (
         showError(errorMessage);
       }
     },
-    [setClosureSettings, showSuccess, showError]
+    [apiService, setClosureSettings, showSuccess, showError]
   );
 
   const refreshAllData = useCallback(async () => {
