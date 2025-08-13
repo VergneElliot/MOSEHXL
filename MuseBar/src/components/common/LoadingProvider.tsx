@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { Backdrop, Box, CircularProgress, LinearProgress, Typography } from '@mui/material';
 
 export type LoadingState = 'idle' | 'loading' | 'success' | 'error';

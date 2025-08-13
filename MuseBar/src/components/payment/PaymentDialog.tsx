@@ -15,13 +15,11 @@ import {
   Tab,
   Tabs,
   Alert,
-  CircularProgress,
   useTheme,
   useMediaQuery,
 } from '@mui/material';
 import {
   Payment as PaymentIcon,
-  Receipt as ReceiptIcon,
 } from '@mui/icons-material';
 import { OrderItem } from '../../types';
 

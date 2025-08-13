@@ -20,7 +20,6 @@ const REQUIRED_ENV_VARS = {
   DB_PASSWORD: 'Database password',
   
   // Application
-  PORT: 'Application port',
   NODE_ENV: 'Node environment',
   
   // Security
@@ -154,18 +153,18 @@ export const getEnvironmentConfig = (): EnvironmentConfig => {
 
   return {
     database: {
-      host: process.env.DB_HOST!,
-      port: parseInt(process.env.DB_PORT!),
-      database: process.env.DB_NAME!,
-      user: process.env.DB_USER!,
-      password: process.env.DB_PASSWORD!,
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '5432'),
+      database: process.env.DB_NAME || (isDevelopment ? 'mosehxl_development' : 'mosehxl_production'),
+      user: process.env.DB_USER || 'postgres',
+      password: process.env.DB_PASSWORD || 'password',
       ssl: isProduction,
       maxConnections: parseInt(process.env.DB_MAX_CONNECTIONS || '20'),
       idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '30000'),
     },
 
     server: {
-      port: parseInt(process.env.PORT!),
+      port: parseInt(process.env.PORT || '3001'),
       host: process.env.HOST || '0.0.0.0',
       corsOrigins: process.env.CORS_ORIGIN 
         ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())

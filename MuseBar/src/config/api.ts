@@ -39,11 +39,15 @@ class ApiConfig {
       possibleUrls.unshift(process.env.REACT_APP_API_URL);
     }
 
-    console.log('🔍 Testing backend connectivity...');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 Testing backend connectivity...');
+    }
 
     for (const url of possibleUrls) {
       try {
-        console.log(`Testing: ${url}`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`Testing: ${url}`);
+        }
 
         // Create AbortController for timeout
         const controller = new AbortController();
@@ -61,12 +65,16 @@ class ApiConfig {
           if (data.status === 'OK') {
             this.baseURL = url;
             this.isInitialized = true;
-            console.log(`✅ Backend connected: ${url}`);
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`✅ Backend connected: ${url}`);
+            }
             return;
           }
         }
       } catch (error) {
-        console.log(`❌ Failed to connect to: ${url}`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`❌ Failed to connect to: ${url}`);
+        }
         continue;
       }
     }

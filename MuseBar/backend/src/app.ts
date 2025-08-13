@@ -4,17 +4,16 @@ import dotenv from 'dotenv';
 import { Pool } from 'pg';
 import { ClosureScheduler } from './utils/closureScheduler';
 import { Logger, requestLoggerMiddleware } from './utils/logger';
-import { EnvironmentConfig, getEnvironmentConfig } from './config/environment';
+import { EnvironmentConfig, initializeEnvironment } from './config/environment';
 import { createSecurityMiddleware } from './middleware/security';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
-const PORT = parseInt(process.env.PORT || '3001');
 
 // Initialize environment config and logger
-const config = getEnvironmentConfig();
+const config = initializeEnvironment();
 const logger = Logger.getInstance(config);
 
 // Environment-specific configuration
@@ -111,7 +110,7 @@ initializeUserManagementRoutes(config, logger);
 initializeEstablishmentRoutes(config, logger);
 
 // Start the server on all network interfaces
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(config.server.port, '0.0.0.0', () => {
   // MOSEHXL API Server running
   
   // Start the automatic closure scheduler (only in production)
