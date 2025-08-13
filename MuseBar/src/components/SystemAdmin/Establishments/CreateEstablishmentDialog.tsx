@@ -41,11 +41,11 @@ export const CreateEstablishmentDialog: React.FC<CreateEstablishmentDialogProps>
       setError(null);
       setSuccess(null);
       
-      console.log('🏗️ Creating establishment with data:', formData);
+    // console.debug('Creating establishment with data:', formData);
       
       const response = await createEstablishment(formData);
       
-      console.log('✅ Establishment created successfully:', response);
+    // console.debug('Establishment created successfully:', response);
       
       setSuccess(`Établissement créé avec succès! Invitation envoyée à ${formData.owner_email}`);
       

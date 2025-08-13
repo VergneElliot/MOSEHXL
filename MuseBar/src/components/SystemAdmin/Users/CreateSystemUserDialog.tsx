@@ -43,7 +43,7 @@ export const CreateSystemUserDialog: React.FC<CreateSystemUserDialogProps> = ({
       setError(null);
       
       // TODO: API call to create system user
-      console.log('Creating system user:', formData);
+    // console.debug('Creating system user:', formData);
       
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
