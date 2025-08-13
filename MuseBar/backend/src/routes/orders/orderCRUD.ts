@@ -6,6 +6,7 @@
 import express from 'express';
 import { OrderModel, OrderItemModel, SubBillModel } from '../../models';
 import { requireAuth } from '../auth';
+import { validateBody, validateParams, commonValidations, paramValidations } from '../../middleware/validation';
 
 const router = express.Router();
 
@@ -43,12 +44,9 @@ router.get('/', async (req, res) => {
  * GET order by ID with items and sub-bills
  * GET /api/orders/:id
  */
-router.get('/:id', async (req, res) => {
+router.get('/:id', validateParams([paramValidations.id]), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid order ID' });
-    }
 
     const order = await OrderModel.getById(id);
     if (!order) {
@@ -78,7 +76,7 @@ router.get('/:id', async (req, res) => {
  * POST create new order
  * POST /api/orders
  */
-router.post('/', async (req, res) => {
+router.post('/', validateBody(commonValidations.orderCreate), async (req, res) => {
   try {
     const {
       total_amount,
@@ -95,27 +93,6 @@ router.post('/', async (req, res) => {
     const ip = req.ip;
     const userAgent = req.headers['user-agent'];
     const userId = (req as any).user ? String((req as any).user.id) : undefined;
-
-    // Validate required fields
-    if (total_amount === undefined || typeof total_amount !== 'number' || total_amount < 0) {
-      return res.status(400).json({ error: 'Valid total amount is required' });
-    }
-
-    if (total_tax === undefined || typeof total_tax !== 'number' || total_tax < 0) {
-      return res.status(400).json({ error: 'Valid total tax is required' });
-    }
-
-    if (!payment_method || !['cash', 'card', 'split'].includes(payment_method)) {
-      return res.status(400).json({ error: 'Valid payment method is required' });
-    }
-
-    if (!status || !['pending', 'completed', 'cancelled'].includes(status)) {
-      return res.status(400).json({ error: 'Valid status is required' });
-    }
-
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: 'At least one item is required' });
-    }
 
     // Create the order
     const order = await OrderModel.create({
@@ -180,12 +157,9 @@ router.post('/', async (req, res) => {
  * PUT update order
  * PUT /api/orders/:id
  */
-router.put('/:id', async (req, res) => {
+router.put('/:id', validateParams([paramValidations.id]), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid order ID' });
-    }
 
     const order = await OrderModel.getById(id);
     if (!order) {
@@ -204,12 +178,9 @@ router.put('/:id', async (req, res) => {
  * DELETE order
  * DELETE /api/orders/:id
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', validateParams([paramValidations.id]), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid order ID' });
-    }
 
     const order = await OrderModel.getById(id);
     if (!order) {
