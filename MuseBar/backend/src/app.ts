@@ -41,6 +41,9 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Trust proxy if configured
+app.set('trust proxy', config.server.trustProxy);
+
 // Request logging and security middleware
 app.use(requestLoggerMiddleware(logger));
 app.use(createSecurityMiddleware(config, logger));
@@ -92,7 +95,10 @@ app.use('/api/docs', docsRouter);
 
 // Error handling middleware
 import { createErrorHandler } from './middleware/errorHandler';
+import { notFound } from './middleware/errorHandler';
 const errorHandler = createErrorHandler(logger);
+// 404 handler
+app.use(notFound);
 app.use(errorHandler);
 
 // Initialize services
