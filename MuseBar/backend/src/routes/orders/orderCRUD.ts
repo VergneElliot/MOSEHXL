@@ -92,7 +92,7 @@ router.post('/', validateBody(commonValidations.orderCreate), async (req, res) =
 
     const ip = req.ip;
     const userAgent = req.headers['user-agent'];
-    const userId = (req as any).user ? String((req as any).user.id) : undefined;
+    const userId = req.user ? String(req.user.id) : undefined;
 
     // Create the order
     const order = await OrderModel.create({
