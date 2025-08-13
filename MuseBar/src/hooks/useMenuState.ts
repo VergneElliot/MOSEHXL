@@ -62,7 +62,7 @@ export interface MenuActions {
   setCategoryForm: (form: CategoryFormData) => void;
   setProductForm: (form: ProductFormData) => void;
   updateCategoryForm: (field: keyof CategoryFormData, value: string) => void;
-  updateProductForm: (field: keyof ProductFormData, value: any) => void;
+  updateProductForm: (field: keyof ProductFormData, value: string | number | boolean) => void;
   resetForms: () => void;
 
   // UI actions
@@ -169,7 +169,7 @@ export const useMenuState = (): [MenuState, MenuActions] => {
     setCategoryForm(prev => ({ ...prev, [field]: value }));
   };
 
-  const updateProductForm = (field: keyof ProductFormData, value: any) => {
+  const updateProductForm = (field: keyof ProductFormData, value: string | number | boolean) => {
     setProductForm(prev => ({ ...prev, [field]: value }));
   };
 

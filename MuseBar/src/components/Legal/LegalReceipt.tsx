@@ -206,12 +206,13 @@ const LegalReceipt: React.FC<LegalReceiptProps> = ({
           <Grid container spacing={1}>
             {vatBreakdown.map((v, index) => {
               // Support both 'tax_rate' and 'rate' for backend compatibility
+              const rateCandidate: unknown = (v as unknown as { rate?: number }).rate;
               const rate =
                 typeof v.tax_rate === 'number' && !isNaN(v.tax_rate)
                   ? v.tax_rate
-                  : typeof (v as any).rate === 'number' && !isNaN((v as any).rate)
-                    ? (v as any).rate
-                    : '';
+                  : typeof rateCandidate === 'number' && !isNaN(rateCandidate)
+                    ? rateCandidate
+                    : 0;
               return (
                 <React.Fragment key={index}>
                   <Grid item xs={6}>
@@ -394,12 +395,13 @@ const LegalReceipt: React.FC<LegalReceiptProps> = ({
         <Grid container spacing={1}>
           {vatBreakdown.map((v, index) => {
             // Support both 'tax_rate' and 'rate' for backend compatibility
-            const rate =
-              typeof v.tax_rate === 'number' && !isNaN(v.tax_rate)
-                ? v.tax_rate
-                : typeof (v as any).rate === 'number' && !isNaN((v as any).rate)
-                  ? (v as any).rate
-                  : 0;
+              const rateCandidate: unknown = (v as unknown as { rate?: number }).rate;
+              const rate =
+                typeof v.tax_rate === 'number' && !isNaN(v.tax_rate)
+                  ? v.tax_rate
+                  : typeof rateCandidate === 'number' && !isNaN(rateCandidate)
+                    ? rateCandidate
+                    : 0;
             return (
               <React.Fragment key={index}>
                 <Grid item xs={6}>
