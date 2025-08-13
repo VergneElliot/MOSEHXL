@@ -104,7 +104,7 @@ export interface JournalEntry {
   amount: number;
   vat_amount: number;
   payment_method: string;
-  transaction_data: any;
+  transaction_data: Record<string, unknown>;
   previous_hash: string;
   current_hash: string;
   timestamp: Date;
@@ -121,8 +121,8 @@ export interface ClosureBulletin {
   total_transactions: number;
   total_amount: number;
   total_vat: number;
-  vat_breakdown: any;
-  payment_methods_breakdown: any;
+  vat_breakdown: Array<{ rate: number; subtotal_ht: number; vat: number }> | Record<string, number>;
+  payment_methods_breakdown: Record<string, number>;
   tips_total?: number;
   change_total?: number;
   first_sequence: number;
@@ -165,7 +165,7 @@ export interface AuditEntry {
   action_type: string;
   resource_type?: string;
   resource_id?: string;
-  action_details?: any;
+  action_details?: Record<string, unknown>;
   ip_address?: string;
   user_agent?: string;
   session_id?: string;
