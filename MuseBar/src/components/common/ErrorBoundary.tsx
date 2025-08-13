@@ -253,11 +253,19 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         height: window.innerHeight,
       },
       performance: {
-        memory: (performance as any).memory ? {
-          used: (performance as any).memory.usedJSHeapSize,
-          total: (performance as any).memory.totalJSHeapSize,
-          limit: (performance as any).memory.jsHeapSizeLimit,
-        } : null,
+        memory: (performance as unknown as { memory?: { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number } }).memory
+          ? {
+              used:
+                (performance as unknown as { memory: { usedJSHeapSize: number } }).memory
+                  .usedJSHeapSize,
+              total:
+                (performance as unknown as { memory: { totalJSHeapSize: number } }).memory
+                  .totalJSHeapSize,
+              limit:
+                (performance as unknown as { memory: { jsHeapSizeLimit: number } }).memory
+                  .jsHeapSizeLimit,
+            }
+          : null,
       },
     };
   };
@@ -265,7 +273,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   /**
    * Send error to monitoring service
    */
-  private sendToErrorService = (errorReport: any) => {
+  private sendToErrorService = (errorReport: Record<string, unknown>) => {
     // Example: Send to your error reporting service
     if (process.env.NODE_ENV === 'production') {
       // Sentry.captureException(errorReport);
