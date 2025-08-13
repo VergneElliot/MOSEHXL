@@ -158,7 +158,7 @@ const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <CalculateIcon />
+                      <PaymentIcon />
                     </InputAdornment>
                   ),
                 }}
