@@ -34,23 +34,13 @@ export const EstablishmentForm: React.FC<EstablishmentFormProps> = ({
       <Grid item xs={12} sm={6}>
         <TextField
           fullWidth
-          label="Email de contact"
-          type="email"
-          value={formData.email}
-          onChange={handleChange('email')}
-          required
-        />
-      </Grid>
-      <Grid item xs={12} sm={6}>
-        <TextField
-          fullWidth
           label="Téléphone"
           value={formData.phone}
           onChange={handleChange('phone')}
           required
         />
       </Grid>
-      <Grid item xs={12} sm={6}>
+      <Grid item xs={12}>
         <TextField
           fullWidth
           label="Email du propriétaire"
@@ -58,6 +48,7 @@ export const EstablishmentForm: React.FC<EstablishmentFormProps> = ({
           value={formData.owner_email}
           onChange={handleChange('owner_email')}
           required
+          helperText="Cet email sera utilisé pour l'établissement et pour recevoir l'invitation de configuration"
         />
       </Grid>
       <Grid item xs={12}>

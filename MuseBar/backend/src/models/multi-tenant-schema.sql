@@ -5,7 +5,7 @@
 CREATE TABLE IF NOT EXISTS establishments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(200) NOT NULL,
-    email VARCHAR(200) NOT NULL UNIQUE,
+    email VARCHAR(200) NOT NULL,
     phone VARCHAR(50),
     address TEXT,
     schema_name VARCHAR(50) NOT NULL UNIQUE,

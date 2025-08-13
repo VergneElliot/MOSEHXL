@@ -65,6 +65,9 @@ export const useAuth = (): AuthState & AuthActions => {
 
   const checkAuthStatus = useCallback(async () => {
     try {
+      // Add delay to ensure API is ready
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Ensure API config is ready
       if (!apiConfig.isReady()) {
         await apiConfig.initialize();
@@ -75,6 +78,7 @@ export const useAuth = (): AuthState & AuthActions => {
       setUser(data);
       setPermissions(data.permissions || []);
     } catch (error) {
+      console.error('Auth check failed:', error);
       // Token expired or invalid, logout required
       logout();
     }

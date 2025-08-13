@@ -4,6 +4,7 @@
  */
 
 import { randomUUID } from 'crypto';
+import bcrypt from 'bcrypt';
 import { pool } from '../app';
 import { EmailService } from './email';
 import { EstablishmentModel, CreateEstablishmentData } from '../models/establishment';
@@ -327,7 +328,6 @@ export class UserInvitationService {
       const establishment = await EstablishmentModel.createEstablishment(establishmentData);
 
       // Create establishment admin user
-      const bcrypt = require('bcrypt');
       const hashedPassword = await bcrypt.hash(password, 12);
       
       const userResult = await client.query(`
@@ -435,7 +435,6 @@ export class UserInvitationService {
       }
 
       // Create user
-      const bcrypt = require('bcrypt');
       const hashedPassword = await bcrypt.hash(password, 12);
       
       const userResult = await client.query(`

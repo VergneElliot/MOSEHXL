@@ -2,13 +2,16 @@ import express from 'express';
 import { requireAuth, requireAdmin } from './auth';
 import { EstablishmentService } from '../services/EstablishmentService';
 import { Logger } from '../utils/logger';
+import { getEnvironmentConfig } from '../config/environment';
 
 const router = express.Router();
+const config = getEnvironmentConfig();
+const logger = Logger.getInstance(config);
 
 // POST /api/establishments - Create new establishment (system admin only)
 router.post('/', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const establishmentService = new EstablishmentService(Logger.getInstance());
+    const establishmentService = new EstablishmentService(logger);
     const result = await establishmentService.createEstablishment(
       req.body,
       String((req as any).user.id),
@@ -28,7 +31,7 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
 // GET /api/establishments - List all establishments (system admin only)
 router.get('/', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const establishmentService = new EstablishmentService(Logger.getInstance());
+    const establishmentService = new EstablishmentService(logger);
     const result = await establishmentService.getAllEstablishments();
     res.json(result);
   } catch (error) {
@@ -41,7 +44,7 @@ router.get('/', requireAuth, requireAdmin, async (req, res) => {
 router.get('/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const establishmentService = new EstablishmentService(Logger.getInstance());
+    const establishmentService = new EstablishmentService(logger);
     const result = await establishmentService.getEstablishmentById(id);
     res.json(result);
   } catch (error) {
@@ -50,6 +53,23 @@ router.get('/:id', requireAuth, requireAdmin, async (req, res) => {
       res.status(404).json({ error: error.message });
     } else {
       res.status(500).json({ error: 'Failed to fetch establishment' });
+    }
+  }
+});
+
+// DELETE /api/establishments/:id - Delete establishment (system admin only)
+router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const establishmentService = new EstablishmentService(logger);
+    await establishmentService.deleteEstablishment(id);
+    res.json({ success: true, message: 'Establishment deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting establishment:', error);
+    if (error instanceof Error && error.message === 'Establishment not found') {
+      res.status(404).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: 'Failed to delete establishment' });
     }
   }
 });

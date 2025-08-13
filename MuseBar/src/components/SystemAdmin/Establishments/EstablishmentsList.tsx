@@ -21,7 +21,21 @@ import {
 import { useEstablishments } from '../../../hooks/useEstablishments';
 
 export const EstablishmentsList: React.FC = () => {
-  const { establishments, loading, error } = useEstablishments();
+  const { establishments, loading, error, deleteEstablishment } = useEstablishments();
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!window.confirm(`Êtes-vous sûr de vouloir supprimer l'établissement "${name}" ? Cette action ne peut pas être annulée.`)) {
+      return;
+    }
+
+    try {
+      await deleteEstablishment(id);
+      // The establishments list will be automatically refreshed by the hook
+    } catch (error) {
+      console.error('Error deleting establishment:', error);
+      // You might want to show a toast notification here
+    }
+  };
 
   if (loading) {
     return (
@@ -115,7 +129,12 @@ export const EstablishmentsList: React.FC = () => {
                 <IconButton size="small" title="Modifier">
                   <EditIcon />
                 </IconButton>
-                <IconButton size="small" title="Supprimer">
+                <IconButton 
+                  size="small" 
+                  title="Supprimer"
+                  onClick={() => handleDelete(establishment.id, establishment.name)}
+                  color="error"
+                >
                   <DeleteIcon />
                 </IconButton>
               </TableCell>

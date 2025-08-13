@@ -45,11 +45,32 @@ export const useEstablishments = () => {
     }
   };
 
+  const deleteEstablishment = async (id: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      console.log('🔄 useEstablishments: Deleting establishment...', id);
+      
+      await EstablishmentService.deleteEstablishment(id);
+      console.log('🔄 useEstablishments: Deletion successful');
+      
+      // Reload establishments to get updated list
+      await loadEstablishments();
+      
+      return { success: true };
+    } catch (err) {
+      setError('Erreur lors de la suppression de l\'établissement');
+      console.error('❌ useEstablishments: Error deleting establishment:', err);
+      throw err;
+    }
+  };
+
   return {
     establishments,
     loading,
     error,
     createEstablishment,
+    deleteEstablishment,
     refreshEstablishments: loadEstablishments
   };
 };

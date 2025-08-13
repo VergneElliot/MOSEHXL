@@ -16,7 +16,6 @@ import { getEnvironmentConfig } from '../config/environment';
  */
 export interface CreateEstablishmentRequest {
   name: string;
-  email: string;
   phone: string;
   address: string;
   tva_number?: string;
@@ -71,14 +70,14 @@ export class EstablishmentService {
       // Validate required fields
       this.validateCreateEstablishmentData(data);
 
-      // Check if establishment already exists
+      // Check if establishment with same name already exists (name should still be unique)
       const existingEst = await pool.query(
-        'SELECT id FROM establishments WHERE email = $1 OR name = $2',
-        [data.email, data.name]
+        'SELECT id FROM establishments WHERE name = $1',
+        [data.name]
       );
 
       if (existingEst.rows.length > 0) {
-        throw new Error('Establishment with this email or name already exists');
+        throw new Error('Establishment with this name already exists');
       }
 
       // Generate invitation token
@@ -91,7 +90,7 @@ export class EstablishmentService {
       // Create establishment with isolated schema
       const establishment = await EstablishmentModel.createEstablishment({
         name: data.name,
-        email: data.email,
+        email: data.owner_email,
         phone: data.phone,
         address: data.address,
         subscription_plan: data.subscription_plan || 'basic'
@@ -241,17 +240,44 @@ export class EstablishmentService {
   }
 
   /**
+   * Delete establishment and all associated data
+   */
+  public async deleteEstablishment(id: string): Promise<void> {
+    try {
+      // Initialize EstablishmentModel
+      EstablishmentModel.initialize(this.logger);
+
+      // Delete establishment using the model (this will also drop the schema)
+      await EstablishmentModel.deleteEstablishment(id);
+
+      this.logger.info(
+        'Establishment deleted successfully',
+        { establishmentId: id },
+        'ESTABLISHMENT_SERVICE'
+      );
+    } catch (error) {
+      this.logger.error(
+        'Failed to delete establishment',
+        error as Error,
+        { establishmentId: id },
+        'ESTABLISHMENT_SERVICE'
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Validate create establishment data
    */
   private validateCreateEstablishmentData(data: CreateEstablishmentRequest): void {
-    if (!data.name || !data.email || !data.owner_email || !data.phone || !data.address) {
-      throw new Error('Missing required fields: name, email, owner_email, phone, address');
+    if (!data.name || !data.owner_email || !data.phone || !data.address) {
+      throw new Error('Missing required fields: name, owner_email, phone, address');
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(data.email) || !emailRegex.test(data.owner_email)) {
-      throw new Error('Invalid email format');
+    if (!emailRegex.test(data.owner_email)) {
+      throw new Error('Invalid email format for owner_email');
     }
   }
 
