@@ -40,11 +40,10 @@ export interface SystemSecurityLog {
 
 export interface CreateEstablishmentRequest {
   name: string;
-  email: string;
   phone: string;
   address: string;
   tva_number?: string;
   siret_number?: string;
-  subscription_plan: 'basic' | 'premium';
+  subscription_plan?: 'basic' | 'premium' | 'enterprise';
   owner_email: string;
 }

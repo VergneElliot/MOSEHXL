@@ -33,4 +33,8 @@ export class EstablishmentService {
     const response = await apiService.get<{ establishment: SystemEstablishment; invitations: any[] }>(`/establishments/${id}`);
     return response.data;
   }
+
+  static async deleteEstablishment(id: string): Promise<void> {
+    await apiService.delete(`/establishments/${id}`);
+  }
 }

@@ -278,6 +278,12 @@ export class EstablishmentModel {
         throw new Error('Establishment not found');
       }
 
+      // First, remove establishment_id from associated users to handle foreign key constraint
+      await client.query(
+        'UPDATE users SET establishment_id = NULL WHERE establishment_id = $1',
+        [id]
+      );
+
       // Delete establishment record
       await client.query('DELETE FROM establishments WHERE id = $1', [id]);
 

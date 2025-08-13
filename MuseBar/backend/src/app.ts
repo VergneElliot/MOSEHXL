@@ -62,6 +62,7 @@ import docsRouter from './routes/docs';
 import userManagementRouter from './routes/userManagement';
 import establishmentsRouter from './routes/establishments';
 import setupRouter from './routes/setup';
+import emailTestRouter from './routes/emailTest';
 
 app.use('/api/categories', categoriesRouter);
 app.use('/api/products', productsRouter);
@@ -71,6 +72,11 @@ app.use('/api/auth', authRouter);
 app.use('/api/user-management', userManagementRouter);
 app.use('/api/establishments', establishmentsRouter);
 app.use('/api/setup', setupRouter);
+
+// Development-only email test routes
+if (NODE_ENV === 'development') {
+  app.use('/api', emailTestRouter);
+}
 
 // API Documentation
 app.use('/api/docs', docsRouter);

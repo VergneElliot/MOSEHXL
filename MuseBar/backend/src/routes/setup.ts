@@ -5,9 +5,11 @@
 import express from 'express';
 import { SetupService } from '../services/SetupService';
 import { Logger } from '../utils/logger';
+import { getEnvironmentConfig } from '../config/environment';
 
 const router = express.Router();
-const logger = Logger.getInstance();
+const config = getEnvironmentConfig();
+const logger = Logger.getInstance(config);
 
 // GET /api/setup/validate/:token - Validate invitation token
 router.get('/validate/:token', async (req, res) => {
@@ -25,7 +27,7 @@ router.get('/validate/:token', async (req, res) => {
     logger.error('Error validating invitation token', error as Error, {}, 'SETUP_API');
     res.status(500).json({ 
       isValid: false, 
-      error: 'Internal server error during validation' 
+      error: error instanceof Error ? error.message : 'Internal server error during validation' 
     });
   }
 });
@@ -46,7 +48,7 @@ router.get('/status/:token', async (req, res) => {
     logger.error('Error checking setup status', error as Error, {}, 'SETUP_API');
     res.status(500).json({ 
       completed: false, 
-      error: 'Internal server error' 
+      error: error instanceof Error ? error.message : 'Internal server error' 
     });
   }
 });
@@ -70,7 +72,7 @@ router.post('/complete', async (req, res) => {
     logger.error('Error completing business setup', error as Error, {}, 'SETUP_API');
     res.status(500).json({
       success: false,
-      message: 'Failed to complete setup. Please try again.'
+      message: error instanceof Error ? error.message : 'Failed to complete setup. Please try again.'
     });
   }
 });

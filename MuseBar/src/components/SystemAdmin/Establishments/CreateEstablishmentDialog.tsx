@@ -27,7 +27,6 @@ export const CreateEstablishmentDialog: React.FC<CreateEstablishmentDialogProps>
   
   const [formData, setFormData] = useState<CreateEstablishmentRequest>({
     name: '',
-    email: '',
     phone: '',
     address: '',
     tva_number: '',
@@ -53,7 +52,6 @@ export const CreateEstablishmentDialog: React.FC<CreateEstablishmentDialogProps>
       // Reset form
       setFormData({
         name: '',
-        email: '',
         phone: '',
         address: '',
         tva_number: '',
@@ -76,7 +74,7 @@ export const CreateEstablishmentDialog: React.FC<CreateEstablishmentDialogProps>
     }
   };
 
-  const isFormValid = formData.name && formData.email && formData.owner_email && formData.phone && formData.address;
+  const isFormValid = formData.name && formData.owner_email && formData.phone && formData.address;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
