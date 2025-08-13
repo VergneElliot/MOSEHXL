@@ -82,10 +82,9 @@ if (NODE_ENV === 'development') {
 app.use('/api/docs', docsRouter);
 
 // Error handling middleware
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
-});
+import { createErrorHandler } from './middleware/errorHandler';
+const errorHandler = createErrorHandler(Logger.getInstance(getEnvironmentConfig()));
+app.use(errorHandler);
 
 // Initialize services
 const config = getEnvironmentConfig();
