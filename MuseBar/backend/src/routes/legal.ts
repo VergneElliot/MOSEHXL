@@ -1608,7 +1608,7 @@ router.post('/settings/closure', async (req, res) => {
         ON CONFLICT (setting_key) DO UPDATE SET 
           setting_value = EXCLUDED.setting_value,
           updated_at = CURRENT_TIMESTAMP
-      `, ['daily_closure_time', daily_closure_time, 'Time when daily closure is automatically triggered (HH:MM format)', (req as any).user?.email || 'unknown']);
+      `, ['daily_closure_time', daily_closure_time, 'Time when daily closure is automatically triggered (HH:MM format)', req.user?.email || 'unknown']);
     }
     
     if (auto_closure_enabled !== undefined) {
@@ -1618,7 +1618,7 @@ router.post('/settings/closure', async (req, res) => {
         ON CONFLICT (setting_key) DO UPDATE SET 
           setting_value = EXCLUDED.setting_value,
           updated_at = CURRENT_TIMESTAMP
-      `, ['auto_closure_enabled', auto_closure_enabled.toString(), 'Whether automatic daily closure is enabled', (req as any).user?.email || 'unknown']);
+      `, ['auto_closure_enabled', auto_closure_enabled.toString(), 'Whether automatic daily closure is enabled', req.user?.email || 'unknown']);
     }
     
     if (grace_period_minutes) {
@@ -1628,7 +1628,7 @@ router.post('/settings/closure', async (req, res) => {
         ON CONFLICT (setting_key) DO UPDATE SET 
           setting_value = EXCLUDED.setting_value,
           updated_at = CURRENT_TIMESTAMP
-      `, ['closure_grace_period_minutes', grace_period_minutes.toString(), 'Grace period in minutes before auto-closure', (req as any).user?.email || 'unknown']);
+      `, ['closure_grace_period_minutes', grace_period_minutes.toString(), 'Grace period in minutes before auto-closure', req.user?.email || 'unknown']);
     }
     
     res.json({ message: 'Closure settings updated successfully' });

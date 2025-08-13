@@ -66,7 +66,7 @@ router.post('/', requireAuth, validateBody(commonValidations.categoryCreate), as
     // Log audit trail
     const ip = req.ip;
     const userAgent = req.headers['user-agent'];
-    const userId = (req as any).user ? String((req as any).user.id) : undefined;
+    const userId = req.user ? String(req.user.id) : undefined;
     await AuditTrailModel.logAction({
       user_id: userId,
       action_type: 'CREATE_CATEGORY',
@@ -99,7 +99,7 @@ router.put('/:id', requireAuth, validateParams([paramValidations.id]), async (re
     // Log audit trail
     const ip = req.ip;
     const userAgent = req.headers['user-agent'];
-    const userId = (req as any).user ? String((req as any).user.id) : undefined;
+    const userId = req.user ? String(req.user.id) : undefined;
     await AuditTrailModel.logAction({
       user_id: userId,
       action_type: 'UPDATE_CATEGORY',
@@ -130,7 +130,7 @@ router.delete('/:id', requireAuth, validateParams([paramValidations.id]), async 
     // Log audit trail with appropriate action type
     const ip = req.ip;
     const userAgent = req.headers['user-agent'];
-    const userId = (req as any).user ? String((req as any).user.id) : undefined;
+    const userId = req.user ? String(req.user.id) : undefined;
     
     const actionType = result.action === 'hard' ? 'DELETE_CATEGORY' : 'ARCHIVE_CATEGORY';
     
@@ -195,7 +195,7 @@ router.post('/:id/restore', requireAuth, validateParams([paramValidations.id]), 
     // Log audit trail
     const ip = req.ip;
     const userAgent = req.headers['user-agent'];
-    const userId = (req as any).user ? String((req as any).user.id) : undefined;
+    const userId = req.user ? String(req.user.id) : undefined;
     
     try {
       await AuditTrailModel.logAction({

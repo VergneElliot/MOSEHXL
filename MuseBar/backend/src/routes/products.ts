@@ -113,7 +113,7 @@ router.post('/', requireAuth, async (req, res) => {
     // Log audit trail
     const ip = req.ip;
     const userAgent = req.headers['user-agent'];
-    const userId = (req as any).user ? String((req as any).user.id) : undefined;
+    const userId = req.user ? String(req.user.id) : undefined;
     await AuditTrailModel.logAction({
       user_id: userId,
       action_type: 'CREATE_PRODUCT',
@@ -158,7 +158,7 @@ router.put('/:id', requireAuth, validateParams([paramValidations.id]), async (re
     // Log audit trail
     const ip = req.ip;
     const userAgent = req.headers['user-agent'];
-    const userId = (req as any).user ? String((req as any).user.id) : undefined;
+    const userId = req.user ? String(req.user.id) : undefined;
     await AuditTrailModel.logAction({
       user_id: userId,
       action_type: 'UPDATE_PRODUCT',
@@ -193,7 +193,7 @@ router.delete('/:id', requireAuth, validateParams([paramValidations.id]), async 
     // Log audit trail
     const ip = req.ip;
     const userAgent = req.headers['user-agent'];
-    const userId = (req as any).user ? String((req as any).user.id) : undefined;
+    const userId = req.user ? String(req.user.id) : undefined;
     
     try {
       await AuditTrailModel.logAction({
@@ -247,7 +247,7 @@ router.put('/:id/restore', requireAuth, validateParams([paramValidations.id]), a
     // Log audit trail
     const ip = req.ip;
     const userAgent = req.headers['user-agent'];
-    const userId = (req as any).user ? String((req as any).user.id) : undefined;
+    const userId = req.user ? String(req.user.id) : undefined;
     
     try {
       await AuditTrailModel.logAction({
