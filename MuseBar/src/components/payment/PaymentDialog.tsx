@@ -89,7 +89,15 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     setError('');
   };
 
-  const handleSimplePayment = async (paymentData: any) => {
+const handleSimplePayment = async (paymentData: {
+  items: OrderItem[];
+  totalAmount: number;
+  totalTax: number;
+  paymentMethod: 'cash' | 'card';
+  tips?: number;
+  change?: number;
+  notes?: string;
+}) => {
     setLoading(true);
     setError('');
 

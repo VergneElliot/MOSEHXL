@@ -29,9 +29,9 @@ export interface ClosureState {
   loading: boolean;
   error: string | null;
   creating: boolean;
-  todayStatus: any;
-  closureSettings: any;
-  monthlyStats: any;
+  todayStatus: unknown;
+  closureSettings: unknown;
+  monthlyStats: unknown;
   monthlyStatsError: string | null;
 
   // Dialog state
@@ -61,9 +61,9 @@ export interface ClosureActions {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setCreating: (creating: boolean) => void;
-  setTodayStatus: (status: any) => void;
-  setClosureSettings: (settings: any) => void;
-  setMonthlyStats: (stats: any) => void;
+  setTodayStatus: (status: unknown) => void;
+  setClosureSettings: (settings: unknown) => void;
+  setMonthlyStats: (stats: unknown) => void;
   setMonthlyStatsError: (error: string | null) => void;
 
   // Dialog actions
