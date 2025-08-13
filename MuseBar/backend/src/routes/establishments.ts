@@ -15,7 +15,7 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
     const establishmentService = new EstablishmentService(logger);
     const result = await establishmentService.createEstablishment(
       req.body,
-      String((req as any).user.id),
+      String(req.user!.id),
       req.ip,
       req.headers['user-agent']
     );

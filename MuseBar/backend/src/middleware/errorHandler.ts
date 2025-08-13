@@ -97,8 +97,8 @@ export const createErrorHandler = (logger?: Logger) => {
     let error = { ...err };
     error.message = err.message;
 
-    const requestId = (req as any).requestId;
-    const userId = (req as any).user?.id;
+    const requestId = req.requestId;
+    const userId = req.user?.id;
 
     // Log error with context
     if (logger) {

@@ -28,7 +28,7 @@ export function requireAuth(req: express.Request, res: express.Response, next: e
   }
   try {
     const payload = jwt.verify(auth.slice(7), JWT_SECRET) as { id: number; email: string; is_admin: boolean };
-    (req as any).user = payload as any;
+    req.user = { id: payload.id, email: payload.email, is_admin: payload.is_admin };
     next();
   } catch {
     AuditTrailModel.logAction({
@@ -64,7 +64,7 @@ router.post('/register', requireAuth, requireAdmin, async (req, res) => {
   const userAgent = req.headers['user-agent'];
   if (!email || !password) {
     await AuditTrailModel.logAction({
-      user_id: String((req as any).user.id),
+      user_id: String(req.user!.id),
       action_type: 'CREATE_USER_FAILED',
       action_details: { reason: 'Missing email or password', email },
       ip_address: ip,
@@ -75,7 +75,7 @@ router.post('/register', requireAuth, requireAdmin, async (req, res) => {
   try {
     const user = await UserModel.createUser(email, password, !!is_admin);
     await AuditTrailModel.logAction({
-      user_id: String((req as any).user.id),
+      user_id: String(req.user!.id),
       action_type: 'CREATE_USER',
       resource_type: 'USER',
       resource_id: String(user.id),
@@ -86,7 +86,7 @@ router.post('/register', requireAuth, requireAdmin, async (req, res) => {
     res.status(201).json({ id: user.id, email: user.email, is_admin: user.is_admin });
   } catch (e) {
     await AuditTrailModel.logAction({
-      user_id: String((req as any).user.id),
+      user_id: String(req.user!.id),
       action_type: 'CREATE_USER_FAILED',
       action_details: { reason: 'User already exists or invalid data', email },
       ip_address: ip,
@@ -159,7 +159,7 @@ router.post('/login', async (req, res) => {
 
 // GET /api/auth/me
 router.get('/me', requireAuth, async (req, res) => {
-  const user = await UserModel.findById((req as any).user.id);
+  const user = await UserModel.findById(Number(req.user!.id));
   if (!user) return res.status(404).json({ error: 'User not found' });
   const permissions = await UserModel.getUserPermissions(user.id);
   
@@ -180,7 +180,7 @@ router.get('/me', requireAuth, async (req, res) => {
 
 // POST /api/auth/refresh
 router.post('/refresh', requireAuth, async (req, res) => {
-  const user = await UserModel.findById((req as any).user.id);
+  const user = await UserModel.findById(Number(req.user!.id));
   if (!user) return res.status(404).json({ error: 'User not found' });
   
   const { rememberMe } = req.body;
@@ -218,7 +218,7 @@ router.post('/users/:id/permissions', requireAuth, requireAdmin, async (req, res
   const userAgent = req.headers['user-agent'];
   if (!Array.isArray(permissions)) {
     await AuditTrailModel.logAction({
-      user_id: String((req as any).user.id),
+      user_id: String(req.user!.id),
       action_type: 'SET_PERMISSIONS_FAILED',
       resource_type: 'USER',
       resource_id: String(userId),
@@ -230,7 +230,7 @@ router.post('/users/:id/permissions', requireAuth, requireAdmin, async (req, res
   }
   await UserModel.setUserPermissions(userId, permissions);
   await AuditTrailModel.logAction({
-    user_id: String((req as any).user.id),
+    user_id: String(req.user!.id),
     action_type: 'SET_PERMISSIONS',
     resource_type: 'USER',
     resource_id: String(userId),
@@ -246,7 +246,7 @@ router.post('/logout', requireAuth, async (req, res) => {
   const ip = req.ip;
   const userAgent = req.headers['user-agent'];
   await AuditTrailModel.logAction({
-    user_id: String((req as any).user.id),
+    user_id: String(req.user!.id),
     action_type: 'LOGOUT',
     ip_address: ip,
     user_agent: userAgent

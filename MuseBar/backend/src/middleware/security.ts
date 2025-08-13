@@ -87,9 +87,9 @@ export class RateLimitMiddleware {
             limit: maxRequests,
             resetTime: resetTime.toISOString(),
           },
-          (req as any).user?.id,
+          req.user?.id,
           req.ip,
-          (req as any).requestId
+          req.requestId
         );
 
         // Set rate limit headers
@@ -118,7 +118,7 @@ export class RateLimitMiddleware {
    * Generate rate limit key based on IP and user
    */
   private getKey(req: Request): string {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
     return userId ? `user:${userId}` : `ip:${req.ip}`;
   }
 
@@ -205,7 +205,7 @@ export const inputSanitization = (logger?: Logger) => {
             method: req.method,
           },
           'SECURITY',
-          (req as any).requestId
+          req.requestId
         );
       }
 
@@ -335,9 +335,9 @@ export const requestSizeLimit = (maxSizeKB: number, logger?: Logger) => {
             url: req.originalUrl,
             method: req.method,
           },
-          (req as any).user?.id,
+          req.user?.id,
           req.ip,
-          (req as any).requestId
+          req.requestId
         );
       }
 
