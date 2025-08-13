@@ -89,7 +89,7 @@ export const useLegalCompliance = (): [LegalComplianceState, LegalComplianceActi
   const loadComplianceData = useCallback(async () => {
     setState(prev => ({ ...prev, loading: true, error: null }));
     try {
-      const response = await apiService.get('/api/legal/compliance/status');
+      const response = await apiService.get('/legal/compliance/status');
       setState(prev => ({
         ...prev,
         complianceStatus: response.data as ComplianceStatus,
@@ -109,7 +109,7 @@ export const useLegalCompliance = (): [LegalComplianceState, LegalComplianceActi
 
   const loadJournalEntries = useCallback(async () => {
     try {
-      const response = await apiService.get('/api/legal/journal/entries');
+      const response = await apiService.get('/legal/journal/entries');
       setState(prev => ({
         ...prev,
         journalEntries: (response.data as JournalEntry[]) || [],
@@ -121,7 +121,7 @@ export const useLegalCompliance = (): [LegalComplianceState, LegalComplianceActi
 
   const loadClosureBulletins = useCallback(async () => {
     try {
-      const response = await apiService.get('/api/legal/closures/bulletins');
+      const response = await apiService.get('/legal/closure/bulletins');
       setState(prev => ({
         ...prev,
         closureBulletins: (response.data as ClosureBulletin[]) || [],
