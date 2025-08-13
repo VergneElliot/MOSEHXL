@@ -173,7 +173,7 @@ router.post('/closure/annual', async (req, res) => {
 });
 
 
-// GET receipt for order (detailed receipt)
+// GET receipt for order (moved to legal/closure)
 router.get('/receipt/:orderId', async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -295,7 +295,7 @@ router.get('/receipt/:orderId', async (req, res) => {
   }
 });
 
-// POST generate receipt (for immediate generation after payment)
+// POST generate receipt (moved to legal/closure)
 router.post('/receipt/generate', async (req, res) => {
   try {
     const { order_id, receipt_type = 'detailed' } = req.body;
