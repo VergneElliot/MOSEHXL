@@ -1,3 +1,25 @@
+# Node
+node_modules/
+
+# Editor
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Builds
+MuseBar/build/
+MuseBar/backend/dist/
+
+# Backups and archives
+backups/
+*.tar.gz
+
+# Env files
+*.env
+*.env.local
+
 # Dependencies
 node_modules/
 npm-debug.log*
