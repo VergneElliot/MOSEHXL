@@ -1,6 +1,7 @@
 import express from 'express';
 import { requireAuth, requireAdmin } from './auth';
 import { EstablishmentService } from '../services/EstablishmentService';
+import { validateParams, validateBody, paramValidations } from '../middleware/validation';
 import { Logger } from '../utils/logger';
 import { getEnvironmentConfig } from '../config/environment';
 
@@ -41,7 +42,7 @@ router.get('/', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // GET /api/establishments/:id - Get establishment details (system admin only)
-router.get('/:id', requireAuth, requireAdmin, async (req, res) => {
+router.get('/:id', requireAuth, requireAdmin, validateParams([paramValidations.id]), async (req, res) => {
   try {
     const { id } = req.params;
     const establishmentService = new EstablishmentService(logger);
@@ -58,7 +59,7 @@ router.get('/:id', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // DELETE /api/establishments/:id - Delete establishment (system admin only)
-router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
+router.delete('/:id', requireAuth, requireAdmin, validateParams([paramValidations.id]), async (req, res) => {
   try {
     const { id } = req.params;
     const establishmentService = new EstablishmentService(logger);

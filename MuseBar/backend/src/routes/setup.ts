@@ -4,6 +4,7 @@
 
 import express from 'express';
 import { SetupService } from '../services/SetupService';
+import { validateParams, validateBody } from '../middleware/validation';
 import { Logger } from '../utils/logger';
 import { getEnvironmentConfig } from '../config/environment';
 
@@ -12,7 +13,7 @@ const config = getEnvironmentConfig();
 const logger = Logger.getInstance(config);
 
 // GET /api/setup/validate/:token - Validate invitation token
-router.get('/validate/:token', async (req, res) => {
+router.get('/validate/:token', validateParams([{ param: 'token', validator: (v:any)=> typeof v === 'string' && v.length > 0 }]), async (req, res) => {
   try {
     const { token } = req.params;
     const setupService = new SetupService(logger);
@@ -33,7 +34,7 @@ router.get('/validate/:token', async (req, res) => {
 });
 
 // GET /api/setup/status/:token - Check setup completion status
-router.get('/status/:token', async (req, res) => {
+router.get('/status/:token', validateParams([{ param: 'token', validator: (v:any)=> typeof v === 'string' && v.length > 0 }]), async (req, res) => {
   try {
     const { token } = req.params;
     const setupService = new SetupService(logger);
@@ -54,7 +55,18 @@ router.get('/status/:token', async (req, res) => {
 });
 
 // POST /api/setup/complete - Complete business setup
-router.post('/complete', async (req, res) => {
+router.post('/complete', validateBody([
+  { field: 'first_name', required: true },
+  { field: 'last_name', required: true },
+  { field: 'email', required: true },
+  { field: 'password', required: true },
+  { field: 'confirm_password', required: true },
+  { field: 'business_name', required: true },
+  { field: 'contact_email', required: true },
+  { field: 'phone', required: true },
+  { field: 'address', required: true },
+  { field: 'invitation_token', required: true }
+]), async (req, res) => {
   try {
     const setupService = new SetupService(logger);
     const result = await setupService.completeBusinessSetup(

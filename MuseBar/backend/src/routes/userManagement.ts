@@ -5,6 +5,7 @@
 
 import express from 'express';
 import { requireAuth, requireAdmin } from './auth';
+import { validateBody, validateParams } from '../middleware/validation';
 import { UserInvitationService } from '../services/userInvitationService';
 import { EstablishmentModel } from '../models/establishment';
 import { AuditTrailModel } from '../models/auditTrail';
@@ -29,7 +30,10 @@ export function initializeUserManagementRoutes(config: EnvironmentConfig, log: L
  * POST /api/user-management/send-establishment-invitation
  * Send establishment invitation (System Admin only)
  */
-router.post('/send-establishment-invitation', requireAuth, requireAdmin, async (req, res, next) => {
+router.post('/send-establishment-invitation', requireAuth, requireAdmin, validateBody([
+  { field: 'name', required: true },
+  { field: 'email', required: true },
+]), async (req, res, next) => {
   try {
     const { name, email, phone, address, subscription_plan } = req.body;
     const user = (req as any).user;
@@ -106,7 +110,13 @@ router.post('/send-establishment-invitation', requireAuth, requireAdmin, async (
  * POST /api/user-management/send-user-invitation
  * Send user invitation (Establishment Admin only)
  */
-router.post('/send-user-invitation', requireAuth, async (req, res, next) => {
+router.post('/send-user-invitation', requireAuth, validateBody([
+  { field: 'email', required: true },
+  { field: 'firstName', required: true },
+  { field: 'lastName', required: true },
+  { field: 'role', required: true },
+  { field: 'establishmentId', required: true },
+]), async (req, res, next) => {
   try {
     const { email, firstName, lastName, role, establishmentId } = req.body;
     const user = (req as any).user;
@@ -207,7 +217,10 @@ router.post('/send-user-invitation', requireAuth, async (req, res, next) => {
  * POST /api/user-management/accept-invitation
  * Accept user invitation
  */
-router.post('/accept-invitation', async (req, res, next) => {
+router.post('/accept-invitation', validateBody([
+  { field: 'token', required: true },
+  { field: 'password', required: true },
+]), async (req, res, next) => {
   try {
     const { token, password } = req.body;
 
@@ -322,7 +335,7 @@ router.get('/pending-invitations', requireAuth, async (req, res, next) => {
  * DELETE /api/user-management/cancel-invitation/:invitationId
  * Cancel invitation (Establishment Admin only)
  */
-router.delete('/cancel-invitation/:invitationId', requireAuth, async (req, res, next) => {
+router.delete('/cancel-invitation/:invitationId', requireAuth, validateParams([{ param: 'invitationId', validator: (v:any)=> typeof v === 'string' && v.length > 0 }]), async (req, res, next) => {
   try {
     const { invitationId } = req.params;
     const user = (req as any).user;
