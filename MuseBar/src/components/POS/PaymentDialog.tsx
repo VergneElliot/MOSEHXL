@@ -11,12 +11,8 @@ import {
   FormControlLabel,
   Radio,
   TextField,
-  Grid,
-  Divider,
   Alert,
   AlertTitle,
-  Card,
-  CardContent,
   Chip,
   Tab,
   Tabs,
@@ -35,6 +31,8 @@ import {
   Calculate as CalculateIcon,
 } from '@mui/icons-material';
 import { OrderItem, LocalSubBill } from '../../types';
+import OrderSummaryCard from './OrderSummaryCard';
+import { Grid } from '@mui/material';
 import { usePOSAPI } from '../../hooks/usePOSAPI';
 
 interface PaymentDialogProps {
@@ -249,41 +247,12 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       </DialogTitle>
 
       <DialogContent>
-        {/* Order Summary */}
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Résumé de la commande
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={6}>
-                <Typography variant="body2" color="textSecondary">
-                  Sous-total (HT)
-                </Typography>
-                <Typography variant="body1" fontWeight="medium">
-                  {formatCurrency(orderSubtotal)}
-                </Typography>
-              </Grid>
-              <Grid item xs={6}>
-                <Typography variant="body2" color="textSecondary">
-                  TVA
-                </Typography>
-                <Typography variant="body1" fontWeight="medium">
-                  {formatCurrency(orderTax)}
-                </Typography>
-              </Grid>
-              <Grid item xs={12}>
-                <Divider sx={{ my: 1 }} />
-                <Box display="flex" justifyContent="space-between" alignItems="center">
-                  <Typography variant="h6">Total (TTC)</Typography>
-                  <Typography variant="h6" color="primary">
-                    {formatCurrency(orderTotal)}
-                  </Typography>
-                </Box>
-              </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
+        <OrderSummaryCard
+          orderSubtotal={orderSubtotal}
+          orderTax={orderTax}
+          orderTotal={orderTotal}
+          formatCurrency={formatCurrency}
+        />
 
         {/* Payment Method Tabs */}
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
