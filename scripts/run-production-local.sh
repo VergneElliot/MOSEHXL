@@ -9,12 +9,7 @@ echo "🏭 Setting up MOSEHXL Production for Local Network Access..."
 LOCAL_IP=$(hostname -I | awk '{print $1}')
 echo "🌐 Local IP Address: $LOCAL_IP"
 
-# Check if we're on main branch
-current_branch=$(git branch --show-current)
-if [ "$current_branch" != "main" ]; then
-    echo "⚠️  Warning: You're not on the main branch. Switching to main..."
-    git checkout main
-fi
+# Note: Do not auto-switch branches in scripts; keep current branch.
 
 # Set production environment variables
 export NODE_ENV=production
@@ -58,34 +53,9 @@ npm install
 echo "🔨 Building frontend for production..."
 npm run build
 
-# Create a simple server script for the frontend
-echo "🌐 Creating frontend server script..."
-cat > serve-frontend.js << 'EOF'
-const express = require('express');
-const path = require('path');
-const app = express();
-const PORT = 3000;
-
-// Serve static files from the build directory
-app.use(express.static(path.join(__dirname, 'build')));
-
-// Handle React routing, return all requests to React app
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'build', 'index.html'));
-});
-
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🌐 MOSEHXL Frontend Server running on port ${PORT}`);
-  console.log(`🔧 Environment: Production`);
-  console.log(`🌐 Server accessible on:`);
-  console.log(`   - Local: http://localhost:${PORT}`);
-  console.log(`   - Network: http://192.168.0.152:${PORT}`);
-  console.log(`📱 Accessible from phones/tablets on your network`);
-});
-EOF
-
-# Install express for the frontend server
-npm install express
+# Serve frontend using npx serve
+echo "🌐 Using npx serve for frontend..."
+npx --yes serve -s build -l 3000 &
 
 echo ""
 echo "✅ Production environment setup complete!"
