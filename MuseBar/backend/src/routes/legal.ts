@@ -172,56 +172,6 @@ router.post('/closure/annual', async (req, res) => {
   }
 });
 
-// POST create closure bulletin (generic endpoint for all types)
-router.post('/closure/create', async (req, res) => {
-  try {
-    const { date, type, force } = req.body;
-    
-    if (!date) {
-      return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
-    }
-    
-    if (!type || !['DAILY', 'WEEKLY', 'MONTHLY', 'ANNUAL'].includes(type)) {
-      return res.status(400).json({ 
-        error: 'Valid closure type is required (DAILY, WEEKLY, MONTHLY, ANNUAL)' 
-      });
-    }
-    
-    const closureDate = new Date(date);
-    if (isNaN(closureDate.getTime())) {
-      return res.status(400).json({ error: 'Invalid date format' });
-    }
-    
-    let closure;
-    switch (type) {
-      case 'DAILY':
-        closure = await LegalJournalModel.createDailyClosure(closureDate, force);
-        break;
-      case 'WEEKLY':
-        closure = await LegalJournalModel.createWeeklyClosure(closureDate);
-        break;
-      case 'MONTHLY':
-        closure = await LegalJournalModel.createMonthlyClosure(closureDate);
-        break;
-      case 'ANNUAL':
-        closure = await LegalJournalModel.createAnnualClosure(closureDate);
-        break;
-      default:
-        return res.status(400).json({ error: 'Invalid closure type' });
-    }
-    
-    res.status(201).json({
-      ...closure,
-      compliance_note: `${type} closure bulletin created per French fiscal requirements`
-    });
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('already exists')) {
-      return res.status(409).json({ error: error.message });
-    }
-    console.error(`Error creating ${req.body.type} closure:`, error);
-    res.status(500).json({ error: `Failed to create ${req.body.type} closure` });
-  }
-});
 
 // GET receipt for order (detailed receipt)
 router.get('/receipt/:orderId', async (req, res) => {
@@ -496,36 +446,6 @@ router.get('/closure/bulletins', async (req, res) => {
   }
 });
 
-// GET latest monthly closure bulletin (current month)
-router.get('/closure/monthly-latest', async (req, res) => {
-  try {
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-
-    const bulletins = await LegalJournalModel.getClosureBulletins('MONTHLY');
-    // Find the bulletin for the current month
-    const currentMonthBulletin = bulletins.find(bulletin => {
-      const start = new Date(bulletin.period_start);
-      const end = new Date(bulletin.period_end);
-      return (
-        start.getFullYear() === monthStart.getFullYear() &&
-        start.getMonth() === monthStart.getMonth() &&
-        end.getFullYear() === monthEnd.getFullYear() &&
-        end.getMonth() === monthEnd.getMonth()
-      );
-    });
-
-    if (!currentMonthBulletin) {
-      return res.status(404).json({ error: 'No monthly closure bulletin found for the current month.' });
-    }
-
-    res.json(currentMonthBulletin);
-  } catch (error) {
-    console.error('Error fetching latest monthly closure:', error);
-    res.status(500).json({ error: 'Failed to fetch latest monthly closure' });
-  }
-});
 
 // GET audit trail
 router.get('/audit/trail', async (req, res) => {
