@@ -26,7 +26,7 @@ import {
   Calculate as CalculateIcon,
   Receipt as ReceiptIcon,
 } from '@mui/icons-material';
-import { LoadingButton } from '../common/LoadingStates';
+import LoadingButton from '../common/LoadingButton';
 
 interface LocalSubBill {
   id: string;

@@ -25,7 +25,7 @@ import {
   LocalAtm as CashIcon,
   Calculate as CalculateIcon,
 } from '@mui/icons-material';
-import { LoadingButton } from '../common/LoadingStates';
+import LoadingButton from '../common/LoadingButton';
 
 interface PaymentMethodSelectorProps {
   orderTotal: number;

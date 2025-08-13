@@ -390,7 +390,10 @@ const EstablishmentManagement: React.FC<{ token: string }> = ({ token }) => {
                   <Tooltip title="View Details">
                     <IconButton
                       size="small"
-                      onClick={() => {/* TODO: Implement establishment selection */}}
+                      onClick={() => {
+                        // Future: Navigate to establishment details page
+                        // e.g., navigate(`/system-admin/establishments/${establishment.id}`)
+                      }}
                     >
                       <ViewIcon />
                     </IconButton>
