@@ -216,7 +216,7 @@ const EstablishmentManagement: React.FC<{ token: string }> = ({ token }) => {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' => {
     switch (status) {
       case 'active': return 'success';
       case 'suspended': return 'warning';
@@ -225,7 +225,7 @@ const EstablishmentManagement: React.FC<{ token: string }> = ({ token }) => {
     }
   };
 
-  const getPlanColor = (plan: string) => {
+  const getPlanColor = (plan: string): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' => {
     switch (plan) {
       case 'enterprise': return 'error';
       case 'premium': return 'warning';

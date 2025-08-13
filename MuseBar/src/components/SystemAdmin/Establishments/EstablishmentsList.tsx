@@ -55,7 +55,7 @@ export const EstablishmentsList: React.FC = () => {
     );
   }
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' => {
     switch (status) {
       case 'active': return 'success';
       case 'suspended': return 'error';
@@ -65,7 +65,7 @@ export const EstablishmentsList: React.FC = () => {
     }
   };
 
-  const getPlanColor = (plan: string) => {
+  const getPlanColor = (plan: string): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' => {
     return plan === 'premium' ? 'warning' : 'success';
   };
 
@@ -110,14 +110,14 @@ export const EstablishmentsList: React.FC = () => {
               <TableCell>
                 <Chip 
                   label={establishment.subscription_plan} 
-                  color={getPlanColor(establishment.subscription_plan) as any}
+                  color={getPlanColor(establishment.subscription_plan)}
                   size="small"
                 />
               </TableCell>
               <TableCell>
                 <Chip 
                   label={establishment.status} 
-                  color={getStatusColor(establishment.status) as any}
+                  color={getStatusColor(establishment.status)}
                   size="small"
                 />
               </TableCell>
