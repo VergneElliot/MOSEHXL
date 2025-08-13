@@ -446,25 +446,25 @@ export class ApiService {
   }
 
   // Business Info
-  async getBusinessInfo(): Promise<any> {
-    return this.request<any>('/legal/business-info');
+  async getBusinessInfo() {
+    return this.request('/legal/business-info');
   }
 
-  async updateBusinessInfo(data: any): Promise<any> {
-    return this.request<any>('/legal/business-info', {
+  async updateBusinessInfo(data: Record<string, unknown>) {
+    return this.request('/legal/business-info', {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   }
 
   // Closure Bulletins
-  async getLatestMonthlyClosureBulletin(): Promise<any> {
-    return this.request<any>('/legal/closure/monthly-latest');
+  async getLatestMonthlyClosureBulletin() {
+    return this.request('/legal/closure/monthly-latest');
   }
 
   // Live monthly stats (not based on closure)
-  async getLiveMonthlyStats(): Promise<any> {
-    return this.request<any>('/legal/stats/monthly-live');
+  async getLiveMonthlyStats() {
+    return this.request('/legal/stats/monthly-live');
   }
 }
 

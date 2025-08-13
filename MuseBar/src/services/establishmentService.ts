@@ -29,8 +29,8 @@ export class EstablishmentService {
     return response.data;
   }
 
-  static async getEstablishment(id: string): Promise<{ establishment: SystemEstablishment; invitations: any[] }> {
-    const response = await apiService.get<{ establishment: SystemEstablishment; invitations: any[] }>(`/establishments/${id}`);
+  static async getEstablishment(id: string): Promise<{ establishment: SystemEstablishment; invitations: Array<{ email: string; role: string; status: string; created_at: string; expires_at: string }> }> {
+    const response = await apiService.get<{ establishment: SystemEstablishment; invitations: Array<{ email: string; role: string; status: string; created_at: string; expires_at: string }> }>(`/establishments/${id}`);
     return response.data;
   }
 

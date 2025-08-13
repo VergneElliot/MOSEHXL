@@ -136,6 +136,42 @@ export interface ClosureBulletin {
   change_total?: number;
 }
 
+// Closure today status
+export interface ClosureTodayStatus {
+  is_closed: boolean;
+  closure_bulletin: ClosureBulletin | null;
+  auto_closure_enabled: boolean;
+  next_auto_closure: string;
+  closure_settings: Record<string, string>;
+}
+
+// Closure settings map (settings endpoint returns key-value object)
+export type ClosureSettings = Record<string, {
+  value: string;
+  description?: string;
+  updated_by?: string;
+  updated_at?: string;
+}> | Record<string, string>;
+
+// Live monthly stats
+export interface LiveMonthlyStats {
+  total_transactions: number;
+  total_amount: number;
+  total_vat: number;
+  tips_total: number;
+  change_total: number;
+}
+
+// Business info (minimal)
+export interface BusinessInfo {
+  name: string;
+  address: string;
+  phone?: string;
+  email?: string;
+  siret?: string;
+  tax_identification?: string;
+}
+
 // Union type for all possible API responses
 export type ApiResponseType = 
   | EstablishmentResponse

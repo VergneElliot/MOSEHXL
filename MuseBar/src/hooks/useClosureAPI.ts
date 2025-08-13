@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { ApiService } from '../services/apiService';
 import { ClosureBulletin } from './useClosureState';
+import type { ClosureTodayStatus, ClosureSettings, LiveMonthlyStats } from '../types/api';
 
 export interface ClosureAPIActions {
   loadBulletins: () => Promise<void>;
@@ -22,9 +23,9 @@ export const useClosureAPI = (
   setLoading: (loading: boolean) => void,
   setError: (error: string | null) => void,
   setCreating: (creating: boolean) => void,
-  setTodayStatus: (status: any) => void,
-  setClosureSettings: (settings: any) => void,
-  setMonthlyStats: (stats: any) => void,
+  setTodayStatus: (status: ClosureTodayStatus) => void,
+  setClosureSettings: (settings: ClosureSettings) => void,
+  setMonthlyStats: (stats: LiveMonthlyStats) => void,
   setMonthlyStatsError: (error: string | null) => void,
   addBulletin: (bulletin: ClosureBulletin) => void,
   showSuccess: (message: string) => void,
@@ -51,7 +52,7 @@ export const useClosureAPI = (
 
   const loadTodayStatus = useCallback(async () => {
     try {
-      const { data } = await apiService.get<any>('/legal/closure/today-status');
+      const { data } = await apiService.get<ClosureTodayStatus>('/legal/closure/today-status');
       setTodayStatus(data);
     } catch (err) {
       console.error('Error loading today status:', err);
@@ -60,7 +61,7 @@ export const useClosureAPI = (
 
   const loadClosureSettings = useCallback(async () => {
     try {
-      const { data } = await apiService.get<any>('/legal/closure-settings');
+      const { data } = await apiService.get<ClosureSettings>('/legal/closure-settings');
       setClosureSettings(data);
     } catch (err) {
       console.error('Error loading closure settings:', err);
@@ -71,7 +72,7 @@ export const useClosureAPI = (
     try {
       setMonthlyStatsError(null);
       const stats = await apiService.getLiveMonthlyStats();
-      setMonthlyStats(stats);
+      setMonthlyStats(stats as LiveMonthlyStats);
     } catch (err) {
       setMonthlyStats(null);
       setMonthlyStatsError('Impossible de charger les statistiques mensuelles en direct.');
@@ -115,9 +116,9 @@ export const useClosureAPI = (
   );
 
   const updateClosureSettings = useCallback(
-    async (newSettings: any) => {
+    async (newSettings: Record<string, string>) => {
       try {
-        const { data: updatedSettings } = await apiService.put<any>('/legal/closure-settings', {
+        const { data: updatedSettings } = await apiService.put<ClosureSettings>('/legal/closure-settings', {
           settings: newSettings,
           updated_by: 'UI',
         });
