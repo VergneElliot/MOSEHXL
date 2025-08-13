@@ -452,7 +452,7 @@ const EstablishmentManagement: React.FC<{ token: string }> = ({ token }) => {
             <InputLabel>Subscription Plan</InputLabel>
             <Select
               value={createForm.subscription_plan}
-              onChange={(e) => setCreateForm({ ...createForm, subscription_plan: e.target.value as any })}
+              onChange={(e) => setCreateForm({ ...createForm, subscription_plan: e.target.value as 'basic' | 'premium' | 'enterprise' })}
               label="Subscription Plan"
             >
               <MenuItem value="basic">Basic</MenuItem>
@@ -513,7 +513,7 @@ const EstablishmentManagement: React.FC<{ token: string }> = ({ token }) => {
             <InputLabel>Subscription Plan</InputLabel>
             <Select
               value={inviteForm.subscription_plan}
-              onChange={(e) => setInviteForm({ ...inviteForm, subscription_plan: e.target.value as any })}
+              onChange={(e) => setInviteForm({ ...inviteForm, subscription_plan: e.target.value as 'basic' | 'premium' | 'enterprise' })}
               label="Subscription Plan"
             >
               <MenuItem value="basic">Basic</MenuItem>

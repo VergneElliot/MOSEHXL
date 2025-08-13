@@ -84,11 +84,14 @@ export const useClosureAPI = (
       try {
         setCreating(true);
         setError(null);
-        const { data: result } = await apiService.post<any>('/legal/closure/create', {
+        const { data: result } = await apiService.post<{ closure?: ClosureBulletin }>(
+          '/legal/closure/create',
+          {
           date: closureData.date,
           type: closureData.type,
-        });
-        addBulletin((result as any).closure ?? result);
+        }
+        );
+        addBulletin(result.closure ?? (result as unknown as ClosureBulletin));
         setShowCreateDialog(false);
         setSelectedDate(new Date().toISOString().split('T')[0]);
         showSuccess('Bulletin de clôture créé avec succès');
