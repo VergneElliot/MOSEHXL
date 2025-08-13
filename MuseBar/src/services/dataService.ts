@@ -131,7 +131,9 @@ export class DataService {
   public toggleProductActive(id: string): Product | null {
     const product = this.getProductById(id);
     if (!product) return null;
-    return this.updateProduct(id, { isActive: !product.isActive }) as any;
+    // Fire and forget update; return optimistic value
+    void this.updateProduct(id, { isActive: !product.isActive });
+    return { ...product, isActive: !product.isActive };
   }
 
   // Données par défaut

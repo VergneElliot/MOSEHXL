@@ -37,7 +37,8 @@ export const useHistoryAPI = (
       // Map sub_bills to subBills for frontend compatibility
       const mappedOrders = ordersData.map(order => ({
         ...order,
-        subBills: (order as any)['sub_bills'] || order.subBills || [],
+        // Normalize legacy backend field to frontend shape
+        subBills: (order as unknown as { sub_bills?: Order['subBills'] })['sub_bills'] || order.subBills || [],
       }));
 
       setOrders(mappedOrders);
@@ -51,8 +52,17 @@ export const useHistoryAPI = (
 
   const loadStats = useCallback(async () => {
     try {
-      const businessDayResponse = await apiService.get('/legal/business-day-stats');
-      const businessDayData = businessDayResponse.data as any;
+      const businessDayResponse = await apiService.get<{
+        stats: {
+          total_ttc: number;
+          total_sales: number;
+          top_products: Array<{ name: string; qty: number }>;
+          card_total: number;
+          cash_total: number;
+        };
+        business_day_period: { start: string; end: string; closure_time: string; timezone: string } | null;
+      }>('/legal/business-day-stats');
+      const businessDayData = businessDayResponse.data;
 
       setStats({
         caJour: businessDayData.stats.total_ttc || 0,
