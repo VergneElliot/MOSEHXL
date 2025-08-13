@@ -274,7 +274,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     }
 
     // For development, just log it
-    console.log('Error Report:', errorReport);
+      // console.log('Error Report:', errorReport);
   };
 
   /**

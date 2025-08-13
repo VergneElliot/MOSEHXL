@@ -401,7 +401,7 @@ export const testUtils = {
    */
   takeScreenshot: async (name: string) => {
     // This would integrate with a visual testing tool like Percy or Chromatic
-    console.log(`Screenshot taken: ${name}`);
+  // console.debug(`Screenshot taken: ${name}`);
   },
 
   /**
@@ -534,7 +534,7 @@ export const performanceUtils = {
       end: () => {
         const endTime = performance.now();
         const duration = endTime - startTime;
-        console.log(`${name} render time: ${duration.toFixed(2)}ms`);
+        // console.debug(`${name} render time: ${duration.toFixed(2)}ms`);
         return duration;
       },
     };

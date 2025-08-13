@@ -29,10 +29,10 @@ export const useEstablishments = () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('🔄 useEstablishments: Creating establishment...', data);
+    // console.debug('useEstablishments: Creating establishment...', data);
       
       const response = await EstablishmentService.createEstablishment(data);
-      console.log('🔄 useEstablishments: Creation response:', response);
+    // console.debug('useEstablishments: Creation response:', response);
       
       // Reload establishments to get updated list
       await loadEstablishments();
@@ -49,10 +49,10 @@ export const useEstablishments = () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('🔄 useEstablishments: Deleting establishment...', id);
+    // console.debug('useEstablishments: Deleting establishment...', id);
       
       await EstablishmentService.deleteEstablishment(id);
-      console.log('🔄 useEstablishments: Deletion successful');
+    // console.debug('useEstablishments: Deletion successful');
       
       // Reload establishments to get updated list
       await loadEstablishments();
