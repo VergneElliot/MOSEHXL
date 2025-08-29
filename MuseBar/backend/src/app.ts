@@ -41,6 +41,11 @@ export const pool = new Pool({
   database: process.env.DB_NAME || DEFAULT_DB_NAME,
   password: process.env.DB_PASSWORD || 'password',
   port: parseInt(process.env.DB_PORT || '5432'),
+  ...(process.env.DB_SSL === 'true' ? {
+    ssl: {
+      rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false'
+    }
+  } : {})
 });
 
 console.log(`📊 Connecting to database: ${process.env.DB_NAME || DEFAULT_DB_NAME}`);
