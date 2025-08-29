@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { pool } from '../app';
-import { LegalJournalModel } from './legalJournal';
+import LegalJournalModel from './legalJournal';
 
 export interface ArchiveExport {
   id: number;

@@ -7,8 +7,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "ts-node src/app.ts",
-    "build": "tsc",
-    "start": "node dist/src/app.js",
+    "build": "tsc && mkdir -p dist/docs && cp src/docs/openapi.yaml dist/docs/",
+    "start": "node dist/app.js",
     "migration:migrate": "ts-node src/migrations/cli.ts migrate",
     "migration:rollback": "ts-node src/migrations/cli.ts rollback",
     "migration:status": "ts-node src/migrations/cli.ts status",

@@ -443,7 +443,7 @@ router.post('/test-email', requireAuth, requireAdmin, async (req, res, next) => 
 
     // Test email service configuration
     const emailService = userInvitationService['emailService'];
-    const testResult = await emailService.testConfiguration(testEmail);
+    const testResult = await emailService.testConfiguration();
 
     if (testResult) {
       await AuditTrailModel.logAction({

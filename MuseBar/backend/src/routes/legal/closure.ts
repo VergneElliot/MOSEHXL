@@ -152,7 +152,7 @@ router.post('/create', async (req, res) => {
     let closure;
     switch (type) {
       case 'DAILY':
-        closure = await LegalJournalModel.createDailyClosure(closureDate, force);
+        closure = await LegalJournalModel.createDailyClosure(closureDate);
         break;
       case 'WEEKLY':
         closure = await LegalJournalModel.createWeeklyClosure(closureDate);
