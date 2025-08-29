@@ -16,8 +16,8 @@ const logger = Logger.getInstance(config);
 router.get('/validate/:token', validateParams([{ param: 'token', validator: (v:any)=> typeof v === 'string' && v.length > 0 }]), async (req, res) => {
   try {
     const { token } = req.params;
-    const setupService = new SetupService(logger);
-    const result = await setupService.validateInvitationToken(token);
+    const setupService = SetupService.getInstance();
+    const result = await setupService.validateInvitation(token);
 
     if (!result.isValid) {
       return res.status(400).json(result);
@@ -37,7 +37,7 @@ router.get('/validate/:token', validateParams([{ param: 'token', validator: (v:a
 router.get('/status/:token', validateParams([{ param: 'token', validator: (v:any)=> typeof v === 'string' && v.length > 0 }]), async (req, res) => {
   try {
     const { token } = req.params;
-    const setupService = new SetupService(logger);
+    const setupService = SetupService.getInstance();
     const result = await setupService.checkSetupStatus(token);
 
     if (result.error) {
@@ -68,7 +68,7 @@ router.post('/complete', validateBody([
   { field: 'invitation_token', required: true }
 ]), async (req, res) => {
   try {
-    const setupService = new SetupService(logger);
+    const setupService = SetupService.getInstance();
     const result = await setupService.completeBusinessSetup(
       req.body,
       req.ip,

@@ -80,7 +80,7 @@ app.use('/api/products', productsRouter);
 app.use('/api/orders', ordersRouter);
 app.use('/api/legal', legalRouter);
 app.use('/api/auth', authRouter);
-app.use('/api/user-management', userManagementRouter);
+app.use('/api/user-management', userManagementRouter(config, logger));
 app.use('/api/establishments', establishmentsRouter);
 app.use('/api/setup', setupRouter);
 
