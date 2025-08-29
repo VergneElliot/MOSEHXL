@@ -7,6 +7,37 @@ import { pool } from '../app';
 
 const router = express.Router();
 
+// GET paginated orders (lightweight, for history list)
+router.get('/paginated', async (req, res) => {
+  try {
+    const limit = Math.max(1, Math.min(200, parseInt(String(req.query.limit || '25'))));
+    const offset = Math.max(0, parseInt(String(req.query.offset || '0')));
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+
+    const { rows, total } = await OrderModel.getAllPaginated(limit, offset, search);
+
+    // Include items and sub-bills for each order (page-limited)
+    const ordersWithDetails = await Promise.all(
+      rows.map(async (order) => {
+        const items = await OrderItemModel.getByOrderId(order.id);
+        const subBills = order.payment_method === 'split' ? await SubBillModel.getByOrderId(order.id) : [];
+        return {
+          ...order,
+          items,
+          sub_bills: subBills,
+          tips: order.tips || 0,
+          change: order.change || 0
+        };
+      })
+    );
+
+    res.json({ orders: ordersWithDetails, total });
+  } catch (error) {
+    console.error('Error fetching paginated orders:', error);
+    res.status(500).json({ error: 'Failed to fetch paginated orders' });
+  }
+});
+
 // GET all orders (for history)
 router.get('/', async (req, res) => {
   try {

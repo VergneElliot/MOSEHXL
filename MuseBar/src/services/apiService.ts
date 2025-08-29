@@ -327,6 +327,51 @@ export class ApiService {
     }));
   }
 
+  async getOrdersPaginated(params: { limit: number; offset: number; search?: string }): Promise<{ orders: Order[]; total: number }> {
+    const query = new URLSearchParams({
+      limit: String(params.limit),
+      offset: String(params.offset),
+      ...(params.search ? { search: params.search } : {})
+    });
+    const response = await this.request<any>(`/orders/paginated?${query.toString()}`);
+    const mapped = (response.orders || []).map((order: any) => ({
+      id: order.id.toString(),
+      items: (order.items || []).map((item: any) => ({
+        id: item.id ? item.id.toString() : `${order.id}-${item.product_id || 'unknown'}`,
+        productId: item.product_id ? (isNaN(parseInt(item.product_id)) ? null : item.product_id.toString()) : null,
+        productName: item.product_name || 'Unknown Product',
+        quantity: item.quantity || 1,
+        unitPrice: parseFloat(item.unit_price || '0'),
+        totalPrice: parseFloat(item.total_price || '0'),
+        taxRate: parseFloat(item.tax_rate || '20') / 100,
+        taxAmount: parseFloat(item.tax_amount || '0'),
+        isHappyHourApplied: item.happy_hour_applied || false,
+        isManualHappyHour: item.happy_hour_applied || false,
+        isOffert: parseFloat(item.total_price || '0') === 0,
+        originalPrice: parseFloat(item.unit_price || '0')
+      })),
+      totalAmount: parseFloat(order.total_amount),
+      taxAmount: parseFloat(order.total_tax),
+      discountAmount: 0,
+      finalAmount: parseFloat(order.total_amount),
+      createdAt: new Date(order.created_at),
+      status: order.status as 'pending' | 'completed' | 'cancelled',
+      paymentMethod: order.payment_method as PaymentMethod,
+      subBills: (order.sub_bills || []).map((subBill: any) => ({
+        id: subBill.id.toString(),
+        orderId: order.id.toString(),
+        paymentMethod: subBill.payment_method as 'cash' | 'card',
+        amount: parseFloat(subBill.amount),
+        status: subBill.status as 'pending' | 'paid',
+        createdAt: new Date(subBill.created_at)
+      })),
+      notes: order.notes,
+      tips: order.tips || 0,
+      change: order.change || 0
+    }));
+    return { orders: mapped, total: response.total || 0 };
+  }
+
   async createOrder(order: {
     items: OrderItem[];
     totalAmount: number;

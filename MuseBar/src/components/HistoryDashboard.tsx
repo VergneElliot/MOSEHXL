@@ -13,6 +13,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TablePagination,
   Paper,
   TextField,
   IconButton,
@@ -55,6 +56,9 @@ const HistoryDashboard: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
+  const [total, setTotal] = useState(0);
   const [stats, setStats] = useState({
     caJour: 0,
     ventesJour: 0,
@@ -87,20 +91,25 @@ const HistoryDashboard: React.FC = () => {
   useEffect(() => {
     loadOrders();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [page, pageSize, search]);
 
   const loadOrders = async () => {
     try {
       setLoading(true);
       
-      // Load orders list
-      const ordersData = await apiService.getOrders();
-      // Map sub_bills to subBills for frontend compatibility
-      const mappedOrders = ordersData.map(order => ({
+      // Load paginated orders list
+      const { orders: pageOrders, total } = await apiService.getOrdersPaginated({
+        limit: pageSize,
+        offset: page * pageSize,
+        search: search && search.trim() !== '' ? search.trim() : undefined
+      });
+      // Map sub_bills to subBills for frontend compatibility (safety)
+      const mappedOrders = pageOrders.map(order => ({
         ...order,
-        subBills: (order as any)['sub_bills'] || order.subBills || []
+        subBills: (order as any)['sub_bills'] || (order as any).subBills || []
       }));
       setOrders(mappedOrders);
+      setTotal(total || 0);
       
       // Load business day statistics
       const businessDayResponse = await apiService.get('/legal/business-day-stats');
@@ -121,10 +130,7 @@ const HistoryDashboard: React.FC = () => {
     }
   };
 
-  const filteredOrders = orders.filter(order =>
-    order.id.toLowerCase().includes(search.toLowerCase()) ||
-    order.createdAt.toISOString().includes(search)
-  );
+  const filteredOrders = orders;
 
 
 
@@ -839,6 +845,15 @@ const HistoryDashboard: React.FC = () => {
                     ))}
                   </TableBody>
                 </Table>
+                <TablePagination
+                  component="div"
+                  count={total}
+                  page={page}
+                  onPageChange={(_, p) => setPage(p)}
+                  rowsPerPage={pageSize}
+                  onRowsPerPageChange={e => { setPageSize(parseInt(e.target.value, 10)); setPage(0); }}
+                  rowsPerPageOptions={[25, 50, 100]}
+                />
               </TableContainer>
             )}
             </CardContent>

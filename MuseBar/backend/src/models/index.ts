@@ -315,6 +315,33 @@ export const OrderModel = {
     return result.rows;
   },
 
+  async getAllPaginated(limit: number, offset: number, search?: string): Promise<{ rows: Order[]; total: number }> {
+    const values: any[] = [];
+    let whereClause = '';
+    if (search && String(search).trim() !== '') {
+      values.push(`%${search}%`);
+      values.push(`%${search}%`);
+      whereClause = `WHERE CAST(id AS TEXT) ILIKE $${values.length - 1} OR CAST(created_at AS TEXT) ILIKE $${values.length}`;
+    }
+
+    // Total count
+    const countQuery = `SELECT COUNT(*)::int AS count FROM orders ${whereClause}`;
+    const countResult = await pool.query(countQuery, values);
+    const total: number = countResult.rows[0]?.count || 0;
+
+    // Paged rows
+    values.push(limit);
+    values.push(offset);
+    const listQuery = `
+      SELECT * FROM orders
+      ${whereClause}
+      ORDER BY created_at DESC
+      LIMIT $${values.length - 1} OFFSET $${values.length}
+    `;
+    const listResult = await pool.query(listQuery, values);
+    return { rows: listResult.rows, total };
+  },
+
   async getById(id: number): Promise<Order | null> {
     const result = await pool.query('SELECT * FROM orders WHERE id = $1', [id]);
     return result.rows[0] || null;
