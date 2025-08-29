@@ -209,11 +209,13 @@ npm run dev
 - `DEPLOYMENT-GUIDE.md` - Production deployment
 - `DEVELOPMENT.md` - Development practices
 - `ARCHITECTURE.md` - System architecture
+- `DEVELOPMENT-BRANCH-CURRENT-STATE.md` - Current development status
 - `EMAIL-SERVICE-SETUP-GUIDE.md` - Email configuration
 
 ### **Advanced Topics**
 - `MULTI-TENANT-ARCHITECTURE-PLAN.md` - Multi-tenant design
-- `PROFESSIONAL-ENHANCEMENTS-SUMMARY.md` - Enhancement details
+- `MULTI-TENANT-SYSTEM-STATUS.md` - Current multi-tenant status
+- `MODULARIZATION-IMPROVEMENTS-NEEDED.md` - Pending improvements
 - `CROSS-PLATFORM-COMPATIBILITY.md` - Platform support
 - `MOBILE-SETUP.md` - Mobile configuration
 

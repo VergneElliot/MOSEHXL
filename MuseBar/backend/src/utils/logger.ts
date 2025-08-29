@@ -1,3 +1,5 @@
+/// <reference path="../types/express/index.d.ts" />
+
 /**
  * Professional Logging System
  * Provides structured logging with multiple transports and performance monitoring
