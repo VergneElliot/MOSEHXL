@@ -26,8 +26,17 @@ class ApiConfig {
 
     // Get the current host (works for both localhost and network IPs)
     const currentHost = window.location.hostname;
+    const isProduction = window.location.hostname === 'mosehxl.com' || window.location.hostname === 'www.mosehxl.com';
     
-    // Define possible backend URLs to test
+    // If in production, use the production API
+    if (isProduction) {
+      this.baseURL = 'https://mosehxl.com/api';
+      this.isInitialized = true;
+      console.log('✅ Using production API: https://mosehxl.com/api');
+      return;
+    }
+    
+    // Define possible backend URLs to test for development
     const possibleUrls = [
       `http://${currentHost}:3001`, // Same host as frontend
       'http://localhost:3001',      // Local fallback
@@ -90,6 +99,12 @@ class ApiConfig {
   public getEndpoint(path: string): string {
     // Ensure path starts with /
     const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    
+    // If baseURL already ends with /api, don't add it again
+    if (this.baseURL.endsWith('/api') && cleanPath.startsWith('/api')) {
+      return `${this.baseURL}${cleanPath.substring(4)}`; // Remove the /api prefix
+    }
+    
     return `${this.baseURL}${cleanPath}`;
   }
 
