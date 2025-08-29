@@ -95,6 +95,7 @@ const ClosureBulletinDashboard: React.FC = () => {
   const [closureSettings, setClosureSettings] = useState<any>({});
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   const [selectedClosureType, setSelectedClosureType] = useState<'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL'>('DAILY');
+  const [forceOverride, setForceOverride] = useState(false);
   
   // Add state for print dialog
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
@@ -172,16 +173,25 @@ const ClosureBulletinDashboard: React.FC = () => {
       const response = await fetch(apiConfig.getEndpoint('/api/legal/closure/create'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: selectedDate, type: selectedClosureType }),
+        body: JSON.stringify({ 
+          date: selectedDate, 
+          type: selectedClosureType,
+          ...(selectedClosureType === 'DAILY' ? { force: forceOverride } : {})
+        }),
       });
       if (!response.ok) {
         const errorData = await response.json();
+        // Surface specific guidance for already-closed days
+        if (response.status === 409 && selectedClosureType === 'DAILY' && !forceOverride) {
+          throw new Error('Une clôture existe déjà pour cette date. Cochez "Forcer la création" pour écraser.');
+        }
         throw new Error(errorData.error || 'Failed to create closure');
       }
       const result = await response.json();
       setBulletins(prev => [result.closure, ...prev]);
       setShowCreateDialog(false);
       setSelectedDate(new Date().toISOString().split('T')[0]);
+      setForceOverride(false);
       setSnackbar({ open: true, message: 'Bulletin de clôture créé avec succès', severity: 'success' });
       loadTodayStatus(); // Refresh today status
     } catch (err) {
@@ -670,6 +680,13 @@ const ClosureBulletinDashboard: React.FC = () => {
                   InputLabelProps={{ shrink: true }}
                   sx={{ mb: 2 }}
                 />
+                {selectedClosureType === 'DAILY' && (
+                  <FormControlLabel
+                    control={<Checkbox checked={forceOverride} onChange={(e) => setForceOverride(e.target.checked)} />}
+                    label="Forcer la création (écraser si une clôture existe déjà pour cette date)"
+                    sx={{ mb: 1 }}
+                  />
+                )}
                 <Alert severity="info">
                   <AlertTitle>Information</AlertTitle>
                   La clôture sera créée avec toutes les transactions de la journée sélectionnée.
