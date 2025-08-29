@@ -92,13 +92,38 @@ if (NODE_ENV === 'development') {
 // API Documentation
 app.use('/api/docs', docsRouter);
 
+// Client error logging endpoint
+import { asyncHandler } from './middleware/errorHandling';
+app.post('/api/client-errors', asyncHandler(async (req: any, res: any) => {
+  const errorData = req.body;
+  
+  logger.error(
+    `Client Error [${errorData.errorId}]: ${errorData.message}`,
+    new Error(errorData.message),
+    {
+      ...errorData,
+      source: 'CLIENT'
+    },
+    'CLIENT_ERROR_HANDLER'
+  );
+  
+  res.json({ success: true, message: 'Error logged successfully' });
+}));
+
 // Error handling middleware
 import { createErrorHandler } from './middleware/errorHandler';
+import { createEnhancedErrorHandler } from './middleware/errorHandling';
+import { initializeErrorRecovery as initErrorRecovery } from './utils/errorRecovery';
 import { notFound } from './middleware/errorHandler';
-const errorHandler = createErrorHandler(logger);
+
+// Initialize error recovery system
+initErrorRecovery(logger);
+
+// Use enhanced error handler
+const enhancedErrorHandler = createEnhancedErrorHandler(logger);
 // 404 handler
 app.use(notFound);
-app.use(errorHandler);
+app.use(enhancedErrorHandler);
 
 // Initialize services
 
