@@ -4,7 +4,8 @@ import bcrypt from 'bcrypt';
 export interface User {
   id: number;
   email: string;
-  password_hash: string;
+  password_hash?: string;
+  password?: string;  // Support both column names
   is_admin: boolean;
   created_at: Date;
 }
@@ -12,8 +13,17 @@ export interface User {
 export class UserModel {
   static async createUser(email: string, password: string, is_admin: boolean = false): Promise<User> {
     const password_hash = await bcrypt.hash(password, 12);
+    
+    // First check which column exists
+    const columnCheckResult = await pool.query(
+      `SELECT column_name FROM information_schema.columns 
+       WHERE table_name = 'users' AND column_name IN ('password', 'password_hash') LIMIT 1`
+    );
+    
+    const passwordColumn = columnCheckResult.rows[0]?.column_name || 'password';
+    
     const result = await pool.query(
-      `INSERT INTO users (email, password_hash, is_admin) VALUES ($1, $2, $3) RETURNING *`,
+      `INSERT INTO users (email, ${passwordColumn}, is_admin) VALUES ($1, $2, $3) RETURNING *`,
       [email, password_hash, is_admin]
     );
     return result.rows[0];
@@ -30,7 +40,10 @@ export class UserModel {
   }
 
   static async verifyPassword(user: User, password: string): Promise<boolean> {
-    return bcrypt.compare(password, user.password_hash);
+    // Support both password_hash and password column names
+    const hashedPassword = user.password_hash || user.password;
+    if (!hashedPassword) return false;
+    return bcrypt.compare(password, hashedPassword);
   }
 
   // Permission management
