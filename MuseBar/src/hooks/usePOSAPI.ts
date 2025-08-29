@@ -15,6 +15,7 @@ export interface CreateOrderData {
   items: OrderItem[];
   subBills?: LocalSubBill[];
   tips?: number;
+  cashReceived?: number;
   change?: number;
   notes?: string;
 }
