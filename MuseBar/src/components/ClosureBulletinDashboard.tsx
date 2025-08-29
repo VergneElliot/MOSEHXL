@@ -35,7 +35,8 @@ import {
   FormControlLabel,
   Switch,
   Snackbar,
-  Divider
+  Divider,
+  Checkbox
 } from '@mui/material';
 import {
   Receipt,
