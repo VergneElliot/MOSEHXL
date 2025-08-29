@@ -229,7 +229,10 @@ export class LegalJournalModel {
 
     // Check for existing closure for this specific business day
     // The business day is the date parameter, not the time period
-    const businessDayDate = date.toISOString().split('T')[0]; // YYYY-MM-DD format
+    // Use configured timezone when deriving the business day string to match scheduler logic
+    const businessDayDate = require('moment-timezone')
+      .tz(date, timezone)
+      .format('YYYY-MM-DD');
     const existingQuery = `
       SELECT * FROM closure_bulletins 
       WHERE closure_type = 'DAILY' 

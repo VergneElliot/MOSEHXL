@@ -57,32 +57,46 @@ export class ClosureScheduler {
       }
 
       const now = new Date();
-      
+
       // Determine which business day we might need to close
       const businessDay = this.calculateBusinessDayToClose(now, settings.daily_closure_time, settings.timezone);
-      
-      // Check if this business day has already been closed
-      const existingClosureQuery = `
-        SELECT * FROM closure_bulletins 
-        WHERE closure_type = 'DAILY' 
-        AND DATE(period_start) = $1
-        AND is_closed = TRUE
-        ORDER BY created_at DESC
-        LIMIT 1
-      `;
-      const existingResult = await pool.query(existingClosureQuery, [businessDay.toISOString().split('T')[0]]);
-      
-      if (existingResult.rows.length > 0) {
-        // Business day already closed - no action needed
+
+      // Use configured timezone to compute the business day string
+      const businessDayStr = moment.tz(businessDay, settings.timezone || 'Europe/Paris').format('YYYY-MM-DD');
+
+      // Acquire an advisory lock to avoid duplicate closures across multiple instances
+      const key1 = 0xC10; // arbitrary namespace for closures
+      const key2 = parseInt(moment.tz(businessDay, settings.timezone || 'Europe/Paris').format('YYYYMMDD'), 10);
+      const lockResult = await pool.query('SELECT pg_try_advisory_lock($1, $2) AS locked', [key1, key2]);
+      const gotLock = lockResult.rows?.[0]?.locked === true;
+
+      if (!gotLock) {
+        // Another instance is handling this business day
         return;
       }
 
-      // Check if it's time to close
-      const shouldClose = this.shouldExecuteClosure(settings, now, businessDay);
-      
-      if (shouldClose) {
-        console.log(`🔒 Executing automatic daily closure for business day ${businessDay.toISOString().split('T')[0]}...`);
-        await this.executeAutomaticClosure(now, businessDay);
+      try {
+        // Check if this business day has already been closed
+        const existingClosureQuery = `
+          SELECT 1 FROM closure_bulletins 
+          WHERE closure_type = 'DAILY' 
+          AND DATE(period_start) = $1
+          AND is_closed = TRUE
+          LIMIT 1
+        `;
+        const existingResult = await pool.query(existingClosureQuery, [businessDayStr]);
+        if (existingResult.rows.length > 0) {
+          return;
+        }
+
+        // Check if it's time to close
+        const shouldClose = this.shouldExecuteClosure(settings, now, businessDay);
+        if (shouldClose) {
+          console.log(`🔒 Executing automatic daily closure for business day ${businessDayStr}...`);
+          await this.executeAutomaticClosure(now, businessDay);
+        }
+      } finally {
+        await pool.query('SELECT pg_advisory_unlock($1, $2)', [key1, key2]);
       }
       
     } catch (error) {

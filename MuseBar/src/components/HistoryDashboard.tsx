@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -295,7 +295,7 @@ const HistoryDashboard: React.FC = () => {
     }
   };
 
-  const returnTotals = calculateReturnTotals();
+  const returnTotals = useMemo(() => calculateReturnTotals(), [orderToReturn, isPartialReturn, selectedItemsToReturn, selectedTipToReturn]);
 
   // Function to fetch and show receipt
   const handleShowReceipt = async (orderId: number, type: 'detailed' | 'summary' = 'detailed') => {
