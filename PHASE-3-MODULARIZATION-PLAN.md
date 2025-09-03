@@ -315,7 +315,13 @@ While the original modularization objectives have been achieved, our analysis ha
 - Completed: Setup validator modularized → `MuseBar/backend/src/services/setup/validator/{validationRules.ts}` with `setupValidator.ts` delegating.
 - Build: Backend builds pass after refactors.
 
-- Next up: Frontend targets per plan.
+## ✅ Phase 3B Progress
+
+- Completed: `apiService.ts` modularized → `MuseBar/src/services/api/{core.ts, categories.ts, products.ts, orders.ts, legal.ts}` with `apiService.ts` delegating to domain modules while preserving singleton pattern and API compatibility.
+- Frontend build passing with TypeScript compilation successful and only minor linting warnings.
+- API service reduced from 573 lines to 5 focused modules (core: 40 lines, categories: 77 lines, products: 107 lines, orders: 81 lines, legal: 16 lines) + wrapper (72 lines).
+
+- Next up: Remaining frontend targets per plan.
 
 ## 🎯 Success Criteria
 
