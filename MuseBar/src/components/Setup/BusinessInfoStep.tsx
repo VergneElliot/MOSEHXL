@@ -1,8 +1,9 @@
 /**
  * Business Information Step - Business details form
+ * Refactored to use modular hooks for validation and form management
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Box,
   Typography,
@@ -24,6 +25,7 @@ import {
   Info
 } from '@mui/icons-material';
 import { SetupFormData } from '../../types/setup';
+import { useBusinessValidation, useBusinessForm } from './BusinessInfoStep/hooks';
 
 interface BusinessInfoStepProps {
   formData: SetupFormData;
@@ -36,273 +38,232 @@ export const BusinessInfoStep: React.FC<BusinessInfoStepProps> = ({
   formData,
   onUpdate,
   onNext,
-  onBack
+  onBack,
 }) => {
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  // Initialize hooks
+  const validation = useBusinessValidation();
+  const form = useBusinessForm({
+    formData,
+    onUpdate,
+    onFieldError: validation.clearFieldError,
+  });
 
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-
-    // Required fields
-    if (!formData.businessName.trim()) {
-      newErrors.businessName = 'Business name is required';
-    }
-    if (!formData.contactEmail.trim()) {
-      newErrors.contactEmail = 'Contact email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.contactEmail)) {
-      newErrors.contactEmail = 'Please enter a valid email address';
-    }
-    if (!formData.phone.trim()) {
-      newErrors.phone = 'Phone number is required';
-    }
-    if (!formData.address.trim()) {
-      newErrors.address = 'Business address is required';
-    }
-
-    // Optional field validation
-    if (formData.tvaNumber && !/^FR\d{11}$/.test(formData.tvaNumber.replace(/\s/g, ''))) {
-      newErrors.tvaNumber = 'TVA number format: FR + 11 digits (e.g., FR12345678901)';
-    }
-    if (formData.siretNumber && !/^\d{14}$/.test(formData.siretNumber.replace(/\s/g, ''))) {
-      newErrors.siretNumber = 'SIRET number must be exactly 14 digits';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (validateForm()) {
+  /**
+   * Handle form validation and submission
+   */
+  const handleNext = () => {
+    const isValid = validation.validateForm(formData);
+    if (isValid) {
       onNext();
     }
   };
 
-  const handleInputChange = (field: keyof SetupFormData) => (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const value = e.target.value;
-    onUpdate({ [field]: value });
-    
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
-  };
-
-  // Format TVA number as user types
-  const handleTvaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\s/g, '').toUpperCase();
-    if (value && !value.startsWith('FR')) {
-      value = 'FR' + value;
-    }
-    onUpdate({ tvaNumber: value });
-    if (errors.tvaNumber) {
-      setErrors(prev => ({ ...prev, tvaNumber: '' }));
-    }
-  };
-
-  // Format SIRET number as user types
-  const handleSiretChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, '').slice(0, 14);
-    onUpdate({ siretNumber: value });
-    if (errors.siretNumber) {
-      setErrors(prev => ({ ...prev, siretNumber: '' }));
-    }
+  /**
+   * Handle form submission
+   */
+  const handleSubmit = (e: React.FormEvent) => {
+    form.handleSubmit(e, handleNext);
   };
 
   return (
-    <Box component="form" onSubmit={handleSubmit}>
-      <Box textAlign="center" mb={4}>
-        <Business sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
-        <Typography variant="h4" gutterBottom>
-          Business Information
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Complete your establishment details for legal compliance
-        </Typography>
-      </Box>
+    <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 600, mx: 'auto', p: 3 }}>
+      <Typography variant="h4" gutterBottom align="center" sx={{ mb: 4 }}>
+        Informations de l'Établissement
+      </Typography>
+
+      <Typography variant="body1" color="text.secondary" align="center" sx={{ mb: 4 }}>
+        Renseignez les informations légales de votre établissement
+      </Typography>
+
+      {validation.hasErrors() && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          <Typography variant="subtitle2">
+            Veuillez corriger les erreurs suivantes :
+          </Typography>
+          <ul style={{ margin: '8px 0', paddingLeft: '20px' }}>
+            {Object.values(validation.errors).map((error, index) => (
+              <li key={index}>{error}</li>
+            ))}
+          </ul>
+        </Alert>
+      )}
 
       <Grid container spacing={3}>
-        {/* Basic Business Information */}
-        <Grid item xs={12}>
-          <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-            <Business sx={{ mr: 1 }} />
-            Basic Information
-          </Typography>
-        </Grid>
-
+        {/* Business Name */}
         <Grid item xs={12}>
           <TextField
             fullWidth
-            label="Business Name"
-            value={formData.businessName}
-            onChange={handleInputChange('businessName')}
-            error={!!errors.businessName}
-            helperText={errors.businessName || 'Official business name as registered'}
-            required
+            label="Nom de l'établissement"
+            placeholder="Ex: Restaurant Le Petit Bistrot"
+            value={formData.businessName || ''}
+            onChange={form.handleInputChange('businessName')}
+            error={!!validation.getFieldError('businessName')}
+            helperText={validation.getFieldError('businessName')}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <Business color="action" />
+                  <Business color="primary" />
                 </InputAdornment>
               ),
             }}
+            required
           />
         </Grid>
 
+        {/* Email */}
         <Grid item xs={12} md={6}>
           <TextField
             fullWidth
-            label="Contact Email"
+            label="Email professionnel"
             type="email"
-            value={formData.contactEmail}
-            onChange={handleInputChange('contactEmail')}
-            error={!!errors.contactEmail}
-            helperText={errors.contactEmail || 'Primary business contact email'}
-            required
+            placeholder="contact@restaurant.fr"
+            value={formData.email || ''}
+            onChange={form.handleInputChange('email')}
+            error={!!validation.getFieldError('email')}
+            helperText={validation.getFieldError('email')}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <Email color="action" />
+                  <Email color="primary" />
                 </InputAdornment>
               ),
             }}
+            required
           />
         </Grid>
 
+        {/* Phone */}
         <Grid item xs={12} md={6}>
           <TextField
             fullWidth
-            label="Phone Number"
-            value={formData.phone}
-            onChange={handleInputChange('phone')}
-            error={!!errors.phone}
-            helperText={errors.phone || 'Business phone number'}
-            required
+            label="Téléphone"
+            placeholder="01 23 45 67 89"
+            value={formData.phone || ''}
+            onChange={form.handlePhoneChange}
+            error={!!validation.getFieldError('phone')}
+            helperText={validation.getFieldError('phone')}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <Phone color="action" />
+                  <Phone color="primary" />
                 </InputAdornment>
               ),
             }}
+            required
           />
         </Grid>
 
+        {/* Address */}
         <Grid item xs={12}>
           <TextField
             fullWidth
-            label="Business Address"
+            label="Adresse complète"
+            placeholder="123 Rue de la République, 75001 Paris"
+            value={formData.address || ''}
+            onChange={form.handleInputChange('address')}
+            error={!!validation.getFieldError('address')}
+            helperText={validation.getFieldError('address')}
             multiline
             rows={2}
-            value={formData.address}
-            onChange={handleInputChange('address')}
-            error={!!errors.address}
-            helperText={errors.address || 'Complete business address including city and postal code'}
-            required
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start" sx={{ alignSelf: 'flex-start', mt: 1 }}>
-                  <LocationOn color="action" />
+                  <LocationOn color="primary" />
                 </InputAdornment>
               ),
             }}
+            required
           />
         </Grid>
 
-        {/* Legal Information */}
-        <Grid item xs={12} sx={{ mt: 2 }}>
-          <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-            <Receipt sx={{ mr: 1 }} />
-            Legal Information (Optional)
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Required for French tax compliance if applicable
-          </Typography>
-        </Grid>
-
+        {/* SIRET */}
         <Grid item xs={12} md={6}>
           <TextField
             fullWidth
-            label="TVA Number"
-            value={formData.tvaNumber}
-            onChange={handleTvaChange}
-            error={!!errors.tvaNumber}
-            helperText={errors.tvaNumber || 'French VAT number (if applicable)'}
-            placeholder="FR12345678901"
+            label="Numéro SIRET"
+            placeholder="123 456 789 01234"
+            value={form.getSiretDisplayValue()}
+            onChange={form.handleSiretChange}
+            error={!!validation.getFieldError('siretNumber')}
+            helperText={validation.getFieldError('siretNumber') || '14 chiffres sans espaces'}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <Receipt color="action" />
+                  <Receipt color="primary" />
                 </InputAdornment>
               ),
               endAdornment: (
                 <InputAdornment position="end">
-                  <Tooltip title="French TVA number format: FR followed by 11 digits">
-                    <IconButton edge="end" size="small">
-                      <Info />
+                  <Tooltip title="Le SIRET identifie votre établissement auprès des administrations">
+                    <IconButton size="small">
+                      <Info fontSize="small" />
                     </IconButton>
                   </Tooltip>
                 </InputAdornment>
               ),
             }}
+            required
           />
         </Grid>
 
+        {/* TVA Number */}
         <Grid item xs={12} md={6}>
           <TextField
             fullWidth
-            label="SIRET Number"
-            value={formData.siretNumber}
-            onChange={handleSiretChange}
-            error={!!errors.siretNumber}
-            helperText={errors.siretNumber || 'French business registration number (if applicable)'}
-            placeholder="12345678901234"
+            label="Numéro de TVA"
+            placeholder="FR 12345678901"
+            value={form.getTvaDisplayValue()}
+            onChange={form.handleTvaChange}
+            error={!!validation.getFieldError('tvaNumber')}
+            helperText={validation.getFieldError('tvaNumber') || 'Format: FR + 11 chiffres'}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <AccountBalance color="action" />
+                  <AccountBalance color="primary" />
                 </InputAdornment>
               ),
               endAdornment: (
                 <InputAdornment position="end">
-                  <Tooltip title="SIRET number is exactly 14 digits">
-                    <IconButton edge="end" size="small">
-                      <Info />
+                  <Tooltip title="Numéro de TVA intracommunautaire français">
+                    <IconButton size="small">
+                      <Info fontSize="small" />
                     </IconButton>
                   </Tooltip>
                 </InputAdornment>
               ),
             }}
+            required
           />
         </Grid>
       </Grid>
 
-      <Alert severity="info" sx={{ mt: 3, mb: 4 }}>
-        <Typography variant="body2">
-          <strong>Legal Compliance:</strong> This information will be used for business registration, 
-          legal documentation, and compliance with French business regulations. TVA and SIRET numbers 
-          are only required if your business is registered in France.
-        </Typography>
-      </Alert>
-
-      <Box display="flex" justifyContent="space-between" mt={4}>
+      {/* Navigation Buttons */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
         <Button
           variant="outlined"
           onClick={onBack}
           size="large"
         >
-          Back
+          Précédent
         </Button>
+        
         <Button
-          variant="contained"
           type="submit"
+          variant="contained"
+          color="primary"
           size="large"
-          sx={{ minWidth: 150 }}
+          disabled={validation.hasErrors() && Object.keys(validation.errors).length > 0}
         >
-          Continue
+          Suivant
         </Button>
+      </Box>
+
+      {/* Help Text */}
+      <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+        <Typography variant="body2" color="text.secondary" align="center">
+          💡 <strong>Astuce :</strong> Ces informations sont nécessaires pour la conformité légale 
+          et peuvent être modifiées ultérieurement dans les paramètres.
+        </Typography>
       </Box>
     </Box>
   );
