@@ -220,6 +220,8 @@ The comprehensive Phase 3 plan will elevate the project to **ultimate modulariza
 - Logger split into `utils/logger/{types, logFormatters, logTransport}`, `utils/logger.ts` delegates and retains API.
 - Setup defaults split into `services/setup/defaults/{dataConfig, categoryDefaults, productDefaults, settingDefaults, paymentMethodDefaults}`, `setupDefaults.ts` delegates.
 - Setup wizard split into `services/setup/wizard/{steps, validation, state}`, `setupWizard.ts` delegates.
+- Setup database split into `services/setup/db/{schemaMigration, dataSeeding}`, `setupDatabase.ts` delegates.
+- Setup validator split into `services/setup/validator/{validationRules}`, `setupValidator.ts` delegates.
 - Backend builds successful post-refactor.
 
 ### Upcoming (Phase 3A continuation):

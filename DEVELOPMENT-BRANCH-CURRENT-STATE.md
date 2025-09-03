@@ -87,6 +87,7 @@ MOSEHXL/
 - Logger modularized with clear separation of concerns (types/formatters/transports); public API preserved.
 - Setup defaults modularized into focused default data modules and wired into `setupDefaults.ts`.
 - Setup wizard modularized into focused wizard modules and wired into `setupWizard.ts`.
+- Setup database and validator modularized and wired into their respective orchestrators.
 - Backend builds green after refactors.
 
 ## 📊 Transformation Metrics

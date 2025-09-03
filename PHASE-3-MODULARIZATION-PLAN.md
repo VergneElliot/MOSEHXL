@@ -311,9 +311,11 @@ While the original modularization objectives have been achieved, our analysis ha
 - Completed: Logger modularized → `MuseBar/backend/src/utils/logger/{types.ts, logFormatters.ts, logTransport.ts}` with `utils/logger.ts` delegating; public API unchanged.
 - Completed: Setup defaults modularized → `MuseBar/backend/src/services/setup/defaults/{dataConfig.ts, categoryDefaults.ts, productDefaults.ts, settingDefaults.ts, paymentMethodDefaults.ts}` with `setupDefaults.ts` delegating.
 - Completed: Setup wizard modularized → `MuseBar/backend/src/services/setup/wizard/{steps.ts, validation.ts, state.ts}` with `setupWizard.ts` delegating.
+- Completed: Setup database modularized → `MuseBar/backend/src/services/setup/db/{schemaMigration.ts, dataSeeding.ts}` with `setupDatabase.ts` delegating.
+- Completed: Setup validator modularized → `MuseBar/backend/src/services/setup/validator/{validationRules.ts}` with `setupValidator.ts` delegating.
 - Build: Backend builds pass after refactors.
 
-- Next up: Setup services (`setupDatabase.ts`, `setupValidator.ts`).
+- Next up: Frontend targets per plan.
 
 ## 🎯 Success Criteria
 
