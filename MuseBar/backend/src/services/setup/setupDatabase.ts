@@ -15,6 +15,8 @@ import {
 } from './types';
 import { SchemaManager } from '../SchemaManager';
 import { Logger } from '../../utils/logger';
+import { initializeEstablishmentSchema } from './db';
+import { logSetupProgress as logProgress } from './db';
 
 /**
  * Setup Database Operations
@@ -251,30 +253,8 @@ export class SetupDatabase {
   /**
    * Initialize establishment schema
    */
-  static async initializeEstablishmentSchema(
-    establishmentId: string
-  ): Promise<void> {
-    try {
-      // Note: SchemaManager needs a PoolClient and schema name
-      // For now, we'll use a simple placeholder - needs proper implementation
-      this.logger.info(
-        'Schema initialization placeholder - needs proper implementation'
-      );
-      
-      this.logger.info(
-        'Establishment schema initialized successfully',
-        { establishmentId },
-        'SETUP_DATABASE'
-      );
-    } catch (error) {
-      this.logger.error(
-        'Error initializing establishment schema',
-        error as Error,
-        { establishmentId },
-        'SETUP_DATABASE'
-      );
-      throw error;
-    }
+  static async initializeEstablishmentSchema(establishmentId: string): Promise<void> {
+    await initializeEstablishmentSchema(establishmentId);
   }
 
   /**
@@ -409,46 +389,8 @@ export class SetupDatabase {
   /**
    * Log setup progress
    */
-  static async logSetupProgress(
-    client: PoolClient,
-    establishmentId: string,
-    progress: SetupProgress
-  ): Promise<void> {
-    try {
-      await client.query(`
-        INSERT INTO setup_progress (
-          establishment_id,
-          invitation_validated,
-          user_created,
-          establishment_updated,
-          default_data_created,
-          schema_initialized,
-          audit_logged,
-          created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
-        ON CONFLICT (establishment_id) DO UPDATE SET
-          invitation_validated = EXCLUDED.invitation_validated,
-          user_created = EXCLUDED.user_created,
-          establishment_updated = EXCLUDED.establishment_updated,
-          default_data_created = EXCLUDED.default_data_created,
-          schema_initialized = EXCLUDED.schema_initialized,
-          audit_logged = EXCLUDED.audit_logged,
-          updated_at = CURRENT_TIMESTAMP
-      `, [
-        establishmentId,
-        progress.invitation_validated,
-        progress.user_created,
-        progress.establishment_updated,
-        progress.default_data_created,
-        progress.schema_initialized,
-        progress.audit_logged
-      ]);
-    } catch (error) {
-      // Log progress tracking is not critical, so we don't throw
-      this.logger.warn(
-        'Failed to log setup progress: ' + (error as Error).message
-      );
-    }
+  static async logSetupProgress(client: PoolClient, establishmentId: string, progress: SetupProgress): Promise<void> {
+    await logProgress(client, establishmentId, progress);
   }
 
   /**
