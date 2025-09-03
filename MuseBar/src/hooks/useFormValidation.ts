@@ -3,7 +3,7 @@
  * Advanced form validation with real-time feedback and error handling
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 
 export interface ValidationRule<T = any> {
   required?: boolean;
@@ -281,7 +281,7 @@ export const useFormValidation = <T extends Record<string, any>>(
   }, [errors]);
 
   // Cleanup timeouts on unmount
-  React.useEffect(() => {
+  useEffect(() => {
     return () => {
       Object.values(debounceTimeouts).forEach(timeout => clearTimeout(timeout));
     };

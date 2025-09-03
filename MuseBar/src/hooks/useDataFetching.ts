@@ -293,7 +293,7 @@ export const useInfiniteScrollData = <T>(
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const { loading, error, executeWithLoading } = useLoadingState();
+  const { loadingState, executeWithLoading } = useLoadingState();
 
   const loadPage = useCallback(async (pageNumber: number, append = false) => {
     const execute = pageNumber === 1 ? executeWithLoading : 
@@ -328,10 +328,10 @@ export const useInfiniteScrollData = <T>(
   }, [executeWithLoading, fetchFn, pageSize, data.length]);
 
   const loadMore = useCallback(async () => {
-    if (hasMore && !loading && !isLoadingMore) {
+    if (hasMore && !loadingState.isLoading && !isLoadingMore) {
       await loadPage(page + 1, true);
     }
-  }, [hasMore, loading, isLoadingMore, loadPage, page]);
+  }, [hasMore, loadingState.isLoading, isLoadingMore, loadPage, page]);
 
   const refresh = useCallback(async () => {
     setPage(1);
@@ -346,8 +346,8 @@ export const useInfiniteScrollData = <T>(
 
   return {
     data,
-    loading,
-    error,
+    loading: loadingState.isLoading,
+    error: loadingState.error,
     hasMore,
     loadMore,
     refresh,
