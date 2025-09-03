@@ -6,8 +6,6 @@
 import express from 'express';
 import { requireAuth, requireAdmin } from '../auth';
 import { validateBody, validateParams } from '../../middleware/validation';
-import { pool } from '../../app';
-import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';
 import {
   AuthenticatedRequest,
@@ -17,6 +15,21 @@ import {
   TeamMember,
   ServiceInitialization
 } from './types';
+import {
+  fetchEstablishmentUsers,
+  fetchUserById,
+  fetchUserRowById,
+  updateUserById,
+  deleteOrDeactivateUser,
+  reactivateUser
+} from './users';
+import {
+  logViewEstablishmentUsers,
+  logViewUserDetails,
+  logUpdateUser,
+  logDeactivateOrDeleteUser,
+  logReactivateUser
+} from './users';
 
 const router = express.Router();
 
@@ -64,102 +77,26 @@ router.get('/establishment-users', requireAuth, async (req: any, res: any, next:
       });
     }
 
-    // Build query
-    let query = `
-      SELECT 
-        u.id,
-        u.email,
-        u.first_name,
-        u.last_name,
-        u.role,
-        u.is_active,
-        u.last_login_at,
-        u.created_at,
-        u.updated_at
-      FROM users u
-      WHERE u.establishment_id = $1
-    `;
-    const queryParams: any[] = [establishmentId];
-    let paramCount = 1;
-
-    // Add filters
-    if (role) {
-      paramCount++;
-      query += ` AND u.role = $${paramCount}`;
-      queryParams.push(role);
-    }
-
-    if (status) {
-      paramCount++;
-      query += ` AND u.is_active = $${paramCount}`;
-      queryParams.push(status === 'active');
-    }
-
-    if (search) {
-      paramCount++;
-      query += ` AND (u.first_name ILIKE $${paramCount} OR u.last_name ILIKE $${paramCount} OR u.email ILIKE $${paramCount})`;
-      queryParams.push(`%${search}%`);
-    }
-
-    // Add sorting
-    const validSortFields = ['first_name', 'last_name', 'email', 'role', 'created_at', 'last_login_at'];
-    const sortField = validSortFields.includes(sortBy) ? sortBy : 'created_at';
-    const order = sortOrder === 'asc' ? 'ASC' : 'DESC';
-    query += ` ORDER BY u.${sortField} ${order}`;
-
-    // Add pagination
-    const offset = (Number(page) - 1) * Number(limit);
-    paramCount++;
-    query += ` LIMIT $${paramCount}`;
-    queryParams.push(Number(limit));
-    paramCount++;
-    query += ` OFFSET $${paramCount}`;
-    queryParams.push(offset);
-
-    const result = await pool.query(query, queryParams);
-
-    // Get total count for pagination
-    let countQuery = 'SELECT COUNT(*) FROM users u WHERE u.establishment_id = $1';
-    const countParams = [establishmentId];
-    let countParamIndex = 1;
-
-    if (role) {
-      countParamIndex++;
-      countQuery += ` AND u.role = $${countParamIndex}`;
-      countParams.push(role);
-    }
-
-    if (status) {
-      countParamIndex++;
-      countQuery += ` AND u.is_active = $${countParamIndex}`;
-      countParams.push(status);
-    }
-
-    if (search) {
-      countParamIndex++;
-      countQuery += ` AND (u.first_name ILIKE $${countParamIndex} OR u.last_name ILIKE $${countParamIndex} OR u.email ILIKE $${countParamIndex})`;
-      countParams.push(`%${search}%`);
-    }
-
-    const countResult = await pool.query(countQuery, countParams);
-    const totalCount = parseInt(countResult.rows[0].count);
-
-    await AuditTrailModel.logAction({
-      user_id: String(user.id),
-      action_type: 'VIEW_ESTABLISHMENT_USERS',
-      action_details: {
-        establishmentId,
-        userCount: result.rows.length,
-        filters: { role, status, search }
-      },
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent']
+    const { rows, totalCount } = await fetchEstablishmentUsers(establishmentId, {
+      page: Number(page),
+      limit: Number(limit),
+      role,
+      status,
+      search,
+      sortBy,
+      sortOrder: sortOrder as any
     });
+
+    await logViewEstablishmentUsers(user.id, {
+      establishmentId,
+      userCount: rows.length,
+      filters: { role, status, search }
+    }, req.ip, req.headers['user-agent'] as string | undefined);
 
     res.json({
       success: true,
-      data: result.rows,
-      count: result.rows.length,
+      data: rows,
+      count: rows.length,
       totalCount,
       pagination: {
         page: Number(page),
@@ -190,32 +127,14 @@ router.get('/user/:userId', requireAuth, validateParams([
     const user = req.user!;
 
     // Get user details
-    const result = await pool.query(`
-      SELECT 
-        u.id,
-        u.email,
-        u.first_name,
-        u.last_name,
-        u.role,
-        u.is_active,
-        u.establishment_id,
-        u.last_login_at,
-        u.created_at,
-        u.updated_at,
-        e.name as establishment_name
-      FROM users u
-      LEFT JOIN establishments e ON u.establishment_id = e.id
-      WHERE u.id = $1
-    `, [userId]);
-
-    if (result.rows.length === 0) {
+    const result = await fetchUserById(userId);
+    if (!result) {
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
     }
-
-    const targetUser = result.rows[0];
+    const targetUser = result;
 
     // Validate access permissions
     if (!user.is_admin && 
@@ -226,16 +145,7 @@ router.get('/user/:userId', requireAuth, validateParams([
       });
     }
 
-    await AuditTrailModel.logAction({
-      user_id: String(user.id),
-      action_type: 'VIEW_USER_DETAILS',
-      action_details: {
-        targetUserId: userId,
-        establishmentId: targetUser.establishment_id
-      },
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent']
-    });
+    await logViewUserDetails(user.id, { targetUserId: userId, establishmentId: targetUser.establishment_id }, req.ip, req.headers['user-agent'] as string | undefined);
 
     res.json({
       success: true,
@@ -271,19 +181,13 @@ router.put('/user/:userId', requireAuth, validateParams([
     const user = req.user!;
 
     // Get current user data
-    const currentUserResult = await pool.query(
-      'SELECT * FROM users WHERE id = $1',
-      [userId]
-    );
-
-    if (currentUserResult.rows.length === 0) {
+    const currentUser = await fetchUserRowById(userId);
+    if (!currentUser) {
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
     }
-
-    const currentUser = currentUserResult.rows[0];
 
     // Validate access permissions
     if (!user.is_admin && 
@@ -310,78 +214,25 @@ router.put('/user/:userId', requireAuth, validateParams([
       }
     }
 
-    // Build update query
-    const updates: string[] = [];
-    const values: any[] = [];
-    let paramCount = 0;
-
-    if (firstName !== undefined) {
-      paramCount++;
-      updates.push(`first_name = $${paramCount}`);
-      values.push(firstName);
-    }
-
-    if (lastName !== undefined) {
-      paramCount++;
-      updates.push(`last_name = $${paramCount}`);
-      values.push(lastName);
-    }
-
-    if (email !== undefined) {
-      paramCount++;
-      updates.push(`email = $${paramCount}`);
-      values.push(email);
-    }
-
-    if (role !== undefined) {
-      paramCount++;
-      updates.push(`role = $${paramCount}`);
-      values.push(role);
-    }
-
-    if (isActive !== undefined) {
-      paramCount++;
-      updates.push(`is_active = $${paramCount}`);
-      values.push(isActive);
-    }
-
-    if (updates.length === 0) {
+    if (
+      firstName === undefined &&
+      lastName === undefined &&
+      email === undefined &&
+      role === undefined &&
+      isActive === undefined
+    ) {
       return res.status(400).json({
         success: false,
         message: 'No updates provided'
       });
     }
+    const updatedUser = await updateUserById(userId, { firstName, lastName, email, role, isActive });
 
-    // Add updated_at
-    paramCount++;
-    updates.push(`updated_at = $${paramCount}`);
-    values.push(new Date());
-
-    // Add user ID for WHERE clause
-    paramCount++;
-    values.push(userId);
-
-    const updateQuery = `
-      UPDATE users 
-      SET ${updates.join(', ')}
-      WHERE id = $${paramCount}
-      RETURNING *
-    `;
-
-    const result = await pool.query(updateQuery, values);
-    const updatedUser = result.rows[0];
-
-    await AuditTrailModel.logAction({
-      user_id: String(user.id),
-      action_type: 'UPDATE_USER',
-      action_details: {
-        targetUserId: userId,
-        updates: { firstName, lastName, email, role, isActive },
-        establishmentId: currentUser.establishment_id
-      },
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent']
-    });
+    await logUpdateUser(user.id, {
+      targetUserId: userId,
+      updates: { firstName, lastName, email, role, isActive },
+      establishmentId: currentUser.establishment_id
+    }, req.ip, req.headers['user-agent'] as string | undefined);
 
     res.json({
       success: true,
@@ -428,47 +279,21 @@ router.delete('/user/:userId', requireAuth, requireAdmin, validateParams([
     }
 
     // Get user to delete
-    const userResult = await pool.query(
-      'SELECT * FROM users WHERE id = $1',
-      [userId]
-    );
-
-    if (userResult.rows.length === 0) {
+    const targetUser = await fetchUserRowById(userId);
+    if (!targetUser) {
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
     }
+    const result = await deleteOrDeactivateUser(userId, permanent);
 
-    const targetUser = userResult.rows[0];
-
-    let result;
-    if (permanent) {
-      // Permanent deletion (rarely used)
-      result = await pool.query(
-        'DELETE FROM users WHERE id = $1 RETURNING id',
-        [userId]
-      );
-    } else {
-      // Soft deletion (deactivation)
-      result = await pool.query(
-        'UPDATE users SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING id',
-        [userId]
-      );
-    }
-
-    await AuditTrailModel.logAction({
-      user_id: String(user.id),
-      action_type: permanent ? 'DELETE_USER_PERMANENT' : 'DEACTIVATE_USER',
-      action_details: {
-        targetUserId: userId,
-        targetUserEmail: targetUser.email,
-        establishmentId: targetUser.establishment_id,
-        permanent
-      },
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent']
-    });
+    await logDeactivateOrDeleteUser(user.id, {
+      targetUserId: userId,
+      targetUserEmail: targetUser.email,
+      establishmentId: targetUser.establishment_id,
+      permanent
+    }, req.ip, req.headers['user-agent'] as string | undefined);
 
     res.json({
       success: true,
@@ -496,31 +321,18 @@ router.post('/user/:userId/reactivate', requireAuth, requireAdmin, validateParam
     const { userId } = req.params;
     const user = req.user!;
 
-    const result = await pool.query(
-      'UPDATE users SET is_active = true, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND is_active = false RETURNING *',
-      [userId]
-    );
-
-    if (result.rows.length === 0) {
+    const reactivatedUser = await reactivateUser(userId);
+    if (!reactivatedUser) {
       return res.status(404).json({
         success: false,
         message: 'User not found or already active'
       });
     }
-
-    const reactivatedUser = result.rows[0];
-
-    await AuditTrailModel.logAction({
-      user_id: String(user.id),
-      action_type: 'REACTIVATE_USER',
-      action_details: {
-        targetUserId: userId,
-        targetUserEmail: reactivatedUser.email,
-        establishmentId: reactivatedUser.establishment_id
-      },
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent']
-    });
+    await logReactivateUser(user.id, {
+      targetUserId: userId,
+      targetUserEmail: reactivatedUser.email,
+      establishmentId: reactivatedUser.establishment_id
+    }, req.ip, req.headers['user-agent'] as string | undefined);
 
     res.json({
       success: true,

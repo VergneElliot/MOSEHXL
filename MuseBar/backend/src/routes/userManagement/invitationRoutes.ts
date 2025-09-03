@@ -231,17 +231,10 @@ router.post('/accept-invitation', validateBody([
     let result;
     if (invitation.role === 'establishment_admin') {
       // For establishment invitations, business info might be required
-      if (businessInfo) {
-        result = await userInvitationService.acceptEstablishmentInvitation(token, password, {
-          firstName: firstName || invitation.firstName,
-          lastName: lastName || invitation.lastName,
-          businessInfo
-        });
-      } else {
-        result = await userInvitationService.acceptEstablishmentInvitation(token, password);
-      }
+      // The service currently accepts (token, password) only for establishment flow
+      result = await userInvitationService.acceptEstablishmentInvitation(token, password);
     } else {
-      result = await userInvitationService.acceptUserInvitation(token, password);
+      result = await userInvitationService.acceptUserInvitation(token, password, firstName, lastName);
     }
 
     if (!result.success) {

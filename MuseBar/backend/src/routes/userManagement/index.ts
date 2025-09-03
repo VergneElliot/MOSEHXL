@@ -59,7 +59,7 @@ class UserManagementRouter {
 
     try {
       // Initialize services
-      const userInvitationService = UserInvitationService.getInstance();
+      const userInvitationService = UserInvitationService.getInstance(config, logger);
       
       const services: ServiceInitialization = {
         userInvitationService,
