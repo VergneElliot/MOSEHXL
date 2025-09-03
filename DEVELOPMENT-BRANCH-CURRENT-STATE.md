@@ -85,6 +85,7 @@ MOSEHXL/
 ### **Latest Phase 3A Updates:**
 - User management routes modularized (roles/users/team) into focused submodules with audit/query separation.
 - Logger modularized with clear separation of concerns (types/formatters/transports); public API preserved.
+- Setup defaults modularized into focused default data modules and wired into `setupDefaults.ts`.
 - Backend builds green after refactors.
 
 ## 📊 Transformation Metrics
