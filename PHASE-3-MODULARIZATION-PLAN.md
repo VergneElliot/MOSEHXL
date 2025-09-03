@@ -318,8 +318,10 @@ While the original modularization objectives have been achieved, our analysis ha
 ## ✅ Phase 3B Progress
 
 - Completed: `apiService.ts` modularized → `MuseBar/src/services/api/{core.ts, categories.ts, products.ts, orders.ts, legal.ts}` with `apiService.ts` delegating to domain modules while preserving singleton pattern and API compatibility.
+- Completed: `testUtils.tsx` modularized → `MuseBar/src/utils/testing/{mockGenerators.ts, mockServices.ts, mockStorage.ts, renderUtils.tsx, testHelpers.ts, customMatchers.ts}` with `testUtils.tsx` re-exporting for backward compatibility.
 - Frontend build passing with TypeScript compilation successful and only minor linting warnings.
 - API service reduced from 573 lines to 5 focused modules (core: 40 lines, categories: 77 lines, products: 107 lines, orders: 81 lines, legal: 16 lines) + wrapper (72 lines).
+- Test utilities reduced from 573 lines to 6 focused modules (mockGenerators: 90 lines, mockServices: 71 lines, mockStorage: 48 lines, renderUtils: 78 lines, testHelpers: 95 lines, customMatchers: 130 lines) + wrapper (10 lines).
 
 - Next up: Remaining frontend targets per plan.
 
