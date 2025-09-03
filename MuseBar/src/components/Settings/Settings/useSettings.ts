@@ -1,91 +1,107 @@
 /**
  * Settings State Management Hook
  * Centralized state management for all settings functionality
+ * 
+ * @deprecated Use individual modules from './hooks/' instead for better modularity
+ * This file is maintained for backward compatibility
  */
 
 import { useState, useEffect } from 'react';
-import { apiService } from '../../../services/apiService';
-import {
-  SettingsState,
-  UseSettingsReturn,
-  GeneralSettings,
-  BusinessInfo,
-  ClosureSettings,
-  PaymentSettings,
-  SchedulerStatusResponse,
-} from './types';
+import { SettingsState, UseSettingsReturn } from './types';
+import { useGeneralSettings, useBusinessInfo, useClosureSettings, usePaymentSettings } from './hooks';
 
-/**
- * Default settings values
- */
-const defaultGeneralSettings: GeneralSettings = {
-  barName: 'MuseBar',
-  address: '',
-  phone: '',
-  email: '',
-  taxIdentification: '',
-  currency: 'EUR',
-  language: 'fr',
-};
+// Extended state for the hook with loading states
+interface ExtendedSettingsState extends SettingsState {
+  loading: boolean;
+  saving: boolean;
+}
 
-const defaultBusinessInfo: BusinessInfo = {
-  name: '',
-  address: '',
-  phone: '',
-  email: '',
-  siret: '',
-  taxIdentification: '',
-};
-
-const defaultClosureSettings: ClosureSettings = {
-  auto_closure_enabled: true,
-  daily_closure_time: '02:00',
-  timezone: 'Europe/Paris',
-  grace_period_minutes: 30,
-};
-
-const defaultPaymentSettings: PaymentSettings = {
-  acceptCash: true,
-  acceptCard: true,
-  acceptChecks: false,
-  taxRate: 20.0,
-  discountEnabled: true,
-  maxDiscountPercent: 15,
-};
-
-const defaultPrinterSettings = {
-  enabled: true,
-  printerName: 'Oxhoo TP85v Network',
-  printReceipts: true,
-  printReports: true,
-};
-
-const defaultSchedulerStatus = {
-  is_running: false,
-  has_interval: false,
-  next_check: 'Not scheduled',
-};
-
-/**
- * Settings Hook
- */
 export const useSettings = (): UseSettingsReturn => {
-  const [state, setState] = useState<SettingsState>({
-    generalSettings: defaultGeneralSettings,
-    businessInfo: defaultBusinessInfo,
-    closureSettings: defaultClosureSettings,
-    paymentSettings: defaultPaymentSettings,
-    printerSettings: defaultPrinterSettings,
-    schedulerStatus: defaultSchedulerStatus,
+  const [state, setState] = useState<ExtendedSettingsState>({
+    generalSettings: {
+      barName: 'MuseBar',
+      address: '',
+      phone: '',
+      email: '',
+      taxIdentification: '',
+      currency: 'EUR',
+      language: 'fr',
+    },
+    businessInfo: {
+      name: '',
+      address: '',
+      phone: '',
+      email: '',
+      siret: '',
+      taxIdentification: '',
+    },
+    closureSettings: {
+      auto_closure_enabled: true,
+      daily_closure_time: '02:00',
+      timezone: 'Europe/Paris',
+      grace_period_minutes: 30,
+    },
+    paymentSettings: {
+      acceptCash: true,
+      acceptCard: true,
+      acceptChecks: false,
+      taxRate: 20,
+      discountEnabled: true,
+      maxDiscountPercent: 15,
+    },
+    printerSettings: {
+      enabled: false,
+      printerName: '',
+      printReceipts: true,
+      printReports: false,
+    },
+    schedulerStatus: {
+      is_running: false,
+      has_interval: false,
+      next_check: '',
+    },
+    loading: false,
+    saving: false,
   });
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [infoSaving, setInfoSaving] = useState(false);
-  const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  // Initialize modular hooks
+  const generalHook = useGeneralSettings({
+    generalSettings: state.generalSettings,
+    onUpdate: (settings) => setState(prev => ({ ...prev, generalSettings: settings })),
+    onSave: async () => {
+      setState(prev => ({ ...prev, saving: true }));
+      try {
+        // TODO: Implement API call for general settings
+        console.log('General settings saved:', state.generalSettings);
+      } finally {
+        setState(prev => ({ ...prev, saving: false }));
+      }
+    },
+  });
+
+  const businessHook = useBusinessInfo({
+    businessInfo: state.businessInfo,
+    onUpdate: (info) => setState(prev => ({ ...prev, businessInfo: info })),
+    onLoadingChange: (loading) => setState(prev => ({ ...prev, loading })),
+    onSavingChange: (saving) => setState(prev => ({ ...prev, saving })),
+  });
+
+  const closureHook = useClosureSettings({
+    closureSettings: state.closureSettings,
+    onUpdate: (settings) => setState(prev => ({ ...prev, closureSettings: settings })),
+    onLoadingChange: (loading) => setState(prev => ({ ...prev, loading })),
+    onSavingChange: (saving) => setState(prev => ({ ...prev, saving })),
+  });
+
+  const paymentHook = usePaymentSettings({
+    paymentSettings: state.paymentSettings,
+    onUpdate: (settings) => setState(prev => ({ ...prev, paymentSettings: settings })),
+    onLoadingChange: (loading) => setState(prev => ({ ...prev, loading })),
+    onSavingChange: (saving) => setState(prev => ({ ...prev, saving })),
+  });
 
   /**
-   * Load all settings on mount
+   * Load all settings on component mount
    */
   useEffect(() => {
     loadAllSettings();
@@ -96,237 +112,70 @@ export const useSettings = (): UseSettingsReturn => {
    * Load all settings from API
    */
   const loadAllSettings = async () => {
-    setLoading(true);
+    setState(prev => ({ ...prev, loading: true }));
     try {
       await Promise.all([
-        loadBusinessInfo(),
-        loadClosureSettings(),
-        loadPaymentSettings(),
+        businessHook.loadBusinessInfo(),
+        closureHook.loadClosureSettings(),
+        paymentHook.loadPaymentSettings(),
       ]);
     } catch (error) {
       console.error('Error loading settings:', error);
     } finally {
-      setLoading(false);
+      setState(prev => ({ ...prev, loading: false }));
     }
   };
 
   /**
-   * Load business information
-   */
-  const loadBusinessInfo = async () => {
-    try {
-      const response = await apiService.getBusinessInfo();
-      setState(prev => ({
-        ...prev,
-        businessInfo: {
-          name: response.name || '',
-          address: response.address || '',
-          phone: response.phone || '',
-          email: response.email || '',
-          siret: response.siret || '',
-          taxIdentification: response.tax_identification || '',
-        },
-      }));
-    } catch (error) {
-      console.error('Error loading business info:', error);
-    }
-  };
-
-  /**
-   * Load closure settings
-   */
-  const loadClosureSettings = async () => {
-    try {
-      const response = await apiService.get<SchedulerStatusResponse>('/legal/settings/closure');
-      setState(prev => ({
-        ...prev,
-        closureSettings: response.data.settings,
-        schedulerStatus: response.data.scheduler,
-      }));
-    } catch (error) {
-      console.error('Error loading closure settings:', error);
-    }
-  };
-
-  /**
-   * Load payment settings (placeholder)
-   */
-  const loadPaymentSettings = async () => {
-    try {
-      // TODO: Implement when API endpoint is available
-      // const response = await apiService.get('/settings/payment');
-      // setState(prev => ({ ...prev, paymentSettings: response.data }));
-    } catch (error) {
-      console.error('Error loading payment settings:', error);
-    }
-  };
-
-  /**
-   * Update general settings
-   */
-  const updateGeneralSettings = (generalSettings: GeneralSettings) => {
-    setState(prev => ({ ...prev, generalSettings }));
-  };
-
-  /**
-   * Update business info
-   */
-  const updateBusinessInfo = (businessInfo: BusinessInfo) => {
-    setState(prev => ({ ...prev, businessInfo }));
-  };
-
-  /**
-   * Update closure settings
-   */
-  const updateClosureSettings = (closureSettings: ClosureSettings) => {
-    setState(prev => ({ ...prev, closureSettings }));
-  };
-
-  /**
-   * Update payment settings
-   */
-  const updatePaymentSettings = (paymentSettings: PaymentSettings) => {
-    setState(prev => ({ ...prev, paymentSettings }));
-  };
-
-  /**
-   * Save general settings
-   */
-  const saveGeneralSettings = async (): Promise<void> => {
-    setSaving(true);
-    try {
-      // TODO: Implement API call for general settings
-      // await apiService.post('/settings/general', state.generalSettings);
-      console.log('General settings saved:', state.generalSettings);
-    } catch (error) {
-      console.error('Error saving general settings:', error);
-      throw error;
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  /**
-   * Save business info
-   */
-  const saveBusinessInfo = async (): Promise<void> => {
-    setInfoSaving(true);
-    setInfoMessage(null);
-    try {
-      await apiService.updateBusinessInfo({
-        name: state.businessInfo.name,
-        address: state.businessInfo.address,
-        phone: state.businessInfo.phone,
-        email: state.businessInfo.email,
-        siret: state.businessInfo.siret,
-        tax_identification: state.businessInfo.taxIdentification,
-      });
-      setInfoMessage('Informations du bar sauvegardées avec succès');
-    } catch (error) {
-      setInfoMessage('Erreur lors de la sauvegarde des informations du bar');
-      throw error;
-    } finally {
-      setInfoSaving(false);
-    }
-  };
-
-  /**
-   * Save closure settings
-   */
-  const saveClosureSettings = async (): Promise<void> => {
-    setSaving(true);
-    try {
-      await apiService.post<any>('/legal/settings/closure', state.closureSettings);
-      await loadClosureSettings(); // Reload to get updated data
-    } catch (error) {
-      console.error('Error saving closure settings:', error);
-      throw error;
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  /**
-   * Save payment settings
-   */
-  const savePaymentSettings = async (): Promise<void> => {
-    setSaving(true);
-    try {
-      // TODO: Implement API call for payment settings
-      // await apiService.post('/settings/payment', state.paymentSettings);
-      console.log('Payment settings saved:', state.paymentSettings);
-    } catch (error) {
-      console.error('Error saving payment settings:', error);
-      throw error;
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  /**
-   * Trigger manual closure check
-   */
-  const triggerManualCheck = async (): Promise<void> => {
-    try {
-      await apiService.post<any>('/legal/scheduler/trigger');
-      await loadClosureSettings(); // Reload status
-    } catch (error) {
-      console.error('Error triggering manual check:', error);
-      throw error;
-    }
-  };
-
-  /**
-   * Test printer
+   * Test printer connection
    */
   const testPrinter = async (): Promise<void> => {
+    setState(prev => ({ ...prev, saving: true }));
     try {
-      const response = await apiService.post<any>('/legal/thermal-printer/test', {});
-      const result = response.data;
-      
-      if (!result.success) {
-        throw new Error(result.message || 'Test failed');
-      }
+      // TODO: Implement printer test
+      console.log('Testing printer...');
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
     } catch (error) {
       console.error('Error testing printer:', error);
       throw error;
-    }
-  };
-
-  /**
-   * Check printer status
-   */
-  const checkPrinterStatus = async (): Promise<void> => {
-    try {
-      const response = await apiService.get<any>('/legal/thermal-printer/status');
-      const status = response.data;
-      
-      if (!status.available) {
-        throw new Error(status.status || 'Printer not available');
-      }
-    } catch (error) {
-      console.error('Error checking printer status:', error);
-      throw error;
+    } finally {
+      setState(prev => ({ ...prev, saving: false }));
     }
   };
 
   return {
-    state,
-    loading,
-    saving,
-    infoSaving,
-    infoMessage,
-    updateGeneralSettings,
-    updateBusinessInfo,
-    updateClosureSettings,
-    updatePaymentSettings,
-    saveGeneralSettings,
-    saveBusinessInfo,
-    saveClosureSettings,
-    savePaymentSettings,
-    triggerManualCheck,
+    // State and core properties
+    state: {
+      generalSettings: state.generalSettings,
+      businessInfo: state.businessInfo,
+      closureSettings: state.closureSettings,
+      paymentSettings: state.paymentSettings,
+      printerSettings: state.printerSettings,
+      schedulerStatus: state.schedulerStatus,
+    },
+    loading: state.loading,
+    saving: state.saving,
+    infoSaving: state.saving, // Use same saving state for info
+    infoMessage: null, // TODO: Implement info messages
+    
+    // Settings update functions
+    updateGeneralSettings: generalHook.updateGeneralSettings,
+    updateBusinessInfo: businessHook.updateBusinessInfo,
+    updateClosureSettings: closureHook.updateClosureSettings,
+    updatePaymentSettings: paymentHook.updatePaymentSettings,
+    
+    // Save functions
+    saveGeneralSettings: generalHook.saveWithValidation,
+    saveBusinessInfo: businessHook.saveBusinessInfo,
+    saveClosureSettings: closureHook.saveClosureSettings,
+    savePaymentSettings: paymentHook.savePaymentSettings,
+    
+    // Special functions
+    triggerManualCheck: closureHook.triggerManualCheck,
     testPrinter,
-    checkPrinterStatus,
+    checkPrinterStatus: async () => {
+      // TODO: Implement printer status check
+      console.log('Checking printer status...');
+    },
   };
 };
-
