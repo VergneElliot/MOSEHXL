@@ -6,8 +6,6 @@
 import express from 'express';
 import { requireAuth, requireAdmin } from '../auth';
 import { validateBody, validateParams } from '../../middleware/validation';
-import { pool } from '../../app';
-import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';
 import {
   AuthenticatedRequest,
@@ -15,6 +13,25 @@ import {
   RolePermissions,
   ServiceInitialization
 } from './types';
+import {
+  DEFAULT_ROLES,
+  getSystemRoles,
+  getSystemRoleById,
+  isSystemRoleId,
+  getRolePermissionsForRoleId,
+  fetchCustomRoles,
+  fetchCustomRoleById,
+  checkRoleNameExists,
+  insertCustomRole,
+  updateCustomRole,
+  deactivateCustomRole,
+  countUsersWithRole,
+  logViewRoles,
+  logViewRoleDetails,
+  logCreateCustomRole,
+  logUpdateCustomRole,
+  logDeleteCustomRole
+} from './roles';
 
 const router = express.Router();
 
@@ -28,67 +45,7 @@ export function initializeRoleRoutes(services: ServiceInitialization): void {
   logger = services.logger;
 }
 
-/**
- * Default role definitions
- */
-const DEFAULT_ROLES: Record<string, Role> = {
-  admin: {
-    id: 'admin',
-    name: 'Administrator',
-    description: 'Full system access with all permissions',
-    permissions: {
-      canManageUsers: true,
-      canManageEstablishment: true,
-      canViewReports: true,
-      canManageInventory: true,
-      canProcessOrders: true,
-      canManageSettings: true
-    },
-    isSystemRole: true
-  },
-  manager: {
-    id: 'manager',
-    name: 'Manager',
-    description: 'Management access with most permissions',
-    permissions: {
-      canManageUsers: true,
-      canManageEstablishment: false,
-      canViewReports: true,
-      canManageInventory: true,
-      canProcessOrders: true,
-      canManageSettings: false
-    },
-    isSystemRole: true
-  },
-  staff: {
-    id: 'staff',
-    name: 'Staff',
-    description: 'Standard staff member with operational access',
-    permissions: {
-      canManageUsers: false,
-      canManageEstablishment: false,
-      canViewReports: false,
-      canManageInventory: true,
-      canProcessOrders: true,
-      canManageSettings: false
-    },
-    isSystemRole: true
-  },
-  cashier: {
-    id: 'cashier',
-    name: 'Cashier',
-    description: 'Point of sale operations only',
-    permissions: {
-      canManageUsers: false,
-      canManageEstablishment: false,
-      canViewReports: false,
-      canManageInventory: false,
-      canProcessOrders: true,
-      canManageSettings: false
-    },
-    isSystemRole: true
-  }
-};
+// Default roles now sourced from roles module
 
 /**
  * GET /roles
@@ -106,44 +63,11 @@ router.get('/roles', requireAuth, async (req: any, res: any, next: any) => {
       });
     }
 
-    // Get custom roles from database
-    const customRolesResult = await pool.query(`
-      SELECT 
-        id,
-        name,
-        description,
-        permissions,
-        is_active,
-        created_at,
-        updated_at
-      FROM establishment_roles 
-      WHERE establishment_id = $1 AND is_active = true
-      ORDER BY name
-    `, [establishmentId]);
-
-    // Combine system roles with custom roles
-    const systemRoles = Object.values(DEFAULT_ROLES);
-    const customRoles: Role[] = customRolesResult.rows.map(row => ({
-      id: row.id,
-      name: row.name,
-      description: row.description,
-      permissions: row.permissions,
-      isSystemRole: false,
-      establishmentId
-    }));
-
+    const customRoles = await fetchCustomRoles(establishmentId);
+    const systemRoles = getSystemRoles();
     const allRoles = [...systemRoles, ...customRoles];
 
-    await AuditTrailModel.logAction({
-      user_id: String(user.id),
-      action_type: 'VIEW_ROLES',
-      action_details: {
-        establishmentId,
-        roleCount: allRoles.length
-      },
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent']
-    });
+    await logViewRoles(user.id, establishmentId, allRoles.length, req.ip, req.headers['user-agent'] as string | undefined);
 
     res.json({
       success: true,
@@ -174,8 +98,8 @@ router.get('/role/:roleId', requireAuth, validateParams([
     const establishmentId = req.query.establishmentId as string || user.establishment_id;
 
     // Check if it's a system role
-    if (DEFAULT_ROLES[roleId]) {
-      const role = DEFAULT_ROLES[roleId];
+    if (isSystemRoleId(roleId)) {
+      const role = getSystemRoleById(roleId)!;
       return res.json({
         success: true,
         data: role
@@ -190,46 +114,24 @@ router.get('/role/:roleId', requireAuth, validateParams([
       });
     }
 
-    const roleResult = await pool.query(`
-      SELECT 
-        id,
-        name,
-        description,
-        permissions,
-        is_active,
-        created_at,
-        updated_at
-      FROM establishment_roles 
-      WHERE id = $1 AND establishment_id = $2
-    `, [roleId, establishmentId]);
+    const roleRow = await fetchCustomRoleById(roleId, establishmentId);
 
-    if (roleResult.rows.length === 0) {
+    if (!roleRow) {
       return res.status(404).json({
         success: false,
         message: 'Role not found'
       });
     }
-
-    const roleData = roleResult.rows[0];
     const role: Role = {
-      id: roleData.id,
-      name: roleData.name,
-      description: roleData.description,
-      permissions: roleData.permissions,
+      id: roleRow.id,
+      name: roleRow.name,
+      description: roleRow.description,
+      permissions: roleRow.permissions,
       isSystemRole: false,
       establishmentId
     };
 
-    await AuditTrailModel.logAction({
-      user_id: String(user.id),
-      action_type: 'VIEW_ROLE_DETAILS',
-      action_details: {
-        roleId,
-        establishmentId
-      },
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent']
-    });
+    await logViewRoleDetails(user.id, roleId, establishmentId, req.ip, req.headers['user-agent'] as string | undefined);
 
     res.json({
       success: true,
@@ -298,12 +200,8 @@ router.post('/role', requireAuth, requireAdmin, validateBody([
     }
 
     // Check if role name already exists
-    const existingRole = await pool.query(
-      'SELECT id FROM establishment_roles WHERE name = $1 AND establishment_id = $2',
-      [name, establishmentId]
-    );
-
-    if (existingRole.rows.length > 0) {
+    const exists = await checkRoleNameExists(name, establishmentId);
+    if (exists) {
       return res.status(400).json({
         success: false,
         message: 'Role with this name already exists'
@@ -311,40 +209,15 @@ router.post('/role', requireAuth, requireAdmin, validateBody([
     }
 
     // Create role
-    const result = await pool.query(`
-      INSERT INTO establishment_roles (
-        establishment_id,
-        name,
-        description,
-        permissions,
-        is_active,
-        created_by,
-        created_at,
-        updated_at
-      ) VALUES ($1, $2, $3, $4, true, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      RETURNING id
-    `, [
+    const roleId = await insertCustomRole({
       establishmentId,
       name,
       description,
-      JSON.stringify(permissions),
-      user.id
-    ]);
-
-    const roleId = result.rows[0].id;
-
-    await AuditTrailModel.logAction({
-      user_id: String(user.id),
-      action_type: 'CREATE_CUSTOM_ROLE',
-      action_details: {
-        roleId,
-        roleName: name,
-        establishmentId,
-        permissions
-      },
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent']
+      permissions,
+      createdBy: user.id
     });
+
+    await logCreateCustomRole(user.id, { roleId, roleName: name, establishmentId, permissions }, req.ip, req.headers['user-agent'] as string | undefined);
 
     res.status(201).json({
       success: true,
@@ -386,7 +259,7 @@ router.put('/role/:roleId', requireAuth, requireAdmin, validateParams([
     const user = req.user!;
 
     // Cannot modify system roles
-    if (DEFAULT_ROLES[roleId]) {
+    if (isSystemRoleId(roleId)) {
       return res.status(400).json({
         success: false,
         message: 'Cannot modify system roles'
@@ -394,19 +267,13 @@ router.put('/role/:roleId', requireAuth, requireAdmin, validateParams([
     }
 
     // Get current role
-    const currentRoleResult = await pool.query(
-      'SELECT * FROM establishment_roles WHERE id = $1',
-      [roleId]
-    );
-
-    if (currentRoleResult.rows.length === 0) {
+    const currentRole = await fetchCustomRoleById(roleId, (req.query.establishmentId as string) || req.user!.establishment_id);
+    if (!currentRole) {
       return res.status(404).json({
         success: false,
         message: 'Role not found'
       });
     }
-
-    const currentRole = currentRoleResult.rows[0];
 
     // Validate access
     if (!user.is_admin && user.establishment_id !== currentRole.establishment_id) {
@@ -416,66 +283,21 @@ router.put('/role/:roleId', requireAuth, requireAdmin, validateParams([
       });
     }
 
-    // Build update query
-    const updates: string[] = [];
-    const values: any[] = [];
-    let paramCount = 0;
-
-    if (name !== undefined) {
-      paramCount++;
-      updates.push(`name = $${paramCount}`);
-      values.push(name);
-    }
-
-    if (description !== undefined) {
-      paramCount++;
-      updates.push(`description = $${paramCount}`);
-      values.push(description);
-    }
-
-    if (permissions !== undefined) {
-      paramCount++;
-      updates.push(`permissions = $${paramCount}`);
-      values.push(JSON.stringify(permissions));
-    }
-
-    if (updates.length === 0) {
+    if (name === undefined && description === undefined && permissions === undefined) {
       return res.status(400).json({
         success: false,
         message: 'No updates provided'
       });
     }
 
-    // Add updated_at
-    paramCount++;
-    updates.push(`updated_at = $${paramCount}`);
-    values.push(new Date());
+    const updatedRole = await updateCustomRole(roleId, { name, description, permissions });
 
-    // Add role ID for WHERE clause
-    paramCount++;
-    values.push(roleId);
-
-    const updateQuery = `
-      UPDATE establishment_roles 
-      SET ${updates.join(', ')}
-      WHERE id = $${paramCount}
-      RETURNING *
-    `;
-
-    const result = await pool.query(updateQuery, values);
-    const updatedRole = result.rows[0];
-
-    await AuditTrailModel.logAction({
-      user_id: String(user.id),
-      action_type: 'UPDATE_CUSTOM_ROLE',
-      action_details: {
-        roleId,
-        updates: { name, description, permissions },
-        establishmentId: currentRole.establishment_id
-      },
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent']
-    });
+    await logUpdateCustomRole(
+      user.id,
+      { roleId, updates: { name, description, permissions }, establishmentId: currentRole.establishment_id },
+      req.ip,
+      req.headers['user-agent'] as string | undefined
+    );
 
     res.json({
       success: true,
@@ -512,7 +334,7 @@ router.delete('/role/:roleId', requireAuth, requireAdmin, validateParams([
     const user = req.user!;
 
     // Cannot delete system roles
-    if (DEFAULT_ROLES[roleId]) {
+    if (isSystemRoleId(roleId)) {
       return res.status(400).json({
         success: false,
         message: 'Cannot delete system roles'
@@ -520,19 +342,13 @@ router.delete('/role/:roleId', requireAuth, requireAdmin, validateParams([
     }
 
     // Get role details
-    const roleResult = await pool.query(
-      'SELECT * FROM establishment_roles WHERE id = $1',
-      [roleId]
-    );
-
-    if (roleResult.rows.length === 0) {
+    const role = await fetchCustomRoleById(roleId, (req.query.establishmentId as string) || req.user!.establishment_id);
+    if (!role) {
       return res.status(404).json({
         success: false,
         message: 'Role not found'
       });
     }
-
-    const role = roleResult.rows[0];
 
     // Validate access
     if (!user.is_admin && user.establishment_id !== role.establishment_id) {
@@ -543,12 +359,8 @@ router.delete('/role/:roleId', requireAuth, requireAdmin, validateParams([
     }
 
     // Check if role is in use
-    const usersWithRole = await pool.query(
-      'SELECT COUNT(*) as count FROM users WHERE role = $1 AND establishment_id = $2',
-      [roleId, role.establishment_id]
-    );
-
-    if (parseInt(usersWithRole.rows[0].count) > 0) {
+    const roleUserCount = await countUsersWithRole(roleId, role.establishment_id);
+    if (roleUserCount > 0) {
       return res.status(400).json({
         success: false,
         message: 'Cannot delete role that is currently assigned to users'
@@ -556,22 +368,14 @@ router.delete('/role/:roleId', requireAuth, requireAdmin, validateParams([
     }
 
     // Soft delete (deactivate)
-    await pool.query(
-      'UPDATE establishment_roles SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
-      [roleId]
-    );
+    await deactivateCustomRole(roleId);
 
-    await AuditTrailModel.logAction({
-      user_id: String(user.id),
-      action_type: 'DELETE_CUSTOM_ROLE',
-      action_details: {
-        roleId,
-        roleName: role.name,
-        establishmentId: role.establishment_id
-      },
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent']
-    });
+    await logDeleteCustomRole(
+      user.id,
+      { roleId, roleName: role.name, establishmentId: role.establishment_id },
+      req.ip,
+      req.headers['user-agent'] as string | undefined
+    );
 
     res.json({
       success: true,
@@ -602,8 +406,8 @@ router.get('/role-permissions/:roleId', requireAuth, validateParams([
     let permissions: RolePermissions;
 
     // Check if it's a system role
-    if (DEFAULT_ROLES[roleId]) {
-      permissions = DEFAULT_ROLES[roleId].permissions;
+    if (isSystemRoleId(roleId)) {
+      permissions = getRolePermissionsForRoleId(roleId)!;
     } else {
       // Check custom roles
       const establishmentId = req.query.establishmentId as string || user.establishment_id;
@@ -615,19 +419,14 @@ router.get('/role-permissions/:roleId', requireAuth, validateParams([
         });
       }
 
-      const roleResult = await pool.query(
-        'SELECT permissions FROM establishment_roles WHERE id = $1 AND establishment_id = $2 AND is_active = true',
-        [roleId, establishmentId]
-      );
-
-      if (roleResult.rows.length === 0) {
+      const roleRow = await fetchCustomRoleById(roleId, establishmentId);
+      if (!roleRow || roleRow.is_active === false) {
         return res.status(404).json({
           success: false,
           message: 'Role not found'
         });
       }
-
-      permissions = roleResult.rows[0].permissions;
+      permissions = roleRow.permissions as RolePermissions;
     }
 
     res.json({

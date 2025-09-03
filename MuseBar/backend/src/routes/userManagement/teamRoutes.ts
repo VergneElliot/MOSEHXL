@@ -16,6 +16,8 @@ import {
   EmailTestResult,
   ServiceInitialization
 } from './types';
+import { countUsers, countActiveUsers, getRoleDistribution, fetchTeamMembers } from './team';
+import { logViewTeamStats, logViewTeamMembers, logTestEmailConfiguration, logViewEmailStats, logBulkInviteUsers } from './team';
 
 const router = express.Router();
 
@@ -55,51 +57,20 @@ router.get('/team-stats', requireAuth, async (req: any, res: any, next: any) => 
       });
     }
 
-    // Get total members
-    const totalMembersResult = await pool.query(
-      'SELECT COUNT(*) as count FROM users WHERE establishment_id = $1',
-      [establishmentId]
-    );
-
-    // Get active members
-    const activeMembersResult = await pool.query(
-      'SELECT COUNT(*) as count FROM users WHERE establishment_id = $1 AND is_active = true',
-      [establishmentId]
-    );
-
-    // Get pending invitations
-    const pendingInvitations = await userInvitationService.getPendingInvitations(establishmentId);
-
-    // Get role distribution
-    const roleDistributionResult = await pool.query(`
-      SELECT role, COUNT(*) as count 
-      FROM users 
-      WHERE establishment_id = $1 AND is_active = true
-      GROUP BY role
-    `, [establishmentId]);
-
-    const roleDistribution: Record<string, number> = {};
-    roleDistributionResult.rows.forEach(row => {
-      roleDistribution[row.role] = parseInt(row.count);
-    });
+    const [totalMembers, activeMembers, pendingInvitations, roleDistribution] = await Promise.all([
+      countUsers(establishmentId),
+      countActiveUsers(establishmentId),
+      userInvitationService.getPendingInvitations(establishmentId),
+      getRoleDistribution(establishmentId)
+    ]);
 
     const stats: TeamStats = {
-      totalMembers: parseInt(totalMembersResult.rows[0].count),
-      activeMembers: parseInt(activeMembersResult.rows[0].count),
+      totalMembers,
+      activeMembers,
       pendingInvitations: pendingInvitations.length,
       roleDistribution
     };
-
-    await AuditTrailModel.logAction({
-      user_id: String(user.id),
-      action_type: 'VIEW_TEAM_STATS',
-      action_details: {
-        establishmentId,
-        stats
-      },
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent']
-    });
+    await logViewTeamStats(user.id, establishmentId, stats, req.ip, req.headers['user-agent'] as string | undefined);
 
     res.json({
       success: true,
@@ -141,32 +112,8 @@ router.get('/team-members', requireAuth, async (req: any, res: any, next: any) =
       });
     }
 
-    let query = `
-      SELECT 
-        u.id,
-        u.email,
-        u.first_name as "firstName",
-        u.last_name as "lastName",
-        u.role,
-        u.is_active as "status",
-        u.last_login_at as "lastLogin",
-        u.created_at as "createdAt"
-      FROM users u
-      WHERE u.establishment_id = $1
-    `;
-
-    const queryParams = [establishmentId];
-
-    if (!includeInactive) {
-      query += ' AND u.is_active = true';
-    }
-
-    query += ' ORDER BY u.created_at DESC';
-
-    const result = await pool.query(query, queryParams);
-
-    // Transform status for better readability
-    const teamMembers: TeamMember[] = result.rows.map(row => ({
+    const rows = await fetchTeamMembers(establishmentId, includeInactive);
+    const teamMembers: TeamMember[] = rows.map((row: any) => ({
       ...row,
       status: row.status ? 'active' : 'inactive',
       permissions: {
@@ -178,18 +125,7 @@ router.get('/team-members', requireAuth, async (req: any, res: any, next: any) =
         canManageSettings: ['admin'].includes(row.role)
       }
     }));
-
-    await AuditTrailModel.logAction({
-      user_id: String(user.id),
-      action_type: 'VIEW_TEAM_MEMBERS',
-      action_details: {
-        establishmentId,
-        memberCount: teamMembers.length,
-        includeInactive
-      },
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent']
-    });
+    await logViewTeamMembers(user.id, establishmentId, teamMembers.length, includeInactive, req.ip, req.headers['user-agent'] as string | undefined);
 
     res.json({
       success: true,
@@ -228,16 +164,7 @@ router.post('/test-email', requireAuth, requireAdmin, async (req: any, res: any,
     const testResult = await emailService.testConfiguration();
 
     if (testResult) {
-      await AuditTrailModel.logAction({
-        user_id: String(user.id),
-        action_type: 'TEST_EMAIL_CONFIGURATION',
-        action_details: {
-          testEmail,
-          result: 'success'
-        },
-        ip_address: req.ip,
-        user_agent: req.headers['user-agent']
-      });
+      await logTestEmailConfiguration(user.id, testEmail, 'success', req.ip, req.headers['user-agent'] as string | undefined);
 
       const emailTestResult: EmailTestResult = {
         success: true,
@@ -255,16 +182,7 @@ router.post('/test-email', requireAuth, requireAdmin, async (req: any, res: any,
         data: emailTestResult
       });
     } else {
-      await AuditTrailModel.logAction({
-        user_id: String(user.id),
-        action_type: 'TEST_EMAIL_CONFIGURATION',
-        action_details: {
-          testEmail,
-          result: 'failure'
-        },
-        ip_address: req.ip,
-        user_agent: req.headers['user-agent']
-      });
+      await logTestEmailConfiguration(user.id, testEmail, 'failure', req.ip, req.headers['user-agent'] as string | undefined);
 
       res.status(500).json({
         success: false,
@@ -306,15 +224,7 @@ router.get('/email-stats', requireAuth, requireAdmin, async (req: any, res: any,
     const emailService = (userInvitationService as any)['emailService'];
     const stats = await emailService.getEmailStats();
 
-    await AuditTrailModel.logAction({
-      user_id: String(user.id),
-      action_type: 'VIEW_EMAIL_STATS',
-      action_details: {
-        statsRequested: true
-      },
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent']
-    });
+    await logViewEmailStats(user.id, req.ip, req.headers['user-agent'] as string | undefined);
 
     res.json({
       success: true,
@@ -367,8 +277,8 @@ router.post('/bulk-invite', requireAuth, requireAdmin, async (req: any, res: any
       });
     }
 
-    const results = [];
-    const errors = [];
+    const results: any[] = [];
+    const errors: any[] = [];
 
     for (const invitation of invitations) {
       try {
@@ -391,18 +301,7 @@ router.post('/bulk-invite', requireAuth, requireAdmin, async (req: any, res: any
       }
     }
 
-    await AuditTrailModel.logAction({
-      user_id: String(user.id),
-      action_type: 'BULK_INVITE_USERS',
-      action_details: {
-        establishmentId,
-        totalInvitations: invitations.length,
-        successful: results.length,
-        failed: errors.length
-      },
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent']
-    });
+    await logBulkInviteUsers(user.id, establishmentId, invitations.length, results.length, errors.length, req.ip, req.headers['user-agent'] as string | undefined);
 
     res.json({
       success: errors.length === 0,

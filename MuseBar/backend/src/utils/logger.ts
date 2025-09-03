@@ -9,47 +9,24 @@ import fs from 'fs';
 import path from 'path';
 import { EnvironmentConfig } from '../config/environment';
 import { Request, Response, NextFunction } from 'express';
+import { LogEntry, LogLevel, PerformanceMetric } from './logger/types';
+import { formatLogEntry, writeToConsole } from './logger/logFormatters';
+import { FileTransport } from './logger/logTransport';
 
 /**
  * Log levels in order of severity
  */
-export enum LogLevel {
-  ERROR = 0,
-  WARN = 1,
-  INFO = 2,
-  DEBUG = 3,
-}
+// moved to ./logger/types
 
 /**
  * Log entry structure
  */
-export interface LogEntry {
-  timestamp: string;
-  level: keyof typeof LogLevel;
-  message: string;
-  metadata?: Record<string, any>;
-  context?: string;
-  requestId?: string;
-  userId?: string;
-  ip?: string;
-  userAgent?: string;
-  duration?: number;
-  error?: {
-    name: string;
-    message: string;
-    stack?: string;
-  };
-}
+// moved to ./logger/types
 
 /**
  * Performance monitoring data
  */
-export interface PerformanceMetric {
-  operation: string;
-  duration: number;
-  timestamp: string;
-  metadata?: Record<string, any>;
-}
+// moved to ./logger/types
 
 /**
  * Professional Logger Class
@@ -59,16 +36,15 @@ export class Logger {
   private config: EnvironmentConfig;
   private logLevel: LogLevel;
   private logsDir: string;
+  private fileTransport: FileTransport;
 
   private constructor(config: EnvironmentConfig) {
     this.config = config;
     this.logLevel = this.getLogLevelFromString(config.logging.level);
     this.logsDir = path.join(process.cwd(), 'logs');
     
-    // Create logs directory if it doesn't exist
-    if (config.logging.enableFileLogging && !fs.existsSync(this.logsDir)) {
-      fs.mkdirSync(this.logsDir, { recursive: true });
-    }
+    // Initialize file transport
+    this.fileTransport = new FileTransport(this.logsDir, config.logging.enableFileLogging);
   }
 
   /**
@@ -98,30 +74,7 @@ export class Logger {
    * Format log entry for output
    */
   private formatLogEntry(entry: LogEntry): string {
-    const { timestamp, level, message, metadata, context, requestId, userId, duration, error } = entry;
-    
-    let formattedMessage = `[${timestamp}] ${level.toUpperCase()}`;
-    
-    if (context) formattedMessage += ` [${context}]`;
-    if (requestId) formattedMessage += ` [${requestId}]`;
-    if (userId) formattedMessage += ` [User:${userId}]`;
-    
-    formattedMessage += `: ${message}`;
-    
-    if (duration !== undefined) formattedMessage += ` (${duration}ms)`;
-    
-    if (metadata && Object.keys(metadata).length > 0) {
-      formattedMessage += ` | Metadata: ${JSON.stringify(metadata)}`;
-    }
-    
-    if (error) {
-      formattedMessage += `\n  Error: ${error.name}: ${error.message}`;
-      if (error.stack && this.config.app.environment === 'development') {
-        formattedMessage += `\n  Stack: ${error.stack}`;
-      }
-    }
-    
-    return formattedMessage;
+    return formatLogEntry(entry, this.config);
   }
 
   /**
@@ -148,34 +101,14 @@ export class Logger {
    * Write to console with appropriate colors
    */
   private writeToConsole(level: keyof typeof LogLevel, message: string): void {
-    const colors = {
-      ERROR: '\x1b[31m', // Red
-      WARN: '\x1b[33m',  // Yellow
-      INFO: '\x1b[36m',  // Cyan
-      DEBUG: '\x1b[37m', // White
-    };
-    
-    const reset = '\x1b[0m';
-    const colorCode = colors[level] || colors.INFO;
-    
-    console.log(`${colorCode}${message}${reset}`);
+    writeToConsole(level, message);
   }
 
   /**
    * Write to file with rotation
    */
   private writeToFile(entry: LogEntry): void {
-    const today = new Date().toISOString().split('T')[0];
-    const filename = `${today}.log`;
-    const filepath = path.join(this.logsDir, filename);
-    
-    const logLine = JSON.stringify(entry) + '\n';
-    
-    try {
-      fs.appendFileSync(filepath, logLine);
-    } catch (error) {
-      console.error('Failed to write to log file:', error);
-    }
+    this.fileTransport.write(entry);
   }
 
   /**
