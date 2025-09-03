@@ -309,6 +309,7 @@ While the original modularization objectives have been achieved, our analysis ha
 - Completed: User routes modularized → `MuseBar/backend/src/routes/userManagement/users/{userQueries.ts, userAudit.ts}` with `userRoutes.ts` refactored to delegate.
 - Completed: Team routes modularized → `MuseBar/backend/src/routes/userManagement/team/{teamQueries.ts, teamAudit.ts}` with `teamRoutes.ts` refactored to delegate.
 - Completed: Logger modularized → `MuseBar/backend/src/utils/logger/{types.ts, logFormatters.ts, logTransport.ts}` with `utils/logger.ts` delegating; public API unchanged.
+- Completed: Setup defaults modularized → `MuseBar/backend/src/services/setup/defaults/{dataConfig.ts, categoryDefaults.ts, productDefaults.ts, settingDefaults.ts, paymentMethodDefaults.ts}` with `setupDefaults.ts` delegating.
 - Build: Backend builds pass after refactors.
 
 - Next up: Setup services (`setupDefaults.ts`, `setupWizard.ts`, `setupDatabase.ts`, `setupValidator.ts`).

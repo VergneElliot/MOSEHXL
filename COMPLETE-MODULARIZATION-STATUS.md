@@ -218,6 +218,7 @@ The comprehensive Phase 3 plan will elevate the project to **ultimate modulariza
 - User routes split into `users/{userQueries, userAudit}` with `userRoutes.ts` refactored.
 - Team routes split into `team/{teamQueries, teamAudit}` with `teamRoutes.ts` refactored.
 - Logger split into `utils/logger/{types, logFormatters, logTransport}`, `utils/logger.ts` delegates and retains API.
+- Setup defaults split into `services/setup/defaults/{dataConfig, categoryDefaults, productDefaults, settingDefaults, paymentMethodDefaults}`, `setupDefaults.ts` delegates.
 - Backend builds successful post-refactor.
 
 ### Upcoming (Phase 3A continuation):
