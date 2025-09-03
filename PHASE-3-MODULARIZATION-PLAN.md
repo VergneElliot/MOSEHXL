@@ -319,9 +319,11 @@ While the original modularization objectives have been achieved, our analysis ha
 
 - Completed: `apiService.ts` modularized → `MuseBar/src/services/api/{core.ts, categories.ts, products.ts, orders.ts, legal.ts}` with `apiService.ts` delegating to domain modules while preserving singleton pattern and API compatibility.
 - Completed: `testUtils.tsx` modularized → `MuseBar/src/utils/testing/{mockGenerators.ts, mockServices.ts, mockStorage.ts, renderUtils.tsx, testHelpers.ts, customMatchers.ts}` with `testUtils.tsx` re-exporting for backward compatibility.
+- Completed: `SkeletonLoaders.tsx` modularized → `MuseBar/src/components/common/skeletons/{basicSkeletons.tsx, dashboardSkeletons.tsx, formSkeletons.tsx, transactionSkeletons.tsx, layoutSkeletons.tsx}` with `SkeletonLoaders.tsx` re-exporting for backward compatibility.
 - Frontend build passing with TypeScript compilation successful and only minor linting warnings.
 - API service reduced from 573 lines to 5 focused modules (core: 40 lines, categories: 77 lines, products: 107 lines, orders: 81 lines, legal: 16 lines) + wrapper (72 lines).
 - Test utilities reduced from 573 lines to 6 focused modules (mockGenerators: 90 lines, mockServices: 71 lines, mockStorage: 48 lines, renderUtils: 78 lines, testHelpers: 95 lines, customMatchers: 130 lines) + wrapper (10 lines).
+- Skeleton loaders reduced from 431 lines to 5 focused modules (basicSkeletons: 105 lines, dashboardSkeletons: 80 lines, formSkeletons: 75 lines, transactionSkeletons: 85 lines, layoutSkeletons: 95 lines) + wrapper (10 lines).
 
 - Next up: Remaining frontend targets per plan.
 
