@@ -1,4 +1,11 @@
-import React, { useEffect, useState } from 'react';
+/**
+ * User Management Component
+ * Administrative interface for managing users and permissions
+ * 
+ * Refactored to use modular hooks for better maintainability
+ */
+
+import React, { useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -19,128 +26,109 @@ import {
   DialogActions,
   Alert,
 } from '@mui/material';
-import { apiService } from '../../services/apiService';
 
-const PERMISSIONS = [
-  { key: 'access_pos', label: 'Caisse' },
-  { key: 'access_menu', label: 'Gestion Menu' },
-  { key: 'access_happy_hour', label: 'Happy Hour' },
-  { key: 'access_history', label: 'Historique' },
-  { key: 'access_settings', label: 'Paramètres' },
-  { key: 'access_compliance', label: 'Conformité' },
-];
+import {
+  useUserState,
+  useUserActions,
+  usePermissions,
+  useUserForm,
+} from './UserManagement/hooks';
 
 const UserManagement: React.FC<{ token: string }> = ({ token }) => {
-  const [users, setUsers] = useState<any[]>([]);
-  const [, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  // Already imported as singleton instance
-  const [showAdd, setShowAdd] = useState(false);
-  const [newEmail, setNewEmail] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [newIsAdmin, setNewIsAdmin] = useState(false);
-  const [permDialog, setPermDialog] = useState<{ open: boolean; user: any | null }>({
-    open: false,
-    user: null,
+  // Initialize hooks
+  const userState = useUserState();
+  const userForm = useUserForm();
+  const permissions = usePermissions();
+  
+  const userActions = useUserActions({
+    onUsersUpdate: userState.updateUsers,
+    onUserAdd: userState.addUser,
+    onLoading: userState.setLoadingState,
+    onError: userState.setErrorState,
   });
-  const [permState, setPermState] = useState<{ [key: string]: boolean }>({});
-  const [permSaving, setPermSaving] = useState(false);
-  const [permError, setPermError] = useState<string | null>(null);
 
-  const fetchUsers = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await apiService.get<any[]>('/auth/users');
-      setUsers(response.data);
-    } catch (e) {
-      setError('Erreur lors du chargement des utilisateurs');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Load users on component mount
   useEffect(() => {
-    fetchUsers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+    userActions.fetchUsers();
+  }, [userActions]);
 
+  /**
+   * Handle adding a new user
+   */
   const handleAddUser = async () => {
-    try {
-      await apiService.post<any>('/auth/register', {
-        email: newEmail,
-        password: newPassword,
-        is_admin: newIsAdmin,
-      });
-      setShowAdd(false);
-      setNewEmail('');
-      setNewPassword('');
-      setNewIsAdmin(false);
-      fetchUsers();
-    } catch {
-      setError('Erreur lors de la création de l’utilisateur');
+    const validationError = userForm.validateForm();
+    if (validationError) {
+      userState.setErrorState(validationError);
+      return;
+    }
+
+    const formData = userForm.getFormData();
+    const success = await userActions.createUser(
+      formData.email,
+      formData.password,
+      formData.isAdmin
+    );
+
+    if (success) {
+      userForm.closeAddDialog();
+      // Refresh users list
+      userActions.fetchUsers();
     }
   };
 
-  const openPermDialog = async (user: any) => {
-    setPermDialog({ open: true, user });
-    setPermError(null);
-    setPermSaving(false);
-    // Fetch permissions
-    const response = await apiService.get<any>(`/auth/users/${user.id}/permissions`);
-    const data = response.data;
-    const state: { [key: string]: boolean } = {};
-    PERMISSIONS.forEach(p => {
-      state[p.key] = data.permissions.includes(p.key);
-    });
-    setPermState(state);
-  };
-
-  const handleSavePerms = async () => {
-    setPermSaving(true);
-    setPermError(null);
-    const userId = permDialog.user.id;
-    const perms = Object.keys(permState).filter(k => permState[k]);
-    try {
-      await apiService.post<any>(`/auth/users/${userId}/permissions`, { permissions: perms });
-      setPermDialog({ open: false, user: null });
-      fetchUsers();
-    } catch {
-      setPermError('Erreur lors de la sauvegarde des permissions');
-    } finally {
-      setPermSaving(false);
+  /**
+   * Handle saving permissions
+   */
+  const handleSavePermissions = async () => {
+    const success = await permissions.savePermissions();
+    if (success) {
+      // Refresh users list to update any changes
+      userActions.fetchUsers();
     }
   };
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h5" gutterBottom>
-        Gestion des utilisateurs
+      <Typography variant="h4" gutterBottom>
+        Gestion des Utilisateurs
       </Typography>
-      <Button variant="contained" onClick={() => setShowAdd(true)} sx={{ mb: 2 }}>
-        Ajouter un utilisateur
-      </Button>
-      {error && <Alert severity="error">{error}</Alert>}
+
+      {userState.error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={userState.clearError}>
+          {userState.error}
+        </Alert>
+      )}
+
+      <Box sx={{ mb: 2 }}>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={userForm.openAddDialog}
+        >
+          Ajouter un utilisateur
+        </Button>
+      </Box>
+
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>User ID</TableCell>
               <TableCell>Email</TableCell>
               <TableCell>Admin</TableCell>
-              <TableCell>Créé le</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {users.map(user => (
+            {userState.users.map((user) => (
               <TableRow key={user.id}>
-                <TableCell>{user.id}</TableCell>
                 <TableCell>{user.email}</TableCell>
-                <TableCell>{user.is_admin ? 'Oui' : 'Non'}</TableCell>
-                <TableCell>{new Date(user.created_at).toLocaleString('fr-FR')}</TableCell>
+                <TableCell>{user.isAdmin ? 'Oui' : 'Non'}</TableCell>
                 <TableCell>
-                  <Button size="small" onClick={() => openPermDialog(user)}>
+                  <Button
+                    onClick={() => permissions.openPermDialog(user)}
+                    variant="outlined"
+                    size="small"
+                  >
                     Permissions
                   </Button>
                 </TableCell>
@@ -150,63 +138,112 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
         </Table>
       </TableContainer>
 
-      {/* Add user dialog */}
-      <Dialog open={showAdd} onClose={() => setShowAdd(false)}>
-        <DialogTitle>Ajouter un utilisateur</DialogTitle>
+      {/* Add User Dialog */}
+      <Dialog open={userForm.showAdd} onClose={userForm.closeAddDialog}>
+        <DialogTitle>Ajouter un nouvel utilisateur</DialogTitle>
         <DialogContent>
           <TextField
+            autoFocus
+            margin="dense"
             label="Email"
             type="email"
-            value={newEmail}
-            onChange={e => setNewEmail(e.target.value)}
             fullWidth
-            margin="normal"
+            variant="outlined"
+            value={userForm.newEmail}
+            onChange={(e) => userForm.updateEmail(e.target.value)}
           />
           <TextField
+            margin="dense"
             label="Mot de passe"
             type="password"
-            value={newPassword}
-            onChange={e => setNewPassword(e.target.value)}
             fullWidth
-            margin="normal"
+            variant="outlined"
+            value={userForm.newPassword}
+            onChange={(e) => userForm.updatePassword(e.target.value)}
           />
           <FormControlLabel
             control={
-              <Checkbox checked={newIsAdmin} onChange={e => setNewIsAdmin(e.target.checked)} />
+              <Checkbox
+                checked={userForm.newIsAdmin}
+                onChange={(e) => userForm.updateIsAdmin(e.target.checked)}
+              />
             }
-            label="Admin"
+            label="Administrateur"
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setShowAdd(false)}>Annuler</Button>
-          <Button onClick={handleAddUser} variant="contained">
-            Créer
+          <Button onClick={userForm.closeAddDialog}>Annuler</Button>
+          <Button
+            onClick={handleAddUser}
+            disabled={!userForm.isFormValid()}
+            variant="contained"
+          >
+            Ajouter
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Permissions dialog */}
-      <Dialog open={permDialog.open} onClose={() => setPermDialog({ open: false, user: null })}>
-        <DialogTitle>Permissions de {permDialog.user?.email}</DialogTitle>
+      {/* Permissions Dialog */}
+      <Dialog 
+        open={permissions.permDialog.open} 
+        onClose={permissions.closePermDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          Permissions pour {permissions.permDialog.user?.email}
+        </DialogTitle>
         <DialogContent>
-          {PERMISSIONS.map(p => (
+          {permissions.permError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {permissions.permError}
+            </Alert>
+          )}
+          
+          <Box sx={{ mb: 2 }}>
+            <Button
+              onClick={() => permissions.toggleAllPermissions(true)}
+              size="small"
+              sx={{ mr: 1 }}
+            >
+              Tout sélectionner
+            </Button>
+            <Button
+              onClick={() => permissions.toggleAllPermissions(false)}
+              size="small"
+            >
+              Tout désélectionner
+            </Button>
+          </Box>
+
+          {permissions.availablePermissions.map((perm) => (
             <FormControlLabel
-              key={p.key}
+              key={perm.key}
               control={
                 <Checkbox
-                  checked={!!permState[p.key]}
-                  onChange={e => setPermState(s => ({ ...s, [p.key]: e.target.checked }))}
+                  checked={permissions.hasPermission(perm.key)}
+                  onChange={(e) => permissions.updatePermission(perm.key, e.target.checked)}
                 />
               }
-              label={p.label}
+              label={perm.label}
+              sx={{ display: 'block' }}
             />
           ))}
-          {permError && <Alert severity="error">{permError}</Alert>}
+          
+          <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
+            {permissions.getEnabledCount()} permission(s) sélectionnée(s)
+          </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setPermDialog({ open: false, user: null })}>Annuler</Button>
-          <Button onClick={handleSavePerms} variant="contained" disabled={permSaving}>
-            Sauvegarder
+          <Button onClick={permissions.closePermDialog}>
+            Annuler
+          </Button>
+          <Button
+            onClick={handleSavePermissions}
+            disabled={permissions.permSaving}
+            variant="contained"
+          >
+            {permissions.permSaving ? 'Enregistrement...' : 'Enregistrer'}
           </Button>
         </DialogActions>
       </Dialog>
