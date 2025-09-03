@@ -5,20 +5,14 @@
 
 import jwt from 'jsonwebtoken';
 import { PoolClient } from 'pg';
-import {
-  BusinessSetupRequest,
-  BusinessSetupResponse,
-  SetupStatusResponse,
-  InvitationValidation,
-  SetupContext,
-  SetupProgress,
-  SetupWizardState,
-  SetupStep
-} from './types';
+import { BusinessSetupRequest, BusinessSetupResponse, SetupStatusResponse, InvitationValidation, SetupContext, SetupProgress, SetupWizardState, SetupStep } from './types';
 import { SetupValidator } from './setupValidator';
 import { SetupDatabase } from './setupDatabase';
 import { SetupDefaults } from './setupDefaults';
 import { AuditTrailModel } from '../../models/auditTrail';
+import { getSetupSteps } from './wizard';
+import { validateSetupStep as validateStep } from './wizard';
+import { buildInitialState, markAllCompleted } from './wizard';
 import { Logger } from '../../utils/logger';
 
 /**
@@ -185,58 +179,7 @@ export class SetupWizard {
   /**
    * Get setup wizard steps
    */
-  static getSetupSteps(): SetupStep[] {
-    return [
-      {
-        id: 'invitation',
-        name: 'Validation de l\'invitation',
-        description: 'Vérification du token d\'invitation',
-        required: true,
-        completed: false,
-        order: 1
-      },
-      {
-        id: 'user_info',
-        name: 'Informations utilisateur',
-        description: 'Création du compte administrateur',
-        required: true,
-        completed: false,
-        order: 2
-      },
-      {
-        id: 'business_info',
-        name: 'Informations établissement',
-        description: 'Configuration des données de l\'entreprise',
-        required: true,
-        completed: false,
-        order: 3
-      },
-      {
-        id: 'schema_setup',
-        name: 'Initialisation base de données',
-        description: 'Création du schéma établissement',
-        required: true,
-        completed: false,
-        order: 4
-      },
-      {
-        id: 'default_data',
-        name: 'Données par défaut',
-        description: 'Création des catégories et produits de base',
-        required: true,
-        completed: false,
-        order: 5
-      },
-      {
-        id: 'finalization',
-        name: 'Finalisation',
-        description: 'Finalisation de la configuration',
-        required: true,
-        completed: false,
-        order: 6
-      }
-    ];
-  }
+  static getSetupSteps(): SetupStep[] { return getSetupSteps(); }
 
   /**
    * Get setup wizard state
@@ -268,7 +211,7 @@ export class SetupWizard {
         const status = await SetupDatabase.checkSetupStatus(pool, invitationToken);
         if (status.completed) {
           currentStep = steps.length;
-          steps.forEach(step => step.completed = true);
+          markAllCompleted(steps);
         }
       }
 
@@ -305,46 +248,7 @@ export class SetupWizard {
   /**
    * Validate setup step
    */
-  static validateSetupStep(
-    stepId: string,
-    data: Partial<BusinessSetupRequest>
-  ): { isValid: boolean; errors: any[] } {
-    const errors: any[] = [];
-
-    switch (stepId) {
-      case 'invitation':
-        if (!data.invitation_token) {
-          errors.push({ field: 'invitation_token', message: 'Invitation token is required' });
-        }
-        break;
-
-      case 'user_info':
-        if (!data.first_name) errors.push({ field: 'first_name', message: 'First name is required' });
-        if (!data.last_name) errors.push({ field: 'last_name', message: 'Last name is required' });
-        if (!data.email) errors.push({ field: 'email', message: 'Email is required' });
-        if (!data.password) errors.push({ field: 'password', message: 'Password is required' });
-        if (data.password !== data.confirm_password) {
-          errors.push({ field: 'confirm_password', message: 'Passwords do not match' });
-        }
-        break;
-
-      case 'business_info':
-        if (!data.business_name) errors.push({ field: 'business_name', message: 'Business name is required' });
-        if (!data.contact_email) errors.push({ field: 'contact_email', message: 'Contact email is required' });
-        if (!data.phone) errors.push({ field: 'phone', message: 'Phone is required' });
-        if (!data.address) errors.push({ field: 'address', message: 'Address is required' });
-        break;
-
-      default:
-        // Other steps don't require client-side validation
-        break;
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
-  }
+  static validateSetupStep(stepId: string, data: Partial<BusinessSetupRequest>) { return validateStep(stepId, data); }
 
   /**
    * Create setup audit trail
