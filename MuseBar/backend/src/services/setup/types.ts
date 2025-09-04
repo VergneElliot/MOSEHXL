@@ -77,7 +77,7 @@ export interface SetupStatusResponse {
 export interface UserExistsResult {
   exists: boolean;
   userId?: number;
-  hasEstablishment: boolean;
+  hasEstablishment?: boolean;
 }
 
 /**

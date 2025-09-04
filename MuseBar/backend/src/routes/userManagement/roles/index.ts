@@ -13,5 +13,17 @@ export { RoleAuditLogger } from './RoleAuditLogger';
 export { roleRoutes, initializeRoleRoutes } from './RoleRoutes';
 export * from './types';
 
+// Export role query functions
+export { 
+  isSystemRoleId,
+  checkRoleNameExists,
+  fetchCustomRoleById,
+  fetchCustomRoles,
+  insertCustomRole,
+  updateCustomRole,
+  deactivateCustomRole,
+  countUsersWithRole
+} from './roleQueries';
+
 // Default export for backward compatibility
 export { roleRoutes as default } from './RoleRoutes';

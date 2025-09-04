@@ -15,7 +15,7 @@ function generateToken(user: { id: number; email: string; is_admin: boolean }, r
 }
 
 // Middleware: require auth
-export function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+export async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) {
     AuditTrailModel.logAction({
@@ -28,7 +28,14 @@ export function requireAuth(req: express.Request, res: express.Response, next: e
   }
   try {
     const payload = jwt.verify(auth.slice(7), JWT_SECRET) as { id: number; email: string; is_admin: boolean };
-    req.user = { id: payload.id, email: payload.email, is_admin: payload.is_admin };
+    
+    // Get full user data including establishment info
+    const user = await UserModel.getAuthenticatedUser(payload.id);
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+    
+    req.user = user as any;
     next();
   } catch {
     AuditTrailModel.logAction({

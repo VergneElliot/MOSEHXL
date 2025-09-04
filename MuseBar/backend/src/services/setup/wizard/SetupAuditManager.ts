@@ -192,7 +192,6 @@ export class SetupAuditManager {
       this.logger.error(
         'Failed to create failure audit entry',
         auditError as Error,
-        { establishmentId, originalError: error.message },
         'SETUP_AUDIT'
       );
     }
@@ -231,7 +230,6 @@ export class SetupAuditManager {
       this.logger.error(
         'Failed to get setup audit history',
         error as Error,
-        { establishmentId },
         'SETUP_AUDIT'
       );
       return [];
@@ -269,16 +267,13 @@ export class SetupAuditManager {
 
       this.logger.info(
         'Setup cleanup audit entry created',
-        { establishmentId, actionsCount: cleanupActions.length },
+        undefined,
         'SETUP_AUDIT'
       );
     } catch (error) {
       this.logger.warn(
         'Failed to create cleanup audit entry',
-        { 
-          error: (error as Error).message,
-          establishmentId 
-        },
+        undefined,
         'SETUP_AUDIT'
       );
     }

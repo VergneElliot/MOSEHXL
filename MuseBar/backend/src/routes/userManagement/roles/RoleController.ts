@@ -8,7 +8,7 @@
  * - RoleController.ts (Main delegator)
  */
 
-import { Response, NextFunction } from 'express';
+import { Response, NextFunction, Request } from 'express';
 import {
   RoleRequest,
   CreateRoleRequest,
@@ -19,6 +19,19 @@ import { RoleMutations } from './roleMutations';
 import { RolePermissionOperations } from './rolePermissionOperations';
 
 /**
+ * Type guard to ensure request has required user properties
+ */
+function isRoleRequest(req: Request): req is RoleRequest {
+  return req.user !== undefined && 
+         typeof req.user.id === 'number' &&
+         typeof req.user.email === 'string' &&
+         typeof req.user.first_name === 'string' &&
+         typeof req.user.last_name === 'string' &&
+         typeof req.user.role === 'string' &&
+         typeof req.user.is_admin === 'boolean';
+}
+
+/**
  * Main role management controller - delegates to specialized modules
  */
 export class RoleController {
@@ -27,10 +40,14 @@ export class RoleController {
    * Get all roles for establishment
    */
   public static async getAllRoles(
-    req: RoleRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
+    if (!isRoleRequest(req)) {
+      res.status(400).json({ success: false, message: 'Invalid request type' });
+      return;
+    }
     return RoleOperations.getAllRoles(req, res, next);
   }
 
@@ -38,10 +55,14 @@ export class RoleController {
    * Get specific role details
    */
   public static async getRoleDetails(
-    req: RoleRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
+    if (!isRoleRequest(req)) {
+      res.status(400).json({ success: false, message: 'Invalid request type' });
+      return;
+    }
     return RoleOperations.getRoleDetails(req, res, next);
   }
 
@@ -49,32 +70,44 @@ export class RoleController {
    * Create new custom role
    */
   public static async createRole(
-    req: RoleRequest<CreateRoleRequest>,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
-    return RoleMutations.createRole(req, res, next);
+    if (!isRoleRequest(req)) {
+      res.status(400).json({ success: false, message: 'Invalid request type' });
+      return;
+    }
+    return RoleMutations.createRole(req as RoleRequest<CreateRoleRequest>, res, next);
   }
 
   /**
    * Update existing custom role
    */
   public static async updateRole(
-    req: RoleRequest<UpdateRoleRequest>,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
-    return RoleMutations.updateRole(req, res, next);
+    if (!isRoleRequest(req)) {
+      res.status(400).json({ success: false, message: 'Invalid request type' });
+      return;
+    }
+    return RoleMutations.updateRole(req as RoleRequest<UpdateRoleRequest>, res, next);
   }
 
   /**
    * Delete role (soft delete)
    */
   public static async deleteRole(
-    req: RoleRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
+    if (!isRoleRequest(req)) {
+      res.status(400).json({ success: false, message: 'Invalid request type' });
+      return;
+    }
     return RoleOperations.deleteRole(req, res, next);
   }
 
@@ -82,10 +115,14 @@ export class RoleController {
    * Get role permissions
    */
   public static async getRolePermissions(
-    req: RoleRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
+    if (!isRoleRequest(req)) {
+      res.status(400).json({ success: false, message: 'Invalid request type' });
+      return;
+    }
     return RolePermissionOperations.getRolePermissions(req, res, next);
   }
 
@@ -93,10 +130,14 @@ export class RoleController {
    * Check specific permission for role
    */
   public static async checkPermission(
-    req: RoleRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
+    if (!isRoleRequest(req)) {
+      res.status(400).json({ success: false, message: 'Invalid request type' });
+      return;
+    }
     return RolePermissionOperations.checkPermission(req, res, next);
   }
 
@@ -104,10 +145,14 @@ export class RoleController {
    * Get available permissions structure
    */
   public static async getAvailablePermissions(
-    req: RoleRequest,
+    req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
+    if (!isRoleRequest(req)) {
+      res.status(400).json({ success: false, message: 'Invalid request type' });
+      return;
+    }
     return RolePermissionOperations.getAvailablePermissions(req, res, next);
   }
 }

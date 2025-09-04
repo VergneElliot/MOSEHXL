@@ -60,7 +60,6 @@ export class ErrorRecovery {
           this.logger.error(
             `Operation '${operationName}' failed after ${attempt + 1} attempts`,
             lastError,
-            { attempt, operationName, finalAttempt: true },
             'ERROR_RECOVERY'
           );
           throw lastError;
@@ -73,12 +72,7 @@ export class ErrorRecovery {
 
         this.logger.warn(
           `Operation '${operationName}' failed (attempt ${attempt + 1}/${config.maxRetries + 1}), retrying in ${delay}ms`,
-          { 
-            error: lastError.message, 
-            attempt, 
-            delay, 
-            operationName 
-          },
+          undefined,
           'ERROR_RECOVERY'
         );
 
@@ -155,7 +149,7 @@ export class ErrorRecovery {
           state = 'OPEN';
           this.logger.warn(
             `Circuit breaker OPEN for operation '${operationName}' (failed during half-open)`,
-            { operationName, state, failures },
+            undefined,
             'ERROR_RECOVERY'
           );
         } else if (failures >= options.failureThreshold) {
@@ -163,7 +157,6 @@ export class ErrorRecovery {
           this.logger.error(
             `Circuit breaker OPEN for operation '${operationName}' (failure threshold reached)`,
             error as Error,
-            { operationName, state, failures, threshold: options.failureThreshold },
             'ERROR_RECOVERY'
           );
         }
@@ -186,7 +179,7 @@ export class ErrorRecovery {
     } catch (error) {
       this.logger.warn(
         `Primary operation '${operationName}' failed, attempting fallback`,
-        { error: (error as Error).message, operationName },
+        undefined,
         'ERROR_RECOVERY'
       );
 
@@ -194,7 +187,7 @@ export class ErrorRecovery {
         const result = await fallbackOperation();
         this.logger.info(
           `Fallback operation '${operationName}' succeeded`,
-          { operationName },
+          undefined,
           'ERROR_RECOVERY'
         );
         return result;
@@ -202,11 +195,6 @@ export class ErrorRecovery {
         this.logger.error(
           `Both primary and fallback operations failed for '${operationName}'`,
           fallbackError as Error,
-          { 
-            operationName, 
-            primaryError: (error as Error).message,
-            fallbackError: (fallbackError as Error).message 
-          },
           'ERROR_RECOVERY'
         );
         throw error; // Throw original error

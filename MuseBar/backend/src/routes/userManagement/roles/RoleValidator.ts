@@ -10,7 +10,9 @@ import {
   RoleValidationResult, 
   RoleCreationData, 
   RoleUpdateData,
-  RoleOperationContext
+  RoleOperationContext,
+  CreateRoleRequest,
+  UpdateRoleRequest
 } from './types';
 import { 
   isSystemRoleId,
@@ -76,9 +78,72 @@ export class RoleValidator {
       } catch (error) {
         this.logger.error(
           'Error checking role name existence',
-          error as Error,
-          { name, establishmentId },
-          'ROLE_VALIDATOR'
+          error as Error
+        );
+        errors.push('Error validating role name uniqueness');
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      data: errors.length === 0 ? { name, description, permissions, establishmentId } : undefined
+    };
+  }
+
+  /**
+   * Validate role creation data from body
+   */
+  public static async validateRoleCreationData(
+    data: CreateRoleRequest
+  ): Promise<RoleValidationResult> {
+    const errors: string[] = [];
+    const { name, description, permissions, establishmentId } = data;
+
+    // Required field validation
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      errors.push('Role name is required and must be a non-empty string');
+    }
+
+    if (!description || typeof description !== 'string' || description.trim().length === 0) {
+      errors.push('Role description is required and must be a non-empty string');
+    }
+
+    if (!establishmentId || typeof establishmentId !== 'string') {
+      errors.push('Establishment ID is required');
+    }
+
+    if (!permissions || typeof permissions !== 'object') {
+      errors.push('Permissions object is required');
+    }
+
+    // Validate permissions structure
+    if (permissions) {
+      const permissionErrors = this.validatePermissions(permissions);
+      errors.push(...permissionErrors);
+    }
+
+    // Validate name length
+    if (name && name.length > 100) {
+      errors.push('Role name must be 100 characters or less');
+    }
+
+    // Validate description length
+    if (description && description.length > 500) {
+      errors.push('Role description must be 500 characters or less');
+    }
+
+    // Check if role name already exists
+    if (name && establishmentId && errors.length === 0) {
+      try {
+        const exists = await checkRoleNameExists(name, establishmentId);
+        if (exists) {
+          errors.push('Role with this name already exists');
+        }
+      } catch (error) {
+        this.logger.error(
+          'Error checking role name existence',
+          error as Error
         );
         errors.push('Error validating role name uniqueness');
       }
@@ -123,9 +188,72 @@ export class RoleValidator {
         } catch (error) {
           this.logger.error(
             'Error checking role name existence during update',
-            error as Error,
-            { name, roleId: currentRole.id },
-            'ROLE_VALIDATOR'
+            error as Error
+          );
+          errors.push('Error validating role name uniqueness');
+        }
+      }
+    }
+
+    // Validate description if provided
+    if (description !== undefined) {
+      if (typeof description !== 'string' || description.trim().length === 0) {
+        errors.push('Role description must be a non-empty string');
+      } else if (description.length > 500) {
+        errors.push('Role description must be 500 characters or less');
+      }
+    }
+
+    // Validate permissions if provided
+    if (permissions !== undefined) {
+      if (typeof permissions !== 'object' || permissions === null) {
+        errors.push('Permissions must be an object');
+      } else {
+        const permissionErrors = this.validatePermissions(permissions);
+        errors.push(...permissionErrors);
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      data: errors.length === 0 ? { name, description, permissions } : undefined
+    };
+  }
+
+  /**
+   * Validate role update data from body
+   */
+  public static async validateRoleUpdateData(
+    data: UpdateRoleRequest,
+    currentRole: any
+  ): Promise<RoleValidationResult> {
+    const errors: string[] = [];
+    const { name, description, permissions } = data;
+
+    // Check if any updates are provided
+    if (name === undefined && description === undefined && permissions === undefined) {
+      errors.push('No updates provided');
+      return { isValid: false, errors };
+    }
+
+    // Validate name if provided
+    if (name !== undefined) {
+      if (typeof name !== 'string' || name.trim().length === 0) {
+        errors.push('Role name must be a non-empty string');
+      } else if (name.length > 100) {
+        errors.push('Role name must be 100 characters or less');
+      } else if (name !== currentRole.name) {
+        // Check if new name already exists
+        try {
+          const exists = await checkRoleNameExists(name, currentRole.establishment_id);
+          if (exists) {
+            errors.push('Role with this name already exists');
+          }
+        } catch (error) {
+          this.logger.error(
+            'Error checking role name existence during update',
+            error as Error
           );
           errors.push('Error validating role name uniqueness');
         }
@@ -286,7 +414,7 @@ export class RoleValidator {
   public static createOperationContext(req: RoleRequest): RoleOperationContext {
     return {
       userId: req.user!.id,
-      establishmentId: req.query.establishmentId as string || req.user!.establishment_id,
+      establishmentId: req.query.establishmentId as string || req.user!.establishment_id || '',
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'] as string | undefined,
       timestamp: new Date()

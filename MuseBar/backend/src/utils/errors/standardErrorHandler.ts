@@ -152,14 +152,6 @@ export class ErrorHandler {
     this.logger.error(
       `Error in ${operation}`,
       error,
-      {
-        service,
-        userId,
-        requestId,
-        ...metadata,
-        errorType: error.constructor.name,
-        isOperational: error instanceof StandardError ? error.isOperational : false
-      },
       service
     );
 

@@ -127,7 +127,7 @@ export class RoleOperations {
         
         if (role) {
           // Validate access to this establishment's role
-          const accessValidation = RoleValidator.validateAccess(req, role.establishmentId);
+          const accessValidation = RoleValidator.validateAccess(req, role.establishmentId || '');
           if (!accessValidation.isValid) {
             await RoleAuditLogger.logAccessDenied(
               context,

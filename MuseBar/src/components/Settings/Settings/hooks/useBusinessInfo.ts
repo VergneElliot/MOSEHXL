@@ -71,7 +71,7 @@ export const useBusinessInfo = ({
       errors.push('Invalid email format');
     }
     
-    if (info.phone && !/^[\d\s\-\+\(\)]+$/.test(info.phone)) {
+    if (info.phone && !/^[\d\s\-+()]+$/.test(info.phone)) {
       errors.push('Invalid phone number format');
     }
     

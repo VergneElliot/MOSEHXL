@@ -111,7 +111,6 @@ export class InvitationAcceptance {
       this.logger.error(
         'Failed to accept establishment invitation',
         error as Error,
-        { token: acceptanceData.token },
         'INVITATION_ACCEPTANCE'
       );
 
@@ -218,7 +217,6 @@ export class InvitationAcceptance {
       this.logger.error(
         'Failed to accept user invitation',
         error as Error,
-        { token: acceptanceData.token },
         'INVITATION_ACCEPTANCE'
       );
 
@@ -269,12 +267,7 @@ export class InvitationAcceptance {
 
       this.logger.info(
         'Invitation resend prepared',
-        {
-          invitationId,
-          email: invitation.email,
-          role: invitation.role,
-          requestedBy: userId
-        },
+        undefined,
         'INVITATION_ACCEPTANCE'
       );
 
@@ -289,7 +282,6 @@ export class InvitationAcceptance {
       this.logger.error(
         'Failed to prepare invitation resend',
         error as Error,
-        { invitationId, userId },
         'INVITATION_ACCEPTANCE'
       );
 
@@ -317,7 +309,6 @@ export class InvitationAcceptance {
       this.logger.error(
         'Failed to get invitation details',
         error as Error,
-        { token },
         'INVITATION_ACCEPTANCE'
       );
       throw error;

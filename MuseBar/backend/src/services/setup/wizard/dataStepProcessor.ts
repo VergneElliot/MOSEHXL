@@ -28,7 +28,7 @@ export class DataStepProcessor {
         setupData.invitation_token
       );
 
-      await SetupDatabase.updateEstablishmentFromSetup(
+      await SetupDatabase.updateEstablishmentInfo(
         client, 
         invitation.establishment_id, 
         setupData
@@ -61,7 +61,6 @@ export class DataStepProcessor {
       );
 
       await SetupDatabase.initializeEstablishmentSchema(
-        client, 
         invitation.establishment_id
       );
 
@@ -91,10 +90,9 @@ export class DataStepProcessor {
         setupData.invitation_token
       );
 
-      await SetupDefaults.createEstablishmentDefaults(
+      await SetupDefaults.createAllDefaultData(
         client, 
-        invitation.establishment_id, 
-        setupData
+        invitation.establishment_id
       );
 
       return { 

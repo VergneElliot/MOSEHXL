@@ -17,8 +17,6 @@ import {
 } from '@mui/material';
 import {
   Error,
-  Warning,
-  Info,
   CheckCircle,
 } from '@mui/icons-material';
 import { ComplianceAlertsProps } from './types';

@@ -51,7 +51,7 @@ export const useGeneralSettings = ({ generalSettings, onUpdate, onSave }: UseGen
       errors.push('Invalid email format');
     }
     
-    if (settings.phone && !/^[\d\s\-\+\(\)]+$/.test(settings.phone)) {
+    if (settings.phone && !/^[\d\s\-+()]+$/.test(settings.phone)) {
       errors.push('Invalid phone number format');
     }
     

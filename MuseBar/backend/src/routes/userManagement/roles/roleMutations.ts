@@ -51,7 +51,7 @@ export class RoleMutations {
       const { establishmentId } = establishmentValidation.data!;
 
       // Validate role creation data
-      const validationResult = await RoleValidator.validateRoleCreation(req.body);
+      const validationResult = await RoleValidator.validateRoleCreationData(req.body);
       if (!validationResult.isValid) {
         res.status(400).json({
           success: false,
@@ -67,17 +67,31 @@ export class RoleMutations {
         name,
         description,
         permissions: permissions as RolePermissions,
-        establishment_id: establishmentId,
-        is_active: true
+        establishmentId,
+        createdBy: req.user!.id
       });
 
       // Log the creation
-      await RoleAuditLogger.logCreateRole(context, newRole);
+      await RoleAuditLogger.logCreateRole(context, {
+        roleId: newRole,
+        roleName: name,
+        permissions: permissions as RolePermissions
+      });
 
+      // Fetch the created role for response
+      const createdRole = await fetchCustomRoleById(newRole, establishmentId);
+      
       const response: RoleOperationResponse = {
         success: true,
         message: 'Role created successfully',
-        data: newRole
+        data: createdRole ? {
+          id: createdRole.id,
+          name: createdRole.name,
+          description: createdRole.description,
+          permissions: createdRole.permissions,
+          isSystemRole: false,
+          establishmentId: createdRole.establishment_id
+        } : undefined
       };
 
       res.status(201).json(response);
@@ -164,7 +178,7 @@ export class RoleMutations {
       }
 
       // Validate update data
-      const validationResult = await RoleValidator.validateRoleUpdate(req.body, existingRole);
+      const validationResult = await RoleValidator.validateRoleUpdateData(req.body, existingRole);
       if (!validationResult.isValid) {
         res.status(400).json({
           success: false,
@@ -187,12 +201,22 @@ export class RoleMutations {
       }
 
       // Log the update
-      await RoleAuditLogger.logUpdateRole(context, existingRole, updatedRole);
+      await RoleAuditLogger.logUpdateRole(context, {
+        roleId: roleId!,
+        updates: updateData
+      });
 
       const response: RoleOperationResponse = {
         success: true,
         message: 'Role updated successfully',
-        data: updatedRole
+        data: {
+          id: updatedRole.id,
+          name: updatedRole.name,
+          description: updatedRole.description,
+          permissions: updatedRole.permissions,
+          isSystemRole: false,
+          establishmentId: updatedRole.establishment_id
+        }
       };
 
       res.json(response);

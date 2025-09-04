@@ -88,7 +88,6 @@ export class SetupProgressTracker {
       this.logger.error(
         'Failed to log setup progress',
         error as Error,
-        { establishmentId, progress },
         'SETUP_PROGRESS'
       );
       throw error;
@@ -125,7 +124,6 @@ export class SetupProgressTracker {
       this.logger.error(
         'Error getting setup progress',
         error as Error,
-        { establishmentId },
         'SETUP_PROGRESS'
       );
       return null;

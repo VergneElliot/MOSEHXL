@@ -32,8 +32,7 @@ export class UserStepProcessor {
       const newUser = await SetupDatabase.createOrUpdateUserAccount(
         client, 
         setupData, 
-        invitation.establishment_id, 
-        existingUser.exists ? { userId: existingUser.userId! } : undefined
+        invitation.establishment_id
       );
 
       return { 

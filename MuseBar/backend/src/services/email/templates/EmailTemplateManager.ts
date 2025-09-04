@@ -109,7 +109,6 @@ export class EmailTemplateManager {
       this.logger.error(
         'Template processing failed - template not found',
         error,
-        { templateName, availableTemplates: Array.from(this.templates.keys()) },
         'EMAIL_TEMPLATE_MANAGER'
       );
       throw error;
@@ -124,11 +123,6 @@ export class EmailTemplateManager {
       this.logger.error(
         'Template processing failed - missing variables',
         error,
-        { 
-          templateName, 
-          missingVariables: validation.missingVariables,
-          providedVariables: Object.keys(templateData)
-        },
         'EMAIL_TEMPLATE_MANAGER'
       );
       throw error;
@@ -139,11 +133,7 @@ export class EmailTemplateManager {
       
       this.logger.debug(
         'Email template processed successfully',
-        { 
-          templateName, 
-          variableCount: Object.keys(templateData).length,
-          hasTextBody: !!processed.textBody
-        },
+        undefined,
         'EMAIL_TEMPLATE_MANAGER'
       );
 
@@ -152,7 +142,6 @@ export class EmailTemplateManager {
       this.logger.error(
         'Template processing failed',
         error as Error,
-        { templateName, templateData },
         'EMAIL_TEMPLATE_MANAGER'
       );
       throw error;

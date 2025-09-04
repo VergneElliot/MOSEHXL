@@ -1,5 +1,4 @@
 import { Category, Product, Order, OrderItem } from '../types';
-import type { PaymentMethod } from '../types';
 import { apiCore, categoriesApi, productsApi, ordersApi, legalApi } from './api';
 
 export class ApiService {

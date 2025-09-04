@@ -5,7 +5,7 @@
 
 import { useCallback, useMemo } from 'react';
 import { OrderItem, LocalSubBill } from '../../../../types';
-import { PaymentState, SplitType } from '../types';
+import { PaymentState } from '../types';
 
 interface UsePaymentCalculationsProps {
   state: PaymentState;
@@ -115,7 +115,7 @@ export const usePaymentCalculations = ({
     if (state.subBills.length === 0) return false;
     const tolerance = 0.01; // Allow 1 cent difference due to rounding
     return Math.abs(subBillsTotal - totalWithTips) <= tolerance;
-  }, [subBillsTotal, totalWithTips]);
+  }, [subBillsTotal, totalWithTips, state.subBills.length]);
 
   return {
     totalAmount,

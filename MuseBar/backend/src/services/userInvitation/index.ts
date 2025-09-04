@@ -118,7 +118,6 @@ export class UserInvitationService {
       this.logger.error(
         'Failed to send establishment invitation',
         error as Error,
-        { establishmentData: data },
         'USER_INVITATION_SERVICE'
       );
 
@@ -176,7 +175,6 @@ export class UserInvitationService {
       this.logger.error(
         'Failed to send user invitation',
         error as Error,
-        { userData: data },
         'USER_INVITATION_SERVICE'
       );
 
@@ -220,7 +218,6 @@ export class UserInvitationService {
       this.logger.error(
         'Failed to accept establishment invitation',
         error as Error,
-        { token },
         'USER_INVITATION_SERVICE'
       );
 
@@ -269,7 +266,6 @@ export class UserInvitationService {
       this.logger.error(
         'Failed to accept user invitation',
         error as Error,
-        { token },
         'USER_INVITATION_SERVICE'
       );
 
