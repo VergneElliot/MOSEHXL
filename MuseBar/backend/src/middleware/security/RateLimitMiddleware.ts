@@ -58,7 +58,7 @@ export class RateLimitMiddleware {
         // Log rate limit violation
         this.logger.security(
           'Rate limit exceeded',
-          'medium',
+          'MEDIUM',
           {
             ip: req.ip,
             userAgent: req.headers['user-agent'],
@@ -67,9 +67,8 @@ export class RateLimitMiddleware {
             limit: maxRequests,
             resetTime: resetTime.toISOString(),
           },
-          req.user?.id ? String(req.user.id) : undefined,
-          req.ip,
-          req.requestId
+          req.requestId,
+          req.user?.id ? parseInt(String(req.user.id)) : undefined
         );
 
         // Set rate limit headers

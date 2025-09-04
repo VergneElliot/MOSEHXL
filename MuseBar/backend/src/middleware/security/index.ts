@@ -16,9 +16,7 @@ export { CorsConfigurationService, createCorsOptions } from './CorsConfiguration
 export * from './types';
 
 // Re-export commonly used functions for backward compatibility
-export {
-  SecurityMiddlewareFactory as RateLimitMiddleware
-} from './SecurityMiddleware';
+// Note: RateLimitMiddleware is already exported from RateLimitMiddleware.ts
 
 // Default export for backward compatibility
 export { SecurityMiddlewareFactory as default } from './SecurityMiddleware';

@@ -25,7 +25,7 @@ router.get('/validate/:token', validateParams([{ param: 'token', validator: (v:a
 
     res.json(result);
   } catch (error) {
-    logger.error('Error validating invitation token', error as Error, {}, 'SETUP_API');
+    logger.error('Error validating invitation token', { error: error as Error }, 'SETUP_API');
     res.status(500).json({ 
       isValid: false, 
       error: error instanceof Error ? error.message : 'Internal server error during validation' 
@@ -46,7 +46,7 @@ router.get('/status/:token', validateParams([{ param: 'token', validator: (v:any
 
     res.json(result);
   } catch (error) {
-    logger.error('Error checking setup status', error as Error, {}, 'SETUP_API');
+    logger.error('Error checking setup status', { error: error as Error }, 'SETUP_API');
     res.status(500).json({ 
       completed: false, 
       error: error instanceof Error ? error.message : 'Internal server error' 
@@ -81,7 +81,7 @@ router.post('/complete', validateBody([
 
     res.status(201).json(result);
   } catch (error) {
-    logger.error('Error completing business setup', error as Error, {}, 'SETUP_API');
+    logger.error('Error completing business setup', { error: error as Error }, 'SETUP_API');
     res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : 'Failed to complete setup. Please try again.'

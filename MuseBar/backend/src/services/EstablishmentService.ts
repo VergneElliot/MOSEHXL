@@ -164,8 +164,10 @@ export class EstablishmentService {
     } catch (error) {
       this.logger.error(
         'Failed to create establishment',
-        error as Error,
-        { establishmentData: data },
+        { 
+          error: error as Error,
+          establishmentData: data 
+        },
         'ESTABLISHMENT_SERVICE'
       );
       throw error;
@@ -192,8 +194,7 @@ export class EstablishmentService {
     } catch (error) {
       this.logger.error(
         'Failed to fetch establishments',
-        error as Error,
-        {},
+        { error: error as Error },
         'ESTABLISHMENT_SERVICE'
       );
       throw error;
@@ -231,8 +232,10 @@ export class EstablishmentService {
     } catch (error) {
       this.logger.error(
         'Failed to fetch establishment',
-        error as Error,
-        { establishmentId: id },
+        { 
+          error: error as Error,
+          establishmentId: id 
+        },
         'ESTABLISHMENT_SERVICE'
       );
       throw error;
@@ -258,8 +261,10 @@ export class EstablishmentService {
     } catch (error) {
       this.logger.error(
         'Failed to delete establishment',
-        error as Error,
-        { establishmentId: id },
+        { 
+          error: error as Error,
+          establishmentId: id 
+        },
         'ESTABLISHMENT_SERVICE'
       );
       throw error;
@@ -354,8 +359,11 @@ export class EstablishmentService {
     } catch (emailError) {
       this.logger.error(
         'Failed to send setup invitation email',
-        emailError as Error,
-        { ownerEmail, establishmentName },
+        { 
+          error: emailError as Error,
+          ownerEmail, 
+          establishmentName 
+        },
         'ESTABLISHMENT_SERVICE'
       );
       // Don't fail the establishment creation if email fails

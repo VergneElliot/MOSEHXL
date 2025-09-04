@@ -91,7 +91,7 @@ export class InvitationOperations {
       };
 
     } catch (error) {
-      this.logger.error('Error validating invitation:', error);
+      this.logger.error('Error validating invitation:', error as Error);
       return {
         isValid: false,
         token,
@@ -143,7 +143,7 @@ export class InvitationOperations {
       };
 
     } catch (error) {
-      this.logger.error('Error checking setup status:', error);
+      this.logger.error('Error checking setup status:', error as Error);
       return {
         success: false,
         error: 'Database error'
@@ -180,7 +180,7 @@ export class InvitationOperations {
       return invitation;
 
     } catch (error) {
-      this.logger.error('Error validating invitation for setup:', error);
+      this.logger.error('Error validating invitation for setup:', error as Error);
       throw error;
     }
   }
@@ -205,7 +205,7 @@ export class InvitationOperations {
       this.logger.info(`Completed invitation for token: ${token}, user: ${userId}`);
 
     } catch (error) {
-      this.logger.error('Error completing invitation:', error);
+      this.logger.error('Error completing invitation:', error as Error);
       throw new Error('Failed to complete invitation');
     }
   }

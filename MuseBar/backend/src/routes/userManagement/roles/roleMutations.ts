@@ -84,8 +84,10 @@ export class RoleMutations {
     } catch (error) {
       this.logger.error(
         'Failed to create custom role',
-        error as Error,
-        { userId: req.user?.id },
+        { 
+          error: error as Error,
+          userId: req.user?.id 
+        },
         'ROLE_MUTATIONS'
       );
       next(error);
@@ -197,8 +199,11 @@ export class RoleMutations {
     } catch (error) {
       this.logger.error(
         'Failed to update custom role',
-        error as Error,
-        { roleId: req.params.roleId, userId: req.user?.id },
+        { 
+          error: error as Error,
+          roleId: req.params.roleId, 
+          userId: req.user?.id 
+        },
         'ROLE_MUTATIONS'
       );
       next(error);

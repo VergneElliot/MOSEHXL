@@ -125,8 +125,10 @@ export function createEnhancedErrorHandler(logger: Logger) {
     if (statusCode >= 500) {
       logger.error(
         `Server Error [${errorId}]: ${error.message}`,
-        error,
-        errorContext,
+        { 
+          error: error,
+          ...errorContext 
+        },
         'ERROR_HANDLER'
       );
     } else {

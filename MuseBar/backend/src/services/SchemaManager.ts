@@ -47,8 +47,10 @@ export class SchemaManager {
     } catch (error) {
       SchemaManager.logger?.error(
         'Failed to create establishment schema',
-        error as Error,
-        { schemaName },
+        { 
+          error: error as Error,
+          schemaName 
+        },
         'SCHEMA_MANAGER'
       );
       throw error;
@@ -199,8 +201,10 @@ export class SchemaManager {
     } catch (error) {
       SchemaManager.logger?.error(
         'Failed to drop establishment schema',
-        error as Error,
-        { schemaName },
+        { 
+          error: error as Error,
+          schemaName 
+        },
         'SCHEMA_MANAGER'
       );
       throw error;
@@ -221,8 +225,10 @@ export class SchemaManager {
     } catch (error) {
       SchemaManager.logger?.error(
         'Failed to check schema existence',
-        error as Error,
-        { schemaName },
+        { 
+          error: error as Error,
+          schemaName 
+        },
         'SCHEMA_MANAGER'
       );
       throw error;
@@ -243,8 +249,10 @@ export class SchemaManager {
     } catch (error) {
       SchemaManager.logger?.error(
         'Failed to get schema table count',
-        error as Error,
-        { schemaName },
+        { 
+          error: error as Error,
+          schemaName 
+        },
         'SCHEMA_MANAGER'
       );
       throw error;
@@ -303,8 +311,10 @@ export class SchemaManager {
     } catch (error) {
       SchemaManager.logger?.error(
         'Failed to validate schema integrity',
-        error as Error,
-        { schemaName },
+        { 
+          error: error as Error,
+          schemaName 
+        },
         'SCHEMA_MANAGER'
       );
       

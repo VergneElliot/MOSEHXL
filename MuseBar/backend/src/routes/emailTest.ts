@@ -91,7 +91,8 @@ Sent at: ${new Date().toISOString()}
     });
 
   } catch (error) {
-    logger.error('Failed to send test email', error as Error, {
+    logger.error('Failed to send test email', {
+      error: error as Error,
       to: req.body.to
     }, 'EMAIL_TEST');
 
@@ -124,7 +125,7 @@ router.get('/email-status', async (req, res) => {
     });
 
   } catch (error) {
-    logger.error('Failed to get email status', error as Error, {}, 'EMAIL_TEST');
+    logger.error('Failed to get email status', { error: error as Error }, 'EMAIL_TEST');
 
     res.status(500).json({
       success: false,
@@ -148,7 +149,7 @@ router.get('/email-logs', async (req, res) => {
     });
 
   } catch (error) {
-    logger.error('Failed to get email logs', error as Error, {}, 'EMAIL_TEST');
+    logger.error('Failed to get email logs', { error: error as Error }, 'EMAIL_TEST');
 
     res.status(500).json({
       success: false,

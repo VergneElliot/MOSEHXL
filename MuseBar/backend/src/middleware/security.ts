@@ -4,19 +4,21 @@
  */
 
 // Re-export all components from the modular security package
+export { SecurityMiddlewareFactory } from './security/SecurityMiddleware';
+export { RateLimitMiddleware } from './security/RateLimitMiddleware';
+export { InputSanitizationService } from './security/InputSanitization';
+export { RequestSizeLimitService } from './security/InputSanitization';
+export { SecurityHeadersService } from './security/SecurityHeaders';
+export { CorsConfigurationService } from './security/CorsConfiguration';
+
+// Re-export convenience functions
 export { 
-  SecurityMiddlewareFactory,
   createSecurityMiddleware,
-  RateLimitMiddleware,
-  InputSanitizationService,
-  RequestSizeLimitService,
-  SecurityHeadersService,
-  CorsConfigurationService,
   inputSanitization,
   requestSizeLimit,
   securityHeaders,
   createCorsOptions
-} from './security';
+} from './security/index';
 
 // Re-export types for backward compatibility
 export type {
@@ -30,4 +32,4 @@ export type {
 } from './security/types';
 
 // Default export for backward compatibility
-export { SecurityMiddlewareFactory as default } from './security'; 
+export { SecurityMiddlewareFactory as default } from './security/SecurityMiddleware'; 

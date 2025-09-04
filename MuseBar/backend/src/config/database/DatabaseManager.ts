@@ -79,7 +79,7 @@ export class DatabaseManager {
         duration,
         result.rowCount || 0,
         params,
-        userId,
+        userId ? parseInt(userId) : undefined,
         requestId
       );
 
@@ -92,7 +92,7 @@ export class DatabaseManager {
         error as Error,
         duration,
         params,
-        userId,
+        userId ? parseInt(userId) : undefined,
         requestId
       );
 
@@ -114,21 +114,21 @@ export class DatabaseManager {
     try {
       await client.query('BEGIN');
       
-      this.statsManager.logTransaction('started', undefined, undefined, userId, requestId);
+      this.statsManager.logTransaction('started', undefined, undefined, userId ? parseInt(userId) : undefined, requestId);
 
       const result = await callback(client);
       
       await client.query('COMMIT');
       const duration = Date.now() - startTime;
       
-      this.statsManager.logTransaction('committed', duration, undefined, userId, requestId);
+      this.statsManager.logTransaction('committed', duration, undefined, userId ? parseInt(userId) : undefined, requestId);
 
       return result;
     } catch (error) {
       await client.query('ROLLBACK');
       const duration = Date.now() - startTime;
       
-      this.statsManager.logTransaction('rolled_back', duration, error as Error, userId, requestId);
+      this.statsManager.logTransaction('rolled_back', duration, error as Error, userId ? parseInt(userId) : undefined, requestId);
 
       throw error;
     } finally {

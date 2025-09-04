@@ -97,8 +97,11 @@ router.post('/send-establishment-invitation', requireAuth, requireAdmin, validat
   } catch (error) {
     logger?.error(
       'Failed to send establishment invitation',
-      error as Error,
-      { invitationData: req.body, userId: req.user?.id },
+      { 
+        error: error as Error,
+        invitationData: req.body, 
+        userId: req.user?.id 
+      },
       'INVITATION_ROUTES'
     );
     next(error);
@@ -192,8 +195,11 @@ router.post('/send-user-invitation', requireAuth, validateBody([
   } catch (error) {
     logger?.error(
       'Failed to send user invitation',
-      error as Error,
-      { invitationData: req.body, userId: req.user?.id },
+      { 
+        error: error as Error,
+        invitationData: req.body, 
+        userId: req.user?.id 
+      },
       'INVITATION_ROUTES'
     );
     next(error);
@@ -253,8 +259,10 @@ router.post('/accept-invitation', validateBody([
   } catch (error) {
     logger?.error(
       'Failed to accept invitation',
-      error as Error,
-      { token: req.body.token },
+      { 
+        error: error as Error,
+        token: req.body.token 
+      },
       'INVITATION_ROUTES'
     );
     next(error);
@@ -298,8 +306,10 @@ router.get('/pending-invitations', requireAuth, async (req: any, res: any, next:
   } catch (error) {
     logger?.error(
       'Failed to get pending invitations',
-      error as Error,
-      { userId: req.user?.id },
+      { 
+        error: error as Error,
+        userId: req.user?.id 
+      },
       'INVITATION_ROUTES'
     );
     next(error);
@@ -343,8 +353,11 @@ router.delete('/cancel-invitation/:invitationId', requireAuth, validateParams([
   } catch (error) {
     logger?.error(
       'Failed to cancel invitation',
-      error as Error,
-      { invitationId: req.params.invitationId, userId: req.user?.id },
+      { 
+        error: error as Error,
+        invitationId: req.params.invitationId, 
+        userId: req.user?.id 
+      },
       'INVITATION_ROUTES'
     );
     next(error);
@@ -389,8 +402,11 @@ router.post('/resend-invitation/:invitationId', requireAuth, validateParams([
   } catch (error) {
     logger?.error(
       'Failed to resend invitation',
-      error as Error,
-      { invitationId: req.params.invitationId, userId: req.user?.id },
+      { 
+        error: error as Error,
+        invitationId: req.params.invitationId, 
+        userId: req.user?.id 
+      },
       'INVITATION_ROUTES'
     );
     next(error);

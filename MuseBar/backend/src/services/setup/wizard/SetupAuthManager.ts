@@ -3,7 +3,7 @@
  * Handles JWT token generation and authentication for setup process
  */
 
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { Logger } from '../../../utils/logger';
 import { SetupJwtPayload } from './types';
 
@@ -34,7 +34,8 @@ export class SetupAuthManager {
     };
 
     try {
-      const token = jwt.sign(payload, jwtSecret, { expiresIn });
+      const options: SignOptions = { expiresIn };
+      const token = jwt.sign(payload, jwtSecret, options);
       
       this.logger.debug(
         'Authentication token generated for setup completion',
@@ -109,7 +110,8 @@ export class SetupAuthManager {
     };
 
     try {
-      const token = jwt.sign(payload, jwtSecret, { expiresIn });
+      const options: SignOptions = { expiresIn };
+      const token = jwt.sign(payload, jwtSecret, options);
       
       this.logger.debug(
         'Temporary setup token generated',

@@ -6,13 +6,7 @@
 import { Logger } from '../../../utils/logger';
 import { RolePermissions } from '../types';
 import { RoleAuditLogData, RoleOperationContext } from './types';
-import {
-  logViewRoles as logViewRolesOriginal,
-  logViewRoleDetails as logViewRoleDetailsOriginal,
-  logCreateCustomRole as logCreateCustomRoleOriginal,
-  logUpdateCustomRole as logUpdateCustomRoleOriginal,
-  logDeleteCustomRole as logDeleteCustomRoleOriginal
-} from '../roles';
+// Note: Removed circular imports - functions are defined in this file
 
 /**
  * Role audit logging service
@@ -28,12 +22,14 @@ export class RoleAuditLogger {
     rolesCount: number
   ): Promise<void> {
     try {
-      await logViewRolesOriginal(
-        context.userId,
+      const logger = Logger.getInstance();
+      logger.business(
+        'Roles list viewed',
+        'roles',
         context.establishmentId,
-        rolesCount,
-        context.ipAddress,
-        context.userAgent
+        { context, rolesCount },
+        undefined,
+        context.userId
       );
 
       this.logger.info(
@@ -48,8 +44,11 @@ export class RoleAuditLogger {
     } catch (error) {
       this.logger.error(
         'Failed to log role viewing',
-        error as Error,
-        { context, rolesCount },
+        { 
+          error: error as Error,
+          context, 
+          rolesCount 
+        },
         'ROLE_AUDIT_LOGGER'
       );
     }
@@ -63,13 +62,16 @@ export class RoleAuditLogger {
     roleId: string
   ): Promise<void> {
     try {
-      await logViewRoleDetailsOriginal(
-        context.userId,
+      const logger = Logger.getInstance();
+      logger.business(
+        'Role details viewed',
+        'role',
         roleId,
-        context.establishmentId,
-        context.ipAddress,
-        context.userAgent
+        { context },
+        undefined,
+        context.userId
       );
+      // Function call removed - using direct logging above
 
       this.logger.info(
         'Role details viewing logged',
@@ -83,8 +85,11 @@ export class RoleAuditLogger {
     } catch (error) {
       this.logger.error(
         'Failed to log role details viewing',
-        error as Error,
-        { context, roleId },
+        { 
+          error: error as Error,
+          context, 
+          roleId 
+        },
         'ROLE_AUDIT_LOGGER'
       );
     }
@@ -102,17 +107,16 @@ export class RoleAuditLogger {
     }
   ): Promise<void> {
     try {
-      await logCreateCustomRoleOriginal(
-        context.userId,
-        {
-          roleId: roleData.roleId,
-          roleName: roleData.roleName,
-          establishmentId: context.establishmentId,
-          permissions: roleData.permissions
-        },
-        context.ipAddress,
-        context.userAgent
+      const logger = Logger.getInstance();
+      logger.business(
+        'Custom role created',
+        'role',
+        roleData.roleId,
+        { context, roleData },
+        undefined,
+        context.userId
       );
+      // Function call removed - using direct logging above
 
       this.logger.info(
         'Role creation logged',
@@ -127,8 +131,11 @@ export class RoleAuditLogger {
     } catch (error) {
       this.logger.error(
         'Failed to log role creation',
-        error as Error,
-        { context, roleData },
+        { 
+          error: error as Error,
+          context, 
+          roleData 
+        },
         'ROLE_AUDIT_LOGGER'
       );
     }
@@ -149,16 +156,16 @@ export class RoleAuditLogger {
     }
   ): Promise<void> {
     try {
-      await logUpdateCustomRoleOriginal(
-        context.userId,
-        {
-          roleId: roleData.roleId,
-          updates: roleData.updates,
-          establishmentId: context.establishmentId
-        },
-        context.ipAddress,
-        context.userAgent
+      const logger = Logger.getInstance();
+      logger.business(
+        'Custom role updated',
+        'role',
+        roleData.roleId,
+        { context, roleData },
+        undefined,
+        context.userId
       );
+      // Function call removed - using direct logging above
 
       this.logger.info(
         'Role update logged',
@@ -173,8 +180,11 @@ export class RoleAuditLogger {
     } catch (error) {
       this.logger.error(
         'Failed to log role update',
-        error as Error,
-        { context, roleData },
+        { 
+          error: error as Error,
+          context, 
+          roleData 
+        },
         'ROLE_AUDIT_LOGGER'
       );
     }
@@ -191,16 +201,16 @@ export class RoleAuditLogger {
     }
   ): Promise<void> {
     try {
-      await logDeleteCustomRoleOriginal(
-        context.userId,
-        {
-          roleId: roleData.roleId,
-          roleName: roleData.roleName,
-          establishmentId: context.establishmentId
-        },
-        context.ipAddress,
-        context.userAgent
+      const logger = Logger.getInstance();
+      logger.business(
+        'Custom role deleted',
+        'role',
+        roleData.roleId,
+        { context, roleData },
+        undefined,
+        context.userId
       );
+      // Function call removed - using direct logging above
 
       this.logger.info(
         'Role deletion logged',
@@ -215,8 +225,11 @@ export class RoleAuditLogger {
     } catch (error) {
       this.logger.error(
         'Failed to log role deletion',
-        error as Error,
-        { context, roleData },
+        { 
+          error: error as Error,
+          context, 
+          roleData 
+        },
         'ROLE_AUDIT_LOGGER'
       );
     }
@@ -246,8 +259,12 @@ export class RoleAuditLogger {
     } catch (error) {
       this.logger.error(
         'Failed to log permission access',
-        error as Error,
-        { context, roleId, isSystemRole },
+        { 
+          error: error as Error,
+          context, 
+          roleId, 
+          isSystemRole 
+        },
         'ROLE_AUDIT_LOGGER'
       );
     }
@@ -279,8 +296,13 @@ export class RoleAuditLogger {
     } catch (error) {
       this.logger.error(
         'Failed to log access denied event',
-        error as Error,
-        { context, action, reason, targetResource },
+        { 
+          error: error as Error,
+          context, 
+          action, 
+          reason, 
+          targetResource 
+        },
         'ROLE_AUDIT_LOGGER'
       );
     }
@@ -312,8 +334,12 @@ export class RoleAuditLogger {
     } catch (error) {
       this.logger.error(
         'Failed to log validation error',
-        error as Error,
-        { context, action, errors },
+        { 
+          error: error as Error,
+          context, 
+          action, 
+          errors 
+        },
         'ROLE_AUDIT_LOGGER'
       );
     }
