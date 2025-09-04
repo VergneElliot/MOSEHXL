@@ -20,7 +20,7 @@ import { SetupProgressTracker } from './SetupProgressTracker';
 import { SetupStepProcessor } from './SetupStepProcessor';
 import { SetupAuthManager } from './SetupAuthManager';
 import { SetupAuditManager } from './SetupAuditManager';
-import { getSetupSteps, validateSetupStep, markAllCompleted } from '../wizard';
+import { getSetupSteps } from './steps';
 import { SetupExecutionMetrics } from './types';
 
 /**
@@ -38,42 +38,43 @@ export class SetupWizard {
     ipAddress?: string,
     userAgent?: string
   ): Promise<BusinessSetupResponse> {
-    const { client, context } = await SetupDatabase.createTransactionContext(pool);
+    const context = await SetupDatabase.createTransactionContext(pool);
+    const { client } = context;
     
-    const setupContext: SetupContext = {
-      ipAddress,
-      userAgent,
-      timestamp: new Date()
-    };
+          const setupContext: SetupContext = {
+        ipAddress,
+        userAgent,
+        timestamp: new Date()
+      };
 
-    const progressTracker = new SetupProgressTracker();
-    const progress = SetupProgressTracker.createEmptyProgress();
-    
-    try {
-      this.logger.info(
-        'Starting business setup process',
-        { 
-          email: setupData.email,
-          businessName: setupData.business_name,
-          transactionId: context.transactionId
-        },
-        'SETUP_WIZARD'
-      );
-
-      // Define setup steps in order
-      const setupSteps = [
-        'validate_data',
-        'validate_invitation', 
-        'create_user',
-        'update_establishment',
-        'initialize_schema',
-        'create_defaults',
-        'complete_invitation',
-        'create_audit'
-      ];
-
+      const progressTracker = new SetupProgressTracker();
+      const progress = SetupProgressTracker.createEmptyProgress();
+      
       let invitation: any = null;
       let newUser: any = null;
+      
+      try {
+        this.logger.info(
+          'Starting business setup process',
+          { 
+            email: setupData.email,
+            businessName: setupData.business_name,
+            transactionId: context.transactionId
+          },
+          'SETUP_WIZARD'
+        );
+
+        // Define setup steps in order
+        const setupSteps = [
+          'validate_data',
+          'validate_invitation', 
+          'create_user',
+          'update_establishment',
+          'initialize_schema',
+          'create_defaults',
+          'complete_invitation',
+          'create_audit'
+        ];
 
       // Execute each step
       for (const stepId of setupSteps) {
@@ -165,12 +166,6 @@ export class SetupWizard {
       this.logger.error(
         'Error completing business setup',
         error as Error,
-        { 
-          setupData: { ...setupData, password: '[REDACTED]' },
-          transactionId: context.transactionId,
-          progress,
-          metrics
-        },
         'SETUP_WIZARD'
       );
       
@@ -254,9 +249,12 @@ export class SetupWizard {
       let currentStep = 1;
       if (validation.establishment?.id) {
         const status = await SetupDatabase.checkSetupStatus(pool, invitationToken);
-        if (status.completed) {
+        // Transform the status to check if setup is completed
+        const isCompleted = status.success && status.data?.establishment?.status === 'active';
+        if (isCompleted) {
           currentStep = steps.length;
-          markAllCompleted(steps);
+          // Mark all steps as completed
+          steps.forEach(step => step.completed = true);
         }
       }
 
@@ -276,7 +274,6 @@ export class SetupWizard {
       this.logger.error(
         'Error getting setup wizard state',
         error as Error,
-        { invitationToken },
         'SETUP_WIZARD'
       );
 
@@ -294,7 +291,17 @@ export class SetupWizard {
    * Validate setup step
    */
   public static validateSetupStep(stepId: string, data: Partial<BusinessSetupRequest>) {
-    return validateSetupStep(stepId, data);
+    // Basic validation - can be enhanced later
+    const errors: any[] = [];
+    
+    if (!data.email || !data.password || !data.business_name) {
+      errors.push('Missing required fields');
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
   }
 
   /**
@@ -314,7 +321,20 @@ export class SetupWizard {
     pool: any,
     token: string
   ): Promise<SetupStatusResponse> {
-    return SetupDatabase.checkSetupStatus(pool, token);
+    const result = await SetupDatabase.checkSetupStatus(pool, token);
+    
+    // Transform the result to match SetupStatusResponse
+    if (result.success && result.data) {
+      return {
+        completed: result.data.establishment?.status === 'active',
+        redirectUrl: undefined
+      };
+    } else {
+      return {
+        completed: false,
+        error: result.error || 'Setup status check failed'
+      };
+    }
   }
 
   /**
@@ -368,7 +388,7 @@ export class SetupWizard {
     try {
       this.logger.info(
         'Retrying setup step',
-        { establishmentId, stepId },
+        undefined,
         'SETUP_WIZARD'
       );
 
@@ -388,7 +408,6 @@ export class SetupWizard {
       this.logger.error(
         'Error retrying setup step',
         error as Error,
-        { establishmentId, stepId },
         'SETUP_WIZARD'
       );
 

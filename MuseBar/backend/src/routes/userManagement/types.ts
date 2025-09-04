@@ -7,20 +7,13 @@ import { Request, Response, NextFunction } from 'express';
 import { Logger } from '../../utils/logger';
 import { UserInvitationService } from '../../services/userInvitationService';
 import { EnvironmentConfig } from '../../config/environment';
+import { AuthenticatedUser } from '../../models/user';
 
 /**
  * Extended request interface with user information
  */
 export interface AuthenticatedRequest extends Request {
-  user?: {
-    id: number;
-    email: string;
-    first_name: string;
-    last_name: string;
-    role: string;
-    establishment_id: string | undefined;
-    is_admin: boolean;
-  };
+  user?: AuthenticatedUser & { [key: string]: unknown };
 }
 
 /**

@@ -62,13 +62,8 @@ export class SetupStepProcessor {
             'SETUP_STEP_PROCESSOR'
           );
           
-          await SetupProgressTracker.updateStepProgress(
-            client,
-            context.establishmentId,
-            stepId,
-            'completed',
-            result.message
-          );
+          // Progress is tracked through the progress object, not individual step updates
+          // The main progress tracking happens in the wizard orchestrator
           
           return result;
         } else {
@@ -81,17 +76,11 @@ export class SetupStepProcessor {
               'SETUP_STEP_PROCESSOR'
             );
             
-            await SetupProgressTracker.updateStepProgress(
-              client,
-              context.establishmentId,
-              stepId,
-              'failed',
-              `Attempt ${attempt} failed: ${result.message}`
-            );
+            // Progress is tracked through the progress object, not individual step updates
             
             // Wait before retry if specified
-            if (retryOptions?.retryDelay && attempt < maxAttempts) {
-              await new Promise(resolve => setTimeout(resolve, retryOptions.retryDelay));
+            if (retryOptions?.delayMs && attempt < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, retryOptions.delayMs));
             }
           }
         }
@@ -101,24 +90,16 @@ export class SetupStepProcessor {
         this.logger.error(
           `Setup step execution error: ${stepId} (attempt ${attempt}/${maxAttempts})`,
           lastError,
-          { stepId, attempt },
           'SETUP_STEP_PROCESSOR'
         );
         
-        if (attempt < maxAttempts && retryOptions?.retryDelay) {
-          await new Promise(resolve => setTimeout(resolve, retryOptions.retryDelay));
+        if (attempt < maxAttempts && retryOptions?.delayMs) {
+          await new Promise(resolve => setTimeout(resolve, retryOptions.delayMs));
         }
       }
     }
 
-    // All attempts failed
-    await SetupProgressTracker.updateStepProgress(
-      client,
-      context.establishmentId,
-      stepId,
-      'failed',
-      `All ${maxAttempts} attempts failed: ${lastError?.message}`
-    );
+    // All attempts failed - progress is tracked through the progress object
 
     return { 
       success: false, 

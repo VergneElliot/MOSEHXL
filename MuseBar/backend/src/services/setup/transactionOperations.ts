@@ -25,10 +25,8 @@ export class TransactionOperations {
       
       return {
         client,
-        pool,
-        release: () => {
-          client.release();
-        }
+        transactionId: `tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        startTime: new Date()
       };
 
     } catch (error) {
@@ -48,7 +46,8 @@ export class TransactionOperations {
       await client.query('COMMIT');
       
       if (context) {
-        context.release();
+        // Release the client connection
+        context.client.release();
       }
 
       this.logger.info('Transaction committed successfully');
@@ -60,7 +59,8 @@ export class TransactionOperations {
       try {
         await client.query('ROLLBACK');
         if (context) {
-          context.release();
+          // Release the client connection
+          context.client.release();
         }
       } catch (rollbackError) {
         this.logger.error('Error during rollback after commit failure:', rollbackError as Error);
@@ -82,7 +82,8 @@ export class TransactionOperations {
       await client.query('ROLLBACK');
       
       if (context) {
-        context.release();
+        // Release the client connection
+        context.client.release();
       }
 
       if (error) {
@@ -96,7 +97,7 @@ export class TransactionOperations {
       
       if (context) {
         try {
-          context.release();
+          context.client.release();
         } catch (releaseError) {
           this.logger.error('Error releasing connection after rollback failure:', releaseError as Error);
         }

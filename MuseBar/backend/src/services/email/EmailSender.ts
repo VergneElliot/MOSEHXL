@@ -56,9 +56,7 @@ export class EmailSender {
       
       if (!apiKey) {
         this.logger.warn(
-          'SendGrid API key not configured. Email service will be disabled.',
-          {},
-          'EMAIL_SENDER'
+          'SendGrid API key not configured. Email service will be disabled.'
         );
         return;
       }
@@ -67,15 +65,12 @@ export class EmailSender {
       this.isConfigured = true;
 
       this.logger.info(
-        'Email sender initialized successfully',
-        { provider: 'SendGrid' },
-        'EMAIL_SENDER'
+        'Email sender initialized successfully'
       );
     } catch (error) {
       this.logger.error(
         'Failed to initialize email sender',
         error as Error,
-        {},
         'EMAIL_SENDER'
       );
     }
@@ -115,14 +110,7 @@ export class EmailSender {
       const messageId = response[0].headers['x-message-id'];
 
       this.logger.info(
-        'Email sent successfully via provider',
-        {
-          trackingId: options.trackingId,
-          recipients: Array.isArray(options.to) ? options.to.length : 1,
-          subject: options.subject,
-          messageId,
-        },
-        'EMAIL_SENDER'
+        'Email sent successfully via provider'
       );
 
       return {
@@ -135,13 +123,7 @@ export class EmailSender {
 
       this.logger.error(
         'Failed to send email via provider',
-        error as Error,
-        {
-          trackingId: options.trackingId,
-          recipients: Array.isArray(options.to) ? options.to.length : 1,
-          subject: options.subject,
-        },
-        'EMAIL_SENDER'
+        error as Error
       );
 
       return {
@@ -187,9 +169,7 @@ export class EmailSender {
     } catch (error) {
       this.logger.error(
         'Email configuration test failed',
-        error as Error,
-        { testEmail },
-        'EMAIL_SENDER'
+        error as Error
       );
       return false;
     }

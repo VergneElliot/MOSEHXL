@@ -50,7 +50,6 @@ export class SetupService {
       this.logger.error(
         'Error validating invitation',
         error as Error,
-        { token },
         'SETUP_SERVICE'
       );
       return {
@@ -66,12 +65,24 @@ export class SetupService {
    */
   async checkSetupStatus(token: string): Promise<SetupStatusResponse> {
     try {
-      return await SetupDatabase.checkSetupStatus(pool, token);
+      const result = await SetupDatabase.checkSetupStatus(pool, token);
+      
+      // Transform the result to match SetupStatusResponse
+      if (result.success && result.data) {
+        return {
+          completed: result.data.establishment?.status === 'active',
+          redirectUrl: undefined
+        };
+      } else {
+        return {
+          completed: false,
+          error: result.error || 'Setup status check failed'
+        };
+      }
     } catch (error) {
       this.logger.error(
         'Error checking setup status',
         error as Error,
-        { token },
         'SETUP_SERVICE'
       );
       return {
@@ -100,7 +111,6 @@ export class SetupService {
       this.logger.error(
         'Error completing business setup',
         error as Error,
-        { setupData: { ...setupData, password: '[REDACTED]' } },
         'SETUP_SERVICE'
       );
       return {
@@ -120,7 +130,6 @@ export class SetupService {
       this.logger.error(
         'Error getting setup wizard state',
         error as Error,
-        { invitationToken },
         'SETUP_SERVICE'
       );
       
@@ -148,7 +157,6 @@ export class SetupService {
       this.logger.error(
         'Error validating setup data',
         error as Error,
-        { setupData: { ...setupData, password: '[REDACTED]' } },
         'SETUP_SERVICE'
       );
       return {
@@ -185,7 +193,6 @@ export class SetupService {
       this.logger.error(
         'Error getting setup progress',
         error as Error,
-        { establishmentId },
         'SETUP_SERVICE'
       );
       return null;
@@ -202,7 +209,6 @@ export class SetupService {
       this.logger.error(
         'Error cleaning up failed setup',
         error as Error,
-        { establishmentId, userId },
         'SETUP_SERVICE'
       );
       throw error;
@@ -222,7 +228,6 @@ export class SetupService {
       this.logger.error(
         'Error retrying setup step',
         error as Error,
-        { establishmentId, stepId },
         'SETUP_SERVICE'
       );
       return {
@@ -292,7 +297,6 @@ export class SetupService {
       this.logger.error(
         'Setup service connectivity test failed',
         error as Error,
-        {},
         'SETUP_SERVICE'
       );
       return false;

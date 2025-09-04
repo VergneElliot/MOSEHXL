@@ -103,7 +103,6 @@ export class SetupDefaults {
       this.logger.error(
         'Error creating default data',
         error as Error,
-        { establishmentId },
         'SETUP_DEFAULTS'
       );
       throw error;
@@ -122,7 +121,7 @@ export class SetupDefaults {
     try {
       this.logger.info(
         'Customizing default data for business type',
-        { establishmentId, businessType },
+        undefined,
         'SETUP_DEFAULTS'
       );
 
@@ -144,14 +143,13 @@ export class SetupDefaults {
 
       this.logger.info(
         'Business type customization completed',
-        { establishmentId, businessType },
+        undefined,
         'SETUP_DEFAULTS'
       );
     } catch (error) {
       this.logger.error(
         'Error customizing for business type',
         error as Error,
-        { establishmentId, businessType },
         'SETUP_DEFAULTS'
       );
       throw error;
@@ -262,14 +260,13 @@ export class SetupDefaults {
 
       this.logger.info(
         'Default data removed successfully',
-        { establishmentId },
+        undefined,
         'SETUP_DEFAULTS'
       );
     } catch (error) {
       this.logger.error(
         'Error removing default data',
         error as Error,
-        { establishmentId },
         'SETUP_DEFAULTS'
       );
       throw error;

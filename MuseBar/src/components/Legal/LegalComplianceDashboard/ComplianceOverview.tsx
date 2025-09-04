@@ -68,12 +68,7 @@ export const ComplianceOverview: React.FC<ComplianceOverviewProps> = ({
     }
   };
 
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(amount);
-  };
+
 
   const formatDate = (date: string): string => {
     if (!date) return 'N/A';

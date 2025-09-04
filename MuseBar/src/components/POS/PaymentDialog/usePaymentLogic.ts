@@ -58,7 +58,8 @@ export const usePaymentLogic = (
     if (stateHook.state.tabValue === 1) { // Split payment tab
       calculationsHook.initializeSplitBills();
     }
-  }, [stateHook.state.splitType, stateHook.state.splitCount, stateHook.state.tabValue]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stateHook.state.splitType, stateHook.state.splitCount, stateHook.state.tabValue, calculationsHook.initializeSplitBills]);
 
   // Composite operations that combine multiple hooks
   const handleTabChange = useCallback((newValue: number) => {
@@ -66,6 +67,7 @@ export const usePaymentLogic = (
     if (newValue === 1) {
       calculationsHook.initializeSplitBills();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stateHook.setTabValue, calculationsHook.initializeSplitBills]);
 
   return {

@@ -19,7 +19,7 @@ export class SetupAuthManager {
   public static generateAuthToken(
     user: any, 
     establishmentId: string,
-    expiresIn: string = '7d'
+    expiresIn: '7d' | '24h' | '1h' | '30m' = '7d'
   ): string {
     const jwtSecret = process.env.JWT_SECRET;
     if (!jwtSecret) {
@@ -39,12 +39,7 @@ export class SetupAuthManager {
       
       this.logger.debug(
         'Authentication token generated for setup completion',
-        { 
-          userId: user.id, 
-          email: user.email, 
-          establishmentId,
-          expiresIn 
-        },
+        undefined,
         'SETUP_AUTH'
       );
 
@@ -53,7 +48,6 @@ export class SetupAuthManager {
       this.logger.error(
         'Failed to generate authentication token',
         error as Error,
-        { userId: user.id, establishmentId },
         'SETUP_AUTH'
       );
       throw new Error('Failed to generate authentication token');
@@ -74,7 +68,7 @@ export class SetupAuthManager {
       
       this.logger.debug(
         'Authentication token verified',
-        { userId: decoded.userId, establishmentId: decoded.establishmentId },
+        undefined,
         'SETUP_AUTH'
       );
 
@@ -82,7 +76,7 @@ export class SetupAuthManager {
     } catch (error) {
       this.logger.warn(
         'Invalid authentication token',
-        { error: (error as Error).message },
+        undefined,
         'SETUP_AUTH'
       );
       throw new Error('Invalid authentication token');
@@ -95,7 +89,7 @@ export class SetupAuthManager {
   public static generateTemporaryToken(
     establishmentId: string,
     stepId: string,
-    expiresIn: string = '1h'
+    expiresIn: '7d' | '24h' | '1h' | '30m' = '1h'
   ): string {
     const jwtSecret = process.env.JWT_SECRET;
     if (!jwtSecret) {
@@ -115,7 +109,7 @@ export class SetupAuthManager {
       
       this.logger.debug(
         'Temporary setup token generated',
-        { establishmentId, stepId, expiresIn },
+        undefined,
         'SETUP_AUTH'
       );
 
@@ -124,7 +118,6 @@ export class SetupAuthManager {
       this.logger.error(
         'Failed to generate temporary setup token',
         error as Error,
-        { establishmentId, stepId },
         'SETUP_AUTH'
       );
       throw new Error('Failed to generate temporary setup token');

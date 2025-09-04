@@ -35,8 +35,7 @@ export class CompletionStepProcessor {
       await SetupDatabase.completeInvitation(
         client,
         setupData.invitation_token,
-        existingUser.userId!,
-        invitation.establishment_id
+        existingUser.userId!
       );
       
       return { 

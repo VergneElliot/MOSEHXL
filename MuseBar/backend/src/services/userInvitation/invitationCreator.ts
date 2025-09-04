@@ -68,7 +68,6 @@ export class InvitationCreator {
       this.logger.error(
         'Failed to create establishment invitation record',
         error as Error,
-        { establishmentData: data },
         'INVITATION_CREATOR'
       );
 
@@ -109,13 +108,7 @@ export class InvitationCreator {
 
       this.logger.info(
         'User invitation record created',
-        {
-          invitationId,
-          userEmail: data.email,
-          role: data.role,
-          establishmentId: data.establishmentId,
-          inviterUserId: data.inviterUserId
-        },
+        undefined,
         'INVITATION_CREATOR'
       );
 
@@ -130,7 +123,6 @@ export class InvitationCreator {
       this.logger.error(
         'Failed to create user invitation record',
         error as Error,
-        { userData: data },
         'INVITATION_CREATOR'
       );
 
@@ -157,7 +149,6 @@ export class InvitationCreator {
       this.logger.error(
         'Failed to get invitation by ID',
         error as Error,
-        { invitationId },
         'INVITATION_CREATOR'
       );
       throw error;
@@ -180,7 +171,6 @@ export class InvitationCreator {
       this.logger.error(
         'Failed to get invitation by token',
         error as Error,
-        { token },
         'INVITATION_CREATOR'
       );
       throw error;
@@ -204,7 +194,6 @@ export class InvitationCreator {
       this.logger.error(
         'Failed to get pending invitations',
         error as Error,
-        { establishmentId },
         'INVITATION_CREATOR'
       );
       throw error;
@@ -225,7 +214,7 @@ export class InvitationCreator {
       if (result.rowCount && result.rowCount > 0) {
         this.logger.info(
           'Invitation cancelled successfully',
-          { invitationId, cancelledBy: userId },
+          undefined,
           'INVITATION_CREATOR'
         );
         return true;
@@ -237,7 +226,6 @@ export class InvitationCreator {
       this.logger.error(
         'Failed to cancel invitation',
         error as Error,
-        { invitationId, userId },
         'INVITATION_CREATOR'
       );
       throw error;
@@ -260,7 +248,7 @@ export class InvitationCreator {
       if (expiredCount > 0) {
         this.logger.info(
           'Expired invitations cleaned up',
-          { expiredCount },
+          undefined,
           'INVITATION_CREATOR'
         );
       }
@@ -271,7 +259,6 @@ export class InvitationCreator {
       this.logger.error(
         'Failed to cleanup expired invitations',
         error as Error,
-        {},
         'INVITATION_CREATOR'
       );
       throw error;

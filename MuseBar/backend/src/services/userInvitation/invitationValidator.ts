@@ -77,7 +77,6 @@ export class InvitationValidator {
       this.logger.error(
         'Error validating establishment invitation',
         error as Error,
-        { email: data.email },
         'INVITATION_VALIDATOR'
       );
       
@@ -157,7 +156,6 @@ export class InvitationValidator {
       this.logger.error(
         'Error validating user invitation',
         error as Error,
-        { email: data.email, establishmentId: data.establishmentId },
         'INVITATION_VALIDATOR'
       );
       
@@ -202,7 +200,6 @@ export class InvitationValidator {
       this.logger.error(
         'Error validating invitation token',
         error as Error,
-        { token },
         'INVITATION_VALIDATOR'
       );
       

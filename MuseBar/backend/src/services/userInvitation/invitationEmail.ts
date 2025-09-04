@@ -71,10 +71,6 @@ export class InvitationEmail {
       this.logger.error(
         'Failed to send establishment invitation email',
         error as Error,
-        { 
-          invitationId: invitation.id,
-          establishmentEmail: invitation.email 
-        },
         'INVITATION_EMAIL'
       );
 
@@ -117,14 +113,7 @@ export class InvitationEmail {
 
       this.logger.info(
         'User invitation email sent successfully',
-        {
-          invitationId: invitation.id,
-          userEmail: invitation.email,
-          role: userData.role,
-          establishmentId: userData.establishmentId,
-          inviterUserId: userData.inviterUserId,
-          emailTrackingId
-        },
+        undefined,
         'INVITATION_EMAIL'
       );
 
@@ -140,10 +129,6 @@ export class InvitationEmail {
       this.logger.error(
         'Failed to send user invitation email',
         error as Error,
-        { 
-          invitationId: invitation.id,
-          userEmail: invitation.email 
-        },
         'INVITATION_EMAIL'
       );
 
@@ -212,10 +197,6 @@ export class InvitationEmail {
       this.logger.error(
         'Failed to send invitation reminder email',
         error as Error,
-        { 
-          invitationId: invitation.id,
-          email: invitation.email 
-        },
         'INVITATION_EMAIL'
       );
 
@@ -247,11 +228,7 @@ export class InvitationEmail {
 
       this.logger.info(
         'Invitation cancellation email sent successfully',
-        {
-          invitationId: invitation.id,
-          email: invitation.email,
-          emailTrackingId
-        },
+        undefined,
         'INVITATION_EMAIL'
       );
 
@@ -267,10 +244,6 @@ export class InvitationEmail {
       this.logger.error(
         'Failed to send invitation cancellation email',
         error as Error,
-        { 
-          invitationId: invitation.id,
-          email: invitation.email 
-        },
         'INVITATION_EMAIL'
       );
 
@@ -293,7 +266,6 @@ export class InvitationEmail {
       this.logger.error(
         'Failed to test email configuration',
         error as Error,
-        {},
         'INVITATION_EMAIL'
       );
       throw error;
@@ -311,7 +283,6 @@ export class InvitationEmail {
       this.logger.error(
         'Failed to get email stats',
         error as Error,
-        {},
         'INVITATION_EMAIL'
       );
       throw error;
@@ -329,7 +300,6 @@ export class InvitationEmail {
       this.logger.error(
         'Failed to validate email configuration',
         error as Error,
-        {},
         'INVITATION_EMAIL'
       );
       throw error;
