@@ -104,8 +104,8 @@ export const createErrorHandler = (logger?: Logger) => {
     if (logger) {
       logger.error(
         'Request error occurred',
-        err,
         {
+          error: err,
           url: req.originalUrl,
           method: req.method,
           ip: req.ip,
@@ -116,7 +116,7 @@ export const createErrorHandler = (logger?: Logger) => {
         },
         'ERROR_HANDLER',
         requestId,
-        userId ? String(userId) : undefined
+        userId ? parseInt(userId as string) : undefined
       );
     } else {
       console.error('❌ Error:', {

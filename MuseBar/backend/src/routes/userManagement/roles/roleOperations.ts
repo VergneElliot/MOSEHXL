@@ -73,8 +73,10 @@ export class RoleOperations {
     } catch (error) {
       this.logger.error(
         'Failed to get roles',
-        error as Error,
-        { userId: req.user?.id },
+        { 
+          error: error as Error,
+          userId: req.user?.id 
+        },
         'ROLE_OPERATIONS'
       );
       next(error);
@@ -162,8 +164,11 @@ export class RoleOperations {
     } catch (error) {
       this.logger.error(
         'Failed to get role details',
-        error as Error,
-        { roleId: req.params.roleId, userId: req.user?.id },
+        { 
+          error: error as Error,
+          roleId: req.params.roleId, 
+          userId: req.user?.id 
+        },
         'ROLE_OPERATIONS'
       );
       next(error);
@@ -278,8 +283,11 @@ export class RoleOperations {
     } catch (error) {
       this.logger.error(
         'Failed to delete custom role',
-        error as Error,
-        { roleId: req.params.roleId, userId: req.user?.id },
+        { 
+          error: error as Error,
+          roleId: req.params.roleId, 
+          userId: req.user?.id 
+        },
         'ROLE_OPERATIONS'
       );
       next(error);

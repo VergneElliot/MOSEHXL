@@ -95,8 +95,8 @@ export class DatabasePool {
     this.pool.on('error', (error, client) => {
       this.logger.error(
         'Database pool error',
-        error,
         { 
+          error: error,
           totalConnections: this.stats.totalConnections,
           isHealthy: this.stats.isHealthy 
         },
@@ -116,8 +116,7 @@ export class DatabasePool {
       if (error) {
         this.logger.error(
           'Error releasing database client',
-          error,
-          {},
+          { error: error },
           'DATABASE'
         );
       }

@@ -114,8 +114,8 @@ export class EmailLogger {
 
       this.logger.error(
         'Email marked as failed',
-        error instanceof Error ? error : new Error(String(error)),
         {
+          error: error instanceof Error ? error : new Error(String(error)),
           trackingId,
           subject: emailLog.subject,
         },

@@ -56,7 +56,7 @@ export class EstablishmentOperations {
       this.logger.info(`Updated establishment info for: ${establishmentId}`);
 
     } catch (error) {
-      this.logger.error('Error updating establishment info:', error);
+      this.logger.error('Error updating establishment info:', error as Error);
       throw new Error('Failed to update establishment information');
     }
   }
@@ -69,7 +69,7 @@ export class EstablishmentOperations {
       await initializeEstablishmentSchema(establishmentId);
       this.logger.info(`Initialized schema for establishment: ${establishmentId}`);
     } catch (error) {
-      this.logger.error('Error initializing establishment schema:', error);
+      this.logger.error('Error initializing establishment schema:', error as Error);
       throw new Error('Failed to initialize establishment schema');
     }
   }
@@ -94,7 +94,7 @@ export class EstablishmentOperations {
       this.logger.info(`Activated establishment: ${establishmentId}`);
 
     } catch (error) {
-      this.logger.error('Error activating establishment:', error);
+      this.logger.error('Error activating establishment:', error as Error);
       throw new Error('Failed to activate establishment');
     }
   }
@@ -110,7 +110,7 @@ export class EstablishmentOperations {
     try {
       return await EstablishmentQueries.getEstablishmentById(client, establishmentId);
     } catch (error) {
-      this.logger.error('Error getting establishment info:', error);
+      this.logger.error('Error getting establishment info:', error as Error);
       throw new Error('Failed to retrieve establishment information');
     }
   }
@@ -135,7 +135,7 @@ export class EstablishmentOperations {
       this.logger.info(`Created defaults for establishment: ${establishmentId}`);
 
     } catch (error) {
-      this.logger.error('Error creating establishment defaults:', error);
+      this.logger.error('Error creating establishment defaults:', error as Error);
       throw new Error('Failed to create establishment defaults');
     }
   }
@@ -227,7 +227,7 @@ export class EstablishmentOperations {
     try {
       await logProgress(client, establishmentId, progress);
     } catch (error) {
-      this.logger.error('Error logging setup progress:', error);
+      this.logger.error('Error logging setup progress:', error as Error);
       throw new Error('Failed to log setup progress');
     }
   }

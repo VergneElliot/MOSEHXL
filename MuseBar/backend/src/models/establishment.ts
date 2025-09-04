@@ -119,8 +119,10 @@ export class EstablishmentModel {
       
       EstablishmentModel.logger?.error(
         'Failed to create establishment',
-        error as Error,
-        { establishmentData: data },
+        { 
+          error: error as Error,
+          establishmentData: data 
+        },
         'ESTABLISHMENT_MODEL'
       );
       
@@ -144,8 +146,10 @@ export class EstablishmentModel {
     } catch (error) {
       EstablishmentModel.logger?.error(
         'Failed to get establishment by ID',
-        error as Error,
-        { establishmentId: id },
+        { 
+          error: error as Error,
+          establishmentId: id 
+        },
         'ESTABLISHMENT_MODEL'
       );
       throw error;
@@ -166,8 +170,10 @@ export class EstablishmentModel {
     } catch (error) {
       EstablishmentModel.logger?.error(
         'Failed to get establishment by email',
-        error as Error,
-        { email },
+        { 
+          error: error as Error,
+          email 
+        },
         'ESTABLISHMENT_MODEL'
       );
       throw error;
@@ -187,8 +193,7 @@ export class EstablishmentModel {
     } catch (error) {
       EstablishmentModel.logger?.error(
         'Failed to get all establishments',
-        error as Error,
-        {},
+        { error: error as Error },
         'ESTABLISHMENT_MODEL'
       );
       throw error;
@@ -255,8 +260,11 @@ export class EstablishmentModel {
     } catch (error) {
       EstablishmentModel.logger?.error(
         'Failed to update establishment',
-        error as Error,
-        { establishmentId: id, updateData: data },
+        { 
+          error: error as Error,
+          establishmentId: id, 
+          updateData: data 
+        },
         'ESTABLISHMENT_MODEL'
       );
       throw error;
@@ -302,8 +310,10 @@ export class EstablishmentModel {
       
       EstablishmentModel.logger?.error(
         'Failed to delete establishment',
-        error as Error,
-        { establishmentId: id },
+        { 
+          error: error as Error,
+          establishmentId: id 
+        },
         'ESTABLISHMENT_MODEL'
       );
       
@@ -351,8 +361,10 @@ export class EstablishmentModel {
     } catch (error) {
       EstablishmentModel.logger?.error(
         'Failed to get establishment stats',
-        error as Error,
-        { establishmentId: id },
+        { 
+          error: error as Error,
+          establishmentId: id 
+        },
         'ESTABLISHMENT_MODEL'
       );
       throw error;

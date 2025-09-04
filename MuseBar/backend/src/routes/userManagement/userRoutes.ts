@@ -108,8 +108,9 @@ router.get('/establishment-users', requireAuth, async (req: any, res: any, next:
     logger?.error(
       'Failed to get establishment users',
       error as Error,
-      { userId: req.user?.id },
-      'USER_ROUTES'
+      'USER_ROUTES',
+      undefined,
+      req.user?.id
     );
     next(error);
   }
@@ -155,8 +156,9 @@ router.get('/user/:userId', requireAuth, validateParams([
     logger?.error(
       'Failed to get user details',
       error as Error,
-      { userId: req.params.userId, requesterId: req.user?.id },
-      'USER_ROUTES'
+      'USER_ROUTES',
+      undefined,
+      req.user?.id
     );
     next(error);
   }
@@ -251,8 +253,9 @@ router.put('/user/:userId', requireAuth, validateParams([
     logger?.error(
       'Failed to update user',
       error as Error,
-      { userId: req.params.userId, updates: req.body, requesterId: req.user?.id },
-      'USER_ROUTES'
+      'USER_ROUTES',
+      undefined,
+      req.user?.id
     );
     next(error);
   }
@@ -303,8 +306,9 @@ router.delete('/user/:userId', requireAuth, requireAdmin, validateParams([
     logger?.error(
       'Failed to delete/deactivate user',
       error as Error,
-      { userId: req.params.userId, requesterId: req.user?.id },
-      'USER_ROUTES'
+      'USER_ROUTES',
+      undefined,
+      req.user?.id
     );
     next(error);
   }
@@ -349,8 +353,9 @@ router.post('/user/:userId/reactivate', requireAuth, requireAdmin, validateParam
     logger?.error(
       'Failed to reactivate user',
       error as Error,
-      { userId: req.params.userId, requesterId: req.user?.id },
-      'USER_ROUTES'
+      'USER_ROUTES',
+      undefined,
+      req.user?.id
     );
     next(error);
   }

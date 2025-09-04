@@ -93,8 +93,11 @@ export class RolePermissionOperations {
     } catch (error) {
       this.logger.error(
         'Failed to get role permissions',
-        error as Error,
-        { roleId: req.params.roleId, userId: req.user?.id },
+        { 
+          error: error as Error,
+          roleId: req.params.roleId, 
+          userId: req.user?.id 
+        },
         'ROLE_PERMISSION_OPERATIONS'
       );
       next(error);
@@ -180,8 +183,11 @@ export class RolePermissionOperations {
     } catch (error) {
       this.logger.error(
         'Failed to check permission',
-        error as Error,
-        { roleId: req.params.roleId, userId: req.user?.id },
+        { 
+          error: error as Error,
+          roleId: req.params.roleId, 
+          userId: req.user?.id 
+        },
         'ROLE_PERMISSION_OPERATIONS'
       );
       next(error);
@@ -275,8 +281,10 @@ export class RolePermissionOperations {
     } catch (error) {
       this.logger.error(
         'Failed to get available permissions',
-        error as Error,
-        { userId: req.user?.id },
+        { 
+          error: error as Error,
+          userId: req.user?.id 
+        },
         'ROLE_PERMISSION_OPERATIONS'
       );
       next(error);

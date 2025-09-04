@@ -47,7 +47,7 @@ export class DatabaseStatsManager {
     duration: number,
     rowCount: number,
     params?: any[],
-    userId?: string,
+    userId?: number,
     requestId?: string
   ): void {
     this.updateQueryStats(duration);
@@ -61,8 +61,8 @@ export class DatabaseStatsManager {
         query: this.sanitizeQuery(query),
         paramsCount: params?.length || 0,
       },
-      userId,
-      requestId
+      requestId,
+      userId
     );
   }
 
@@ -74,13 +74,13 @@ export class DatabaseStatsManager {
     error: Error,
     duration: number,
     params?: any[],
-    userId?: string,
+    userId?: number,
     requestId?: string
   ): void {
     this.logger.error(
       'Database query failed',
-      error,
       {
+        error: error,
         query: this.sanitizeQuery(query),
         paramsCount: params?.length || 0,
         duration,
@@ -98,7 +98,7 @@ export class DatabaseStatsManager {
     type: 'started' | 'committed' | 'rolled_back',
     duration?: number,
     error?: Error,
-    userId?: string,
+    userId?: number,
     requestId?: string
   ): void {
     if (type === 'started') {
@@ -116,14 +116,16 @@ export class DatabaseStatsManager {
         duration || 0,
         undefined,
         { status: 'committed' },
-        userId,
-        requestId
+        requestId,
+        userId
       );
     } else if (type === 'rolled_back' && error) {
       this.logger.error(
         'Transaction rolled back',
-        error,
-        { duration: duration || 0 },
+        { 
+          error: error,
+          duration: duration || 0 
+        },
         'DATABASE',
         requestId,
         userId

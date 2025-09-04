@@ -38,8 +38,8 @@ export class InputSanitizationService {
         if (logger) {
           logger.error(
             'Input sanitization failed',
-            error as Error,
             {
+              error: error as Error,
               url: req.originalUrl,
               method: req.method,
             },
@@ -176,16 +176,16 @@ export class RequestSizeLimitService {
         if (logger) {
           logger.security(
             'Request size limit exceeded',
-            'low',
+            'LOW',
             {
               contentLength,
               maxSize: maxSizeBytes,
               url: req.originalUrl,
               method: req.method,
+              ip: req.ip,
             },
-            req.user?.id ? String(req.user.id) : undefined,
-            req.ip,
-            req.requestId
+            req.requestId,
+            req.user?.id ? parseInt(String(req.user.id)) : undefined
           );
         }
 

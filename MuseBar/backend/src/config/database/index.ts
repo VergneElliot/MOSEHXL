@@ -3,7 +3,9 @@
  * Exports all database components and maintains backward compatibility
  */
 
-export { DatabaseManager } from './DatabaseManager';
+import { DatabaseManager } from './DatabaseManager';
+
+export { DatabaseManager };
 export { DatabasePool } from './DatabasePool';
 export { DatabaseStatsManager } from './DatabaseStats';
 export { DatabaseHealthMonitor } from './DatabaseHealthMonitor';

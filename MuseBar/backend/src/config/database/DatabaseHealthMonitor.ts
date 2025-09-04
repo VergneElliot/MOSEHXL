@@ -91,8 +91,8 @@ export class DatabaseHealthMonitor {
 
       this.logger.error(
         'Database health check failed',
-        error as Error,
         { 
+          error: error as Error,
           totalConnections: this.pool.totalCount,
           idleConnections: this.pool.idleCount,
           waitingCount: this.pool.waitingCount,

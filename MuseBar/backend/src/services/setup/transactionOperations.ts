@@ -32,7 +32,7 @@ export class TransactionOperations {
       };
 
     } catch (error) {
-      this.logger.error('Error creating transaction context:', error);
+      this.logger.error('Error creating transaction context:', error as Error);
       throw new Error('Failed to create database transaction');
     }
   }
@@ -54,7 +54,7 @@ export class TransactionOperations {
       this.logger.info('Transaction committed successfully');
 
     } catch (error) {
-      this.logger.error('Error committing transaction:', error);
+      this.logger.error('Error committing transaction:', error as Error);
       
       // Attempt rollback on commit failure
       try {
@@ -63,7 +63,7 @@ export class TransactionOperations {
           context.release();
         }
       } catch (rollbackError) {
-        this.logger.error('Error during rollback after commit failure:', rollbackError);
+        this.logger.error('Error during rollback after commit failure:', rollbackError as Error);
       }
       
       throw new Error('Failed to commit transaction');
@@ -92,13 +92,13 @@ export class TransactionOperations {
       }
 
     } catch (rollbackError) {
-      this.logger.error('Error during transaction rollback:', rollbackError);
+      this.logger.error('Error during transaction rollback:', rollbackError as Error);
       
       if (context) {
         try {
           context.release();
         } catch (releaseError) {
-          this.logger.error('Error releasing connection after rollback failure:', releaseError);
+          this.logger.error('Error releasing connection after rollback failure:', releaseError as Error);
         }
       }
       
@@ -148,7 +148,7 @@ export class TransactionOperations {
       this.logger.info(`Cleanup completed for establishment: ${establishmentId}`);
 
     } catch (error) {
-      this.logger.error('Error during cleanup:', error);
+      this.logger.error('Error during cleanup:', error as Error);
       throw new Error('Failed to cleanup failed setup');
     }
   }
@@ -181,7 +181,7 @@ export class TransactionOperations {
       const result = await client.query('SELECT txid_current()');
       return result.rows[0]?.txid_current || 'unknown';
     } catch (error) {
-      this.logger.error('Error getting transaction status:', error);
+      this.logger.error('Error getting transaction status:', error as Error);
       return 'error';
     }
   }
@@ -197,7 +197,7 @@ export class TransactionOperations {
       await client.query(`SAVEPOINT ${savepointName}`);
       this.logger.debug(`Created savepoint: ${savepointName}`);
     } catch (error) {
-      this.logger.error(`Error creating savepoint ${savepointName}:`, error);
+      this.logger.error(`Error creating savepoint ${savepointName}:`, error as Error);
       throw new Error(`Failed to create savepoint: ${savepointName}`);
     }
   }
@@ -213,7 +213,7 @@ export class TransactionOperations {
       await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
       this.logger.debug(`Rolled back to savepoint: ${savepointName}`);
     } catch (error) {
-      this.logger.error(`Error rolling back to savepoint ${savepointName}:`, error);
+      this.logger.error(`Error rolling back to savepoint ${savepointName}:`, error as Error);
       throw new Error(`Failed to rollback to savepoint: ${savepointName}`);
     }
   }
@@ -229,7 +229,7 @@ export class TransactionOperations {
       await client.query(`RELEASE SAVEPOINT ${savepointName}`);
       this.logger.debug(`Released savepoint: ${savepointName}`);
     } catch (error) {
-      this.logger.error(`Error releasing savepoint ${savepointName}:`, error);
+      this.logger.error(`Error releasing savepoint ${savepointName}:`, error as Error);
       // Don't throw here as this is cleanup
     }
   }

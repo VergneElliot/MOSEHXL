@@ -80,8 +80,9 @@ router.get('/team-stats', requireAuth, async (req: any, res: any, next: any) => 
     logger?.error(
       'Failed to get team statistics',
       error as Error,
-      { userId: req.user?.id },
-      'TEAM_ROUTES'
+      'TEAM_ROUTES',
+      undefined,
+      req.user?.id
     );
     next(error);
   }
@@ -136,8 +137,9 @@ router.get('/team-members', requireAuth, async (req: any, res: any, next: any) =
     logger?.error(
       'Failed to get team members',
       error as Error,
-      { userId: req.user?.id },
-      'TEAM_ROUTES'
+      'TEAM_ROUTES',
+      undefined,
+      req.user?.id
     );
     next(error);
   }
@@ -197,8 +199,9 @@ router.post('/test-email', requireAuth, requireAdmin, async (req: any, res: any,
     logger?.error(
       'Failed to test email configuration',
       error as Error,
-      { testEmail: req.body.testEmail, userId: req.user?.id },
-      'TEAM_ROUTES'
+      'TEAM_ROUTES',
+      undefined,
+      req.user?.id
     );
     
     res.status(500).json({
@@ -239,8 +242,9 @@ router.get('/email-stats', requireAuth, requireAdmin, async (req: any, res: any,
     logger?.error(
       'Failed to get email statistics',
       error as Error,
-      { userId: req.user?.id },
-      'TEAM_ROUTES'
+      'TEAM_ROUTES',
+      undefined,
+      req.user?.id
     );
     next(error);
   }
@@ -320,8 +324,9 @@ router.post('/bulk-invite', requireAuth, requireAdmin, async (req: any, res: any
     logger?.error(
       'Failed to send bulk invitations',
       error as Error,
-      { userId: req.user?.id },
-      'TEAM_ROUTES'
+      'TEAM_ROUTES',
+      undefined,
+      req.user?.id
     );
     next(error);
   }

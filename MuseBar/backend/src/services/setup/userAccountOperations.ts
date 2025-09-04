@@ -29,7 +29,7 @@ export class UserAccountOperations {
     try {
       return await UserQueries.checkUserExists(client, email);
     } catch (error) {
-      this.logger.error('Error checking user existence:', error);
+      this.logger.error('Error checking user existence:', error as Error);
       throw new Error('Failed to check user existence');
     }
   }
@@ -76,7 +76,7 @@ export class UserAccountOperations {
       }
 
     } catch (error) {
-      this.logger.error('Error creating/updating user account:', error);
+      this.logger.error('Error creating/updating user account:', error as Error);
       throw new Error('Failed to create or update user account');
     }
   }
@@ -122,7 +122,7 @@ export class UserAccountOperations {
       return newUserResult.rows[0];
 
     } catch (error) {
-      this.logger.error('Error creating new user:', error);
+      this.logger.error('Error creating new user:', error as Error);
       throw new Error('Failed to create new user account');
     }
   }
@@ -150,7 +150,7 @@ export class UserAccountOperations {
       return await bcrypt.compare(password, password_hash);
 
     } catch (error) {
-      this.logger.error('Error validating user credentials:', error);
+      this.logger.error('Error validating user credentials:', error as Error);
       return false;
     }
   }
@@ -177,7 +177,7 @@ export class UserAccountOperations {
       this.logger.info(`Updated user role: ${userId} -> ${role} (admin: ${isAdmin})`);
 
     } catch (error) {
-      this.logger.error('Error updating user role:', error);
+      this.logger.error('Error updating user role:', error as Error);
       throw new Error('Failed to update user role');
     }
   }
@@ -193,7 +193,7 @@ export class UserAccountOperations {
     try {
       return await UserQueries.getUserWithEstablishment(client, userId);
     } catch (error) {
-      this.logger.error('Error getting user with establishment:', error);
+      this.logger.error('Error getting user with establishment:', error as Error);
       throw new Error('Failed to retrieve user information');
     }
   }
