@@ -14,6 +14,7 @@ import { UserInvitationTemplate } from './userInvitationTemplate';
 import { PasswordResetTemplate } from './passwordResetTemplate';
 import { EmailVerificationTemplate } from './emailVerificationTemplate';
 import { EstablishmentSetupTemplate } from './establishmentSetupTemplate';
+import { EstablishmentCreatedTemplate } from './establishmentCreatedTemplate';
 
 /**
  * Built-in email templates registry - delegates to specialized template modules
@@ -31,6 +32,7 @@ export class BuiltInTemplates {
     templates.set(BuiltInTemplateId.PASSWORD_RESET, PasswordResetTemplate.getTemplate());
     templates.set(BuiltInTemplateId.EMAIL_VERIFICATION, EmailVerificationTemplate.getTemplate());
     templates.set(BuiltInTemplateId.ESTABLISHMENT_SETUP, EstablishmentSetupTemplate.getTemplate());
+    templates.set(BuiltInTemplateId.ESTABLISHMENT_CREATED, EstablishmentCreatedTemplate.getTemplate());
 
     return templates;
   }
@@ -52,6 +54,9 @@ export class BuiltInTemplates {
       case BuiltInTemplateId.ESTABLISHMENT_SETUP:
         return EstablishmentSetupTemplate.getTemplate();
       
+      case BuiltInTemplateId.ESTABLISHMENT_CREATED:
+        return EstablishmentCreatedTemplate.getTemplate();
+      
       default:
         return null;
     }
@@ -65,7 +70,8 @@ export class BuiltInTemplates {
       BuiltInTemplateId.USER_INVITATION,
       BuiltInTemplateId.PASSWORD_RESET,
       BuiltInTemplateId.EMAIL_VERIFICATION,
-      BuiltInTemplateId.ESTABLISHMENT_SETUP
+      BuiltInTemplateId.ESTABLISHMENT_SETUP,
+      BuiltInTemplateId.ESTABLISHMENT_CREATED
     ];
   }
 

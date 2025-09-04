@@ -51,5 +51,6 @@ export enum BuiltInTemplateId {
   USER_INVITATION = 'user_invitation',
   PASSWORD_RESET = 'password_reset',
   EMAIL_VERIFICATION = 'email_verification',
-  ESTABLISHMENT_SETUP = 'establishment_setup'
+  ESTABLISHMENT_SETUP = 'establishment_setup',
+  ESTABLISHMENT_CREATED = 'establishment_created'
 }
