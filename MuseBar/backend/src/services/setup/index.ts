@@ -1,6 +1,7 @@
 /**
  * Setup Service Module - Clean Exports
- * Provides a modular setup system for business establishment configuration
+ * UPDATED: Provides a modular setup system with specialized database operation modules
+ * Maintains backward compatibility while providing access to focused modules
  */
 
 // Core classes
@@ -8,6 +9,12 @@ export { SetupValidator } from './setupValidator';
 export { SetupDatabase } from './setupDatabase';
 export { SetupDefaults } from './setupDefaults';
 export { SetupWizard } from './setupWizard';
+
+// Specialized database operation modules
+export { InvitationOperations } from './invitationOperations';
+export { UserAccountOperations } from './userAccountOperations';
+export { EstablishmentOperations } from './establishmentOperations';
+export { TransactionOperations } from './transactionOperations';
 
 // Types
 export type {

@@ -1,20 +1,26 @@
 /**
  * Setup Step Processor
- * Handles individual step processing logic for setup wizard
+ * REFACTORED: Main step processor that delegates to specialized step processors
+ * The original 449-line processor has been modularized into:
+ * - validationStepProcessor.ts (Validation operations)
+ * - userStepProcessor.ts (User management operations)
+ * - dataStepProcessor.ts (Database/schema operations)
+ * - completionStepProcessor.ts (Completion operations)
+ * - SetupStepProcessor.ts (Main coordinator)
  */
 
 import { PoolClient } from 'pg';
 import { Logger } from '../../../utils/logger';
 import { BusinessSetupRequest, SetupContext, SetupProgress } from '../types';
-import { SetupValidator } from '../setupValidator';
-import { SetupDatabase } from '../setupDatabase';
-import { SetupDefaults } from '../setupDefaults';
 import { SetupProgressTracker } from './SetupProgressTracker';
-import { SetupAuditManager } from './SetupAuditManager';
 import { SetupStepResult, SetupRetryOptions } from './types';
+import { ValidationStepProcessor } from './validationStepProcessor';
+import { UserStepProcessor } from './userStepProcessor';
+import { DataStepProcessor } from './dataStepProcessor';
+import { CompletionStepProcessor } from './completionStepProcessor';
 
 /**
- * Setup step processing service
+ * Main setup step processing service - delegates to specialized processors
  */
 export class SetupStepProcessor {
   private static logger = Logger.getInstance();
@@ -55,52 +61,74 @@ export class SetupStepProcessor {
             { stepId, attempt },
             'SETUP_STEP_PROCESSOR'
           );
-          return result;
-        }
-
-        lastError = result.error || new Error('Step failed without specific error');
-        
-        if (attempt < maxAttempts) {
-          const delayMs = retryOptions?.exponentialBackoff 
-            ? (retryOptions.delayMs || 1000) * Math.pow(2, attempt - 1)
-            : (retryOptions?.delayMs || 1000);
           
-          this.logger.warn(
-            `Setup step failed, retrying in ${delayMs}ms: ${stepId}`,
-            { stepId, attempt, error: lastError.message },
-            'SETUP_STEP_PROCESSOR'
+          await SetupProgressTracker.updateStepProgress(
+            client,
+            context.establishmentId,
+            stepId,
+            'completed',
+            result.message
           );
-
-          await this.delay(delayMs);
+          
+          return result;
+        } else {
+          lastError = result.error || new Error(result.message);
+          
+          if (attempt < maxAttempts) {
+            this.logger.warn(
+              `Setup step failed, retrying: ${stepId} (attempt ${attempt}/${maxAttempts})`,
+              { stepId, attempt, error: lastError.message },
+              'SETUP_STEP_PROCESSOR'
+            );
+            
+            await SetupProgressTracker.updateStepProgress(
+              client,
+              context.establishmentId,
+              stepId,
+              'failed',
+              `Attempt ${attempt} failed: ${result.message}`
+            );
+            
+            // Wait before retry if specified
+            if (retryOptions?.retryDelay && attempt < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, retryOptions.retryDelay));
+            }
+          }
         }
       } catch (error) {
         lastError = error as Error;
         
         this.logger.error(
-          `Setup step error: ${stepId}`,
+          `Setup step execution error: ${stepId} (attempt ${attempt}/${maxAttempts})`,
           lastError,
           { stepId, attempt },
           'SETUP_STEP_PROCESSOR'
         );
-
-        if (attempt < maxAttempts) {
-          const delayMs = retryOptions?.exponentialBackoff 
-            ? (retryOptions.delayMs || 1000) * Math.pow(2, attempt - 1)
-            : (retryOptions?.delayMs || 1000);
-          await this.delay(delayMs);
+        
+        if (attempt < maxAttempts && retryOptions?.retryDelay) {
+          await new Promise(resolve => setTimeout(resolve, retryOptions.retryDelay));
         }
       }
     }
 
-    return {
-      success: false,
-      error: lastError || new Error(`Step ${stepId} failed after ${maxAttempts} attempts`),
-      message: `Failed to complete step ${stepId} after ${maxAttempts} attempts`
+    // All attempts failed
+    await SetupProgressTracker.updateStepProgress(
+      client,
+      context.establishmentId,
+      stepId,
+      'failed',
+      `All ${maxAttempts} attempts failed: ${lastError?.message}`
+    );
+
+    return { 
+      success: false, 
+      error: lastError || new Error('Step execution failed'),
+      message: `Step ${stepId} failed after ${maxAttempts} attempts`
     };
   }
 
   /**
-   * Internal step execution logic
+   * Execute step by delegating to appropriate processor
    */
   private static async executeStepInternal(
     stepId: string,
@@ -110,29 +138,33 @@ export class SetupStepProcessor {
     progress: SetupProgress
   ): Promise<SetupStepResult> {
     switch (stepId) {
+      // Validation steps
       case 'validate_data':
-        return await this.executeValidateDataStep(setupData);
-
+        return ValidationStepProcessor.executeValidateDataStep(setupData);
+        
       case 'validate_invitation':
-        return await this.executeValidateInvitationStep(client, setupData);
+        return ValidationStepProcessor.executeValidateInvitationStep(client, setupData);
 
+      // User management steps
       case 'create_user':
-        return await this.executeCreateUserStep(client, setupData, context);
-
-      case 'update_establishment':
-        return await this.executeUpdateEstablishmentStep(client, setupData, context);
-
-      case 'initialize_schema':
-        return await this.executeInitializeSchemaStep(setupData, context);
-
-      case 'create_defaults':
-        return await this.executeCreateDefaultsStep(client, setupData, context);
-
-      case 'complete_invitation':
-        return await this.executeCompleteInvitationStep(client, setupData);
-
+        return UserStepProcessor.executeCreateUserStep(client, setupData);
+        
       case 'create_audit':
-        return await this.executeCreateAuditStep(client, setupData, context);
+        return UserStepProcessor.executeCreateAuditStep(client, setupData, context);
+
+      // Data/schema steps
+      case 'update_establishment':
+        return DataStepProcessor.executeUpdateEstablishmentStep(client, setupData);
+        
+      case 'initialize_schema':
+        return DataStepProcessor.executeInitializeSchemaStep(client, setupData);
+        
+      case 'create_defaults':
+        return DataStepProcessor.executeCreateDefaultsStep(client, setupData);
+
+      // Completion steps
+      case 'complete_invitation':
+        return CompletionStepProcessor.executeCompleteInvitationStep(client, setupData);
 
       default:
         return {
@@ -141,309 +173,5 @@ export class SetupStepProcessor {
           message: `Step ${stepId} is not recognized`
         };
     }
-  }
-
-  /**
-   * Execute data validation step
-   */
-  private static async executeValidateDataStep(
-    setupData: BusinessSetupRequest
-  ): Promise<SetupStepResult> {
-    try {
-      SetupValidator.validateSetupDataStrict(setupData);
-      return { success: true, message: 'Setup data validated successfully' };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error as Error,
-        message: 'Setup data validation failed'
-      };
-    }
-  }
-
-  /**
-   * Execute invitation validation step
-   */
-  private static async executeValidateInvitationStep(
-    client: PoolClient,
-    setupData: BusinessSetupRequest
-  ): Promise<SetupStepResult> {
-    try {
-      const invitation = await SetupValidator.validateInvitationForSetup(
-        client, 
-        setupData.invitation_token
-      );
-      return { 
-        success: true, 
-        data: invitation,
-        message: 'Invitation validated successfully'
-      };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error as Error,
-        message: 'Invitation validation failed'
-      };
-    }
-  }
-
-  /**
-   * Execute user creation step
-   */
-  private static async executeCreateUserStep(
-    client: PoolClient,
-    setupData: BusinessSetupRequest,
-    context: SetupContext
-  ): Promise<SetupStepResult> {
-    try {
-      // Get invitation to get establishment ID
-      const invitation = await SetupValidator.validateInvitationForSetup(
-        client, 
-        setupData.invitation_token
-      );
-
-      const existingUser = await SetupDatabase.checkUserExists(client, setupData.email);
-      const newUser = await SetupDatabase.createOrUpdateUserAccount(
-        client, 
-        setupData, 
-        invitation.establishment_id, 
-        existingUser.exists ? { userId: existingUser.userId! } : undefined
-      );
-
-      return { 
-        success: true, 
-        data: newUser,
-        message: 'User account created/updated successfully'
-      };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error as Error,
-        message: 'User creation failed'
-      };
-    }
-  }
-
-  /**
-   * Execute establishment update step
-   */
-  private static async executeUpdateEstablishmentStep(
-    client: PoolClient,
-    setupData: BusinessSetupRequest,
-    context: SetupContext
-  ): Promise<SetupStepResult> {
-    try {
-      const invitation = await SetupValidator.validateInvitationForSetup(
-        client, 
-        setupData.invitation_token
-      );
-
-      await SetupDatabase.updateEstablishmentInfo(
-        client, 
-        setupData, 
-        invitation.establishment_id
-      );
-
-      return { 
-        success: true,
-        message: 'Establishment information updated successfully'
-      };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error as Error,
-        message: 'Establishment update failed'
-      };
-    }
-  }
-
-  /**
-   * Execute schema initialization step
-   */
-  private static async executeInitializeSchemaStep(
-    setupData: BusinessSetupRequest,
-    context: SetupContext
-  ): Promise<SetupStepResult> {
-    try {
-      // This would typically involve initializing database schemas
-      // For now, we'll just log that it's completed
-      this.logger.info(
-        'Schema initialization step completed',
-        {},
-        'SETUP_STEP_PROCESSOR'
-      );
-
-      return { 
-        success: true,
-        message: 'Schema initialized successfully'
-      };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error as Error,
-        message: 'Schema initialization failed'
-      };
-    }
-  }
-
-  /**
-   * Execute default data creation step
-   */
-  private static async executeCreateDefaultsStep(
-    client: PoolClient,
-    setupData: BusinessSetupRequest,
-    context: SetupContext
-  ): Promise<SetupStepResult> {
-    try {
-      const invitation = await SetupValidator.validateInvitationForSetup(
-        client, 
-        setupData.invitation_token
-      );
-
-      await SetupDefaults.createAllDefaultData(
-        client, 
-        invitation.establishment_id, 
-        context
-      );
-
-      return { 
-        success: true,
-        message: 'Default data created successfully'
-      };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error as Error,
-        message: 'Default data creation failed'
-      };
-    }
-  }
-
-  /**
-   * Execute invitation completion step
-   */
-  private static async executeCompleteInvitationStep(
-    client: PoolClient,
-    setupData: BusinessSetupRequest
-  ): Promise<SetupStepResult> {
-    try {
-      // Get user info first
-      const existingUser = await SetupDatabase.checkUserExists(client, setupData.email);
-      if (!existingUser.exists) {
-        throw new Error('User must be created before completing invitation');
-      }
-
-      await SetupDatabase.completeInvitation(
-        client, 
-        setupData.invitation_token, 
-        existingUser.userId!
-      );
-
-      return { 
-        success: true,
-        message: 'Invitation completed successfully'
-      };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error as Error,
-        message: 'Invitation completion failed'
-      };
-    }
-  }
-
-  /**
-   * Execute audit creation step
-   */
-  private static async executeCreateAuditStep(
-    client: PoolClient,
-    setupData: BusinessSetupRequest,
-    context: SetupContext
-  ): Promise<SetupStepResult> {
-    try {
-      const invitation = await SetupValidator.validateInvitationForSetup(
-        client, 
-        setupData.invitation_token
-      );
-      
-      const existingUser = await SetupDatabase.checkUserExists(client, setupData.email);
-      if (!existingUser.exists) {
-        throw new Error('User must exist before creating audit trail');
-      }
-
-      await SetupAuditManager.createSetupAuditTrail(
-        client,
-        existingUser.userId!,
-        invitation.establishment_id,
-        setupData,
-        context
-      );
-
-      return { 
-        success: true,
-        message: 'Audit trail created successfully'
-      };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error as Error,
-        message: 'Audit trail creation failed'
-      };
-    }
-  }
-
-  /**
-   * Delay utility for retry logic
-   */
-  private static delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  /**
-   * Get step dependencies
-   */
-  public static getStepDependencies(stepId: string): string[] {
-    const dependencies: Record<string, string[]> = {
-      'validate_data': [],
-      'validate_invitation': ['validate_data'],
-      'create_user': ['validate_invitation'],
-      'update_establishment': ['validate_invitation'],
-      'initialize_schema': ['validate_invitation'],
-      'create_defaults': ['create_user', 'update_establishment', 'initialize_schema'],
-      'complete_invitation': ['create_user'],
-      'create_audit': ['create_user', 'update_establishment', 'create_defaults']
-    };
-
-    return dependencies[stepId] || [];
-  }
-
-  /**
-   * Check if step can be executed
-   */
-  public static canExecuteStep(stepId: string, progress: SetupProgress): boolean {
-    const dependencies = this.getStepDependencies(stepId);
-    
-    for (const dependency of dependencies) {
-      switch (dependency) {
-        case 'validate_data':
-        case 'validate_invitation':
-          if (!progress.invitation_validated) return false;
-          break;
-        case 'create_user':
-          if (!progress.user_created) return false;
-          break;
-        case 'update_establishment':
-          if (!progress.establishment_updated) return false;
-          break;
-        case 'initialize_schema':
-          if (!progress.schema_initialized) return false;
-          break;
-        case 'create_defaults':
-          if (!progress.default_data_created) return false;
-          break;
-      }
-    }
-
-    return true;
   }
 }

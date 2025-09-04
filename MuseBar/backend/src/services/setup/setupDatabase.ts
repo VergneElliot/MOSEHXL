@@ -1,29 +1,36 @@
 /**
- * Setup Database - Database Operations
- * Handles all database operations for the setup process
+ * Setup Database - Main Database Coordinator
+ * REFACTORED: Main setup database that delegates to specialized modules
+ * The original 434-line database has been modularized into:
+ * - invitationOperations.ts (Invitation management)
+ * - userAccountOperations.ts (User account operations)
+ * - establishmentOperations.ts (Establishment setup)
+ * - transactionOperations.ts (Transaction management)
+ * - setupDatabase.ts (Main coordinator)
  */
 
-import bcrypt from 'bcrypt';
 import { PoolClient } from 'pg';
 import {
   BusinessSetupRequest,
   InvitationValidation,
-  InvitationData,
   UserExistsResult,
   TransactionContext,
   SetupProgress
 } from './types';
-import { SchemaManager } from '../SchemaManager';
+import { InvitationOperations } from './invitationOperations';
+import { UserAccountOperations } from './userAccountOperations';
+import { EstablishmentOperations } from './establishmentOperations';
+import { TransactionOperations } from './transactionOperations';
 import { Logger } from '../../utils/logger';
-import { initializeEstablishmentSchema } from './db';
-import { logSetupProgress as logProgress } from './db';
 
 /**
- * Setup Database Operations
+ * Main setup database coordinator - delegates to specialized modules
  */
 export class SetupDatabase {
   private static logger = Logger.getInstance();
 
+  // ===== INVITATION OPERATIONS =====
+  
   /**
    * Validate invitation token
    */
@@ -31,133 +38,44 @@ export class SetupDatabase {
     pool: any,
     token: string
   ): Promise<InvitationValidation> {
-    try {
-      if (!token) {
-        return {
-          isValid: false,
-          token,
-          error: 'No invitation token provided'
-        };
-      }
-
-      // Check if invitation exists and is valid
-      const invitationQuery = await pool.query(`
-        SELECT ui.*, e.id as establishment_id, e.name as establishment_name, e.email as establishment_email
-        FROM user_invitations ui
-        LEFT JOIN establishments e ON ui.establishment_id = e.id
-        WHERE ui.invitation_token = $1 
-          AND ui.status = 'pending'
-          AND ui.expires_at > CURRENT_TIMESTAMP
-      `, [token]);
-
-      if (invitationQuery.rows.length === 0) {
-        return {
-          isValid: false,
-          token,
-          error: 'Invalid or expired invitation token'
-        };
-      }
-
-      const invitation = invitationQuery.rows[0];
-
-      // If invitation has no establishment_id, it's for new business setup
-      if (!invitation.establishment_id) {
-        return {
-          isValid: true,
-          token,
-          establishment: {
-            id: '', // Will be created during setup
-            name: invitation.establishment_name,
-            email: invitation.email
-          },
-          expires_at: invitation.expires_at
-        };
-      }
-
-      // Check if establishment setup is already completed
-      const establishment = await pool.query(
-        'SELECT status FROM establishments WHERE id = $1',
-        [invitation.establishment_id]
-      );
-
-      if (establishment.rows[0]?.status === 'active') {
-        return {
-          isValid: false,
-          token,
-          error: 'This establishment has already been set up'
-        };
-      }
-
-      return {
-        isValid: true,
-        token,
-        establishment: {
-          id: invitation.establishment_id,
-          name: invitation.establishment_name,
-          email: invitation.establishment_email
-        },
-        expires_at: invitation.expires_at
-      };
-
-    } catch (error) {
-      this.logger.error(
-        'Error validating invitation',
-        error as Error,
-        { token },
-        'SETUP_DATABASE'
-      );
-      
-      return {
-        isValid: false,
-        token,
-        error: 'Internal server error'
-      };
-    }
+    return InvitationOperations.validateInvitation(pool, token);
   }
 
   /**
-   * Check setup status
+   * Check setup status for invitation
    */
-  static async checkSetupStatus(
-    pool: any,
-    token: string
-  ): Promise<{ completed: boolean; redirectUrl?: string; error?: string }> {
-    try {
-      const invitationQuery = await pool.query(`
-        SELECT ui.*, e.status as establishment_status
-        FROM user_invitations ui
-        LEFT JOIN establishments e ON ui.establishment_id = e.id
-        WHERE ui.invitation_token = $1
-      `, [token]);
+  static async checkSetupStatus(pool: any, token: string) {
+    return InvitationOperations.checkSetupStatus(pool, token);
+  }
 
-      if (invitationQuery.rows.length === 0) {
-        return {
-          completed: false,
-          error: 'Invalid invitation token'
-        };
-      }
+  /**
+   * Validate invitation for setup process
+   */
+  static async validateInvitationForSetup(client: PoolClient, token: string) {
+    return InvitationOperations.validateInvitationForSetup(client, token);
+  }
 
-      const invitation = invitationQuery.rows[0];
-      const isCompleted = invitation.establishment_status === 'active';
+  /**
+   * Complete invitation process
+   */
+  static async completeInvitation(
+    client: PoolClient,
+    token: string,
+    userId: number
+  ): Promise<void> {
+    return InvitationOperations.completeInvitation(client, token, userId);
+  }
 
-      return {
-        completed: isCompleted,
-        redirectUrl: isCompleted ? '/login' : undefined
-      };
+  // ===== USER ACCOUNT OPERATIONS =====
 
-    } catch (error) {
-      this.logger.error(
-        'Error checking setup status',
-        error as Error,
-        { token },
-        'SETUP_DATABASE'
-      );
-      
-      return {
-        completed: false,
-        error: 'Internal server error'
-      };
-    }
+  /**
+   * Check if user exists by email
+   */
+  static async checkUserExists(
+    client: PoolClient,
+    email: string
+  ): Promise<UserExistsResult> {
+    return UserAccountOperations.checkUserExists(client, email);
   }
 
   /**
@@ -166,174 +84,106 @@ export class SetupDatabase {
   static async createOrUpdateUserAccount(
     client: PoolClient,
     setupData: BusinessSetupRequest,
-    establishmentId: string,
-    existingUser?: { userId: number }
-  ): Promise<any> {
-    const saltRounds = 12;
-    const passwordHash = await bcrypt.hash(setupData.password, saltRounds);
-
-    if (existingUser) {
-      // Update existing user
-      const userResult = await client.query(`
-        UPDATE users SET 
-          password_hash = $1,
-          first_name = $2,
-          last_name = $3,
-          establishment_id = $4,
-          role = 'admin',
-          updated_at = CURRENT_TIMESTAMP
-        WHERE id = $5
-        RETURNING id, email, first_name, last_name, role
-      `, [passwordHash, setupData.first_name, setupData.last_name, establishmentId, existingUser.userId]);
-
-      return userResult.rows[0];
-    } else {
-      // Create new user
-      const userResult = await client.query(`
-        INSERT INTO users (
-          email, password_hash, first_name, last_name, 
-          role, establishment_id, is_active, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, 'admin', $5, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        RETURNING id, email, first_name, last_name, role
-      `, [setupData.email, passwordHash, setupData.first_name, setupData.last_name, establishmentId]);
-
-      return userResult.rows[0];
-    }
+    establishmentId: string
+  ) {
+    return UserAccountOperations.createOrUpdateUserAccount(client, setupData, establishmentId);
   }
+
+  /**
+   * Validate user credentials during setup
+   */
+  static async validateUserCredentials(
+    client: PoolClient,
+    email: string,
+    password: string
+  ): Promise<boolean> {
+    return UserAccountOperations.validateUserCredentials(client, email, password);
+  }
+
+  /**
+   * Update user role and permissions
+   */
+  static async updateUserRole(
+    client: PoolClient,
+    userId: number,
+    role: string,
+    isAdmin: boolean = false
+  ): Promise<void> {
+    return UserAccountOperations.updateUserRole(client, userId, role, isAdmin);
+  }
+
+  /**
+   * Get user by ID with establishment info
+   */
+  static async getUserWithEstablishment(client: PoolClient, userId: number) {
+    return UserAccountOperations.getUserWithEstablishment(client, userId);
+  }
+
+  // ===== ESTABLISHMENT OPERATIONS =====
 
   /**
    * Update establishment information
    */
   static async updateEstablishmentInfo(
     client: PoolClient,
-    setupData: BusinessSetupRequest,
-    establishmentId: string
+    establishmentId: string,
+    setupData: BusinessSetupRequest
   ): Promise<void> {
-    await client.query(`
-      UPDATE establishments SET 
-        name = $1,
-        contact_email = $2,
-        phone = $3,
-        address = $4,
-        tva_number = $5,
-        siret_number = $6,
-        status = 'active',
-        setup_completed_at = CURRENT_TIMESTAMP,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $7
-    `, [
-      setupData.business_name,
-      setupData.contact_email,
-      setupData.phone,
-      setupData.address,
-      setupData.tva_number || null,
-      setupData.siret_number || null,
-      establishmentId
-    ]);
-  }
-
-  /**
-   * Complete invitation process
-   */
-  static async completeInvitation(
-    client: PoolClient,
-    invitationToken: string,
-    userId: number
-  ): Promise<void> {
-    await client.query(`
-      UPDATE user_invitations SET 
-        status = 'accepted',
-        accepted_at = CURRENT_TIMESTAMP,
-        accepted_by = $2,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE invitation_token = $1
-    `, [invitationToken, userId]);
+    return EstablishmentOperations.updateEstablishmentInfo(client, establishmentId, setupData);
   }
 
   /**
    * Initialize establishment schema
    */
   static async initializeEstablishmentSchema(establishmentId: string): Promise<void> {
-    await initializeEstablishmentSchema(establishmentId);
+    return EstablishmentOperations.initializeEstablishmentSchema(establishmentId);
   }
 
   /**
-   * Check if user exists
+   * Mark establishment as active
    */
-  static async checkUserExists(
+  static async activateEstablishment(
     client: PoolClient,
-    email: string
-  ): Promise<UserExistsResult> {
-    const existingUser = await client.query(
-      'SELECT id, establishment_id FROM users WHERE email = $1',
-      [email]
-    );
-
-    if (existingUser.rows.length === 0) {
-      return { exists: false, hasEstablishment: false };
-    }
-
-    const user = existingUser.rows[0];
-    const hasEstablishment = user.establishment_id !== null;
-
-    if (hasEstablishment) {
-      throw new Error('User with this email already exists and is associated with an establishment');
-    }
-
-    return { exists: true, userId: user.id, hasEstablishment: false };
+    establishmentId: string
+  ): Promise<void> {
+    return EstablishmentOperations.activateEstablishment(client, establishmentId);
   }
 
   /**
-   * Validate invitation for setup
+   * Get establishment information
    */
-  static async validateInvitationForSetup(
-    client: PoolClient,
-    invitationToken: string
-  ): Promise<InvitationData> {
-    const invitationQuery = await client.query(`
-      SELECT ui.*, e.id as establishment_id, e.name as establishment_name, e.status as establishment_status
-      FROM user_invitations ui
-      LEFT JOIN establishments e ON ui.establishment_id = e.id
-      WHERE ui.invitation_token = $1 
-        AND ui.status = 'pending'
-        AND ui.expires_at > CURRENT_TIMESTAMP
-    `, [invitationToken]);
-
-    if (invitationQuery.rows.length === 0) {
-      throw new Error('Invalid or expired invitation token');
-    }
-
-    const invitation = invitationQuery.rows[0];
-
-    if (invitation.establishment_status === 'active') {
-      throw new Error('This establishment has already been set up');
-    }
-
-    return {
-      establishment_id: invitation.establishment_id,
-      establishment_name: invitation.establishment_name,
-      establishment_status: invitation.establishment_status,
-      invitation_id: invitation.id,
-      expires_at: invitation.expires_at
-    };
+  static async getEstablishmentInfo(client: PoolClient, establishmentId: string) {
+    return EstablishmentOperations.getEstablishmentInfo(client, establishmentId);
   }
+
+  /**
+   * Create establishment defaults
+   */
+  static async createEstablishmentDefaults(
+    client: PoolClient,
+    establishmentId: string
+  ): Promise<void> {
+    return EstablishmentOperations.createEstablishmentDefaults(client, establishmentId);
+  }
+
+  /**
+   * Log setup progress
+   */
+  static async logSetupProgress(
+    client: PoolClient, 
+    establishmentId: string, 
+    progress: SetupProgress
+  ): Promise<void> {
+    return EstablishmentOperations.logSetupProgress(client, establishmentId, progress);
+  }
+
+  // ===== TRANSACTION OPERATIONS =====
 
   /**
    * Create transaction context
    */
-  static async createTransactionContext(
-    pool: any
-  ): Promise<{ client: PoolClient; context: TransactionContext }> {
-    const client = await pool.connect();
-    const context: TransactionContext = {
-      client,
-      transactionId: `setup_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      startTime: new Date()
-    };
-
-    await client.query('BEGIN');
-    
-    return { client, context };
+  static async createTransactionContext(pool: any): Promise<TransactionContext> {
+    return TransactionOperations.createTransactionContext(pool);
   }
 
   /**
@@ -341,23 +191,9 @@ export class SetupDatabase {
    */
   static async commitTransaction(
     client: PoolClient,
-    context: TransactionContext
+    context?: TransactionContext
   ): Promise<void> {
-    try {
-      await client.query('COMMIT');
-      
-      const duration = Date.now() - context.startTime.getTime();
-      this.logger.info(
-        'Setup transaction committed successfully',
-        { 
-          transactionId: context.transactionId,
-          duration: `${duration}ms`
-        },
-        'SETUP_DATABASE'
-      );
-    } finally {
-      client.release();
-    }
+    return TransactionOperations.commitTransaction(client, context);
   }
 
   /**
@@ -365,70 +201,60 @@ export class SetupDatabase {
    */
   static async rollbackTransaction(
     client: PoolClient,
-    context: TransactionContext,
+    context?: TransactionContext,
     error?: Error
   ): Promise<void> {
-    try {
-      await client.query('ROLLBACK');
-      
-      const duration = Date.now() - context.startTime.getTime();
-      this.logger.error(
-        'Setup transaction rolled back',
-        error || new Error('Transaction rollback'),
-        { 
-          transactionId: context.transactionId,
-          duration: `${duration}ms`
-        },
-        'SETUP_DATABASE'
-      );
-    } finally {
-      client.release();
-    }
+    return TransactionOperations.rollbackTransaction(client, context, error);
   }
 
   /**
-   * Log setup progress
-   */
-  static async logSetupProgress(client: PoolClient, establishmentId: string, progress: SetupProgress): Promise<void> {
-    await logProgress(client, establishmentId, progress);
-  }
-
-  /**
-   * Cleanup failed setup
+   * Clean up failed setup
    */
   static async cleanupFailedSetup(
     client: PoolClient,
     establishmentId: string,
     userId?: number
   ): Promise<void> {
-    try {
-      // Reset establishment status
-      await client.query(
-        'UPDATE establishments SET status = \'pending\', setup_completed_at = NULL WHERE id = $1',
-        [establishmentId]
-      );
+    return TransactionOperations.cleanupFailedSetup(client, establishmentId, userId);
+  }
 
-      // Remove user association if user was created/updated
-      if (userId) {
-        await client.query(
-          'UPDATE users SET establishment_id = NULL WHERE id = $1',
-          [userId]
-        );
-      }
+  /**
+   * Execute with transaction wrapper
+   */
+  static async executeWithTransaction<T>(
+    pool: any,
+    operation: (client: PoolClient) => Promise<T>
+  ): Promise<T> {
+    return TransactionOperations.executeWithTransaction(pool, operation);
+  }
 
-      this.logger.info(
-        'Cleaned up failed setup',
-        { establishmentId, userId },
-        'SETUP_DATABASE'
-      );
-    } catch (error) {
-      this.logger.error(
-        'Error during setup cleanup',
-        error as Error,
-        { establishmentId, userId },
-        'SETUP_DATABASE'
-      );
-    }
+  // ===== UTILITY METHODS =====
+
+  /**
+   * Get transaction status
+   */
+  static async getTransactionStatus(client: PoolClient): Promise<string> {
+    return TransactionOperations.getTransactionStatus(client);
+  }
+
+  /**
+   * Create savepoint
+   */
+  static async createSavepoint(client: PoolClient, savepointName: string): Promise<void> {
+    return TransactionOperations.createSavepoint(client, savepointName);
+  }
+
+  /**
+   * Rollback to savepoint
+   */
+  static async rollbackToSavepoint(client: PoolClient, savepointName: string): Promise<void> {
+    return TransactionOperations.rollbackToSavepoint(client, savepointName);
+  }
+
+  /**
+   * Release savepoint
+   */
+  static async releaseSavepoint(client: PoolClient, savepointName: string): Promise<void> {
+    return TransactionOperations.releaseSavepoint(client, savepointName);
   }
 }
-

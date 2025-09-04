@@ -9,19 +9,15 @@ import { AuthenticatedRequest, Role, RolePermissions } from '../types';
 /**
  * Extended authenticated request for role operations
  */
-export interface RoleRequest extends AuthenticatedRequest {
+export interface RoleRequest<T = any> extends AuthenticatedRequest {
   params: {
     roleId?: string;
   };
   query: {
     establishmentId?: string;
+    permission?: string;
   };
-  body: {
-    name?: string;
-    description?: string;
-    permissions?: RolePermissions;
-    establishmentId?: string;
-  };
+  body: T;
 }
 
 /**
@@ -33,6 +29,25 @@ export interface RoleOperationContext {
   ipAddress?: string;
   userAgent?: string;
   timestamp: Date;
+}
+
+/**
+ * Create role request body
+ */
+export interface CreateRoleRequest {
+  name: string;
+  description: string;
+  permissions: RolePermissions;
+  establishmentId?: string;
+}
+
+/**
+ * Update role request body
+ */
+export interface UpdateRoleRequest {
+  name?: string;
+  description?: string;
+  permissions?: RolePermissions;
 }
 
 /**

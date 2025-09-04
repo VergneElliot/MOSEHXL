@@ -1,9 +1,13 @@
 /**
  * Role Management Module Entry Point
- * Exports all role management components and maintains backward compatibility
+ * UPDATED: Exports all role management components including new modular structure
+ * Maintains backward compatibility while providing access to specialized modules
  */
 
 export { RoleController } from './RoleController';
+export { RoleOperations } from './roleOperations';
+export { RoleMutations } from './roleMutations';
+export { RolePermissionOperations } from './rolePermissionOperations';
 export { RoleValidator } from './RoleValidator';
 export { RoleAuditLogger } from './RoleAuditLogger';
 export { roleRoutes, initializeRoleRoutes } from './RoleRoutes';

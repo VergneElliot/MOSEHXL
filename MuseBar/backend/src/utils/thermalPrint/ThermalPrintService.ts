@@ -13,6 +13,7 @@ import { ReceiptData, ClosureBulletinData, PrinterConfig, PrinterStatus, PrintQu
  */
 const DEFAULT_CONFIG: PrinterConfig = {
   device: process.platform === 'win32' ? 'POS-58' : '/dev/usb/lp0',
+  devicePath: process.platform === 'win32' ? 'POS-58' : '/dev/usb/lp0',
   baudRate: 9600,
   paperWidth: 58, // mm
   characterWidth: 32,
@@ -211,13 +212,8 @@ export class ThermalPrintService {
    * Get printer status
    */
   getPrinterStatus(): PrinterStatus {
-    // Basic status - in a real implementation, this would query the actual printer
-    return {
-      isConnected: true, // Assume connected if no errors
-      isReady: !this.printQueue.isProcessing(),
-      paperStatus: 'ok', // Would need actual hardware query
-      lastPrint: undefined // Would track from actual print jobs
-    };
+    // Use the comprehensive status from the print queue
+    return this.printQueue.getStatus();
   }
   
   /**
