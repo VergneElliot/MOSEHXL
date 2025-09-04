@@ -72,6 +72,9 @@ import authRouter from './routes/auth';
 import docsRouter from './routes/docs';
 import userManagementRouter from './routes/userManagement';
 import establishmentsRouter from './routes/establishments';
+import enhancedEstablishmentsRouter from './routes/enhancedEstablishments';
+import adminDashboardRouter from './routes/adminDashboard';
+import establishmentSearchRouter from './routes/establishmentSearch';
 import setupRouter from './routes/setup';
 import emailTestRouter from './routes/emailTest';
 
@@ -82,6 +85,9 @@ app.use('/api/legal', legalRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/user-management', userManagementRouter(config, logger));
 app.use('/api/establishments', establishmentsRouter);
+app.use('/api/enhanced-establishments', enhancedEstablishmentsRouter);
+app.use('/api/admin-dashboard', adminDashboardRouter);
+app.use('/api/establishment-search', establishmentSearchRouter);
 app.use('/api/setup', setupRouter);
 
 // Development-only email test routes
