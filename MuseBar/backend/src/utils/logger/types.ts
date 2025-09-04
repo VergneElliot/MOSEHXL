@@ -10,9 +10,14 @@ export interface LogEntry {
   level: keyof typeof LogLevel;
   message: string;
   metadata?: Record<string, any>;
+  category?: string;
   context?: string;
   requestId?: string;
   userId?: string;
+  service?: string;
+  version?: string;
+  environment?: string;
+  nodeId?: string;
   ip?: string;
   userAgent?: string;
   duration?: number;

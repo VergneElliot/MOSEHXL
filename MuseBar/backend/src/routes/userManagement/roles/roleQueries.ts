@@ -1,5 +1,6 @@
 import { pool } from '../../../app';
 import { Role } from '../types';
+import { DEFAULT_ROLES } from './rolePermissions';
 
 export async function fetchCustomRoles(establishmentId: string): Promise<Role[]> {
   const customRolesResult = await pool.query(`
@@ -140,6 +141,13 @@ export async function countUsersWithRole(roleId: string, establishmentId: string
     [roleId, establishmentId]
   );
   return parseInt(usersWithRole.rows[0].count);
+}
+
+/**
+ * Check if a role ID is a system role
+ */
+export function isSystemRoleId(roleId: string): boolean {
+  return roleId in DEFAULT_ROLES;
 }
 
 

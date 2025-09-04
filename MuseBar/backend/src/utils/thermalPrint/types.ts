@@ -74,17 +74,20 @@ export interface ClosureBulletinData {
 
 export interface PrintJob {
   id: string;
-  type: 'receipt' | 'closure';
+  type: 'receipt' | 'closure' | 'closure_bulletin';
   data: ReceiptData | ClosureBulletinData;
   priority: 'low' | 'normal' | 'high';
   createdAt: Date;
+  updatedAt: Date;
   attempts: number;
   maxAttempts: number;
   status: 'pending' | 'processing' | 'completed' | 'failed';
+  error?: string;
 }
 
 export interface PrinterConfig {
   device: string;
+  devicePath: string;
   baudRate: number;
   paperWidth: number;
   characterWidth: number;
@@ -93,11 +96,17 @@ export interface PrinterConfig {
 }
 
 export interface PrinterStatus {
+  connected: boolean;
   isConnected: boolean;
+  online: boolean;
   isReady: boolean;
+  processing: boolean;
   paperStatus: 'ok' | 'low' | 'out';
+  error?: string | null;
   errorCode?: string;
-  lastPrint?: Date;
+  lastPrint?: Date | null;
+  lastPrintTime?: Date | null;
+  queueLength: number;
 }
 
 export interface PrintQueueStats {

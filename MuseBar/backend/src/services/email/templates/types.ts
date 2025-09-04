@@ -13,6 +13,11 @@ export interface EmailTemplate {
   htmlBody: string;
   textBody?: string;
   variables: string[];
+  category?: string;
+  isBuiltIn?: boolean;
+  isActive?: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 /**

@@ -1,37 +1,36 @@
 /**
  * Print Queue - Job Management and Processing
- * Handles print job queuing, processing, and error handling
+ * REFACTORED: Main print queue that delegates to specialized modules
+ * The original 439-line queue has been modularized into:
+ * - queueStorage.ts (Storage operations)
+ * - queueProcessor.ts (Processing logic)
+ * - printOperations.ts (Print execution)
+ * - printQueue.ts (Main coordinator)
  */
 
 import { EventEmitter } from 'events';
-import { spawn, ChildProcess } from 'child_process';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import * as os from 'os';
 import { PrintJob, PrinterConfig, PrinterStatus, PrintQueueStats, ReceiptData, ClosureBulletinData } from './types';
-import { PrintTemplates } from './printTemplates';
+import { QueueStorage } from './queueStorage';
+import { QueueProcessor } from './queueProcessor';
+import { PrintOperations } from './printOperations';
 
 /**
- * Print Queue Manager
+ * Main print queue manager - delegates to specialized modules
  */
 export class PrintQueue extends EventEmitter {
-  private jobs: Map<string, PrintJob> = new Map();
-  private processing: boolean = false;
-  private processingJob: string | null = null;
-  private printerConfig: PrinterConfig;
-  private stats: PrintQueueStats = {
-    pending: 0,
-    processing: 0,
-    completed: 0,
-    failed: 0,
-    totalJobs: 0
-  };
-  
+  private storage: QueueStorage;
+  private processor: QueueProcessor;
+  private printOps: PrintOperations;
   private static instance: PrintQueue;
   
   constructor(config: PrinterConfig) {
     super();
-    this.printerConfig = config;
+    
+    // Initialize specialized modules
+    this.storage = new QueueStorage();
+    this.printOps = new PrintOperations(config);
+    this.processor = new QueueProcessor(this.storage, this.printOps);
+    
     this.setupEventHandlers();
   }
   
@@ -49,24 +48,40 @@ export class PrintQueue extends EventEmitter {
   }
   
   /**
-   * Setup event handlers
+   * Setup event forwarding from processor
    */
   private setupEventHandlers(): void {
-    this.on('jobAdded', () => {
-      if (!this.processing) {
-        this.processQueue();
-      }
+    // Forward processor events
+    this.processor.on('processing_started', () => {
+      this.emit('processing_started');
     });
     
-    this.on('jobCompleted', (jobId: string) => {
-      this.updateStats();
-      this.emit('queueUpdated', this.getQueueStats());
+    this.processor.on('processing_stopped', () => {
+      this.emit('processing_stopped');
     });
     
-    this.on('jobFailed', (jobId: string, error: Error) => {
-      console.error(`Print job ${jobId} failed:`, error);
-      this.updateStats();
-      this.emit('queueUpdated', this.getQueueStats());
+    this.processor.on('job_started', (job: PrintJob) => {
+      this.emit('job_started', job);
+    });
+    
+    this.processor.on('job_completed', (job: PrintJob) => {
+      this.emit('job_completed', job);
+    });
+    
+    this.processor.on('job_failed', (job: PrintJob, error: Error) => {
+      this.emit('job_failed', job, error);
+    });
+    
+    this.processor.on('job_retry', (job: PrintJob, error: Error) => {
+      this.emit('job_retry', job, error);
+    });
+    
+    this.processor.on('queue_paused', () => {
+      this.emit('queue_paused');
+    });
+    
+    this.processor.on('queue_resumed', () => {
+      this.emit('queue_resumed');
     });
   }
   
@@ -74,219 +89,54 @@ export class PrintQueue extends EventEmitter {
    * Add receipt print job
    */
   addReceiptJob(data: ReceiptData, priority: 'low' | 'normal' | 'high' = 'normal'): string {
-    const jobId = this.generateJobId();
-    
     const job: PrintJob = {
-      id: jobId,
+      id: this.generateJobId(),
       type: 'receipt',
       data,
       priority,
-      createdAt: new Date(),
+      status: 'pending',
       attempts: 0,
-      maxAttempts: this.printerConfig.retryAttempts,
-      status: 'pending'
+      maxAttempts: 3,
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
     
-    this.jobs.set(jobId, job);
-    this.updateStats();
-    this.emit('jobAdded', jobId);
+    this.storage.addJob(job);
+    this.emit('job_added', job);
     
-    return jobId;
+    // Start processing if not already running
+    if (!this.processor.isProcessing()) {
+      this.processor.processQueue();
+    }
+    
+    return job.id;
   }
   
   /**
    * Add closure bulletin print job
    */
   addClosureJob(data: ClosureBulletinData, priority: 'low' | 'normal' | 'high' = 'high'): string {
-    const jobId = this.generateJobId();
-    
     const job: PrintJob = {
-      id: jobId,
-      type: 'closure',
+      id: this.generateJobId(),
+      type: 'closure_bulletin',
       data,
       priority,
-      createdAt: new Date(),
+      status: 'pending',
       attempts: 0,
-      maxAttempts: this.printerConfig.retryAttempts,
-      status: 'pending'
+      maxAttempts: 3,
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
     
-    this.jobs.set(jobId, job);
-    this.updateStats();
-    this.emit('jobAdded', jobId);
+    this.storage.addJob(job);
+    this.emit('job_added', job);
     
-    return jobId;
-  }
-  
-  /**
-   * Process the queue
-   */
-  private async processQueue(): Promise<void> {
-    if (this.processing) {
-      return;
+    // Start processing if not already running
+    if (!this.processor.isProcessing()) {
+      this.processor.processQueue();
     }
     
-    this.processing = true;
-    
-    try {
-      while (this.hasPendingJobs()) {
-        const job = this.getNextJob();
-        if (!job) break;
-        
-        this.processingJob = job.id;
-        job.status = 'processing';
-        this.updateStats();
-        
-        try {
-          await this.processJob(job);
-          job.status = 'completed';
-          this.emit('jobCompleted', job.id);
-        } catch (error) {
-          job.attempts++;
-          
-          if (job.attempts >= job.maxAttempts) {
-            job.status = 'failed';
-            this.emit('jobFailed', job.id, error as Error);
-          } else {
-            job.status = 'pending';
-            // Re-add to queue for retry
-            setTimeout(() => {
-              if (job.status === 'pending') {
-                this.emit('jobAdded', job.id);
-              }
-            }, 5000); // 5 second delay before retry
-          }
-        }
-        
-        this.processingJob = null;
-      }
-    } finally {
-      this.processing = false;
-    }
-  }
-  
-  /**
-   * Process individual job
-   */
-  private async processJob(job: PrintJob): Promise<void> {
-    let content: string;
-    
-    // Generate content based on job type
-    if (job.type === 'receipt') {
-      content = PrintTemplates.generateReceipt(job.data as ReceiptData);
-    } else {
-      content = PrintTemplates.generateClosureBulletin(job.data as ClosureBulletinData);
-    }
-    
-    // Print the content
-    await this.printContent(content, job.id);
-    
-    this.emit('jobProcessed', job.id, job.type);
-  }
-  
-  /**
-   * Print content to thermal printer
-   */
-  private async printContent(content: string, jobId: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error(`Print job ${jobId} timed out`));
-      }, this.printerConfig.timeout);
-      
-      try {
-        if (process.platform === 'win32') {
-          this.printWindows(content, resolve, reject, timeout);
-        } else {
-          this.printUnix(content, resolve, reject, timeout);
-        }
-      } catch (error) {
-        clearTimeout(timeout);
-        reject(error);
-      }
-    });
-  }
-  
-  /**
-   * Print on Windows systems
-   */
-  private printWindows(content: string, resolve: () => void, reject: (error: Error) => void, timeout: NodeJS.Timeout): void {
-    const tempFile = path.join(os.tmpdir(), `print_${Date.now()}.txt`);
-    
-    fs.writeFile(tempFile, content, 'binary')
-      .then(() => {
-        const printProcess = spawn('print', ['/D:' + this.printerConfig.device, tempFile]);
-        
-        printProcess.on('close', (code) => {
-          clearTimeout(timeout);
-          fs.unlink(tempFile).catch(() => {});
-          
-          if (code === 0) {
-            resolve();
-          } else {
-            reject(new Error(`Print process exited with code ${code}`));
-          }
-        });
-        
-        printProcess.on('error', (error) => {
-          clearTimeout(timeout);
-          fs.unlink(tempFile).catch(() => {});
-          reject(error);
-        });
-      })
-      .catch(reject);
-  }
-  
-  /**
-   * Print on Unix/Linux systems
-   */
-  private printUnix(content: string, resolve: () => void, reject: (error: Error) => void, timeout: NodeJS.Timeout): void {
-    const printProcess = spawn('lp', ['-d', this.printerConfig.device, '-o', 'raw']);
-    
-    printProcess.stdin.write(content, 'binary');
-    printProcess.stdin.end();
-    
-    printProcess.on('close', (code) => {
-      clearTimeout(timeout);
-      
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(`Print process exited with code ${code}`));
-      }
-    });
-    
-    printProcess.on('error', (error) => {
-      clearTimeout(timeout);
-      reject(error);
-    });
-  }
-  
-  /**
-   * Get next job to process (priority order)
-   */
-  private getNextJob(): PrintJob | null {
-    const pendingJobs = Array.from(this.jobs.values())
-      .filter(job => job.status === 'pending')
-      .sort((a, b) => {
-        // Sort by priority (high > normal > low) then by creation time
-        const priorityOrder = { high: 3, normal: 2, low: 1 };
-        const priorityDiff = priorityOrder[b.priority] - priorityOrder[a.priority];
-        
-        if (priorityDiff !== 0) {
-          return priorityDiff;
-        }
-        
-        return a.createdAt.getTime() - b.createdAt.getTime();
-      });
-    
-    return pendingJobs[0] || null;
-  }
-  
-  /**
-   * Check if there are pending jobs
-   */
-  private hasPendingJobs(): boolean {
-    return Array.from(this.jobs.values()).some(job => job.status === 'pending');
+    return job.id;
   }
   
   /**
@@ -297,143 +147,143 @@ export class PrintQueue extends EventEmitter {
   }
   
   /**
-   * Update queue statistics
-   */
-  private updateStats(): void {
-    const jobs = Array.from(this.jobs.values());
-    
-    this.stats = {
-      pending: jobs.filter(job => job.status === 'pending').length,
-      processing: jobs.filter(job => job.status === 'processing').length,
-      completed: jobs.filter(job => job.status === 'completed').length,
-      failed: jobs.filter(job => job.status === 'failed').length,
-      totalJobs: jobs.length
-    };
-  }
-  
-  /**
    * Get job by ID
    */
   getJob(jobId: string): PrintJob | null {
-    return this.jobs.get(jobId) || null;
+    return this.storage.getJob(jobId);
   }
   
   /**
    * Get all jobs
    */
   getAllJobs(): PrintJob[] {
-    return Array.from(this.jobs.values());
+    return this.storage.getAllJobs();
   }
   
   /**
    * Get jobs by status
    */
   getJobsByStatus(status: PrintJob['status']): PrintJob[] {
-    return Array.from(this.jobs.values()).filter(job => job.status === status);
+    return this.storage.getJobsByStatus(status);
   }
   
   /**
    * Get queue statistics
    */
   getQueueStats(): PrintQueueStats {
-    this.updateStats();
-    return { ...this.stats };
+    return this.storage.getStats();
   }
   
   /**
-   * Cancel job
+   * Cancel a job
    */
   cancelJob(jobId: string): boolean {
-    const job = this.jobs.get(jobId);
+    const job = this.storage.getJob(jobId);
     if (!job || job.status === 'completed' || job.status === 'processing') {
       return false;
     }
     
-    this.jobs.delete(jobId);
-    this.updateStats();
-    this.emit('jobCancelled', jobId);
-    
-    return true;
-  }
-  
-  /**
-   * Clear completed and failed jobs
-   */
-  clearCompletedJobs(): void {
-    const jobsToRemove = Array.from(this.jobs.entries())
-      .filter(([_, job]) => job.status === 'completed' || job.status === 'failed')
-      .map(([id, _]) => id);
-    
-    jobsToRemove.forEach(id => this.jobs.delete(id));
-    this.updateStats();
-    this.emit('queueCleared');
-  }
-  
-  /**
-   * Retry failed job
-   */
-  retryJob(jobId: string): boolean {
-    const job = this.jobs.get(jobId);
-    if (!job || job.status !== 'failed') {
-      return false;
+    const removed = this.storage.removeJob(jobId);
+    if (removed) {
+      this.emit('job_cancelled', job);
     }
     
-    job.status = 'pending';
-    job.attempts = 0;
-    this.updateStats();
-    this.emit('jobAdded', jobId);
+    return removed;
+  }
+  
+  /**
+   * Clear completed jobs
+   */
+  clearCompletedJobs(): void {
+    const removedCount = this.storage.clearCompletedJobs();
+    this.emit('jobs_cleared', { count: removedCount, type: 'completed' });
+  }
+  
+  /**
+   * Retry a failed job
+   */
+  retryJob(jobId: string): boolean {
+    const success = this.storage.retryJob(jobId);
+    if (success) {
+      const job = this.storage.getJob(jobId);
+      if (job) {
+        this.emit('job_retried', job);
+        
+        // Start processing if not already running
+        if (!this.processor.isProcessing()) {
+          this.processor.processQueue();
+        }
+      }
+    }
     
-    return true;
+    return success;
   }
   
   /**
    * Get printer configuration
    */
   getConfig(): PrinterConfig {
-    return { ...this.printerConfig };
+    return this.printOps.getConfig();
   }
   
   /**
    * Update printer configuration
    */
   updateConfig(config: Partial<PrinterConfig>): void {
-    this.printerConfig = { ...this.printerConfig, ...config };
-    this.emit('configUpdated', this.printerConfig);
+    this.printOps.updateConfig(config);
   }
   
   /**
    * Check if queue is processing
    */
   isProcessing(): boolean {
-    return this.processing;
+    return this.processor.isProcessing();
   }
   
   /**
    * Get currently processing job ID
    */
   getProcessingJobId(): string | null {
-    return this.processingJob;
+    return this.processor.getProcessingJobId();
   }
   
   /**
    * Pause queue processing
    */
   pauseQueue(): void {
-    this.processing = true; // Prevents new jobs from being processed
-    this.emit('queuePaused');
+    this.processor.pauseQueue();
   }
   
   /**
    * Resume queue processing
    */
   resumeQueue(): void {
-    this.processing = false;
-    this.emit('queueResumed');
+    this.processor.resumeQueue();
+  }
+  
+  /**
+   * Test printer connectivity
+   */
+  async testPrinter(): Promise<boolean> {
+    return this.printOps.testPrinter();
+  }
+  
+  /**
+   * Get printer status
+   */
+  getStatus(): PrinterStatus {
+    const processorStatus = this.processor.getStatus();
     
-    // Start processing if there are pending jobs
-    if (this.hasPendingJobs()) {
-      this.processQueue();
-    }
+    return {
+      connected: true, // Would need actual printer detection
+      isConnected: true,
+      online: !processorStatus.paused,
+      isReady: !processorStatus.processing,
+      processing: processorStatus.processing,
+      paperStatus: 'ok' as const,
+      error: null,
+      lastPrintTime: null, // Could track this
+      queueLength: this.storage.getStats().pending
+    };
   }
 }
-
