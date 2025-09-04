@@ -10,6 +10,7 @@ import {
   UserExistsResult
 } from './types';
 import { Logger } from '../../utils/logger';
+import { UserQueries } from '../../utils/database';
 
 /**
  * User account database operations
@@ -19,31 +20,14 @@ export class UserAccountOperations {
 
   /**
    * Check if user exists by email
+   * Uses shared query utility to eliminate duplication
    */
   static async checkUserExists(
     client: PoolClient,
     email: string
   ): Promise<UserExistsResult> {
     try {
-      const existingUser = await client.query(`
-        SELECT id, first_name, last_name, email, establishment_id
-        FROM users 
-        WHERE email = $1
-      `, [email]);
-
-      if (existingUser.rows.length === 0) {
-        return { exists: false };
-      }
-
-      const user = existingUser.rows[0];
-      const hasEstablishment = user.establishment_id != null;
-
-      return {
-        exists: true,
-        user,
-        hasEstablishment
-      };
-
+      return await UserQueries.checkUserExists(client, email);
     } catch (error) {
       this.logger.error('Error checking user existence:', error);
       throw new Error('Failed to check user existence');
@@ -200,31 +184,14 @@ export class UserAccountOperations {
 
   /**
    * Get user by ID with establishment info
+   * Uses shared query utility to eliminate duplication
    */
   static async getUserWithEstablishment(
     client: PoolClient,
     userId: number
   ) {
     try {
-      const userQuery = await client.query(`
-        SELECT 
-          u.id,
-          u.email,
-          u.first_name,
-          u.last_name,
-          u.phone,
-          u.role,
-          u.is_admin,
-          u.establishment_id,
-          e.name as establishment_name,
-          e.status as establishment_status
-        FROM users u
-        LEFT JOIN establishments e ON u.establishment_id = e.id
-        WHERE u.id = $1
-      `, [userId]);
-
-      return userQuery.rows[0] || null;
-
+      return await UserQueries.getUserWithEstablishment(client, userId);
     } catch (error) {
       this.logger.error('Error getting user with establishment:', error);
       throw new Error('Failed to retrieve user information');
