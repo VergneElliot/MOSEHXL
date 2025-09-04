@@ -9,6 +9,7 @@ import {
   SetupProgress
 } from './types';
 import { Logger } from '../../utils/logger';
+import { EstablishmentQueries } from '../../utils/database';
 import { initializeEstablishmentSchema } from './db';
 import { logSetupProgress as logProgress } from './db';
 
@@ -100,32 +101,14 @@ export class EstablishmentOperations {
 
   /**
    * Get establishment information
+   * Uses shared query utility to eliminate duplication
    */
   static async getEstablishmentInfo(
     client: PoolClient,
     establishmentId: string
   ) {
     try {
-      const establishmentQuery = await client.query(`
-        SELECT 
-          id,
-          name,
-          email,
-          address,
-          phone,
-          siret,
-          vat_number,
-          timezone,
-          currency,
-          status,
-          created_at,
-          activated_at
-        FROM establishments
-        WHERE id = $1
-      `, [establishmentId]);
-
-      return establishmentQuery.rows[0] || null;
-
+      return await EstablishmentQueries.getEstablishmentById(client, establishmentId);
     } catch (error) {
       this.logger.error('Error getting establishment info:', error);
       throw new Error('Failed to retrieve establishment information');
