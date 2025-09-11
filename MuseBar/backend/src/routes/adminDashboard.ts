@@ -13,6 +13,22 @@ const router = express.Router();
 const config = getEnvironmentConfig();
 const logger = Logger.getInstance(config);
 
+// GET /api/admin-dashboard/test - Minimal test endpoint to isolate the error
+router.get('/test', (req, res) => {
+  try {
+    res.json({
+      success: true,
+      message: 'Test endpoint working',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false,
+      error: 'Test endpoint failed'
+    });
+  }
+});
+
 // GET /api/admin-dashboard/metrics - Get comprehensive dashboard metrics
 router.get('/metrics', requireAuth, requireAdmin, async (req, res) => {
   try {

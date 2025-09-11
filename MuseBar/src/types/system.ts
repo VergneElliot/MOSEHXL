@@ -18,11 +18,16 @@ export interface SystemEstablishment {
   address: string;
   tva_number?: string;
   siret_number?: string;
-  subscription_plan: 'basic' | 'premium';
-  status: 'active' | 'suspended' | 'pending' | 'setup_required';
+  subscription_plan: 'basic' | 'premium' | 'enterprise';
+  subscription_status: 'active' | 'suspended' | 'cancelled';
+  status: 'active' | 'suspended' | 'pending' | 'setup_required' | 'pending_setup' | 'setup_in_progress';
+  business_type: 'restaurant' | 'bar' | 'cafe' | 'retail' | 'other';
+  timezone: string;
+  language: 'fr' | 'en' | 'es' | 'de' | 'it';
   created_at: string;
+  updated_at: string;
   owner_email: string;
-  schema_name?: string;
+  schema_name: string;
 }
 
 export interface SystemSecurityLog {
@@ -40,10 +45,14 @@ export interface SystemSecurityLog {
 
 export interface CreateEstablishmentRequest {
   name: string;
+  email: string;
   phone: string;
   address: string;
   tva_number?: string;
   siret_number?: string;
   subscription_plan?: 'basic' | 'premium' | 'enterprise';
+  business_type?: 'restaurant' | 'bar' | 'cafe' | 'retail' | 'other';
+  timezone?: string;
+  language?: 'fr' | 'en' | 'es' | 'de' | 'it';
   owner_email: string;
 }

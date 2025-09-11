@@ -158,7 +158,7 @@ export class SchemaManager {
     await client.query(`
       CREATE TABLE IF NOT EXISTS "${schemaName}".audit_trail (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER,
+        user_id VARCHAR(100),
         action_type VARCHAR(100) NOT NULL,
         resource_type VARCHAR(50),
         resource_id VARCHAR(100),

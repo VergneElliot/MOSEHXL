@@ -1,5 +1,5 @@
 import React from 'react';
-import { Grid, TextField } from '@mui/material';
+import { Grid, TextField, MenuItem } from '@mui/material';
 import { CreateEstablishmentRequest } from '../../../types/system';
 
 interface EstablishmentFormProps {
@@ -40,7 +40,18 @@ export const EstablishmentForm: React.FC<EstablishmentFormProps> = ({
           required
         />
       </Grid>
-      <Grid item xs={12}>
+      <Grid item xs={12} sm={6}>
+        <TextField
+          fullWidth
+          label="Email de l'établissement"
+          type="email"
+          value={formData.email}
+          onChange={handleChange('email')}
+          required
+          helperText="Email principal de l'établissement"
+        />
+      </Grid>
+      <Grid item xs={12} sm={6}>
         <TextField
           fullWidth
           label="Email du propriétaire"
@@ -48,7 +59,7 @@ export const EstablishmentForm: React.FC<EstablishmentFormProps> = ({
           value={formData.owner_email}
           onChange={handleChange('owner_email')}
           required
-          helperText="Cet email sera utilisé pour l'établissement et pour recevoir l'invitation de configuration"
+          helperText="Email pour recevoir l'invitation de configuration"
         />
       </Grid>
       <Grid item xs={12}>
@@ -78,17 +89,56 @@ export const EstablishmentForm: React.FC<EstablishmentFormProps> = ({
           onChange={handleChange('siret_number')}
         />
       </Grid>
-      <Grid item xs={12}>
+      <Grid item xs={12} sm={6}>
+        <TextField
+          fullWidth
+          select
+          label="Type d'activité"
+          value={formData.business_type || 'other'}
+          onChange={handleChange('business_type')}
+        >
+          <MenuItem value="restaurant">Restaurant</MenuItem>
+          <MenuItem value="bar">Bar</MenuItem>
+          <MenuItem value="cafe">Café</MenuItem>
+          <MenuItem value="retail">Commerce de détail</MenuItem>
+          <MenuItem value="other">Autre</MenuItem>
+        </TextField>
+      </Grid>
+      <Grid item xs={12} sm={6}>
         <TextField
           fullWidth
           select
           label="Plan d'abonnement"
-          value={formData.subscription_plan}
+          value={formData.subscription_plan || 'basic'}
           onChange={handleChange('subscription_plan')}
-          SelectProps={{ native: true }}
         >
-          <option value="basic">Basic</option>
-          <option value="premium">Premium</option>
+          <MenuItem value="basic">Basic</MenuItem>
+          <MenuItem value="premium">Premium</MenuItem>
+          <MenuItem value="enterprise">Enterprise</MenuItem>
+        </TextField>
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <TextField
+          fullWidth
+          label="Fuseau horaire"
+          value={formData.timezone || 'Europe/Paris'}
+          onChange={handleChange('timezone')}
+          helperText="Ex: Europe/Paris, America/New_York"
+        />
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <TextField
+          fullWidth
+          select
+          label="Langue"
+          value={formData.language || 'fr'}
+          onChange={handleChange('language')}
+        >
+          <MenuItem value="fr">Français</MenuItem>
+          <MenuItem value="en">English</MenuItem>
+          <MenuItem value="es">Español</MenuItem>
+          <MenuItem value="de">Deutsch</MenuItem>
+          <MenuItem value="it">Italiano</MenuItem>
         </TextField>
       </Grid>
     </Grid>

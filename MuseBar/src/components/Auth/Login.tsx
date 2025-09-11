@@ -52,7 +52,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         token: string;
         user: any;
         expiresIn: string;
-      }>('/auth/login', {
+      }>('/auth/simple-login', {
         email,
         password,
         rememberMe,

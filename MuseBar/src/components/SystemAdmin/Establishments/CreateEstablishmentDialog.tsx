@@ -10,6 +10,7 @@ import {
 import { EstablishmentForm } from './EstablishmentForm';
 import { CreateEstablishmentRequest } from '../../../types/system';
 import { useEstablishments } from '../../../hooks/useEstablishments';
+import { ensureAuthentication } from '../../../services/authHelper';
 
 interface CreateEstablishmentDialogProps {
   open: boolean;
@@ -27,11 +28,15 @@ export const CreateEstablishmentDialog: React.FC<CreateEstablishmentDialogProps>
   
   const [formData, setFormData] = useState<CreateEstablishmentRequest>({
     name: '',
+    email: '',
     phone: '',
     address: '',
     tva_number: '',
     siret_number: '',
     subscription_plan: 'basic',
+    business_type: 'other',
+    timezone: 'Europe/Paris',
+    language: 'fr',
     owner_email: ''
   });
 
@@ -40,6 +45,8 @@ export const CreateEstablishmentDialog: React.FC<CreateEstablishmentDialogProps>
       setLoading(true);
       setError(null);
       setSuccess(null);
+      
+      ensureAuthentication(); // Ensure token is set
       
     // console.debug('Creating establishment with data:', formData);
       
@@ -52,11 +59,15 @@ export const CreateEstablishmentDialog: React.FC<CreateEstablishmentDialogProps>
       // Reset form
       setFormData({
         name: '',
+        email: '',
         phone: '',
         address: '',
         tva_number: '',
         siret_number: '',
         subscription_plan: 'basic',
+        business_type: 'other',
+        timezone: 'Europe/Paris',
+        language: 'fr',
         owner_email: ''
       });
       
@@ -74,7 +85,7 @@ export const CreateEstablishmentDialog: React.FC<CreateEstablishmentDialogProps>
     }
   };
 
-  const isFormValid = formData.name && formData.owner_email && formData.phone && formData.address;
+  const isFormValid = formData.name && formData.email && formData.owner_email && formData.phone && formData.address;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>

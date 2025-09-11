@@ -78,15 +78,14 @@ export class EstablishmentDataProcessor {
   ): Promise<EstablishmentRecord> {
     const establishmentQuery = `
       INSERT INTO establishments (
-        id, name, email, phone, address, schema_name,
+        name, email, phone, address, schema_name,
         subscription_plan, subscription_status, status,
         tva_number, siret_number, business_type, timezone, language
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *
     `;
 
     const establishmentValues = [
-      randomUUID(),
       data.name.trim(),
       data.email.toLowerCase(),
       data.phone || null,

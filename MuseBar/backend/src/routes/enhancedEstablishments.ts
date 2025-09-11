@@ -17,6 +17,12 @@ const logger = Logger.getInstance(config);
 // POST /api/enhanced-establishments - Create new establishment with enhanced workflow
 router.post('/', requireAuth, requireAdmin, async (req, res) => {
   try {
+    logger.info('Enhanced establishment creation request received', {
+      user_id: req.user?.id,
+      user_id_type: typeof req.user?.id,
+      body_keys: Object.keys(req.body)
+    }, 'ENHANCED_ESTABLISHMENTS_ROUTE');
+
     const establishmentCreationService = new EstablishmentCreationOrchestrator(logger);
     const result = await establishmentCreationService.createEstablishment(
       req.body,

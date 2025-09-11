@@ -18,6 +18,8 @@ export class RequestLogger {
       const startTime = Date.now();
       const requestId = RequestLogger.generateRequestId();
       
+      console.log(`[REQUEST_LOGGER] Starting request ${req.method} ${req.path} with ID: ${requestId}`);
+      
       // Add request ID to request object
       req.requestId = requestId;
       
@@ -80,6 +82,7 @@ export class RequestLogger {
         );
       });
       
+      console.log(`[REQUEST_LOGGER] Request ${req.method} ${req.path} middleware completed, calling next()`);
       next();
     };
   }
