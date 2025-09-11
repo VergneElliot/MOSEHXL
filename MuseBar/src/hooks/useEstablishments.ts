@@ -13,14 +13,20 @@ export const useEstablishments = () => {
       setLoading(true);
       setError(null);
       
+      // Debug: Check authentication state
+      console.log('🔍 useEstablishments: Starting loadEstablishments');
+      console.log('🔍 useEstablishments: localStorage auth_token:', localStorage.getItem('auth_token') ? 'Present' : 'Missing');
+      
       // Ensure token is set before making API call
       ensureAuthentication();
       
+      console.log('🔍 useEstablishments: About to call EstablishmentService.getEstablishments()');
       const response = await EstablishmentService.getEstablishments();
+      console.log('🔍 useEstablishments: Got response:', response);
       setEstablishments(response.establishments);
     } catch (err) {
       setError('Erreur lors du chargement des établissements');
-      console.error('Error loading establishments:', err);
+      console.error('❌ useEstablishments: Error loading establishments:', err);
     } finally {
       setLoading(false);
     }
