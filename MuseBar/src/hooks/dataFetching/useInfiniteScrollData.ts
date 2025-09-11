@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { useLoadingState } from '../useLoadingState';
+import { useLoadingState } from '../loadingState/useLoadingState';
 import { UseInfiniteScrollDataReturn } from './types';
 
 export const useInfiniteScrollData = <T>(

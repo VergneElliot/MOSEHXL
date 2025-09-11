@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useLoadingState } from '../useLoadingState';
+import { useLoadingState } from '../loadingState/useLoadingState';
 import { getCachedData, setCachedData, invalidateCache, isDataStale } from './cacheManager';
 import { UseDataFetchingOptions, UseDataFetchingReturn } from './types';
 
