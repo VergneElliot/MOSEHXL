@@ -1,10 +1,14 @@
 import { apiConfig } from '../../config/api';
+import { registerSetTokenFunction } from '../authHelper';
 
 let authToken: string | null = null;
 
 export function setToken(token: string | null) {
   authToken = token;
 }
+
+// Register the setToken function with authHelper to avoid circular dependencies
+registerSetTokenFunction(setToken);
 
 export function getToken(): string | null {
   return authToken;
