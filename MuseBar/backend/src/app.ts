@@ -155,6 +155,7 @@ import adminDashboardRouter from './routes/adminDashboard';
 import establishmentSearchRouter from './routes/establishmentSearch';
 import setupRouter from './routes/setup';
 import emailTestRouter from './routes/emailTest';
+import establishmentAccountCreationRouter from './routes/establishmentAccountCreation';
 
 app.use('/api/categories', categoriesRouter);
 app.use('/api/products', productsRouter);
@@ -167,6 +168,7 @@ app.use('/api/enhanced-establishments', enhancedEstablishmentsRouter);
 app.use('/api/admin-dashboard', adminDashboardRouter);
 app.use('/api/establishment-search', establishmentSearchRouter);
 app.use('/api/setup', setupRouter);
+app.use('/api/establishment-account-creation', establishmentAccountCreationRouter);
 
 // Development-only email test routes
 if (NODE_ENV === 'development') {
