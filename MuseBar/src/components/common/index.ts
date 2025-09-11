@@ -17,4 +17,4 @@ export {
   CLOSURE_STATUS_CONFIG,
 } from './StatusChip';
 export { default as AppRouter } from './AppRouter';
-export { default as ErrorDisplay } from './ErrorDisplay';
+export { ErrorDisplay } from './ErrorBoundary';

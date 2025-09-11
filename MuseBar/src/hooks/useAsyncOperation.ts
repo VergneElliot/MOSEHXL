@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { useErrorHandler, ErrorInfo } from './useErrorHandler';
+import { useErrorHandler } from '../components/common/ErrorBoundary/useErrorHandler';
+import { ErrorInfo } from '../components/common/ErrorBoundary/types';
 
 export interface AsyncState<T = any> {
   data: T | null;
@@ -18,53 +19,55 @@ export const useAsyncOperation = <T = any>(
   asyncFn: (...args: any[]) => Promise<T>,
   context?: string
 ): [AsyncState<T>, AsyncActions<T>] => {
-  const [errorState, errorActions] = useErrorHandler(context);
-  const [state, setState] = useState<Omit<AsyncState<T>, 'error'>>({
+  const errorHandler = useErrorHandler();
+  const [state, setState] = useState<AsyncState<T>>({
     data: null,
     loading: false,
+    error: null,
     success: false,
   });
 
   const execute = useCallback(
     async (...args: any[]): Promise<T> => {
-      setState(prev => ({ ...prev, loading: true, success: false }));
-      errorActions.clearError();
+      setState(prev => ({ ...prev, loading: true, success: false, error: null }));
 
       try {
         const result = await asyncFn(...args);
         setState({
           data: result,
           loading: false,
+          error: null,
           success: true,
         });
         return result;
       } catch (error) {
-        setState(prev => ({ ...prev, loading: false, success: false }));
-        errorActions.setError(error as Error);
+        const errorInfo: ErrorInfo = {
+          componentStack: error instanceof Error ? error.stack || '' : '',
+          errorBoundary: undefined,
+          errorBoundaryStack: undefined,
+        };
+        setState(prev => ({ ...prev, loading: false, success: false, error: errorInfo }));
         throw error;
       }
     },
-    [asyncFn, errorActions]
+    [asyncFn, context]
   );
 
   const reset = useCallback(() => {
     setState({
       data: null,
       loading: false,
+      error: null,
       success: false,
     });
-    errorActions.clearError();
-  }, [errorActions]);
+  }, []);
 
   const setData = useCallback((data: T) => {
     setState(prev => ({ ...prev, data, success: true }));
   }, []);
 
   return [
-    {
-      ...state,
-      error: errorState.error,
-    },
+    state,
     {
       execute,
       reset,
