@@ -57,6 +57,84 @@ export const pool = new Pool({
 });
 
 // Connecting to database
+// Lightweight DB query logging wrapper to trace SQL causing failures
+// Wrap pool.query
+const originalPoolQuery = pool.query.bind(pool) as (text: any, params?: any) => Promise<any>;
+pool.query = async (text: any, params?: any) => {
+  const startTime = Date.now();
+  try {
+    const result = await originalPoolQuery(text, params);
+    const duration = Date.now() - startTime;
+    try {
+      logger.database(
+        'query',
+        undefined,
+        duration,
+        result?.rowCount || 0,
+        {
+          preview: typeof text === 'string' ? text.replace(/\s+/g, ' ').slice(0, 300) : '[non-string sql]',
+          params: Array.isArray(params) ? params.map(p => (p === null || p === undefined ? p : String(p).slice(0, 120))) : undefined
+        }
+      );
+    } catch {}
+    return result;
+  } catch (error: any) {
+    const duration = Date.now() - startTime;
+    try {
+      logger.error(
+        'Database query failed',
+        {
+          error: error?.message || String(error),
+          preview: typeof text === 'string' ? text.replace(/\s+/g, ' ').slice(0, 300) : '[non-string sql]',
+          params: Array.isArray(params) ? params.map(p => (p === null || p === undefined ? p : String(p).slice(0, 120))) : undefined,
+          duration: `${duration}ms`
+        },
+        'DATABASE'
+      );
+    } catch {}
+    throw error;
+  }
+};
+
+// Patch each new client on connect to log queries
+pool.on('connect', (client) => {
+  const originalClientQuery = client.query.bind(client);
+  client.query = async (text: any, params?: any) => {
+    const startTime = Date.now();
+    try {
+      const result = await originalClientQuery(text, params);
+      const duration = Date.now() - startTime;
+      try {
+        logger.database(
+          'client_query',
+          undefined,
+          duration,
+          result?.rowCount || 0,
+          {
+            preview: typeof text === 'string' ? text.replace(/\s+/g, ' ').slice(0, 300) : '[non-string sql]',
+            params: Array.isArray(params) ? params.map((p: any) => (p === null || p === undefined ? p : String(p).slice(0, 120))) : undefined
+          }
+        );
+      } catch {}
+      return result;
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      try {
+        logger.error(
+          'Database client query failed',
+          {
+            error: error?.message || String(error),
+            preview: typeof text === 'string' ? text.replace(/\s+/g, ' ').slice(0, 300) : '[non-string sql]',
+            params: Array.isArray(params) ? params.map((p: any) => (p === null || p === undefined ? p : String(p).slice(0, 120))) : undefined,
+            duration: `${duration}ms`
+          },
+          'DATABASE'
+        );
+      } catch {}
+      throw error;
+    }
+  };
+});
 
 // Health check route
 app.get('/api/health', (req, res) => {

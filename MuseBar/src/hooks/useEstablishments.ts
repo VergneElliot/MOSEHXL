@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { SystemEstablishment, CreateEstablishmentRequest } from '../types/system';
 import { EstablishmentService } from '../services/establishmentService';
+import { ensureAuthentication } from '../services/authHelper';
 
 export const useEstablishments = () => {
   const [establishments, setEstablishments] = useState<SystemEstablishment[]>([]);
@@ -11,6 +12,7 @@ export const useEstablishments = () => {
     try {
       setLoading(true);
       setError(null);
+      ensureAuthentication(); // Ensure token is set
       const response = await EstablishmentService.getEstablishments();
       setEstablishments(response.establishments);
     } catch (err) {
@@ -29,6 +31,7 @@ export const useEstablishments = () => {
     try {
       setLoading(true);
       setError(null);
+      ensureAuthentication(); // Ensure token is set
     // console.debug('useEstablishments: Creating establishment...', data);
       
       const response = await EstablishmentService.createEstablishment(data);

@@ -280,8 +280,13 @@ export class EstablishmentModel {
     try {
       await client.query('BEGIN');
 
-      // Get establishment to find schema name
-      const establishment = await this.getById(id);
+      // Get establishment to find schema name using client connection
+      const establishmentResult = await client.query(
+        'SELECT * FROM establishments WHERE id = $1',
+        [id]
+      );
+      
+      const establishment = establishmentResult.rows[0];
       if (!establishment) {
         throw new Error('Establishment not found');
       }

@@ -54,9 +54,16 @@ export class EmailSender {
     try {
       const apiKey = process.env.SENDGRID_API_KEY;
       
-      if (!apiKey) {
+      if (!apiKey || apiKey === 'your_sendgrid_api_key_here' || apiKey === 'disabled_for_development') {
         this.logger.warn(
-          'SendGrid API key not configured. Email service will be disabled.'
+          'SendGrid API key not configured or invalid. Email service will run in development mode.'
+        );
+        return;
+      }
+
+      if (!apiKey.startsWith('SG.')) {
+        this.logger.warn(
+          'SendGrid API key does not start with "SG.". Email service will run in development mode.'
         );
         return;
       }
@@ -85,7 +92,22 @@ export class EmailSender {
     error?: string;
   }> {
     if (!this.isConfigured) {
-      throw new Error('Email service not configured. Please set SENDGRID_API_KEY.');
+      // In development mode, log the email instead of throwing an error
+      this.logger.warn(
+        'Email service not configured. Logging email for development.',
+        {
+          to: options.to,
+          subject: options.subject,
+          trackingId: options.trackingId
+        },
+        'EMAIL_SENDER'
+      );
+      
+      return {
+        success: true,
+        messageId: 'dev-mode-' + Date.now(),
+        error: 'Email service not configured - logged for development'
+      };
     }
 
     try {

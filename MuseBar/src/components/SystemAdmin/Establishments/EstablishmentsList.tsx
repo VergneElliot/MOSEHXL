@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -18,10 +18,33 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon
 } from '@mui/icons-material';
-import { useEstablishments } from '../../../hooks/useEstablishments';
+import { EstablishmentService } from '../../../services/establishmentService';
+import { SystemEstablishment } from '../../../types/system';
+import { ensureAuthentication } from '../../../services/authHelper';
 
 export const EstablishmentsList: React.FC = () => {
-  const { establishments, loading, error, deleteEstablishment } = useEstablishments();
+  const [establishments, setEstablishments] = useState<SystemEstablishment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadEstablishments = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      ensureAuthentication(); // Ensure token is set
+      const response = await EstablishmentService.searchEstablishments();
+      setEstablishments(response.data.establishments);
+    } catch (err) {
+      console.error('Error loading establishments:', err);
+      setError('Erreur lors du chargement des établissements');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadEstablishments();
+  }, []);
 
   const handleDelete = async (id: string, name: string) => {
     if (!window.confirm(`Êtes-vous sûr de vouloir supprimer l'établissement "${name}" ? Cette action ne peut pas être annulée.`)) {
@@ -29,11 +52,11 @@ export const EstablishmentsList: React.FC = () => {
     }
 
     try {
-      await deleteEstablishment(id);
-      // The establishments list will be automatically refreshed by the hook
+      await EstablishmentService.deleteEstablishment(id);
+      await loadEstablishments(); // Refresh the list
     } catch (error) {
       console.error('Error deleting establishment:', error);
-      // You might want to show a toast notification here
+      setError('Erreur lors de la suppression de l\'établissement');
     }
   };
 
@@ -60,13 +83,19 @@ export const EstablishmentsList: React.FC = () => {
       case 'active': return 'success';
       case 'suspended': return 'error';
       case 'pending': return 'warning';
+      case 'pending_setup': return 'info';
+      case 'setup_in_progress': return 'warning';
       case 'setup_required': return 'info';
       default: return 'default';
     }
   };
 
   const getPlanColor = (plan: string): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' => {
-    return plan === 'premium' ? 'warning' : 'success';
+    switch (plan) {
+      case 'premium': return 'warning';
+      case 'enterprise': return 'error';
+      default: return 'success';
+    }
   };
 
   if (establishments.length === 0) {
@@ -89,8 +118,10 @@ export const EstablishmentsList: React.FC = () => {
           <TableRow>
             <TableCell>Nom</TableCell>
             <TableCell>Email</TableCell>
+            <TableCell>Type</TableCell>
             <TableCell>Plan</TableCell>
             <TableCell>Statut</TableCell>
+            <TableCell>Fuseau</TableCell>
             <TableCell>Créé le</TableCell>
             <TableCell>Actions</TableCell>
           </TableRow>
@@ -109,6 +140,13 @@ export const EstablishmentsList: React.FC = () => {
               <TableCell>{establishment.email}</TableCell>
               <TableCell>
                 <Chip 
+                  label={establishment.business_type} 
+                  color="info"
+                  size="small"
+                />
+              </TableCell>
+              <TableCell>
+                <Chip 
                   label={establishment.subscription_plan} 
                   color={getPlanColor(establishment.subscription_plan)}
                   size="small"
@@ -121,6 +159,7 @@ export const EstablishmentsList: React.FC = () => {
                   size="small"
                 />
               </TableCell>
+              <TableCell>{establishment.timezone}</TableCell>
               <TableCell>{new Date(establishment.created_at).toLocaleDateString('fr-FR')}</TableCell>
               <TableCell>
                 <IconButton size="small" title="Voir">

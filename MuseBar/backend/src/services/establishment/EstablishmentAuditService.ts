@@ -51,21 +51,23 @@ export class EstablishmentAuditService {
     auditData: AuditData
   ): Promise<AuditLogEntry> {
     try {
+      // Use public.audit_trail columns that exist universally in Phase 1
       const auditQuery = `
-        INSERT INTO audit_trail (
-          id, establishment_id, user_id, action, details, ip_address, user_agent
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING *
+        INSERT INTO public.audit_trail (
+          user_id, action_type, resource_type, resource_id, action_details, ip_address, user_agent, session_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING id, action_type as action, "timestamp" as created_at
       `;
 
       const auditValues = [
-        randomUUID(),
-        auditData.establishment_id,
-        auditData.user_id,
+        auditData.user_id || null,
         auditData.action,
-        JSON.stringify(auditData.details),
+        'establishment',
+        auditData.establishment_id,
+        JSON.stringify(auditData.details || {}),
         auditData.ip_address || null,
-        auditData.user_agent || null
+        auditData.user_agent || null,
+        null
       ];
 
       const result = await client.query(auditQuery, auditValues);
@@ -205,6 +207,20 @@ export class EstablishmentAuditService {
     ipAddress?: string,
     userAgent?: string
   ): Promise<AuditLogEntry> {
+    // Debug logging to identify the UUID issue
+    this.logger.debug(
+      'Audit service parameters',
+      { 
+        establishmentId,
+        userId,
+        establishmentIdType: typeof establishmentId,
+        userIdType: typeof userId,
+        establishmentIdLength: establishmentId?.length,
+        userIdLength: userId?.length
+      },
+      'ESTABLISHMENT_AUDIT_SERVICE'
+    );
+
     return this.createAuditTrail(client, {
       establishment_id: establishmentId,
       user_id: userId,

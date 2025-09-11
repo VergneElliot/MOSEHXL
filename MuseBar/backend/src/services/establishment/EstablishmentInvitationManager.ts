@@ -80,13 +80,12 @@ export class EstablishmentInvitationManager {
   ): Promise<void> {
     const invitationQuery = `
       INSERT INTO user_invitations (
-        id, email, establishment_id, inviter_user_id, inviter_name,
+        email, establishment_id, inviter_user_id, inviter_name,
         establishment_name, role, invitation_token, expires_at, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     `;
 
     await client.query(invitationQuery, [
-      randomUUID(),
       data.email,
       data.establishmentId,
       'system', // System admin

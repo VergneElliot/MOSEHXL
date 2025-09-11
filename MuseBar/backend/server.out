@@ -1,0 +1,70 @@
+
+> mosehxl-backend@1.0.0 dev
+> ts-node src/app.ts
+
+[dotenv@17.0.1] injecting env (25) from .env – [tip] encrypt with dotenvx: https://dotenvx.com
+[dotenv@17.0.1] injecting env (0) from .env – [tip] encrypt with dotenvx: https://dotenvx.com
+✅ Environment validation passed
+🌍 Environment: development
+📱 Application: MuseBar POS v1.0.0
+🚀 Server: 0.0.0.0:3001
+📊 Database: localhost:5432/mosehxl_development
+🔐 Security: JWT (24h), BCrypt (12 rounds)
+📝 Logging: debug level
+[36m[2025-09-06T13:08:46.864Z] INFO: Built-in email templates loaded | Metadata: {"templateCount":5}[0m
+[33m[2025-09-06T13:08:46.865Z] WARN: SendGrid API key not configured or invalid. Email service will run in development mode.[0m
+[36m[2025-09-06T13:08:46.865Z] INFO: Email service initialized successfully | Metadata: {"components":["TemplateManager","EmailLogger","EmailSender"]}[0m
+[36m[2025-09-06T13:08:46.865Z] INFO: User Invitation Service initialized with modular architecture | Metadata: {"components":["validator","creator","emailService","acceptance"]}[0m
+[36m[2025-09-06T13:08:46.865Z] INFO: User management routes initialized successfully[0m
+[36m[2025-09-06T13:08:46.890Z] INFO: Establishment routes initialized[0m
+[REQUEST_LOGGER] Starting request POST /api/auth/simple-login with ID: t9qasltdbw9uxaihlykjhs
+[37m[2025-09-06T13:08:51.962Z] DEBUG [t9qasltdbw9uxaihlykjhs]: Request started: POST /api/auth/simple-login | Metadata: {"method":"POST","url":"/api/auth/simple-login","ip":"127.0.0.1","userAgent":"curl/8.5.0","headers":{"host":"localhost:3001","user-agent":"curl/8.5.0","accept":"*/*","content-type":"application/json","content-length":"62"},"query":{},"body":{"email":"elliot.vergne@gmail.com","password":"[REDACTED]"}}[0m
+[REQUEST_LOGGER] Request POST /api/auth/simple-login middleware completed, calling next()
+[SECURITY_MIDDLEWARE] Executing middleware 0 for POST /api/auth/simple-login
+[SECURITY_MIDDLEWARE] Executing middleware 1 for POST /api/auth/simple-login
+[SECURITY_MIDDLEWARE] Executing middleware 2 for POST /api/auth/simple-login
+[SECURITY_MIDDLEWARE] Executing middleware 3 for POST /api/auth/simple-login
+[SECURITY_MIDDLEWARE] All middlewares completed for POST /api/auth/simple-login
+[36m[2025-09-06T13:08:51.977Z] INFO [t9qasltdbw9uxaihlykjhs]: POST /api/auth/simple-login - 200 (16ms) | Metadata: {"method":"POST","url":"/api/auth/simple-login","statusCode":200,"duration":"16ms","ip":"127.0.0.1","userAgent":"curl/8.5.0","responseTime":16,"statusClass":"success"}[0m
+[REQUEST_LOGGER] Starting request POST /api/enhanced-establishments with ID: q9rhzktmcpzd00i1rhur
+[37m[2025-09-06T13:08:57.720Z] DEBUG [q9rhzktmcpzd00i1rhur]: Request started: POST /api/enhanced-establishments | Metadata: {"method":"POST","url":"/api/enhanced-establishments","ip":"127.0.0.1","userAgent":"curl/8.5.0","headers":{"host":"localhost:3001","user-agent":"curl/8.5.0","accept":"*/*","content-type":"application/json","authorization":"[REDACTED]","content-length":"311"},"query":{},"body":{"name":"Test Delete Establishment","address":"123 Delete St","city":"Delete City","postalCode":"12345","country":"France","phone":"+33123456789","email":"delete@test.com","siret":"12345678901240","vatNumber":"FR12345678907","legalForm":"SARL","managerName":"Delete Manager","managerEmail":"delete@manager.com"}}[0m
+[REQUEST_LOGGER] Request POST /api/enhanced-establishments middleware completed, calling next()
+[SECURITY_MIDDLEWARE] Executing middleware 0 for POST /api/enhanced-establishments
+[SECURITY_MIDDLEWARE] Executing middleware 1 for POST /api/enhanced-establishments
+[SECURITY_MIDDLEWARE] Executing middleware 2 for POST /api/enhanced-establishments
+[SECURITY_MIDDLEWARE] Executing middleware 3 for POST /api/enhanced-establishments
+[SECURITY_MIDDLEWARE] All middlewares completed for POST /api/enhanced-establishments
+[37m[2025-09-06T13:08:57.722Z] DEBUG [q9rhzktmcpzd00i1rhur]: Auth check started | Metadata: {"method":"POST","path":"/"}[0m
+Auth error: JsonWebTokenError: invalid signature
+    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/jsonwebtoken/verify.js:171:19
+    at getSecret (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/jsonwebtoken/verify.js:97:14)
+    at Object.module.exports [as verify] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/jsonwebtoken/verify.js:101:10)
+    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/auth.ts:31:25
+    at Generator.next (<anonymous>)
+    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/auth.ts:8:71
+    at new Promise (<anonymous>)
+    at __awaiter (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/auth.ts:4:12)
+    at requireAuth (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/auth.ts:34:12)
+    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)
+[33m[2025-09-06T13:08:57.732Z] WARN [q9rhzktmcpzd00i1rhur]: POST /api/enhanced-establishments - 401 (12ms) | Metadata: {"method":"POST","url":"/api/enhanced-establishments","statusCode":401,"duration":"12ms","ip":"127.0.0.1","userAgent":"curl/8.5.0","responseTime":12,"statusClass":"client_error"}[0m
+[REQUEST_LOGGER] Starting request POST /api/auth/simple-login with ID: kcyajhd519ifalr1fbv1b
+[37m[2025-09-06T13:09:12.287Z] DEBUG [kcyajhd519ifalr1fbv1b]: Request started: POST /api/auth/simple-login | Metadata: {"method":"POST","url":"/api/auth/simple-login","ip":"127.0.0.1","userAgent":"curl/8.5.0","headers":{"host":"localhost:3001","user-agent":"curl/8.5.0","accept":"*/*","content-type":"application/json","content-length":"62"},"query":{},"body":{"email":"elliot.vergne@gmail.com","password":"[REDACTED]"}}[0m
+[REQUEST_LOGGER] Request POST /api/auth/simple-login middleware completed, calling next()
+[SECURITY_MIDDLEWARE] Executing middleware 0 for POST /api/auth/simple-login
+[SECURITY_MIDDLEWARE] Executing middleware 1 for POST /api/auth/simple-login
+[SECURITY_MIDDLEWARE] Executing middleware 2 for POST /api/auth/simple-login
+[SECURITY_MIDDLEWARE] Executing middleware 3 for POST /api/auth/simple-login
+[SECURITY_MIDDLEWARE] All middlewares completed for POST /api/auth/simple-login
+[36m[2025-09-06T13:09:12.290Z] INFO [kcyajhd519ifalr1fbv1b]: POST /api/auth/simple-login - 200 (4ms) | Metadata: {"method":"POST","url":"/api/auth/simple-login","statusCode":200,"duration":"4ms","ip":"127.0.0.1","userAgent":"curl/8.5.0","responseTime":4,"statusClass":"success"}[0m
+[REQUEST_LOGGER] Starting request GET /api/establishments with ID: sz2awy9wrg3yy1p3e0jlq
+[37m[2025-09-06T13:09:16.655Z] DEBUG [sz2awy9wrg3yy1p3e0jlq]: Request started: GET /api/establishments | Metadata: {"method":"GET","url":"/api/establishments","ip":"127.0.0.1","userAgent":"curl/8.5.0","headers":{"host":"localhost:3001","user-agent":"curl/8.5.0","accept":"*/*","authorization":"[REDACTED]"},"query":{},"body":{}}[0m
+[REQUEST_LOGGER] Request GET /api/establishments middleware completed, calling next()
+[SECURITY_MIDDLEWARE] Executing middleware 0 for GET /api/establishments
+[SECURITY_MIDDLEWARE] Executing middleware 1 for GET /api/establishments
+[SECURITY_MIDDLEWARE] Executing middleware 2 for GET /api/establishments
+[SECURITY_MIDDLEWARE] Executing middleware 3 for GET /api/establishments
+[SECURITY_MIDDLEWARE] All middlewares completed for GET /api/establishments
+[37m[2025-09-06T13:09:16.656Z] DEBUG [sz2awy9wrg3yy1p3e0jlq]: Auth check started | Metadata: {"method":"GET","path":"/"}[0m
+[37m[2025-09-06T13:09:16.658Z] DEBUG [sz2awy9wrg3yy1p3e0jlq] [User:3]: Auth successful | Metadata: {"userId":3}[0m
+[36m[2025-09-06T13:09:16.685Z] INFO: Database client_query | Metadata: {"operation":"client_query","duration":"4ms","rowsAffected":4,"preview":" SELECT id, name, email, phone, address, tva_number, siret_number, subscription_plan, status, created_at FROM establishments ORDER BY created_at DESC "}[0m
+[37m[2025-09-06T13:28:44.604Z] DEBUG: Rate limit store cleanup completed | Metadata: {"cleanedEntries":1,"remainingEntries":0}[0m

@@ -92,23 +92,32 @@ export class EstablishmentCreationOrchestrator {
       const schemaName = this.dataProcessor.generateSchemaName();
 
       // Step 4: Create establishment record
+      this.logger.info('Creating establishment record', { name: data.name }, 'ESTABLISHMENT_CREATION_ORCHESTRATOR');
       const establishment = await this.dataProcessor.createEstablishmentRecord(client, data, schemaName);
+      this.logger.info('Establishment record created', { id: establishment.id }, 'ESTABLISHMENT_CREATION_ORCHESTRATOR');
 
       // Step 5: Create isolated schema and tables
+      this.logger.info('Creating establishment schema', { schemaName }, 'ESTABLISHMENT_CREATION_ORCHESTRATOR');
       await this.dataProcessor.createEstablishmentSchema(client, schemaName);
+      this.logger.info('Establishment schema created', { schemaName }, 'ESTABLISHMENT_CREATION_ORCHESTRATOR');
 
       // Step 6: Generate invitation data
+      this.logger.info('Generating invitation data', { establishmentId: establishment.id, email: data.email }, 'ESTABLISHMENT_CREATION_ORCHESTRATOR');
       const invitationData = await this.invitationManager.generateInvitationData(
         client,
         establishment.id,
         data.email,
         data.name
       );
+      this.logger.info('Invitation data generated', { token: invitationData.token.substring(0, 8) + '...' }, 'ESTABLISHMENT_CREATION_ORCHESTRATOR');
 
       // Step 7: Send establishment creation confirmation email
+      this.logger.info('Sending creation confirmation email', { email: data.email }, 'ESTABLISHMENT_CREATION_ORCHESTRATOR');
       await this.sendCreationConfirmationEmail(data, establishment, invitationData);
+      this.logger.info('Creation confirmation email sent', { email: data.email }, 'ESTABLISHMENT_CREATION_ORCHESTRATOR');
 
       // Step 8: Create audit trail
+      this.logger.info('Creating audit trail', { establishmentId: establishment.id, userId: createdByUserId }, 'ESTABLISHMENT_CREATION_ORCHESTRATOR');
       const auditLog = await this.auditService.logEstablishmentCreation(
         client,
         establishment.id,
@@ -117,6 +126,7 @@ export class EstablishmentCreationOrchestrator {
         ipAddress,
         userAgent
       );
+      this.logger.info('Audit trail created', { auditId: auditLog.id }, 'ESTABLISHMENT_CREATION_ORCHESTRATOR');
 
       await client.query('COMMIT');
 
@@ -159,6 +169,8 @@ export class EstablishmentCreationOrchestrator {
         'Failed to create establishment',
         { 
           error: error as Error,
+          errorMessage: (error as Error).message,
+          errorStack: (error as Error).stack,
           establishment_data: data,
           created_by: createdByUserId
         },

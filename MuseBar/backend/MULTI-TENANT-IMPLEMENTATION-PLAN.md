@@ -56,8 +56,7 @@ Transform MuseBar from a single-establishment system into a **multi-tenant SaaS 
 - [ ] Create establishment setup progress tracking
 
 #### **1.3 System Admin Establishment Interface** ✅ COMPLETED
-- [x] Enhance system admin dashboard with establishment creation view
-- [x] Add establishment creation form with all required fields
+ - [x] Add establishment creation form with all required fields
 - [x] Implement establishment search and filtering
 - [x] Create establishment overview dashboard
 

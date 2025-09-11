@@ -3,7 +3,7 @@
  * Ensures all required environment variables are present and valid
  */
 
-import dotenv from 'dotenv';
+import * as dotenv from 'dotenv';
 
 // Load environment variables
 dotenv.config();
