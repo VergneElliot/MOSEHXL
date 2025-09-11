@@ -32,13 +32,31 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
     Object.assign(headers, options.headers as Record<string, string>);
   }
 
-  const config: RequestInit = { ...options, headers };
+  // Create timeout controller if no signal is provided
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-  const res = await fetch(url, config);
-  if (!res.ok) {
-    throw new Error(`HTTP error! status: ${res.status}`);
+  const config: RequestInit = { 
+    ...options, 
+    headers,
+    signal: options.signal || controller.signal
+  };
+
+  try {
+    const res = await fetch(url, config);
+    clearTimeout(timeoutId);
+    
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+    return res.json();
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timeout - please try again');
+    }
+    throw error;
   }
-  return res.json();
 }
 
 

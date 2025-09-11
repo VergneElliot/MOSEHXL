@@ -16,9 +16,6 @@ export const useEstablishments = () => {
       // Ensure token is set before making API call
       ensureAuthentication();
       
-      // Add a small delay to ensure token is properly set
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
       const response = await EstablishmentService.getEstablishments();
       setEstablishments(response.establishments);
     } catch (err) {
@@ -40,9 +37,6 @@ export const useEstablishments = () => {
       
       // Ensure token is set before making API call
       ensureAuthentication();
-      
-      // Add a small delay to ensure token is properly set
-      await new Promise(resolve => setTimeout(resolve, 50));
       
     // console.debug('useEstablishments: Creating establishment...', data);
       
