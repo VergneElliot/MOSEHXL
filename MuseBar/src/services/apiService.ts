@@ -5,7 +5,11 @@ export class ApiService {
   private static instance: ApiService;
   private static token: string | null = null;
 
-  public static setToken(token: string | null) { ApiService.token = token; apiCore.setToken(token); }
+  public static setToken(token: string | null) { 
+    console.log('🔍 ApiService: setToken called with:', token ? 'Token present' : 'null');
+    ApiService.token = token; 
+    apiCore.setToken(token); 
+  }
 
   public static getInstance(): ApiService {
     if (!ApiService.instance) {
