@@ -8,40 +8,26 @@ nohup: ignoring input
 📊 Database: localhost:5432/mosehxl_development
 🔐 Security: JWT (24h), BCrypt (12 rounds)
 📝 Logging: debug level
-[36m[2025-09-11T08:30:44.458Z] INFO: Built-in email templates loaded | Metadata: {"templateCount":5}[0m
-[33m[2025-09-11T08:30:44.459Z] WARN: SendGrid API key not configured or invalid. Email service will run in development mode.[0m
-[36m[2025-09-11T08:30:44.459Z] INFO: Email service initialized successfully | Metadata: {"components":["TemplateManager","EmailLogger","EmailSender"]}[0m
-[36m[2025-09-11T08:30:44.459Z] INFO: User Invitation Service initialized with modular architecture | Metadata: {"components":["validator","creator","emailService","acceptance"]}[0m
-[36m[2025-09-11T08:30:44.459Z] INFO: User management routes initialized successfully[0m
-[36m[2025-09-11T08:30:44.484Z] INFO: Establishment routes initialized[0m
-[REQUEST_LOGGER] Starting request GET /api/auth/me with ID: 7mw43zy7jbw0disnsit3hr5
-[37m[2025-09-11T08:30:48.408Z] DEBUG [7mw43zy7jbw0disnsit3hr5]: Request started: GET /api/auth/me | Metadata: {"method":"GET","url":"/api/auth/me","ip":"127.0.0.1","userAgent":"curl/8.5.0","headers":{"host":"localhost:3001","user-agent":"curl/8.5.0","accept":"*/*"},"query":{},"body":{}}[0m
+[36m[2025-09-11T08:55:44.441Z] INFO: Built-in email templates loaded | Metadata: {"templateCount":5}[0m
+[33m[2025-09-11T08:55:44.442Z] WARN: SendGrid API key not configured or invalid. Email service will run in development mode.[0m
+[36m[2025-09-11T08:55:44.442Z] INFO: Email service initialized successfully | Metadata: {"components":["TemplateManager","EmailLogger","EmailSender"]}[0m
+[36m[2025-09-11T08:55:44.442Z] INFO: User Invitation Service initialized with modular architecture | Metadata: {"components":["validator","creator","emailService","acceptance"]}[0m
+[36m[2025-09-11T08:55:44.443Z] INFO: User management routes initialized successfully[0m
+[36m[2025-09-11T08:55:44.467Z] INFO: Establishment routes initialized[0m
+[REQUEST_LOGGER] Starting request GET /api/auth/me with ID: bjdxx0go1uuqxps9xu4
+[37m[2025-09-11T08:55:52.762Z] DEBUG [bjdxx0go1uuqxps9xu4]: Request started: GET /api/auth/me | Metadata: {"method":"GET","url":"/api/auth/me","ip":"127.0.0.1","userAgent":"curl/8.5.0","headers":{"host":"localhost:3001","user-agent":"curl/8.5.0","accept":"*/*","authorization":"[REDACTED]"},"query":{},"body":{}}[0m
 [REQUEST_LOGGER] Request GET /api/auth/me middleware completed, calling next()
 [SECURITY_MIDDLEWARE] Executing middleware 0 for GET /api/auth/me
 [SECURITY_MIDDLEWARE] Executing middleware 1 for GET /api/auth/me
 [SECURITY_MIDDLEWARE] Executing middleware 2 for GET /api/auth/me
 [SECURITY_MIDDLEWARE] Executing middleware 3 for GET /api/auth/me
 [SECURITY_MIDDLEWARE] All middlewares completed for GET /api/auth/me
-[37m[2025-09-11T08:30:48.410Z] DEBUG [7mw43zy7jbw0disnsit3hr5]: Auth check started | Metadata: {"method":"GET","path":"/me"}[0m
-[33m[2025-09-11T08:30:48.415Z] WARN [7mw43zy7jbw0disnsit3hr5]: GET /api/auth/me - 401 (8ms) | Metadata: {"method":"GET","url":"/api/auth/me","statusCode":401,"duration":"8ms","ip":"127.0.0.1","userAgent":"curl/8.5.0","responseTime":8,"statusClass":"client_error"}[0m
-[REQUEST_LOGGER] Starting request GET /api/auth/me with ID: hfq586b2borg7vtac8773l
-[37m[2025-09-11T08:30:54.909Z] DEBUG [hfq586b2borg7vtac8773l]: Request started: GET /api/auth/me | Metadata: {"method":"GET","url":"/api/auth/me","ip":"127.0.0.1","userAgent":"curl/8.5.0","headers":{"host":"localhost:3001","user-agent":"curl/8.5.0","accept":"*/*","authorization":"[REDACTED]"},"query":{},"body":{}}[0m
-[REQUEST_LOGGER] Request GET /api/auth/me middleware completed, calling next()
-[SECURITY_MIDDLEWARE] Executing middleware 0 for GET /api/auth/me
-[SECURITY_MIDDLEWARE] Executing middleware 1 for GET /api/auth/me
-[SECURITY_MIDDLEWARE] Executing middleware 2 for GET /api/auth/me
-[SECURITY_MIDDLEWARE] Executing middleware 3 for GET /api/auth/me
-[SECURITY_MIDDLEWARE] All middlewares completed for GET /api/auth/me
-[37m[2025-09-11T08:30:54.910Z] DEBUG [hfq586b2borg7vtac8773l]: Auth check started | Metadata: {"method":"GET","path":"/me"}[0m
-Auth error: JsonWebTokenError: jwt malformed
-    at Object.module.exports [as verify] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/jsonwebtoken/verify.js:70:17)
-    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/auth.ts:31:25
-    at Generator.next (<anonymous>)
-    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/auth.ts:8:71
-    at new Promise (<anonymous>)
-    at __awaiter (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/auth.ts:4:12)
-    at requireAuth (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/auth.ts:34:12)
-    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)
-    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)
-    at Route.dispatch (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:119:3)
-[33m[2025-09-11T08:30:54.921Z] WARN [hfq586b2borg7vtac8773l]: GET /api/auth/me - 401 (12ms) | Metadata: {"method":"GET","url":"/api/auth/me","statusCode":401,"duration":"12ms","ip":"127.0.0.1","userAgent":"curl/8.5.0","responseTime":12,"statusClass":"client_error"}[0m
+🔍 requireAuth: Starting auth check for user
+[37m[2025-09-11T08:55:52.765Z] DEBUG [bjdxx0go1uuqxps9xu4]: Auth check started | Metadata: {"method":"GET","path":"/me"}[0m
+🔍 requireAuth: About to verify JWT token...
+🔍 requireAuth: JWT token verified successfully, user ID: 3
+🔍 requireAuth: User object created, calling next()...
+[37m[2025-09-11T08:55:52.767Z] DEBUG [bjdxx0go1uuqxps9xu4] [User:3]: Auth successful | Metadata: {"userId":3}[0m
+🔍 /me endpoint: Starting request for user ID: 3
+🔍 /me endpoint: Response sent successfully
+[36m[2025-09-11T08:55:52.773Z] INFO [bjdxx0go1uuqxps9xu4] [User:3]: GET /api/auth/me - 200 (11ms) | Metadata: {"method":"GET","url":"/api/auth/me","statusCode":200,"duration":"11ms","userId":3,"ip":"127.0.0.1","userAgent":"curl/8.5.0","responseTime":11,"statusClass":"success"}[0m
