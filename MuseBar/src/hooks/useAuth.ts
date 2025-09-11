@@ -103,6 +103,7 @@ export const useAuth = (): AuthState & AuthActions => {
 
   // Check authentication status when token changes
   useEffect(() => {
+    // Set token in both ApiService and apiCore to ensure consistency
     ApiService.setToken(token);
     
     if (token) {
