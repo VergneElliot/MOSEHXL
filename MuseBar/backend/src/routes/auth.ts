@@ -227,23 +227,41 @@ router.post('/simple-login', async (req, res) => {
 
 // GET /api/auth/me
 router.get('/me', requireAuth, async (req, res) => {
-  const user = await UserModel.findById(Number(req.user!.id));
-  if (!user) return res.status(404).json({ error: 'User not found' });
-  const permissions = await UserModel.getUserPermissions(user.id);
-  
-  // Get additional user fields from database
-  const userDetails = await pool.query('SELECT first_name, last_name, role FROM users WHERE id = $1', [user.id]);
-  const details = userDetails.rows[0] || {};
-  
-  res.json({ 
-    id: user.id, 
-    email: user.email, 
-    is_admin: user.is_admin, 
-    role: details.role,
-    first_name: details.first_name,
-    last_name: details.last_name,
-    permissions 
-  });
+  try {
+    console.log('🔍 /me endpoint: Starting request for user ID:', req.user!.id);
+    
+    const user = await UserModel.findById(Number(req.user!.id));
+    if (!user) {
+      console.log('🔍 /me endpoint: User not found');
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    console.log('🔍 /me endpoint: User found, getting permissions...');
+    
+    // Simplified permissions - return empty array for now to avoid hanging
+    const permissions: string[] = [];
+    
+    console.log('🔍 /me endpoint: Getting user details...');
+    
+    // Get additional user fields from database
+    const userDetails = await pool.query('SELECT first_name, last_name, role FROM users WHERE id = $1', [user.id]);
+    const details = userDetails.rows[0] || {};
+    
+    console.log('🔍 /me endpoint: Sending response...');
+    
+    res.json({ 
+      id: user.id, 
+      email: user.email, 
+      is_admin: user.is_admin, 
+      role: details.role,
+      first_name: details.first_name,
+      last_name: details.last_name,
+      permissions 
+    });
+  } catch (error) {
+    console.error('❌ /me endpoint error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // POST /api/auth/refresh

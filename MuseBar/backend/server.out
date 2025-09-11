@@ -1,0 +1,37 @@
+nohup: ignoring input
+[dotenv@17.0.1] injecting env (25) from .env – [tip] encrypt with dotenvx: https://dotenvx.com
+[dotenv@17.0.1] injecting env (0) from .env – [tip] encrypt with dotenvx: https://dotenvx.com
+✅ Environment validation passed
+🌍 Environment: development
+📱 Application: MuseBar POS v1.0.0
+🚀 Server: 0.0.0.0:3001
+📊 Database: localhost:5432/mosehxl_development
+🔐 Security: JWT (24h), BCrypt (12 rounds)
+📝 Logging: debug level
+[36m[2025-09-11T08:27:45.704Z] INFO: Built-in email templates loaded | Metadata: {"templateCount":5}[0m
+[33m[2025-09-11T08:27:45.705Z] WARN: SendGrid API key not configured or invalid. Email service will run in development mode.[0m
+[36m[2025-09-11T08:27:45.705Z] INFO: Email service initialized successfully | Metadata: {"components":["TemplateManager","EmailLogger","EmailSender"]}[0m
+[36m[2025-09-11T08:27:45.705Z] INFO: User Invitation Service initialized with modular architecture | Metadata: {"components":["validator","creator","emailService","acceptance"]}[0m
+[36m[2025-09-11T08:27:45.705Z] INFO: User management routes initialized successfully[0m
+[36m[2025-09-11T08:27:45.725Z] INFO: Establishment routes initialized[0m
+[REQUEST_LOGGER] Starting request GET /api/auth/me with ID: 8sb5dknhid5crht9kcdli
+[37m[2025-09-11T08:27:55.718Z] DEBUG [8sb5dknhid5crht9kcdli]: Request started: GET /api/auth/me | Metadata: {"method":"GET","url":"/api/auth/me","ip":"127.0.0.1","userAgent":"curl/8.5.0","headers":{"host":"localhost:3001","user-agent":"curl/8.5.0","accept":"*/*","authorization":"[REDACTED]"},"query":{},"body":{}}[0m
+[REQUEST_LOGGER] Request GET /api/auth/me middleware completed, calling next()
+[SECURITY_MIDDLEWARE] Executing middleware 0 for GET /api/auth/me
+[SECURITY_MIDDLEWARE] Executing middleware 1 for GET /api/auth/me
+[SECURITY_MIDDLEWARE] Executing middleware 2 for GET /api/auth/me
+[SECURITY_MIDDLEWARE] Executing middleware 3 for GET /api/auth/me
+[SECURITY_MIDDLEWARE] All middlewares completed for GET /api/auth/me
+[37m[2025-09-11T08:27:55.720Z] DEBUG [8sb5dknhid5crht9kcdli]: Auth check started | Metadata: {"method":"GET","path":"/me"}[0m
+Auth error: JsonWebTokenError: invalid signature
+    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/jsonwebtoken/verify.js:171:19
+    at getSecret (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/jsonwebtoken/verify.js:97:14)
+    at Object.module.exports [as verify] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/jsonwebtoken/verify.js:101:10)
+    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/auth.ts:31:25
+    at Generator.next (<anonymous>)
+    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/auth.ts:8:71
+    at new Promise (<anonymous>)
+    at __awaiter (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/auth.ts:4:12)
+    at requireAuth (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/auth.ts:34:12)
+    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)
+[33m[2025-09-11T08:27:55.740Z] WARN [8sb5dknhid5crht9kcdli]: GET /api/auth/me - 401 (22ms) | Metadata: {"method":"GET","url":"/api/auth/me","statusCode":401,"duration":"22ms","ip":"127.0.0.1","userAgent":"curl/8.5.0","responseTime":22,"statusClass":"client_error"}[0m
