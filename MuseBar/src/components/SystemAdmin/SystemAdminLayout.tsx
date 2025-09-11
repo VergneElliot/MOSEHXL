@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, AppBar, Toolbar, Typography, Button } from '@mui/material';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
+import { NavigationBreadcrumbs } from './NavigationBreadcrumbs';
 
 interface SystemAdminLayoutProps {
   children: React.ReactNode;
@@ -30,6 +31,7 @@ const SystemAdminLayout: React.FC<SystemAdminLayoutProps> = ({ children }) => {
       </AppBar>
       
       <Box sx={{ flex: 1, overflow: 'auto' }}>
+        <NavigationBreadcrumbs />
         {children}
       </Box>
     </Box>

@@ -23,7 +23,7 @@ const SystemSecurityLogsPage: React.FC = () => {
   });
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ px: 3, pb: 3 }}>
       <Typography variant="h4" gutterBottom sx={{ mb: 3 }}>
         Journal de Sécurité Système
       </Typography>

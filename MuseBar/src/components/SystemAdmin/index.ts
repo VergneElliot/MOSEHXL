@@ -3,6 +3,7 @@ export { default as SystemDashboard } from './Dashboard/SystemDashboard';
 export { default as EstablishmentsPage } from './Establishments/EstablishmentsPage';
 export { default as SystemUsersPage } from './Users/SystemUsersPage';
 export { default as SystemSecurityLogsPage } from './SecurityLogs/SystemSecurityLogsPage';
+export { default as NavigationBreadcrumbs } from './NavigationBreadcrumbs';
 
 // Dashboard components
 export { DashboardCard } from './Dashboard/DashboardCard';
