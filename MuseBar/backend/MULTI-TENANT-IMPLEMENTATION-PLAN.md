@@ -64,7 +64,7 @@ Transform MuseBar from a single-establishment system into a **multi-tenant SaaS 
 
 #### **2.1 Fix Current Email Issues**
 - [ ] Debug and fix email confirmation system
-- [ ] Test all email templates (invitation, setup completion, etc.)
+- [ ] npm
 - [ ] Implement email delivery tracking and retry logic
 - [ ] Add email verification for establishment setup
 

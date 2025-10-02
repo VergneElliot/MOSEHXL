@@ -41,15 +41,17 @@ router.post('/complete',
     { field: 'businessInfo', required: true }
   ]),
   validateInvitation,
-  validateBusinessInfo,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { password } = req.body as EstablishmentAccountCreationRequest;
+      logger.info('Route handler started for establishment account creation');
+      const { token, password, businessInfo } = req.body as EstablishmentAccountCreationRequest;
       const invitation = req.invitationValidation;
-      const businessInfo = req.validatedBusinessInfo;
+
+      logger.info('Extracted request data', { tokenPreview: token.substring(0, 8) + '...', businessType: businessInfo.businessType });
 
       // Password validation
       if (password.length < 8) {
+        logger.warn('Password validation failed - too short');
         return res.status(400).json({
           success: false,
           error: 'Password must be at least 8 characters long'
@@ -58,17 +60,21 @@ router.post('/complete',
 
       // Initialize service if not already done
       if (!establishmentAccountService) {
+        logger.info('Initializing EstablishmentAccountService');
         const pool = req.app.locals.db;
         establishmentAccountService = new EstablishmentAccountService(pool, logger);
+        logger.info('EstablishmentAccountService initialized');
       }
 
-      // Process account creation
+      logger.info('About to call completeAccountCreation');
+      // Use the invitation from middleware validation
       const response = await establishmentAccountService.completeAccountCreation({
         token,
         password,
         businessInfo
       });
 
+      logger.info('Account creation completed, sending response');
       res.json(response);
     } catch (error) {
       logger.error('Establishment account creation error', error as Error);
@@ -78,6 +84,19 @@ router.post('/complete',
 );
 
 /**
+ * GET /health
+ * Health check endpoint for establishment account creation service
+ */
+router.get('/health', async (req: Request, res: Response) => {
+  res.json({
+    success: true,
+    message: 'Establishment Account Creation Service is healthy',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0'
+  });
+});
+
+/**
  * GET /validate/:token
  * Validate invitation token (for frontend pre-validation)
  */
@@ -85,14 +104,16 @@ router.get('/validate/:token', async (req: Request, res: Response, next: NextFun
   try {
     const { token } = req.params;
     
-    // TODO: Implement token validation service
-    // This will be implemented in Phase 1, Step 2
+    // Initialize service if not already done
+    if (!establishmentAccountService) {
+      const pool = req.app.locals.db;
+      establishmentAccountService = new EstablishmentAccountService(pool, logger);
+    }
+
+    // Validate the invitation token
+    const validationResult = await establishmentAccountService.validateInvitation(token);
     
-    res.json({
-      success: true,
-      message: 'Token validation endpoint ready',
-      token
-    });
+    res.json(validationResult);
   } catch (error) {
     logger.error('Token validation error', error as Error);
     next(error);

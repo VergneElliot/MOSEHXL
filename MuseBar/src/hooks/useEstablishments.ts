@@ -24,9 +24,15 @@ export const useEstablishments = () => {
       const response = await EstablishmentService.getEstablishments();
       console.log('🔍 useEstablishments: Got response:', response);
       setEstablishments(response.establishments);
-    } catch (err) {
-      setError('Erreur lors du chargement des établissements');
+    } catch (err: any) {
+      const errorMessage = err.message || 'Erreur lors du chargement des établissements';
+      setError(errorMessage);
       console.error('❌ useEstablishments: Error loading establishments:', err);
+      
+      // Don't disconnect on timeout errors - just show error message
+      if (errorMessage.includes('timeout')) {
+        console.log('🔄 useEstablishments: Timeout error - keeping user logged in');
+      }
     } finally {
       setLoading(false);
     }

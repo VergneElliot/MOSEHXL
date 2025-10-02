@@ -38,7 +38,7 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
 
   // Create timeout controller if no signal is provided
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout (reduced from 30)
 
   const config: RequestInit = { 
     ...options, 
@@ -51,6 +51,13 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
     clearTimeout(timeoutId);
     
     if (!res.ok) {
+      // Handle specific HTTP errors
+      if (res.status === 401) {
+        // Clear invalid token and redirect to login
+        localStorage.removeItem('auth_token');
+        window.location.href = '/login';
+        throw new Error('Session expired - please login again');
+      }
       throw new Error(`HTTP error! status: ${res.status}`);
     }
     return res.json();

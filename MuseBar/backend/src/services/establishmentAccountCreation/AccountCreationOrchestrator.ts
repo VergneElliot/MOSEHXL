@@ -76,11 +76,11 @@ export class AccountCreationOrchestrator {
       });
 
       // Validate business information
-      const validation = this.businessInfoValidator.validate(businessInfo);
+      const validation = this.businessInfoValidator.validateBusinessInfo(businessInfo);
       if (!validation.isValid) {
         return {
           success: false,
-          error: `Business information validation failed: ${validation.error}`
+          error: `Business information validation failed: ${validation.errors?.join(', ') || 'Unknown validation error'}`
         };
       }
 
@@ -135,6 +135,11 @@ export class AccountCreationOrchestrator {
         );
 
         // Step 4: Mark invitation as completed
+        this.logger.info('About to mark invitation as completed', { 
+          token: invitationData.token.substring(0, 8) + '...',
+          establishmentId: invitationData.establishment.id 
+        });
+        
         const invitationCompletionData = {
           token: invitationData.token,
           establishmentId: invitationData.establishment.id,
@@ -148,6 +153,8 @@ export class AccountCreationOrchestrator {
           ipAddress,
           userAgent
         );
+        
+        this.logger.info('Invitation completion finished successfully');
 
         // Commit transaction
         await client.query('COMMIT');
@@ -158,20 +165,29 @@ export class AccountCreationOrchestrator {
           schemaName: createdSchema.schemaName
         });
 
-        // Send setup completion email (non-blocking)
-        this.emailService.sendTemplateEmail(
-          'establishment_setup',
-          createdUser.email,
-          {
-            ownerName: sanitizedBusinessInfo.companyName,
-            establishmentName: sanitizedBusinessInfo.companyName,
-            loginUrl: `${this.config.frontend.url}/login`,
-            supportUrl: `${this.config.frontend.url}/support`,
-            dashboardUrl: `${this.config.frontend.url}/dashboard`,
-            setupDate: new Date().toLocaleDateString('en-US'),
+        // Send setup completion email (truly non-blocking)
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        setImmediate(async () => {
+          try {
+            await this.emailService.sendTemplateEmail(
+              'establishment_setup',
+              createdUser.email,
+              {
+                ownerName: sanitizedBusinessInfo.companyName,
+                establishmentName: sanitizedBusinessInfo.companyName,
+                loginUrl: `${frontendUrl}/login`,
+                supportUrl: `${frontendUrl}/support`,
+                dashboardUrl: `${frontendUrl}/dashboard`,
+                setupDate: new Date().toLocaleDateString('en-US'),
+              }
+            );
+            this.logger.info('Establishment setup completion email sent successfully', { 
+              email: createdUser.email,
+              establishmentName: sanitizedBusinessInfo.companyName 
+            });
+          } catch (emailError) {
+            this.logger.error('Failed to send establishment setup completion email', emailError as Error);
           }
-        ).catch(emailError => {
-          this.logger.error('Failed to send establishment setup completion email', emailError as Error);
         });
 
         return {

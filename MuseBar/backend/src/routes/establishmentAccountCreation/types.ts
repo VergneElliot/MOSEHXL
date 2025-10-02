@@ -16,13 +16,14 @@ export interface EstablishmentAccountCreationRequest {
  * Business information required for establishment setup
  */
 export interface BusinessInfo {
-  taxId: string;
-  siret: string;
-  businessType: string;
+  companyName: string;
+  taxId: string; // French SIREN/SIRET
+  siretNumber: string;
   address: string;
-  city: string;
   postalCode: string;
-  phone: string;
+  city: string;
+  country: string;
+  businessType: string;
 }
 
 /**

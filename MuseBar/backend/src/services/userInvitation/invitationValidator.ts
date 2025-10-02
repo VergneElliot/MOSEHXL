@@ -42,18 +42,7 @@ export class InvitationValidator {
         };
       }
 
-      // Check if establishment with this email already exists
-      const existingEstablishment = await pool.query(
-        'SELECT id FROM establishments WHERE email = $1',
-        [data.email]
-      );
-
-      if (existingEstablishment.rows.length > 0) {
-        return {
-          isValid: false,
-          message: 'An establishment with this email already exists'
-        };
-      }
+      // Email uniqueness check removed - users can have multiple establishments with same email
 
       // Check if there's already a pending invitation for this email
       const existingInvitation = await pool.query(
@@ -121,18 +110,7 @@ export class InvitationValidator {
         };
       }
 
-      // Check if user with this email already exists in this establishment
-      const existingUser = await pool.query(
-        'SELECT id FROM users WHERE email = $1 AND establishment_id = $2',
-        [data.email, data.establishmentId]
-      );
-
-      if (existingUser.rows.length > 0) {
-        return {
-          isValid: false,
-          message: 'A user with this email already exists in this establishment'
-        };
-      }
+      // Email uniqueness check removed - users can have multiple establishments with same email
 
       // Check if there's already a pending invitation for this email in this establishment
       const existingInvitation = await pool.query(

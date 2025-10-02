@@ -31,7 +31,9 @@ export class EstablishmentAccountService {
   public async completeAccountCreation(
     request: EstablishmentAccountCreationRequest
   ): Promise<EstablishmentAccountCreationResponse> {
+    this.logger.info('Getting database client connection...');
     const client = await this.pool.connect();
+    this.logger.info('Database client connected successfully');
     
     try {
       this.logger.info('Processing establishment account creation request', {
@@ -44,6 +46,7 @@ export class EstablishmentAccountService {
       if (!invitationValidation.isValid) {
         return {
           success: false,
+          message: invitationValidation.error || 'Invalid invitation token',
           error: invitationValidation.error || 'Invalid invitation token'
         };
       }
@@ -53,6 +56,7 @@ export class EstablishmentAccountService {
       if (!passwordValidation.isValid) {
         return {
           success: false,
+          message: passwordValidation.error || 'Invalid password',
           error: passwordValidation.error || 'Invalid password'
         };
       }
@@ -68,6 +72,7 @@ export class EstablishmentAccountService {
       if (!result.success) {
         return {
           success: false,
+          message: result.error || 'Account creation failed',
           error: result.error || 'Account creation failed'
         };
       }
@@ -89,6 +94,7 @@ export class EstablishmentAccountService {
       this.logger.error('Establishment account creation service error', error as Error);
       return {
         success: false,
+        message: 'Internal server error during account creation',
         error: 'Internal server error during account creation'
       };
     } finally {
@@ -190,6 +196,24 @@ export class EstablishmentAccountService {
     } catch (error) {
       this.logger.warn('Failed to send completion email', error as Error);
       // Don't fail the entire process if email fails
+    }
+  }
+
+  /**
+   * Validate invitation token (public method for route handlers)
+   */
+  public async validateInvitation(token: string): Promise<{
+    isValid: boolean;
+    establishment?: any;
+    error?: string;
+  }> {
+    const client = await this.pool.connect();
+    
+    try {
+      const result = await this.validateInvitationToken(client, token);
+      return result;
+    } finally {
+      client.release();
     }
   }
 

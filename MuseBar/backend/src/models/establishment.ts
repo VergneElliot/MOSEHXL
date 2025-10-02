@@ -291,16 +291,29 @@ export class EstablishmentModel {
         throw new Error('Establishment not found');
       }
 
-      // First, remove establishment_id from associated users to handle foreign key constraint
+      // 1) Clean dependent records to satisfy foreign keys
+      // a) Remove business_settings row linked to this establishment
+      await client.query(
+        'DELETE FROM business_settings WHERE establishment_id = $1',
+        [id]
+      );
+
+      // b) Delete pending/accepted invitations for this establishment
+      await client.query(
+        'DELETE FROM user_invitations WHERE establishment_id = $1',
+        [id]
+      );
+
+      // c) Detach users from this establishment (kept for audit/history)
       await client.query(
         'UPDATE users SET establishment_id = NULL WHERE establishment_id = $1',
         [id]
       );
 
-      // Delete establishment record
+      // 2) Delete establishment record
       await client.query('DELETE FROM establishments WHERE id = $1', [id]);
 
-      // Drop establishment schema (this will delete all data) using SchemaManager
+      // 3) Drop establishment schema (this will delete all data) using SchemaManager
       await SchemaManager.dropEstablishmentSchema(client, establishment.schema_name);
 
       await client.query('COMMIT');

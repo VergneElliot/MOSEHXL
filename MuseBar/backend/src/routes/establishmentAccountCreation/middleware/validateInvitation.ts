@@ -19,8 +19,11 @@ export const validateInvitation = async (
   try {
     const { token } = req.body;
     const logger = Logger.getInstance();
+    
+    logger.info('validateInvitation middleware started', { tokenPreview: token?.substring(0, 8) + '...' });
 
     if (!token) {
+      logger.warn('No token provided in request body');
       res.status(400).json({
         success: false,
         error: 'Invitation token is required'
@@ -28,14 +31,19 @@ export const validateInvitation = async (
       return;
     }
 
+    logger.info('Getting database connection from pool...');
     // Get database connection
     const pool = req.app.locals.db as Pool;
     const client = await pool.connect();
+    logger.info('Database client connected successfully');
 
     try {
+      logger.info('About to validate invitation token...');
       const validation = await validateInvitationToken(client, token, logger);
+      logger.info('Invitation token validation completed', { isValid: validation.isValid });
       
       if (!validation.isValid) {
+        logger.warn('Invitation validation failed', { error: validation.error });
         res.status(400).json({
           success: false,
           error: validation.error
@@ -45,8 +53,10 @@ export const validateInvitation = async (
 
       // Attach validation result to request
       req.invitationValidation = validation;
+      logger.info('Calling next() to proceed to route handler');
       next();
     } finally {
+      logger.info('Releasing database client connection');
       client.release();
     }
   } catch (error) {
@@ -68,6 +78,7 @@ async function validateInvitationToken(
   logger: Logger
 ): Promise<InvitationValidationResult> {
   try {
+    logger.info('Starting database query for invitation validation');
     const query = `
       SELECT ui.*, e.id as establishment_id, e.name as establishment_name, 
              e.email as establishment_email, e.status as establishment_status
@@ -78,7 +89,9 @@ async function validateInvitationToken(
         AND ui.expires_at > CURRENT_TIMESTAMP
     `;
 
+    logger.info('Executing SQL query...');
     const result = await client.query(query, [token]);
+    logger.info('SQL query completed', { rowCount: result.rows.length });
 
     if (result.rows.length === 0) {
       return {

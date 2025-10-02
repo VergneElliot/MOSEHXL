@@ -1,7 +1,7 @@
 import { PoolClient } from 'pg';
 import { Logger } from '../../../utils/logger';
 import { AuditTrailModel } from '../../../models/auditTrail';
-import { BusinessInfo } from '../../routes/establishmentAccountCreation/types';
+import { BusinessInfo } from '../../../routes/establishmentAccountCreation/types';
 
 export interface EstablishmentUpdateData {
   establishmentId: string;
@@ -13,7 +13,6 @@ export interface UpdatedEstablishment {
   id: string;
   name: string;
   status: string;
-  businessInfo: BusinessInfo;
 }
 
 export class EstablishmentOperations {
@@ -36,62 +35,84 @@ export class EstablishmentOperations {
     const { establishmentId, businessInfo, status } = updateData;
 
     try {
-      // 1. Update establishment with business information
-      const updateResult = await client.query(
+      // 1. Update establishment status only
+      const establishmentResult = await client.query(
         `UPDATE establishments 
          SET 
-           business_name = $1,
-           tax_id = $2,
-           siret_number = $3,
-           address = $4,
-           postal_code = $5,
-           city = $6,
-           country = $7,
-           business_type = $8,
-           status = $9,
+           business_type = $1,
+           status = $2,
            updated_at = NOW()
-         WHERE id = $10
-         RETURNING id, business_name, status, tax_id, siret_number, address, postal_code, city, country, business_type`,
+         WHERE id = $3
+         RETURNING id, name, status`,
         [
-          businessInfo.companyName,
-          businessInfo.taxId,
-          businessInfo.siretNumber,
-          businessInfo.address,
-          businessInfo.postalCode,
-          businessInfo.city,
-          businessInfo.country,
           businessInfo.businessType,
           status,
           establishmentId
         ]
       );
 
-      if (updateResult.rows.length === 0) {
+      if (establishmentResult.rows.length === 0) {
         throw new Error(`Establishment with ID ${establishmentId} not found`);
       }
 
-      const establishment = updateResult.rows[0];
+      // 2. Create or update business_settings for this establishment
+      const businessSettingsResult = await client.query(
+        `INSERT INTO business_settings (
+           name, address, phone, email, siret, tax_identification, establishment_id, updated_at
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+         ON CONFLICT (establishment_id) DO UPDATE SET
+           name = EXCLUDED.name,
+           address = EXCLUDED.address,
+           phone = EXCLUDED.phone,
+           email = EXCLUDED.email,
+           siret = EXCLUDED.siret,
+           tax_identification = EXCLUDED.tax_identification,
+           updated_at = NOW()
+         RETURNING id, name`,
+        [
+          businessInfo.companyName,
+          businessInfo.address,
+          '',  // phone not in BusinessInfo interface
+          businessInfo.companyName + '@example.com',  // email not in BusinessInfo interface
+          businessInfo.siretNumber,
+          businessInfo.taxId,
+          establishmentId
+        ]
+      );
+
+      const establishment = establishmentResult.rows[0];
+      const businessSettings = businessSettingsResult.rows[0];
+      
       this.logger.info('Establishment updated with business information', { 
         establishmentId: establishment.id,
-        businessName: establishment.business_name,
-        status: establishment.status
+        businessName: establishment.name,
+        status: establishment.status,
+        businessSettingsId: businessSettings.id
       });
 
-      // 2. Log audit trail
-      await AuditTrailModel.logAction({
-        user_id: userId,
-        action_type: 'ESTABLISHMENT_BUSINESS_INFO_UPDATED',
-        resource_type: 'ESTABLISHMENT',
-        resource_id: establishmentId,
-        action_details: {
-          establishment_name: establishment.business_name,
-          business_info: businessInfo,
-          status: status,
-          update_type: 'business_info_completion'
-        },
-        ip_address: ipAddress,
-        user_agent: userAgent
-      });
+      // 2. Log audit trail using transaction client to prevent deadlock
+      await client.query(
+        `INSERT INTO audit_trail (
+          user_id, action_type, resource_type, resource_id, 
+          action_details, ip_address, user_agent, session_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          userId,
+          'ESTABLISHMENT_BUSINESS_INFO_UPDATED',
+          'ESTABLISHMENT',
+          establishmentId,
+          JSON.stringify({
+            establishment_name: establishment.name,
+            business_info: businessInfo,
+            status: status,
+            update_type: 'business_info_completion',
+            business_settings_id: businessSettings.id
+          }),
+          ipAddress,
+          userAgent,
+          null // session_id
+        ]
+      );
 
       this.logger.info('Audit trail logged for establishment business info update', { 
         establishmentId, 
@@ -100,25 +121,12 @@ export class EstablishmentOperations {
 
       return {
         id: establishment.id,
-        name: establishment.business_name,
-        status: establishment.status,
-        businessInfo: {
-          companyName: establishment.business_name,
-          taxId: establishment.tax_id,
-          siretNumber: establishment.siret_number,
-          address: establishment.address,
-          postalCode: establishment.postal_code,
-          city: establishment.city,
-          country: establishment.country,
-          businessType: establishment.business_type
-        }
+        name: establishment.name,
+        status: establishment.status
       };
 
     } catch (error) {
-      this.logger.error('Failed to update establishment with business information', error as Error, { 
-        establishmentId, 
-        businessInfo 
-      });
+      this.logger.error('Failed to update establishment with business information', error as Error);
       throw new Error(`Failed to update establishment: ${(error as Error).message}`);
     }
   }
@@ -165,7 +173,7 @@ export class EstablishmentOperations {
   ): Promise<{ exists: boolean; status?: string; name?: string }> {
     try {
       const result = await client.query(
-        'SELECT id, status, business_name FROM establishments WHERE id = $1',
+        'SELECT id, status, name FROM establishments WHERE id = $1',
         [establishmentId]
       );
 
@@ -178,17 +186,17 @@ export class EstablishmentOperations {
       this.logger.debug('Establishment status retrieved', { 
         establishmentId, 
         status: establishment.status,
-        name: establishment.business_name
+        name: establishment.name
       });
 
       return {
         exists: true,
         status: establishment.status,
-        name: establishment.business_name
+        name: establishment.name
       };
 
     } catch (error) {
-      this.logger.error('Failed to get establishment status', error as Error, { establishmentId });
+      this.logger.error('Failed to get establishment status', error as Error);
       throw new Error(`Failed to get establishment status: ${(error as Error).message}`);
     }
   }
@@ -247,7 +255,7 @@ export class EstablishmentOperations {
       });
 
     } catch (error) {
-      this.logger.error('Failed to update establishment status', error as Error, { establishmentId, status });
+      this.logger.error('Failed to update establishment status', error as Error);
       throw new Error(`Failed to update establishment status: ${(error as Error).message}`);
     }
   }

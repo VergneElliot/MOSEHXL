@@ -11,6 +11,7 @@ import { Login } from './components/Auth';
 import InvitationAcceptance from './components/InvitationAcceptance';
 import { AppHeader } from './components/common/AppHeader';
 import { BusinessSetupWizard } from './components/Setup';
+import EstablishmentAccountCreation from './components/EstablishmentAccountCreation';
 
 function App() {
   // const location = useLocation();
@@ -59,7 +60,10 @@ function App() {
   }, []);
 
   const handleLogin = (jwt: string, userObj: any, rememberMeFlag: boolean, expiresIn: string) => {
+    // Persist auth
     login(jwt, userObj, rememberMeFlag, expiresIn);
+    // After login, if not system admin, ensure POS loads fresh data for user's establishment
+    // Nothing else here; POS view will load based on isSystemAdmin below
   };
 
   const handleLogout = () => {
@@ -88,6 +92,9 @@ function App() {
     <Routes>
       {/* Setup wizard route - no authentication required */}
       <Route path="/setup/:token" element={<BusinessSetupWizard />} />
+      
+      {/* Establishment account creation route - no authentication required */}
+      <Route path="/establishment-setup/:token" element={<EstablishmentAccountCreation />} />
       
       {/* Main application routes */}
       <Route path="/*" element={

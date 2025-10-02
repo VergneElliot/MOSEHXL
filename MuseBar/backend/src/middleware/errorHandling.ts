@@ -214,10 +214,7 @@ export class CriticalErrorHandler {
       'INVITATION_ERROR'
     );
 
-    // Convert technical errors to user-friendly messages
-    if (error.message.includes('duplicate key') || error.message.includes('already exists')) {
-      return new BusinessLogicError('An invitation for this email already exists');
-    }
+    // Email uniqueness error handling removed - users can have multiple establishments with same email
     
     if (error.message.includes('foreign key') || error.message.includes('establishment')) {
       return new BusinessLogicError('The specified establishment is not available');

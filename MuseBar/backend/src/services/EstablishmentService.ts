@@ -157,7 +157,7 @@ export class EstablishmentService {
           email: establishment.email,
           status: 'setup_required',
           invitation_token: invitationToken, // For testing - remove in production
-          invitation_link: `${process.env.FRONTEND_URL}/setup/${invitationToken}`
+          invitation_link: `${process.env.FRONTEND_URL}/establishment-setup/${invitationToken}`
         }
       };
 
@@ -329,7 +329,7 @@ export class EstablishmentService {
         this.logger
       );
 
-      const setupUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/setup/${invitationToken}`;
+      const setupUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/establishment-setup/${invitationToken}`;
       const expirationDate = expiresAt.toLocaleDateString('fr-FR', {
         weekday: 'long',
         year: 'numeric',
