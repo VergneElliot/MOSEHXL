@@ -61,13 +61,9 @@ function validateBusinessInfoData(
   const errors: string[] = [];
 
   // Required field validation
-  if (!businessInfo.taxId || businessInfo.taxId.trim().length === 0) {
-    errors.push('Tax ID is required');
-  }
+  // Tax ID is optional - no validation required
 
-  if (!businessInfo.siret || businessInfo.siret.trim().length === 0) {
-    errors.push('SIRET number is required');
-  }
+  // SIRET number is optional - no validation required
 
   if (!businessInfo.businessType || businessInfo.businessType.trim().length === 0) {
     errors.push('Business type is required');
@@ -85,22 +81,13 @@ function validateBusinessInfoData(
     errors.push('Postal code is required');
   }
 
-  // Basic format validation (can be enhanced later)
-  if (businessInfo.taxId && businessInfo.taxId.length < 5) {
-    errors.push('Tax ID appears to be too short');
-  }
-
-  if (businessInfo.siret && businessInfo.siret.length < 9) {
-    errors.push('SIRET number appears to be too short');
-  }
+  // NO RESTRICTIONS WHATSOEVER on Tax ID and SIRET - user can enter anything
 
   if (businessInfo.postalCode && !/^\d{5}$/.test(businessInfo.postalCode)) {
     errors.push('Postal code must be 5 digits');
   }
 
-  if (businessInfo.phone && !/^[\d\s\+\-\(\)]+$/.test(businessInfo.phone)) {
-    errors.push('Phone number contains invalid characters');
-  }
+  // Phone validation removed as it's not in the new interface
 
   return {
     isValid: errors.length === 0,

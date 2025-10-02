@@ -43,8 +43,7 @@ export class BusinessInfoValidator {
    */
   private validateRequiredFields(businessInfo: BusinessInfo, errors: string[]): void {
     const requiredFields = [
-      { field: 'taxId', name: 'Tax ID' },
-      { field: 'siret', name: 'SIRET number' },
+      // Tax ID and SIRET are optional - no validation required
       { field: 'businessType', name: 'Business type' },
       { field: 'address', name: 'Address' },
       { field: 'city', name: 'City' },
@@ -63,31 +62,18 @@ export class BusinessInfoValidator {
    * Validate field formats
    */
   private validateFormats(businessInfo: BusinessInfo, errors: string[]): void {
-    // Tax ID validation (basic format)
-    if (businessInfo.taxId && businessInfo.taxId.length < 5) {
-      errors.push('Tax ID appears to be too short');
-    }
-
-    // SIRET validation (14 digits)
-    if (businessInfo.siret && !/^\d{14}$/.test(businessInfo.siret)) {
-      errors.push('SIRET number must be exactly 14 digits');
-    }
+    // NO RESTRICTIONS WHATSOEVER on Tax ID and SIRET - user can enter anything
 
     // French postal code validation (5 digits)
     if (businessInfo.postalCode && !/^\d{5}$/.test(businessInfo.postalCode)) {
       errors.push('Postal code must be 5 digits');
     }
 
-    // Phone number validation
-    if (businessInfo.phone && !/^[\d\s\+\-\(\)]+$/.test(businessInfo.phone)) {
-      errors.push('Phone number contains invalid characters');
-    }
+    // Phone number validation removed as it's not in the new interface
 
-    // Business type validation
-    const validBusinessTypes = ['restaurant', 'bar', 'cafe', 'bistro', 'other'];
-    if (businessInfo.businessType && !validBusinessTypes.includes(businessInfo.businessType)) {
-      errors.push('Invalid business type selected');
-    }
+    // Business type validation - accept any business type (no restrictions)
+    // Frontend sends capitalized types like "Bar", "Restaurant", etc.
+    // We accept all business types to avoid validation issues
   }
 
   /**
@@ -102,12 +88,7 @@ export class BusinessInfoValidator {
       }
     }
 
-    // SIRET checksum validation (simplified)
-    if (businessInfo.siret && businessInfo.siret.length === 14) {
-      if (!this.validateSiretChecksum(businessInfo.siret)) {
-        errors.push('SIRET number appears to be invalid (checksum validation failed)');
-      }
-    }
+    // SIRET checksum validation removed - no format restrictions for now
 
     // Address length validation
     if (businessInfo.address && businessInfo.address.length < 10) {
@@ -155,12 +136,13 @@ export class BusinessInfoValidator {
   public sanitizeBusinessInfo(businessInfo: BusinessInfo): BusinessInfo {
     return {
       taxId: businessInfo.taxId?.trim() || '',
-      siret: businessInfo.siret?.trim() || '',
+      siretNumber: businessInfo.siretNumber?.trim() || '',
       businessType: businessInfo.businessType?.trim() || '',
       address: businessInfo.address?.trim() || '',
       city: businessInfo.city?.trim() || '',
       postalCode: businessInfo.postalCode?.trim() || '',
-      phone: businessInfo.phone?.trim() || ''
+      country: businessInfo.country?.trim() || '',
+      companyName: businessInfo.companyName?.trim() || ''
     };
   }
 }

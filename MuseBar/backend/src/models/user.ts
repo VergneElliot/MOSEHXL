@@ -30,7 +30,16 @@ export class UserModel {
   }
 
   static async findByEmail(email: string): Promise<User | null> {
-    const result = await pool.query(`SELECT * FROM users WHERE email = $1`, [email]);
+    // Prefer users with establishment_id (actual establishment owners)
+    // over users without establishment_id (test users)
+    const result = await pool.query(`
+      SELECT * FROM users 
+      WHERE email = $1 
+      ORDER BY 
+        CASE WHEN establishment_id IS NOT NULL THEN 0 ELSE 1 END,
+        id DESC
+      LIMIT 1
+    `, [email]);
     return result.rows[0] || null;
   }
 

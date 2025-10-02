@@ -53,14 +53,7 @@ router.post('/send-establishment-invitation', requireAuth, requireAdmin, validat
       });
     }
 
-    // Check if establishment already exists
-    const existingEstablishment = await EstablishmentModel.getByEmail(email);
-    if (existingEstablishment) {
-      return res.status(400).json({
-        success: false,
-        message: 'An establishment with this email already exists'
-      });
-    }
+    // Email uniqueness check removed - users can have multiple establishments with same email
 
     // Send establishment invitation
     const result = await userInvitationService.sendEstablishmentInvitation({

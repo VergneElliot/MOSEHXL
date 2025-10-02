@@ -44,22 +44,29 @@ export class SchemaOperations {
       // 3. Set up permissions for the schema
       await this.setupSchemaPermissions(client, schemaName, establishmentId);
 
-      // 4. Log audit trail
-      await AuditTrailModel.logAction({
-        user_id: userId,
-        action_type: 'ESTABLISHMENT_SCHEMA_CREATED',
-        resource_type: 'SCHEMA',
-        resource_id: schemaName,
-        action_details: {
-          schema_name: schemaName,
-          establishment_id: establishmentId,
-          establishment_name: establishmentName,
-          tables_created: tablesCreated,
-          isolation_type: 'schema_based'
-        },
-        ip_address: ipAddress,
-        user_agent: userAgent
-      });
+      // 4. Log audit trail using transaction client to avoid deadlocks
+      await client.query(
+        `INSERT INTO audit_trail (
+          user_id, action_type, resource_type, resource_id,
+          action_details, ip_address, user_agent, session_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          userId,
+          'ESTABLISHMENT_SCHEMA_CREATED',
+          'SCHEMA',
+          schemaName,
+          JSON.stringify({
+            schema_name: schemaName,
+            establishment_id: establishmentId,
+            establishment_name: establishmentName,
+            tables_created: tablesCreated,
+            isolation_type: 'schema_based'
+          }),
+          ipAddress,
+          userAgent,
+          null
+        ]
+      );
 
       this.logger.info('Audit trail logged for schema creation', { schemaName, establishmentId });
 
@@ -70,10 +77,7 @@ export class SchemaOperations {
       };
 
     } catch (error) {
-      this.logger.error('Failed to create establishment schema', error as Error, { 
-        schemaName, 
-        establishmentId 
-      });
+      this.logger.error('Failed to create establishment schema', error as Error);
       throw new Error(`Failed to create establishment schema: ${(error as Error).message}`);
     }
   }
@@ -167,7 +171,7 @@ export class SchemaOperations {
       return tablesCreated;
 
     } catch (error) {
-      this.logger.error('Failed to create basic tables in schema', error as Error, { schemaName });
+      this.logger.error('Failed to create basic tables in schema', error as Error);
       throw new Error(`Failed to create basic tables: ${(error as Error).message}`);
     }
   }
@@ -193,7 +197,7 @@ export class SchemaOperations {
       this.logger.info('Schema permissions set up', { schemaName, establishmentId });
 
     } catch (error) {
-      this.logger.error('Failed to set up schema permissions', error as Error, { schemaName });
+      this.logger.error('Failed to set up schema permissions', error as Error);
       throw new Error(`Failed to set up schema permissions: ${(error as Error).message}`);
     }
   }
@@ -238,7 +242,7 @@ export class SchemaOperations {
       return exists;
 
     } catch (error) {
-      this.logger.error('Failed to check schema existence', error as Error, { schemaName });
+      this.logger.error('Failed to check schema existence', error as Error);
       throw new Error(`Failed to check schema existence: ${(error as Error).message}`);
     }
   }
@@ -283,7 +287,7 @@ export class SchemaOperations {
       };
 
     } catch (error) {
-      this.logger.error('Failed to get schema info', error as Error, { schemaName });
+      this.logger.error('Failed to get schema info', error as Error);
       throw new Error(`Failed to get schema info: ${(error as Error).message}`);
     }
   }
@@ -306,23 +310,30 @@ export class SchemaOperations {
 
       this.logger.info('Schema cleaned up', { schemaName, establishmentId });
 
-      // Log audit trail
-      await AuditTrailModel.logAction({
-        user_id: userId,
-        action_type: 'ESTABLISHMENT_SCHEMA_CLEANED_UP',
-        resource_type: 'SCHEMA',
-        resource_id: schemaName,
-        action_details: {
-          schema_name: schemaName,
-          establishment_id: establishmentId,
-          cleanup_type: 'schema_drop'
-        },
-        ip_address: ipAddress,
-        user_agent: userAgent
-      });
+      // Log audit trail using transaction client
+      await client.query(
+        `INSERT INTO audit_trail (
+          user_id, action_type, resource_type, resource_id,
+          action_details, ip_address, user_agent, session_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          userId,
+          'ESTABLISHMENT_SCHEMA_CLEANED_UP',
+          'SCHEMA',
+          schemaName,
+          JSON.stringify({
+            schema_name: schemaName,
+            establishment_id: establishmentId,
+            cleanup_type: 'schema_drop'
+          }),
+          ipAddress,
+          userAgent,
+          null
+        ]
+      );
 
     } catch (error) {
-      this.logger.error('Failed to cleanup schema', error as Error, { schemaName });
+      this.logger.error('Failed to cleanup schema', error as Error);
       throw new Error(`Failed to cleanup schema: ${(error as Error).message}`);
     }
   }

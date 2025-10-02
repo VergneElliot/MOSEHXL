@@ -85,7 +85,7 @@ Transform MuseBar from single-establishment system into enterprise-grade **multi
 CREATE TABLE establishments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(200) NOT NULL,
-    email VARCHAR(200) NOT NULL UNIQUE,
+    email VARCHAR(200) NOT NULL,
     phone VARCHAR(50),
     address TEXT,
     schema_name VARCHAR(50) NOT NULL UNIQUE,
@@ -115,7 +115,7 @@ CREATE TABLE users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    UNIQUE(email, establishment_id)
+    -- Email uniqueness removed - users can have multiple establishments with same email
 );
 
 -- Role definitions

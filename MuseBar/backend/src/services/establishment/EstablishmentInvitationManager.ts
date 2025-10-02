@@ -48,7 +48,7 @@ export class EstablishmentInvitationManager {
     });
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const link = `${frontendUrl}/setup/invitation/${token}`;
+    const link = `${frontendUrl}/establishment-setup/${token}`;
 
     const setup_instructions = this.generateSetupInstructions();
 

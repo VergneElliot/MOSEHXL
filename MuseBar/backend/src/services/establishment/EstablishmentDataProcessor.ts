@@ -57,15 +57,7 @@ export class EstablishmentDataProcessor {
       throw new Error('Establishment with this name already exists');
     }
 
-    // Check email uniqueness
-    const emailCheck = await client.query(
-      'SELECT id FROM establishments WHERE LOWER(email) = LOWER($1)',
-      [data.email.toLowerCase()]
-    );
-
-    if (emailCheck.rows.length > 0) {
-      throw new Error('Establishment with this email already exists');
-    }
+    // Email uniqueness check removed - users can have multiple establishments with same email
   }
 
   /**

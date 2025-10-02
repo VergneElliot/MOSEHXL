@@ -54,13 +54,12 @@ export class UserAccountOperations {
           role, 
           establishment_id, 
           is_admin, 
-          status, 
           email_verified,
           created_at, 
           updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
         RETURNING id, email, role, establishment_id`,
-        [email, passwordHash, role, establishmentId, false, 'active', true]
+        [email, passwordHash, role, establishmentId, false, true]
       );
 
       const user = userResult.rows[0];
@@ -78,22 +77,28 @@ export class UserAccountOperations {
         establishment_id: user.establishment_id
       });
 
-      // 4. Log audit trail
-      await AuditTrailModel.logAction({
-        user_id: user.id,
-        action_type: 'ESTABLISHMENT_ADMIN_CREATED',
-        resource_type: 'USER',
-        resource_id: user.id,
-        action_details: {
-          email: user.email,
-          role: user.role,
-          establishment_id: user.establishment_id,
-          account_type: 'establishment_admin'
-        },
-        ip_address: ipAddress,
-        user_agent: userAgent
-      });
-
+      // 4. Log audit trail using transaction client to prevent deadlock
+      await client.query(
+        `INSERT INTO audit_trail (
+          user_id, action_type, resource_type, resource_id, 
+          action_details, ip_address, user_agent, session_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          user.id,
+          'ESTABLISHMENT_ADMIN_CREATED',
+          'USER',
+          user.id,
+          JSON.stringify({
+            email: user.email,
+            role: user.role,
+            establishment_id: user.establishment_id,
+            account_type: 'establishment_admin'
+          }),
+          ipAddress,
+          userAgent,
+          null // session_id
+        ]
+      );
       this.logger.info('Audit trail logged for establishment admin creation', { userId: user.id });
 
       return {
@@ -105,7 +110,7 @@ export class UserAccountOperations {
       };
 
     } catch (error) {
-      this.logger.error('Failed to create establishment admin user', error as Error, { email, establishmentId });
+      this.logger.error('Failed to create establishment admin user', error as Error);
       throw new Error(`Failed to create establishment admin user: ${(error as Error).message}`);
     }
   }
@@ -149,24 +154,7 @@ export class UserAccountOperations {
     return { isValid: true };
   }
 
-  /**
-   * Check if user email already exists
-   */
-  public async checkEmailExists(client: PoolClient, email: string): Promise<boolean> {
-    try {
-      const result = await client.query(
-        'SELECT id FROM users WHERE email = $1',
-        [email]
-      );
-      
-      const exists = result.rows.length > 0;
-      this.logger.debug('Email existence check completed', { email, exists });
-      return exists;
-    } catch (error) {
-      this.logger.error('Failed to check email existence', error as Error, { email });
-      throw new Error(`Failed to check email existence: ${(error as Error).message}`);
-    }
-  }
+  // Email uniqueness check removed - users can have multiple establishments with same email
 
   /**
    * Generate JWT token for user
@@ -179,7 +167,7 @@ export class UserAccountOperations {
       establishment_id: user.establishment_id
     };
 
-    return jwt.sign(payload, this.jwtSecret, { expiresIn: this.jwtExpiresIn });
+    return jwt.sign(payload, this.jwtSecret, { expiresIn: this.jwtExpiresIn } as any);
   }
 
   /**

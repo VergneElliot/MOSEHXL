@@ -36,18 +36,28 @@ export class InvitationOperations {
     const { token, establishmentId, userEmail } = completionData;
 
     try {
-      // 1. Update invitation status to completed
-      const updateResult = await client.query(
+      this.logger.info('Starting invitation completion', { 
+        token: token.substring(0, 8) + '...',
+        establishmentId 
+      });
+
+      // 1. Update invitation status to accepted with timeout protection
+      const updatePromise = client.query(
         `UPDATE user_invitations 
          SET 
-           status = 'completed',
-           accepted_at = NOW(),
-           completed_by_user_id = $1,
-           updated_at = NOW()
-         WHERE invitation_token = $2 AND establishment_id = $3
+           status = 'accepted',
+           accepted_at = NOW()
+         WHERE invitation_token = $1 AND establishment_id = $2
          RETURNING id, invitation_token, establishment_id, email, accepted_at`,
-        [userId, token, establishmentId]
+        [token, establishmentId]
       );
+
+      // Add 5 second timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Invitation completion query timed out')), 5000);
+      });
+
+      const updateResult = await Promise.race([updatePromise, timeoutPromise]) as any;
 
       if (updateResult.rows.length === 0) {
         throw new Error(`Invitation with token ${token.substring(0, 8)}... not found or already completed`);
@@ -61,22 +71,28 @@ export class InvitationOperations {
         userEmail: invitation.email
       });
 
-      // 2. Log audit trail
-      await AuditTrailModel.logAction({
-        user_id: userId,
-        action_type: 'INVITATION_COMPLETED',
-        resource_type: 'INVITATION',
-        resource_id: invitation.id,
-        action_details: {
-          invitation_token: token.substring(0, 8) + '...',
-          establishment_id: establishmentId,
-          user_email: userEmail,
-          completion_type: 'account_creation'
-        },
-        ip_address: ipAddress,
-        user_agent: userAgent
-      });
-
+      // 2. Log audit trail using transaction client to prevent deadlock
+      await client.query(
+        `INSERT INTO audit_trail (
+          user_id, action_type, resource_type, resource_id, 
+          action_details, ip_address, user_agent, session_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          userId,
+          'INVITATION_COMPLETED',
+          'INVITATION',
+          invitation.id,
+          JSON.stringify({
+            invitation_token: token.substring(0, 8) + '...',
+            establishment_id: establishmentId,
+            user_email: userEmail,
+            completion_type: 'account_creation'
+          }),
+          ipAddress,
+          userAgent,
+          null // session_id
+        ]
+      );
       this.logger.info('Audit trail logged for invitation completion', { 
         invitationId: invitation.id, 
         userId 
@@ -91,10 +107,7 @@ export class InvitationOperations {
       };
 
     } catch (error) {
-      this.logger.error('Failed to complete invitation', error as Error, { 
-        token: token.substring(0, 8) + '...',
-        establishmentId 
-      });
+      this.logger.error('Failed to complete invitation', error as Error);
       throw new Error(`Failed to complete invitation: ${(error as Error).message}`);
     }
   }
@@ -233,9 +246,7 @@ export class InvitationOperations {
       };
 
     } catch (error) {
-      this.logger.error('Failed to check invitation status', error as Error, { 
-        token: token.substring(0, 8) + '...' 
-      });
+      this.logger.error('Failed to check invitation status', error as Error);
       throw new Error(`Failed to check invitation status: ${(error as Error).message}`);
     }
   }
@@ -338,9 +349,7 @@ export class InvitationOperations {
       };
 
     } catch (error) {
-      this.logger.error('Failed to get invitation details', error as Error, { 
-        token: token.substring(0, 8) + '...' 
-      });
+      this.logger.error('Failed to get invitation details', error as Error);
       throw new Error(`Failed to get invitation details: ${(error as Error).message}`);
     }
   }
