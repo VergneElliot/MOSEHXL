@@ -30,9 +30,12 @@ yarn-error.log*
 build/
 dist/
 
-# Environment variables and secrets
+# Environment variables and secrets (never commit files that may contain secrets)
 .env
 .env.local
+.env.development
+.env.test
+.env.production
 .env.development.local
 .env.test.local
 .env.production.local
