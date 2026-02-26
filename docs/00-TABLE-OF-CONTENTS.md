@@ -14,3 +14,4 @@ Each chapter is self-contained. Read them in order, or jump to whatever you need
 | 05 | [Database](./05-DATABASE.md) | PostgreSQL, tables, SQL, indexes, migrations — how data is stored |
 | 06 | [Auth and Security](./06-AUTH-AND-SECURITY.md) | JWT, bcrypt, CORS, rate limiting — how users are authenticated and protected |
 | 07 | [Legal Compliance](./07-LEGAL-COMPLIANCE.md) | Hash chains, ISCA pillars, French law — how the legal system works technically |
+| 08 | [Audit & Full Course](./08-AUDIT-AND-FULL-COURSE.md) | Code audit, redundant code, architecture assessment, and complete file-by-file course for developers |
