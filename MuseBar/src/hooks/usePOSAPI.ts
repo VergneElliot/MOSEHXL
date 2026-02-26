@@ -86,28 +86,20 @@ export const usePOSAPI = (
   const processRetour = useCallback(
     async (retourData: RetourData) => {
       try {
-        const response = await apiService.post('/orders', {
-          total_amount: -retourData.item.totalPrice,
-          total_tax: -retourData.item.taxAmount,
-          payment_method: retourData.paymentMethod,
-          status: 'completed',
-          notes: `RETOUR: ${retourData.reason}`,
-          items: [
-            {
-              product_id: retourData.item.productId,
-              product_name: `RETOUR - ${retourData.item.productName}`,
-              quantity: -retourData.item.quantity,
-              unit_price: retourData.item.unitPrice,
-              total_price: -retourData.item.totalPrice,
-              tax_rate: retourData.item.taxRate,
-              tax_amount: -retourData.item.taxAmount,
-              happy_hour_applied: false,
-              sub_bill_id: null,
-            },
-          ],
-          sub_bills: [],
-          tips: 0,
-          change: 0,
+        // Use the dedicated retour endpoint — it validates the payload,
+        // creates the negative order, and writes a REFUND entry to the
+        // legal journal and audit trail.
+        const response = await apiService.post('/orders/payment/retour', {
+          item: {
+            productId: retourData.item.productId,
+            productName: retourData.item.productName,
+            quantity: retourData.item.quantity,
+            unitPrice: retourData.item.unitPrice,
+            totalPrice: retourData.item.totalPrice,
+            taxRate: retourData.item.taxRate,
+          },
+          reason: retourData.reason,
+          paymentMethod: retourData.paymentMethod,
         });
 
         onSuccess('Retour traité avec succès');

@@ -27,22 +27,14 @@ export const useAuth = (): AuthState & AuthActions => {
 
   // Initialize authentication from localStorage
   useEffect(() => {
-    console.log('🔍 useAuth: Initializing authentication from localStorage');
     const storedToken = localStorage.getItem('auth_token');
     const storedRememberMe = localStorage.getItem('remember_me') === 'true';
     const storedExpiresIn = localStorage.getItem('token_expires_in') || '12h';
 
-    console.log('🔍 useAuth: Stored token:', storedToken ? 'Present' : 'Missing');
-    console.log('🔍 useAuth: Stored rememberMe:', storedRememberMe);
-    console.log('🔍 useAuth: Stored expiresIn:', storedExpiresIn);
-
     if (storedToken) {
-      console.log('🔍 useAuth: Setting token from localStorage');
       setToken(storedToken);
       setRememberMe(storedRememberMe);
       setTokenExpiresIn(storedExpiresIn);
-    } else {
-      console.log('🔍 useAuth: No stored token found');
     }
   }, []);
 
@@ -101,17 +93,11 @@ export const useAuth = (): AuthState & AuthActions => {
 
   // Check authentication status when token changes
   useEffect(() => {
-    console.log('🔍 useAuth: Token changed, current token:', token ? 'Present' : 'Missing');
-    
-    // Set token in both ApiService and apiCore to ensure consistency
-    console.log('🔍 useAuth: Setting token in ApiService');
     ApiService.setToken(token);
-    
+
     if (token) {
-      console.log('🔍 useAuth: Token present, checking auth status');
       checkAuthStatus();
     } else {
-      console.log('🔍 useAuth: No token, clearing user data');
       setUser(null);
       setPermissions([]);
     }
