@@ -7,10 +7,10 @@ export async function createDefaultPaymentMethods(
   client: PoolClient,
   establishmentId: string
 ): Promise<void> {
+  // Only two payment methods: cash and card (French compliance; no check, PayPal, etc.)
   const paymentMethods = [
     { name: 'Espèces', code: 'cash', is_active: true, requires_amount: true, description: 'Paiement en liquide' },
     { name: 'Carte Bancaire', code: 'card', is_active: true, requires_amount: false, description: 'Paiement par carte bancaire' },
-    { name: 'Chèque', code: 'check', is_active: false, requires_amount: true, description: 'Paiement par chèque' }
   ];
 
   logger.info('Creating default payment methods', { establishmentId, count: paymentMethods.length }, 'SETUP_DEFAULTS');

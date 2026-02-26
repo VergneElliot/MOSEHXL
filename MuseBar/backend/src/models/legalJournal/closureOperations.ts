@@ -37,73 +37,25 @@ export class ClosureOperations {
     `;
     const ordersResult = await pool.query(ordersQuery, [start.toDate(), end.toDate()]);
     const orders = ordersResult.rows;
+    const orderIds = orders.map((o: { id: number }) => o.id);
 
-    // Calculate totals
+    // Totals from orders (exact — no rounding; used for storage and hash)
     const totalTransactions = orders.length;
     let totalAmount = 0;
     let totalVat = 0;
-    
-    // VAT breakdown initialization
-    const vatBreakdown: VATBreakdown = {
-      vat_10: { amount: 0, vat: 0 },
-      vat_20: { amount: 0, vat: 0 }
-    };
-
-    // Payment methods breakdown
     const paymentBreakdown: PaymentBreakdown = {};
 
-    // Process each order
     for (const order of orders) {
-      const orderAmount = parseFloat(order.total_amount || '0');
-      const orderVat = parseFloat(order.total_tax || order.taxAmount || '0');
-      const paymentMethod = order.payment_method || 'cash';
-
+      const orderAmount = parseFloat(String(order.total_amount ?? 0));
+      const orderVat = parseFloat(String(order.total_tax ?? order.taxAmount ?? 0));
       totalAmount += orderAmount;
       totalVat += orderVat;
-
-      // Update payment methods breakdown
+      const paymentMethod = order.payment_method || 'cash';
       paymentBreakdown[paymentMethod] = (paymentBreakdown[paymentMethod] || 0) + orderAmount;
-
-      // Calculate VAT breakdown based on items
-      if (order.items && Array.isArray(order.items)) {
-        for (const item of order.items) {
-          const itemAmount = parseFloat(item.price || '0') * parseInt(item.quantity || '1');
-          const vatRate = parseFloat(item.vat_rate || '20');
-          const itemVat = itemAmount * (vatRate / 100);
-
-          if (vatRate === 10) {
-            vatBreakdown.vat_10.amount += itemAmount;
-            vatBreakdown.vat_10.vat += itemVat;
-          } else {
-            vatBreakdown.vat_20.amount += itemAmount;
-            vatBreakdown.vat_20.vat += itemVat;
-          }
-        }
-      } else {
-        // If no items breakdown, assume 20% VAT
-        vatBreakdown.vat_20.amount += orderAmount;
-        vatBreakdown.vat_20.vat += orderVat;
-      }
     }
 
-    // Round VAT calculations to avoid floating point issues
-    vatBreakdown.vat_10.amount = Math.round(vatBreakdown.vat_10.amount * 100) / 100;
-    vatBreakdown.vat_10.vat = Math.round(vatBreakdown.vat_10.vat * 100) / 100;
-    vatBreakdown.vat_20.amount = Math.round(vatBreakdown.vat_20.amount * 100) / 100;
-    vatBreakdown.vat_20.vat = Math.round(vatBreakdown.vat_20.vat * 100) / 100;
-
-    // Ensure VAT breakdown totals match the calculated total VAT
-    const calculatedTotalVat = vatBreakdown.vat_10.vat + vatBreakdown.vat_20.vat;
-    const difference = totalVat - calculatedTotalVat;
-    
-    // Distribute the rounding difference proportionally
-    if (Math.abs(difference) > 0.01) {
-      if (vatBreakdown.vat_20.vat > 0) {
-        vatBreakdown.vat_20.vat = Math.round((vatBreakdown.vat_20.vat + difference) * 100) / 100;
-      } else if (vatBreakdown.vat_10.vat > 0) {
-        vatBreakdown.vat_10.vat = Math.round((vatBreakdown.vat_10.vat + difference) * 100) / 100;
-      }
-    }
+    // VAT breakdown from order_items (exact sums for accounting; round only when displaying/printing)
+    const vatBreakdown = await getExactVatBreakdownFromOrderItems(pool, orderIds);
 
     // Calculate tips and change totals
     const netTipsTotal = orders.reduce((sum, order) => sum + parseFloat(order.tips || '0'), 0);
@@ -210,21 +162,16 @@ export class ClosureOperations {
     const totalAmount = orders.reduce((sum, order) => sum + parseFloat(order.total_amount || '0'), 0);
     const totalVat = orders.reduce((sum, order) => sum + parseFloat(order.total_tax || order.taxAmount || '0'), 0);
 
-    // Aggregate VAT breakdown
-    const vatBreakdown: VATBreakdown = { vat_10: { amount: 0, vat: 0 }, vat_20: { amount: 0, vat: 0 } };
+    const orderIds = orders.map((o: { id: number }) => o.id);
     const paymentBreakdown: PaymentBreakdown = {};
-
-    // Process orders for breakdowns
     for (const order of orders) {
       const paymentMethod = order.payment_method || 'cash';
-      const orderAmount = parseFloat(order.total_amount || '0');
-      
+      const orderAmount = parseFloat(String(order.total_amount ?? 0));
       paymentBreakdown[paymentMethod] = (paymentBreakdown[paymentMethod] || 0) + orderAmount;
-      
-      // Simplified VAT breakdown (assume 20% unless specified)
-      vatBreakdown.vat_20.amount += orderAmount;
-      vatBreakdown.vat_20.vat += parseFloat(order.total_tax || order.taxAmount || '0');
     }
+
+    // Exact VAT breakdown from order_items (no rounding for storage)
+    const vatBreakdown = await getExactVatBreakdownFromOrderItems(pool, orderIds);
 
     // Calculate tips and change
     const tipsTotal = Math.max(0, orders.reduce((sum, order) => sum + parseFloat(order.tips || '0'), 0));
@@ -262,6 +209,46 @@ export class ClosureOperations {
   static async getClosureBulletins(type?: 'DAILY' | 'MONTHLY' | 'ANNUAL'): Promise<ClosureBulletin[]> {
     return await JournalQueries.getClosureBulletins(type);
   }
+}
+
+/**
+ * Build exact VAT breakdown from order_items (no rounding).
+ * Used for closure bulletins so stored totals match sum of order tax amounts.
+ * tax_rate in DB may be 0.10/0.20 (decimal) or 10/20 (percentage); we bucket by 10% vs 20%.
+ */
+async function getExactVatBreakdownFromOrderItems(
+  pool: { query: (q: string, values?: unknown[]) => Promise<{ rows: unknown[] }> },
+  orderIds: number[]
+): Promise<VATBreakdown> {
+  const vatBreakdown: VATBreakdown = {
+    vat_10: { amount: 0, vat: 0 },
+    vat_20: { amount: 0, vat: 0 }
+  };
+  if (orderIds.length === 0) return vatBreakdown;
+
+  const itemsResult = await pool.query(
+    'SELECT total_price, tax_amount, tax_rate FROM order_items WHERE order_id = ANY($1)',
+    [orderIds]
+  );
+  const items = itemsResult.rows as Array<{ total_price: string | number; tax_amount: string | number; tax_rate: string | number }>;
+
+  for (const item of items) {
+    const totalPrice = parseFloat(String(item.total_price ?? 0));
+    const taxAmount = parseFloat(String(item.tax_amount ?? 0));
+    const rate = parseFloat(String(item.tax_rate ?? 0.2));
+    // 10%: rate 0.10 or 10; otherwise treat as 20%
+    const is10 = rate <= 0.15 || (rate >= 9 && rate <= 11);
+    const amountHt = totalPrice - taxAmount;
+
+    if (is10) {
+      vatBreakdown.vat_10.amount += amountHt;
+      vatBreakdown.vat_10.vat += taxAmount;
+    } else {
+      vatBreakdown.vat_20.amount += amountHt;
+      vatBreakdown.vat_20.vat += taxAmount;
+    }
+  }
+  return vatBreakdown;
 }
 
 /**

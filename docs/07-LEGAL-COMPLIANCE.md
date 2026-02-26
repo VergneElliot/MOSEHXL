@@ -408,6 +408,30 @@ Customer                                                    Inspector
 
 ---
 
+## Pricing and TVA (TTC)
+
+In France, **displayed prices are always TTC** (toutes taxes comprises — all tax included). When you set a product at 8€, the customer pays 8€; the 10% or 20% TVA is already included in that amount.
+
+- **Product price in the DB and in the POS** is TTC. The two tax rates used are 10% (e.g. non-alcoholic) and 20% (e.g. alcohol).
+- **Cart line totals** are TTC: `unitPrice * quantity`. The tax component for each line is derived for reporting only: `taxAmount = totalPrice * (taxRate / (1 + taxRate))`.
+- **Order total** (amount due) = sum of line totals (TTC). The sum of `taxAmount` across items is **not** added on top — it is only used for the legal breakdown (Sous-total HT, TVA, Total TTC) and for journal/closure records.
+
+In the code, `usePOSLogic` exposes `orderSubtotal` (sum of line TTC totals), `orderTax` (sum of tax components), and `orderTotal`. For French TTC, **orderTotal = orderSubtotal**; `orderTax` is for display and compliance only.
+
+### Tax and rounding (accounting vs display)
+
+For **display** (UI, receipts, closure printouts), amounts and TVA are shown rounded to 2 decimals (e.g. `formatCurrency`, `.toFixed(2)`).
+
+For **accounting and legal compliance**, we store **exact** values so that week/month/year closures sum to the true totals:
+
+- **Database**: Monetary and tax columns use `DECIMAL(12,4)` (orders, order_items, legal_journal, closure_bulletins) so that the exact tax per line and per order is stored. Summing these values gives the correct period totals without rounding drift.
+- **Frontend**: When adding to cart or updating quantity, `taxAmount` is computed with full precision and sent to the API **without rounding**. Rounding is applied only when rendering (e.g. `formatCurrency(orderTax)`).
+- **Closure bulletins**: Totals and VAT breakdown are computed from stored order/order_items values (exact sums). The bulletin stores these exact numbers; printing/export services round to 2 decimals for human-readable output.
+
+Never round tax or sale amounts before persisting; round only for display.
+
+---
+
 ## Summary
 
 | Pillar | Mechanism | Tables | Code |
