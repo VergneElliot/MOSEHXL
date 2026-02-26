@@ -9,25 +9,26 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 /**
- * Required environment variables for the application
+ * Required environment variables for the application.
+ * In production, ARCHIVE_SECRET_KEY is also required for legal/archive signing.
  */
-const REQUIRED_ENV_VARS = {
+const REQUIRED_ENV_VARS: Record<string, string> = {
   // Database
   DB_HOST: 'Database host',
   DB_PORT: 'Database port',
   DB_NAME: 'Database name',
   DB_USER: 'Database user',
   DB_PASSWORD: 'Database password',
-  
+
   // Application
   NODE_ENV: 'Node environment',
-  
+
   // Security
   JWT_SECRET: 'JWT secret key',
-  
+
   // Optional but recommended
   CORS_ORIGIN: 'CORS origin (optional)',
-} as const;
+};
 
 /**
  * Validates that all required environment variables are present
@@ -37,8 +38,14 @@ export const validateEnvironment = (): void => {
   const missing: string[] = [];
   const invalid: string[] = [];
 
+  // In production, archive signing requires a secret key (no hardcoded fallback)
+  const requiredVars = { ...REQUIRED_ENV_VARS };
+  if (process.env.NODE_ENV === 'production') {
+    requiredVars.ARCHIVE_SECRET_KEY = 'Archive HMAC key for legal/export signing';
+  }
+
   // Check required variables
-  Object.entries(REQUIRED_ENV_VARS).forEach(([key, description]) => {
+  Object.entries(requiredVars).forEach(([key, description]) => {
     const value = process.env[key];
     
     if (!value) {
@@ -60,6 +67,11 @@ export const validateEnvironment = (): void => {
         }
         break;
       case 'JWT_SECRET':
+        if (value.length < 32) {
+          invalid.push(`${key} must be at least 32 characters long for security`);
+        }
+        break;
+      case 'ARCHIVE_SECRET_KEY':
         if (value.length < 32) {
           invalid.push(`${key} must be at least 32 characters long for security`);
         }
@@ -115,6 +127,7 @@ export interface EnvironmentConfig {
   security: {
     jwtSecret: string;
     jwtExpiresIn: string;
+    archiveSecretKey: string | undefined; // Required in production, optional in dev
     bcryptRounds: number;
     rateLimitWindowMs: number;
     rateLimitMaxRequests: number;
@@ -157,7 +170,8 @@ export const getEnvironmentConfig = (): EnvironmentConfig => {
       port: parseInt(process.env.DB_PORT || '5432'),
       database: process.env.DB_NAME || (isDevelopment ? 'mosehxl_development' : 'mosehxl_production'),
       user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || 'password',
+      // No fallback: validateEnvironment() ensures DB_PASSWORD is set before we get here
+      password: process.env.DB_PASSWORD!,
       ssl: isProduction,
       maxConnections: parseInt(process.env.DB_MAX_CONNECTIONS || '20'),
       idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '30000'),
@@ -175,8 +189,10 @@ export const getEnvironmentConfig = (): EnvironmentConfig => {
     },
 
     security: {
+      // No fallback: validateEnvironment() ensures JWT_SECRET is set before we get here
       jwtSecret: process.env.JWT_SECRET!,
       jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
+      archiveSecretKey: process.env.ARCHIVE_SECRET_KEY,
       bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS || '12'),
       rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
       rateLimitMaxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),

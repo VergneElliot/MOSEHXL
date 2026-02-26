@@ -47,17 +47,18 @@ app.set('trust proxy', config.server.trustProxy);
 app.use(requestLoggerMiddleware(logger));
 app.use(createSecurityMiddleware(config, logger));
 
-// Database connection with environment-specific defaults.
+// Database connection from validated config (no fallback passwords).
 // options: '--timezone=Europe/Paris' ensures every session uses Paris time so that
 // NOW() / CURRENT_TIMESTAMP return Paris time and TIMESTAMPTZ values display correctly.
-// This must match the TIMESTAMPTZ columns — all timestamps are stored in UTC and
-// converted to/from Europe/Paris at the connection boundary.
 export const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || DEFAULT_DB_NAME,
-  password: process.env.DB_PASSWORD || 'password',
-  port: parseInt(process.env.DB_PORT || '5432'),
+  user: config.database.user,
+  host: config.database.host,
+  database: config.database.database,
+  password: config.database.password,
+  port: config.database.port,
+  ssl: config.database.ssl ? { rejectUnauthorized: true } : false,
+  max: config.database.maxConnections,
+  idleTimeoutMillis: config.database.idleTimeoutMillis,
   options: '--timezone=Europe/Paris',
 });
 

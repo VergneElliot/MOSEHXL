@@ -11,8 +11,7 @@ export interface CreateEstablishmentResponse {
     status: string;
     schema_name: string;
     subscription_plan: string;
-    invitation_token?: string;
-    invitation_link?: string;
+    /** Setup instructions only; invitation token/link are never returned by the API. */
     setup_instructions?: string;
   };
   audit_log: {

@@ -24,9 +24,16 @@ export class UserAccountOperations {
   private jwtSecret: string;
   private jwtExpiresIn: string;
 
-  constructor(logger: Logger) {
+  /**
+   * @param logger - Logger instance
+   * @param jwtSecret - JWT signing secret (from validated config; never a hardcoded fallback)
+   */
+  constructor(logger: Logger, jwtSecret: string) {
     this.logger = logger;
-    this.jwtSecret = process.env.JWT_SECRET || 'supersecretkey';
+    if (!jwtSecret || jwtSecret.length < 32) {
+      throw new Error('UserAccountOperations requires a JWT secret of at least 32 characters (from config).');
+    }
+    this.jwtSecret = jwtSecret;
     this.jwtExpiresIn = '12h';
   }
 
