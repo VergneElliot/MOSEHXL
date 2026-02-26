@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { OrderItem, LocalSubBill } from '../types';
+import { OrderItem } from '../types';
 
 export interface POSState {
   // Order management
@@ -7,19 +7,11 @@ export interface POSState {
   searchQuery: string;
   currentOrder: OrderItem[];
 
-  // Payment states
+  // Payment dialog visibility (payment form state lives in PaymentDialog/usePaymentState)
   paymentDialogOpen: boolean;
-  checkoutMode: 'simple' | 'split-equal' | 'split-items';
-  splitCount: number;
-  subBills: LocalSubBill[];
-  currentPaymentMethod: 'cash' | 'card' | 'split';
-  cashAmount: string;
-  cardAmount: string;
-  tips: string;
 
   // UI states
   mobileView: 'menu' | 'order';
-  itemQuantities: { [productId: string]: number };
 
   // Dialog states
   retourDialogOpen: boolean;
@@ -48,19 +40,11 @@ export interface POSActions {
   removeFromOrder: (index: number) => void;
   clearOrder: () => void;
 
-  // Payment actions
+  // Payment dialog
   setPaymentDialogOpen: (open: boolean) => void;
-  setCheckoutMode: (mode: 'simple' | 'split-equal' | 'split-items') => void;
-  setSplitCount: (count: number) => void;
-  setSubBills: (bills: LocalSubBill[]) => void;
-  setCurrentPaymentMethod: (method: 'cash' | 'card' | 'split') => void;
-  setCashAmount: (amount: string) => void;
-  setCardAmount: (amount: string) => void;
-  setTips: (tips: string) => void;
 
   // UI actions
   setMobileView: (view: 'menu' | 'order') => void;
-  setItemQuantities: (quantities: { [productId: string]: number }) => void;
 
   // Dialog actions
   setRetourDialogOpen: (open: boolean) => void;
@@ -88,23 +72,11 @@ export const usePOSState = (): [POSState, POSActions] => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [currentOrder, setCurrentOrder] = useState<OrderItem[]>([]);
 
-  // Payment states
+  // Payment dialog visibility
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const [checkoutMode, setCheckoutMode] = useState<'simple' | 'split-equal' | 'split-items'>(
-    'simple'
-  );
-  const [splitCount, setSplitCount] = useState(2);
-  const [subBills, setSubBills] = useState<LocalSubBill[]>([]);
-  const [currentPaymentMethod, setCurrentPaymentMethod] = useState<'cash' | 'card' | 'split'>(
-    'card'
-  );
-  const [cashAmount, setCashAmount] = useState('');
-  const [cardAmount, setCardAmount] = useState('');
-  const [tips, setTips] = useState('');
 
   // UI states
   const [mobileView, setMobileView] = useState<'menu' | 'order'>('menu');
-  const [itemQuantities, setItemQuantities] = useState<{ [productId: string]: number }>({});
 
   // Dialog states
   const [retourDialogOpen, setRetourDialogOpen] = useState(false);
@@ -136,11 +108,6 @@ export const usePOSState = (): [POSState, POSActions] => {
 
   const clearOrder = () => {
     setCurrentOrder([]);
-    setTips('');
-    setCashAmount('');
-    setCardAmount('');
-    setSubBills([]);
-    setCheckoutMode('simple');
   };
 
   // Notification helpers
@@ -157,15 +124,7 @@ export const usePOSState = (): [POSState, POSActions] => {
     searchQuery,
     currentOrder,
     paymentDialogOpen,
-    checkoutMode,
-    splitCount,
-    subBills,
-    currentPaymentMethod,
-    cashAmount,
-    cardAmount,
-    tips,
     mobileView,
-    itemQuantities,
     retourDialogOpen,
     retourItem,
     retourReason,
@@ -185,15 +144,7 @@ export const usePOSState = (): [POSState, POSActions] => {
     removeFromOrder,
     clearOrder,
     setPaymentDialogOpen,
-    setCheckoutMode,
-    setSplitCount,
-    setSubBills,
-    setCurrentPaymentMethod,
-    setCashAmount,
-    setCardAmount,
-    setTips,
     setMobileView,
-    setItemQuantities,
     setRetourDialogOpen,
     setRetourItem,
     setRetourReason,

@@ -38,39 +38,28 @@ export const usePOSAPI = (
 ): POSAPIActions => {
   const apiService = ApiService.getInstance();
 
+  // Single code path: delegate to orders API (items mapping, sub_bills, happy_hour_discount_amount in orders.ts)
   const createOrder = useCallback(
     async (orderData: CreateOrderData) => {
       try {
-        const response = await apiService.post('/orders', {
-          total_amount: orderData.totalAmount,
-          total_tax: orderData.totalTax,
-          payment_method: orderData.paymentMethod,
-          status: 'completed',
-          notes: orderData.notes || '',
-          items: orderData.items.map(item => ({
-            product_id: item.productId,
-            product_name: item.productName,
-            quantity: item.quantity,
-            unit_price: item.unitPrice,
-            total_price: item.totalPrice,
-            tax_rate: item.taxRate,
-            tax_amount: item.taxAmount,
-            happy_hour_applied: item.isHappyHourApplied,
-            sub_bill_id: null, // Will be handled for split payments
-          })),
-          sub_bills:
-            orderData.subBills?.map(bill => ({
-              payment_method: bill.payments[0]?.method || 'cash',
+        await apiService.createOrder({
+          totalAmount: orderData.totalAmount,
+          taxAmount: orderData.totalTax,
+          paymentMethod: orderData.paymentMethod,
+          items: orderData.items,
+          sub_bills: orderData.subBills?.map(bill => {
+            const method = bill.payments[0]?.method || 'cash';
+            return {
+              payment_method: method === 'split' ? 'cash' : method,
               amount: bill.total,
-              status: 'paid',
-            })) || [],
-          tips: orderData.tips || 0,
-          change: orderData.change || 0,
+            };
+          }),
+          tips: orderData.tips ?? 0,
+          change: orderData.change ?? 0,
+          notes: orderData.notes,
         });
-
         onSuccess('Commande créée avec succès');
         onDataUpdate();
-        return response.data;
       } catch (error: any) {
         const errorMessage =
           error.response?.data?.error ||
