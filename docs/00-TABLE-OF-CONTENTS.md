@@ -19,4 +19,5 @@ Each chapter is self-contained. Read them in order, or jump to whatever you need
 | 10 | [Multi-tenant and Muse POS access](./10-MULTI-TENANT-AND-MUSE-POS-ACCESS.md) | How user–establishment links work; how to log in to Muse POS; script to fix lost links |
 | 11 | [Security: Hardcoded secrets fix](./11-SECURITY-HARDCODED-SECRETS-FIX.md) | Why hardcoded JWT/DB/archive secrets are dangerous and how they were removed |
 | 12 | [Security: Invitation token leak fix](./12-SECURITY-INVITATION-TOKEN-LEAK-FIX.md) | Why invitation tokens must not be returned in API responses and how it was fixed |
+| 13 | [Security: Env files not tracked](./13-SECURITY-ENV-FILES-NOT-TRACKED.md) | Why .env.development/.production must not be in Git and how they were untracked |
 | — | [Session summary: POS tax, payment, cleanup](./SESSION-SUMMARY-POS-TAX-PAYMENT-AND-CLEANUP.md) | Handoff: TTC tax fix, exact tax storage, cash/card only, three payment buttons, migrations, code cleanup |
