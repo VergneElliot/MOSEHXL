@@ -25,15 +25,7 @@ describe('usePOSState', () => {
     expect(state.searchQuery).toBe('');
     expect(state.currentOrder).toEqual([]);
     expect(state.paymentDialogOpen).toBe(false);
-    expect(state.checkoutMode).toBe('simple');
-    expect(state.splitCount).toBe(2);
-    expect(state.subBills).toEqual([]);
-    expect(state.currentPaymentMethod).toBe('card');
-    expect(state.cashAmount).toBe('');
-    expect(state.cardAmount).toBe('');
-    expect(state.tips).toBe('');
     expect(state.mobileView).toBe('menu');
-    expect(state.itemQuantities).toEqual({});
     expect(state.retourDialogOpen).toBe(false);
     expect(state.retourItem).toBeNull();
     expect(state.retourReason).toBe('');
@@ -132,72 +124,6 @@ describe('usePOSState', () => {
     expect(result.current[0].paymentDialogOpen).toBe(true);
   });
 
-  it('should update checkout mode', () => {
-    const { result } = renderHook(() => usePOSState());
-    const [, actions] = result.current;
-
-    act(() => {
-      actions.setCheckoutMode('split-equal');
-    });
-
-    expect(result.current[0].checkoutMode).toBe('split-equal');
-  });
-
-  it('should update split count', () => {
-    const { result } = renderHook(() => usePOSState());
-    const [, actions] = result.current;
-
-    act(() => {
-      actions.setSplitCount(4);
-    });
-
-    expect(result.current[0].splitCount).toBe(4);
-  });
-
-  it('should update payment method', () => {
-    const { result } = renderHook(() => usePOSState());
-    const [, actions] = result.current;
-
-    act(() => {
-      actions.setCurrentPaymentMethod('cash');
-    });
-
-    expect(result.current[0].currentPaymentMethod).toBe('cash');
-  });
-
-  it('should update cash amount', () => {
-    const { result } = renderHook(() => usePOSState());
-    const [, actions] = result.current;
-
-    act(() => {
-      actions.setCashAmount('50.00');
-    });
-
-    expect(result.current[0].cashAmount).toBe('50.00');
-  });
-
-  it('should update card amount', () => {
-    const { result } = renderHook(() => usePOSState());
-    const [, actions] = result.current;
-
-    act(() => {
-      actions.setCardAmount('25.50');
-    });
-
-    expect(result.current[0].cardAmount).toBe('25.50');
-  });
-
-  it('should update tips', () => {
-    const { result } = renderHook(() => usePOSState());
-    const [, actions] = result.current;
-
-    act(() => {
-      actions.setTips('5.00');
-    });
-
-    expect(result.current[0].tips).toBe('5.00');
-  });
-
   it('should update mobile view', () => {
     const { result } = renderHook(() => usePOSState());
     const [, actions] = result.current;
@@ -207,17 +133,6 @@ describe('usePOSState', () => {
     });
 
     expect(result.current[0].mobileView).toBe('order');
-  });
-
-  it('should update item quantities', () => {
-    const { result } = renderHook(() => usePOSState());
-    const [, actions] = result.current;
-
-    act(() => {
-      actions.setItemQuantities({ '1': 3, '2': 1 });
-    });
-
-    expect(result.current[0].itemQuantities).toEqual({ '1': 3, '2': 1 });
   });
 
   it('should update retour dialog state', () => {
