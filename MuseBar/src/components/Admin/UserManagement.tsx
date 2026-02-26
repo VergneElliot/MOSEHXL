@@ -47,10 +47,13 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
     onError: userState.setErrorState,
   });
 
-  // Load users on component mount
+  // Load users only when this tab is active and we have a token (avoids 401 race
+  // where /auth/users was called before the token was set after login).
   useEffect(() => {
-    userActions.fetchUsers();
-  }, [userActions]);
+    if (token) {
+      userActions.fetchUsers();
+    }
+  }, [token, userActions]);
 
   /**
    * Handle adding a new user
