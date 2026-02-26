@@ -122,7 +122,6 @@ app.post('/api/client-errors', asyncHandler(async (req: any, res: any) => {
 }));
 
 // Error handling middleware
-import { createErrorHandler } from './middleware/errorHandler';
 import { createEnhancedErrorHandler } from './middleware/errorHandling';
 import { initializeErrorRecovery as initErrorRecovery } from './utils/errorRecovery';
 import { notFound } from './middleware/errorHandler';
