@@ -30,7 +30,7 @@ export interface ExportData {
 
 export class ArchiveService {
   private static readonly EXPORT_DIR = path.join(process.cwd(), 'exports');
-  private static readonly SECRET_KEY = 'MUSEBAR-LEGAL-COMPLIANCE-2025'; // In production, use environment variable
+  // No hardcoded fallback: use ARCHIVE_SECRET_KEY from env; throw if missing when signing/verifying.
 
   // Initialize export directory
   static async initialize(): Promise<void> {
@@ -41,11 +41,17 @@ export class ArchiveService {
 
   // Create HMAC signature for file integrity
   private static createDigitalSignature(data: string): string {
-    const key = process.env.ARCHIVE_SECRET_KEY || this.SECRET_KEY;
+    const key = process.env.ARCHIVE_SECRET_KEY;
+    if (!key || key.length < 32) {
+      throw new Error(
+        'ARCHIVE_SECRET_KEY environment variable is required for archive signing (at least 32 characters). ' +
+        'Set it in your .env file. In production it is required.'
+      );
+    }
     return crypto.createHmac('sha256', key).update(data).digest('hex');
   }
 
-  // Verify HMAC signature
+  // Verify HMAC signature (throws if ARCHIVE_SECRET_KEY is not set)
   static verifyDigitalSignature(data: string, signature: string): boolean {
     const expectedSignature = this.createDigitalSignature(data);
     return crypto.timingSafeEqual(

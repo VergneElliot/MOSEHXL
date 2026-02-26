@@ -8,7 +8,15 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { UserModel } from '../models/user';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
+// No fallback: if JWT_SECRET is missing, fail fast so we never run with a default secret.
+const rawSecret = process.env.JWT_SECRET;
+if (!rawSecret || rawSecret.length < 32) {
+  throw new Error(
+    'JWT_SECRET environment variable is required and must be at least 32 characters. ' +
+    'Set it in your .env file and restart the server.'
+  );
+}
+const JWT_SECRET: string = rawSecret;
 
 export interface JwtPayload {
   id: number;

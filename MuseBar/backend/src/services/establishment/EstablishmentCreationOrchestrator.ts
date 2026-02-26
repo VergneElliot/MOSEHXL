@@ -27,8 +27,7 @@ export interface EnhancedCreateEstablishmentResponse {
     status: string;
     schema_name: string;
     subscription_plan: string;
-    invitation_token?: string;
-    invitation_link?: string;
+    /** Generic instructions only; invitation token/link are never returned in API. */
     setup_instructions?: string;
   };
   audit_log: {
@@ -151,8 +150,6 @@ export class EstablishmentCreationOrchestrator {
           status: establishment.status,
           schema_name: establishment.schema_name,
           subscription_plan: establishment.subscription_plan,
-          invitation_token: invitationData.token,
-          invitation_link: invitationData.link,
           setup_instructions: invitationData.setup_instructions
         },
         audit_log: {

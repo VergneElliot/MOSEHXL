@@ -49,12 +49,12 @@ export class AccountCreationOrchestrator {
 
   constructor(logger: Logger) {
     this.logger = logger;
+    this.config = getEnvironmentConfig();
     this.businessInfoValidator = new BusinessInfoValidator(logger);
-    this.userAccountOperations = new UserAccountOperations(logger);
+    this.userAccountOperations = new UserAccountOperations(logger, this.config.security.jwtSecret);
     this.establishmentOperations = new EstablishmentOperations(logger);
     this.schemaOperations = new SchemaOperations(logger);
     this.invitationOperations = new InvitationOperations(logger);
-    this.config = getEnvironmentConfig();
     this.emailService = EmailService.getInstance(this.config, logger);
   }
 

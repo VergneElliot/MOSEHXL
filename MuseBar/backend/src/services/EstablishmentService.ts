@@ -34,8 +34,7 @@ export interface CreateEstablishmentResponse {
     name: string;
     email: string;
     status: string;
-    invitation_token?: string;
-    invitation_link?: string;
+    /** Invitation sent to owner by email; token/link are never returned in API. */
   };
 }
 
@@ -150,14 +149,12 @@ export class EstablishmentService {
       );
 
       return {
-        message: 'Establishment created successfully',
+        message: 'Establishment created successfully. Setup invitation sent to business owner by email.',
         establishment: {
           id: establishment.id,
           name: establishment.name,
           email: establishment.email,
-          status: 'setup_required',
-          invitation_token: invitationToken, // For testing - remove in production
-          invitation_link: `${process.env.FRONTEND_URL}/establishment-setup/${invitationToken}`
+          status: 'setup_required'
         }
       };
 
