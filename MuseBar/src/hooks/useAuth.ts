@@ -118,6 +118,9 @@ export const useAuth = (): AuthState & AuthActions => {
   }, [token, user, tokenExpiresIn, refreshToken]);
 
   const login = useCallback((jwt: string, userObj: User, rememberMeFlag: boolean, expiresIn: string) => {
+    // Set token on API client immediately so any request after this (e.g. /auth/me, /auth/users)
+    // has the Bearer header before React re-renders and child effects run.
+    ApiService.setToken(jwt);
     setToken(jwt);
     setUser(userObj);
     setPermissions(userObj.permissions || []);

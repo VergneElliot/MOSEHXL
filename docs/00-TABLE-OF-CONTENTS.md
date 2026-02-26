@@ -15,3 +15,5 @@ Each chapter is self-contained. Read them in order, or jump to whatever you need
 | 06 | [Auth and Security](./06-AUTH-AND-SECURITY.md) | JWT, bcrypt, CORS, rate limiting — how users are authenticated and protected |
 | 07 | [Legal Compliance](./07-LEGAL-COMPLIANCE.md) | Hash chains, ISCA pillars, French law — how the legal system works technically |
 | 08 | [Audit & Full Course](./08-AUDIT-AND-FULL-COURSE.md) | Code audit, redundant code, architecture assessment, and complete file-by-file course for developers |
+| 09 | [Database Architecture Compatibility](./09-DATABASE-ARCHITECTURE-COMPATIBILITY.md) | What the DB must have for current code; migration CLI vs reference schemas; verification queries |
+| 10 | [Multi-tenant and Muse POS access](./10-MULTI-TENANT-AND-MUSE-POS-ACCESS.md) | How user–establishment links work; how to log in to Muse POS; script to fix lost links |
