@@ -4,7 +4,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { Pool } from 'pg';
+import { pool } from '../../../app';
 import { InvitationValidationResult } from '../types';
 import { Logger } from '../../../utils/logger';
 
@@ -32,8 +32,6 @@ export const validateInvitation = async (
     }
 
     logger.info('Getting database connection from pool...');
-    // Get database connection
-    const pool = req.app.locals.db as Pool;
     const client = await pool.connect();
     logger.info('Database client connected successfully');
 

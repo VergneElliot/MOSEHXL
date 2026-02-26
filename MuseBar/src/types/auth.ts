@@ -1,12 +1,32 @@
 // Authentication and user management types
 
+/**
+ * Logged-in user as returned by GET /auth/me.
+ * Single source of truth for the frontend — import from here, don't redefine.
+ */
 export interface User {
   id: string;
   email: string;
   is_admin: boolean;
+  role: string;
+  establishment_id: string | null;
+  first_name: string;
+  last_name: string;
+  permissions: string[];
+}
+
+/**
+ * A user listed in the establishment's user management panel.
+ * Returned by GET /auth/users (scoped to the requester's establishment).
+ * Uses camelCase `isAdmin` because the API response is mapped in useUserActions.
+ */
+export interface EstablishmentMember {
+  id: string;
+  email: string;
+  isAdmin: boolean;
+  role: string;
+  establishment_id: string | null;
   permissions?: string[];
-  created_at: Date;
-  updated_at: Date;
 }
 
 export interface LoginCredentials {
@@ -24,19 +44,21 @@ export interface AuthResponse {
 export interface Permission {
   key: string;
   label: string;
-  description?: string;
 }
 
-// Common permission keys
-export const PERMISSIONS = {
-  ACCESS_POS: 'access_pos',
-  ACCESS_MENU: 'access_menu',
-  ACCESS_HAPPY_HOUR: 'access_happy_hour',
-  ACCESS_HISTORY: 'access_history',
-  ACCESS_SETTINGS: 'access_settings',
-  ACCESS_COMPLIANCE: 'access_compliance',
-  ADMIN_USERS: 'admin_users',
-  ADMIN_AUDIT: 'admin_audit',
-} as const;
+/**
+ * All grantable permissions. The `key` matches the `name` column in the
+ * database `permissions` table. The `label` is the French UI string shown
+ * in the permission editor. Keep this list in sync with the DB seed and
+ * with the `permission` fields on TABS in AppRouter.tsx.
+ */
+export const ALL_PERMISSIONS: Permission[] = [
+  { key: 'access_pos', label: 'Caisse' },
+  { key: 'access_menu', label: 'Gestion Menu' },
+  { key: 'access_happy_hour', label: 'Happy Hour' },
+  { key: 'access_history', label: 'Historique' },
+  { key: 'access_settings', label: 'Paramètres' },
+  { key: 'access_compliance', label: 'Conformité & Clôtures' },
+];
 
-export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+export type PermissionKey = (typeof ALL_PERMISSIONS)[number]['key'];

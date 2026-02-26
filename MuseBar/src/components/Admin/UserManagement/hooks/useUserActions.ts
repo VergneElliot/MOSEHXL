@@ -5,12 +5,29 @@
 
 import { useCallback } from 'react';
 import { apiService } from '../../../../services/apiService';
+import { EstablishmentMember as User } from '../../../../types/auth';
 
-interface User {
+/** Raw shape returned by the backend (snake_case). */
+interface ApiUser {
   id: string;
   email: string;
-  isAdmin: boolean;
+  is_admin: boolean;
+  role: string;
+  establishment_id: string | null;
+  first_name?: string;
+  last_name?: string;
   permissions?: string[];
+}
+
+function mapApiUser(raw: ApiUser): User {
+  return {
+    id: String(raw.id),
+    email: raw.email,
+    isAdmin: raw.is_admin,
+    role: raw.role,
+    establishment_id: raw.establishment_id,
+    permissions: raw.permissions,
+  };
 }
 
 interface UseUserActionsProps {
@@ -27,16 +44,13 @@ export const useUserActions = ({
   onError,
 }: UseUserActionsProps) => {
 
-  /**
-   * Fetch all users from API
-   */
   const fetchUsers = useCallback(async () => {
     onLoading(true);
     onError(null);
     
     try {
-      const response = await apiService.get<User[]>('/auth/users');
-      onUsersUpdate(response.data);
+      const response = await apiService.get<ApiUser[]>('/auth/users');
+      onUsersUpdate(response.data.map(mapApiUser));
     } catch (error) {
       console.error('Failed to fetch users:', error);
       onError('Failed to load users');
@@ -46,7 +60,8 @@ export const useUserActions = ({
   }, [onUsersUpdate, onLoading, onError]);
 
   /**
-   * Create a new user
+   * Create a new user in the establishment.
+   * isAdmin=true maps to role 'establishment_admin'; false maps to 'cashier'.
    */
   const createUser = useCallback(async (
     email: string,
@@ -56,13 +71,13 @@ export const useUserActions = ({
     onError(null);
     
     try {
-      const response = await apiService.post<User>('/auth/users', {
+      const response = await apiService.post<ApiUser>('/auth/users', {
         email,
         password,
-        isAdmin,
+        role: isAdmin ? 'establishment_admin' : 'cashier',
       });
       
-      onUserAdd(response.data);
+      onUserAdd(mapApiUser(response.data));
       return true;
     } catch (error) {
       console.error('Failed to create user:', error);
@@ -71,9 +86,6 @@ export const useUserActions = ({
     }
   }, [onUserAdd, onError]);
 
-  /**
-   * Delete a user
-   */
   const deleteUser = useCallback(async (userId: string): Promise<boolean> => {
     onError(null);
     
@@ -88,7 +100,8 @@ export const useUserActions = ({
   }, [onError]);
 
   /**
-   * Update user role
+   * Update user role.
+   * isAdmin=true sets role to 'establishment_admin'; false sets role to 'cashier'.
    */
   const updateUserRole = useCallback(async (
     userId: string,
@@ -97,7 +110,9 @@ export const useUserActions = ({
     onError(null);
     
     try {
-      await apiService.put(`/auth/users/${userId}/role`, { isAdmin });
+      await apiService.put(`/auth/users/${userId}/role`, {
+        role: isAdmin ? 'establishment_admin' : 'cashier',
+      });
       return true;
     } catch (error) {
       console.error('Failed to update user role:', error);

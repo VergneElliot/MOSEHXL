@@ -1,26 +1,45 @@
 import { pool } from '../app';
 import bcrypt from 'bcrypt';
 
-export interface User {
+/**
+ * Full database row from the `users` table.
+ * Returned by SELECT * queries. Contains sensitive fields (password_hash)
+ * that must NEVER be sent to the frontend.
+ */
+export interface UserRow {
   id: number;
   email: string;
   password_hash: string;
   is_admin: boolean;
+  role: string;
+  establishment_id: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  email_verified: boolean;
+  is_active: boolean;
+  last_login: Date | null;
   created_at: Date;
+  updated_at: Date;
 }
 
+/**
+ * Subset of user data carried in the JWT and attached to `req.user`.
+ * This is the backend's "session" representation -- no DB query needed.
+ * Must stay in sync with `types/express/index.d.ts`.
+ */
 export interface AuthenticatedUser {
   id: number;
   email: string;
-  first_name: string;
-  last_name: string;
-  role: string;
-  establishment_id: string | undefined;
   is_admin: boolean;
+  role: string;
+  establishment_id: string | null;
 }
 
+/** @deprecated Use UserRow instead. Alias kept for backward compatibility during migration. */
+export type User = UserRow;
+
 export class UserModel {
-  static async createUser(email: string, password: string, is_admin: boolean = false): Promise<User> {
+  static async createUser(email: string, password: string, is_admin: boolean = false): Promise<UserRow> {
     const password_hash = await bcrypt.hash(password, 12);
     const result = await pool.query(
       `INSERT INTO users (email, password_hash, is_admin) VALUES ($1, $2, $3) RETURNING *`,
@@ -29,9 +48,22 @@ export class UserModel {
     return result.rows[0];
   }
 
-  static async findByEmail(email: string): Promise<User | null> {
-    // Prefer users with establishment_id (actual establishment owners)
-    // over users without establishment_id (test users)
+  static async createUserForEstablishment(
+    email: string,
+    password: string,
+    role: string,
+    establishmentId: string
+  ): Promise<UserRow> {
+    const password_hash = await bcrypt.hash(password, 12);
+    const result = await pool.query(
+      `INSERT INTO users (email, password_hash, is_admin, role, establishment_id, email_verified)
+       VALUES ($1, $2, false, $3, $4, true) RETURNING *`,
+      [email, password_hash, role, establishmentId]
+    );
+    return result.rows[0];
+  }
+
+  static async findByEmail(email: string): Promise<UserRow | null> {
     const result = await pool.query(`
       SELECT * FROM users 
       WHERE email = $1 
@@ -43,44 +75,26 @@ export class UserModel {
     return result.rows[0] || null;
   }
 
-  static async findById(id: number): Promise<User | null> {
+  static async findById(id: number): Promise<UserRow | null> {
     const result = await pool.query(`SELECT * FROM users WHERE id = $1`, [id]);
     return result.rows[0] || null;
   }
 
   static async getAuthenticatedUser(id: number): Promise<AuthenticatedUser | null> {
     const result = await pool.query(`
-      SELECT 
-        u.id,
-        u.email,
-        COALESCE(u.first_name, '') as first_name,
-        COALESCE(u.last_name, '') as last_name,
-        COALESCE(u.role, 'user') as role,
-        u.establishment_id,
-        u.is_admin
-      FROM users u
-      WHERE u.id = $1
+      SELECT id, email, is_admin, COALESCE(role, 'user') as role, establishment_id
+      FROM users WHERE id = $1
     `, [id]);
-    
-    if (result.rows.length === 0) return null;
-    
-    const row = result.rows[0];
-    return {
-      id: row.id,
-      email: row.email,
-      first_name: row.first_name,
-      last_name: row.last_name,
-      role: row.role,
-      establishment_id: row.establishment_id,
-      is_admin: row.is_admin
-    };
+    return result.rows[0] || null;
   }
 
-  static async verifyPassword(user: User, password: string): Promise<boolean> {
+  static async verifyPassword(user: UserRow, password: string): Promise<boolean> {
     return bcrypt.compare(password, user.password_hash);
   }
 
-  // Permission management
+  // Permission management.
+  // Returns explicit permissions from user_permissions, falling back to role-based defaults
+  // so newly created establishment users always get the correct access without manual seeding.
   static async getUserPermissions(userId: number): Promise<string[]> {
     const result = await pool.query(
       `SELECT p.name FROM permissions p
@@ -88,7 +102,24 @@ export class UserModel {
        WHERE up.user_id = $1`,
       [userId]
     );
-    return result.rows.map((row: any) => row.name);
+
+    if (result.rows.length > 0) {
+      return result.rows.map((row: any) => row.name);
+    }
+
+    // No explicit permissions — derive from the user's role.
+    const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [userId]);
+    const role: string = userResult.rows[0]?.role || '';
+
+    // Only establishment_admin gets automatic full access.
+    // All other roles (cashier, manager, etc.) must have permissions explicitly granted
+    // by the establishment admin — no assumptions are made on their behalf.
+    if (role === 'establishment_admin') {
+      const allPerms = await pool.query('SELECT name FROM permissions');
+      return allPerms.rows.map((row: any) => row.name);
+    }
+
+    return [];
   }
 
   static async setUserPermissions(userId: number, permissions: string[]): Promise<void> {

@@ -1,17 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiService, ApiService } from '../services/apiService';
 import { apiConfig } from '../config/api';
-
-interface User {
-  id: string;
-  email: string;
-  name?: string;
-  role?: string;
-  first_name?: string;
-  last_name?: string;
-  is_admin?: boolean;
-  permissions: string[];
-}
+import { User } from '../types/auth';
 
 interface AuthState {
   token: string | null;

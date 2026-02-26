@@ -48,43 +48,39 @@ export class ClosureScheduler {
   // Check if closure should be executed
   static async checkAndExecuteClosure() {
     try {
-      // Get closure settings
       const settings = await this.getClosureSettings();
-      
-      // Check if auto-closure is enabled
+
       if (!settings.auto_closure_enabled) {
         return;
       }
 
-      const now = new Date();
-      const today = now.toISOString().split('T')[0];
-      
-      // Check if today has already been closed
+      // All date logic uses Paris time — the system is France-only.
+      const nowParis = moment.tz(new Date(), settings.timezone);
+      const todayParis = nowParis.format('YYYY-MM-DD'); // Paris calendar date
+
+      // Check if today's business day has already been closed.
+      // DATE(period_start) is evaluated in Paris time via the pool timezone setting.
       const closureQuery = `
-        SELECT * FROM closure_bulletins 
-        WHERE closure_type = 'DAILY' 
-        AND DATE(period_start) = $1
+        SELECT id FROM closure_bulletins
+        WHERE closure_type = 'DAILY'
+        AND DATE(period_start AT TIME ZONE 'Europe/Paris') = $1
         AND is_closed = TRUE
         ORDER BY created_at DESC
         LIMIT 1
       `;
-      const closureResult = await pool.query(closureQuery, [today]);
-      
+      const closureResult = await pool.query(closureQuery, [todayParis]);
+
       if (closureResult.rows.length > 0) {
-        // Already closed today
         return;
       }
 
-      // Check if it's time to close
-      const shouldClose = await this.shouldExecuteClosure(settings, now);
-      
+      const shouldClose = await this.shouldExecuteClosure(settings, nowParis);
+
       if (shouldClose) {
-        // Executing automatic daily closure
-        await this.executeAutomaticClosure(now);
+        await this.executeAutomaticClosure(nowParis.toDate());
       }
-      
+
     } catch (error) {
-      // Error checking closure conditions
       throw error;
     }
   }
@@ -107,23 +103,20 @@ export class ClosureScheduler {
     };
   }
 
-  // Determine if closure should be executed
-  static async shouldExecuteClosure(settings: any, now: Date) {
+  // Determine if closure should be executed.
+  // nowParis must be a moment-timezone object in Europe/Paris.
+  static async shouldExecuteClosure(settings: any, nowParis: moment.Moment) {
     const [hours, minutes] = settings.daily_closure_time.split(':').map(Number);
-    
-    // Create target closure time for today
-    const targetTime = new Date(now);
-    targetTime.setHours(hours, minutes, 0, 0);
-    
-    // If the target time has passed today, check if we're within grace period
-    if (now >= targetTime) {
-      const timeDiff = now.getTime() - targetTime.getTime();
-      const gracePeriodinMs = settings.grace_period_minutes * 60 * 1000;
-      
-      // Execute if within grace period
-      return timeDiff <= gracePeriodinMs;
+
+    // Build the target closure time for today in Paris — safe across DST transitions.
+    const targetParis = nowParis.clone().set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
+
+    if (nowParis.isSameOrAfter(targetParis)) {
+      const timeDiffMs = nowParis.diff(targetParis);
+      const gracePeriodMs = settings.grace_period_minutes * 60 * 1000;
+      return timeDiffMs <= gracePeriodMs;
     }
-    
+
     return false;
   }
 

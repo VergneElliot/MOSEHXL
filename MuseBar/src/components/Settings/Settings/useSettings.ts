@@ -71,8 +71,7 @@ export const useSettings = (): UseSettingsReturn => {
     onSave: async () => {
       setState(prev => ({ ...prev, saving: true }));
       try {
-        // TODO: Implement API call for general settings
-        console.log('General settings saved:', state.generalSettings);
+        // General settings API not yet implemented -- save is a no-op for now
       } finally {
         setState(prev => ({ ...prev, saving: false }));
       }

@@ -1,12 +1,13 @@
 import React from 'react';
 import { AppBar, Toolbar, Typography, Box, Chip, Button } from '@mui/material';
 import { Restaurant as RestaurantIcon } from '@mui/icons-material';
+import { User } from '../../types/auth';
 
 interface AppHeaderProps {
   isHappyHourActive: boolean;
   timeUntilHappyHour: string;
   onLogout: () => void;
-  user: any;
+  user: User | null;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
@@ -42,7 +43,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           {user && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Typography variant="body2" sx={{ color: 'white' }}>
-                {user.name}
+                {user.first_name} {user.last_name}
               </Typography>
               <Button
                 color="inherit"

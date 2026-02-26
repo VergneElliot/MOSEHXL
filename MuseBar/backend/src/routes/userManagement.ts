@@ -1,25 +1,15 @@
 /**
- * Enhanced User Management Routes
- * REFACTORED: This service has been modularized into smaller, focused modules.
- * The original 566-line monolithic route file has been broken down into:
- * - invitationRoutes.ts (Invitation management)
- * - userRoutes.ts (Basic user CRUD)
- * - teamRoutes.ts (Team management)
- * - roleRoutes.ts (Role management)
- * - types.ts (Type definitions)
- * - index.ts (Main orchestrator)
+ * User Management Routes
+ * Currently only mounts the invitation module (send-establishment-invitation,
+ * password reset). User CRUD, team stats, and role management are handled by
+ * the establishment-scoped routes in /api/auth/users (see auth.ts).
  */
 
-// Re-export the modular user management system for backward compatibility
 export {
   default as createUserManagementRouter,
   initializeUserManagementRoutes,
   getUserManagementRouter,
   invitationRoutes,
-  userRoutes,
-  teamRoutes,
-  roleRoutes,
-  // Types
   type AuthenticatedRequest,
   type EstablishmentInvitationData,
   type UserInvitationData,
@@ -41,6 +31,5 @@ export {
   type RouteGroup
 } from './userManagement/index';
 
-// Legacy export - create router with initialization
 import createUserManagementRouter from './userManagement/index';
 export default createUserManagementRouter;

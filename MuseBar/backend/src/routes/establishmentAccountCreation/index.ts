@@ -8,6 +8,7 @@ import { validateBody } from '../../middleware/validation';
 import { validateInvitation } from './middleware/validateInvitation';
 import { validateBusinessInfo } from './middleware/validateBusinessInfo';
 import { Logger } from '../../utils/logger';
+import { pool } from '../../app';
 import { EstablishmentAccountService } from '../../services/establishmentAccountCreation/EstablishmentAccountService';
 import { 
   EstablishmentAccountCreationRequest,
@@ -61,7 +62,6 @@ router.post('/complete',
       // Initialize service if not already done
       if (!establishmentAccountService) {
         logger.info('Initializing EstablishmentAccountService');
-        const pool = req.app.locals.db;
         establishmentAccountService = new EstablishmentAccountService(pool, logger);
         logger.info('EstablishmentAccountService initialized');
       }
@@ -106,7 +106,6 @@ router.get('/validate/:token', async (req: Request, res: Response, next: NextFun
     
     // Initialize service if not already done
     if (!establishmentAccountService) {
-      const pool = req.app.locals.db;
       establishmentAccountService = new EstablishmentAccountService(pool, logger);
     }
 

@@ -10,6 +10,10 @@ import { requireAuth, requireAdmin } from '../auth';
 
 const router = express.Router();
 
+// All journal routes require authentication.
+// The legal journal is an immutable fiscal record (NF 525).
+router.use(requireAuth);
+
 /**
  * GET legal journal integrity verification
  * GET /api/legal/journal/verify
@@ -78,7 +82,7 @@ router.get('/entries', async (req, res) => {
  * GET journal statistics
  * GET /api/legal/journal/stats
  */
-router.get('/stats', requireAuth, requireAdmin, async (req, res) => {
+router.get('/stats', requireAdmin, async (req, res) => {
   try {
     const statsQuery = `
       SELECT 
@@ -111,7 +115,7 @@ router.get('/stats', requireAuth, requireAdmin, async (req, res) => {
  * POST reset journal (development only)
  * POST /api/legal/journal/reset
  */
-router.post('/reset', requireAuth, requireAdmin, async (req, res) => {
+router.post('/reset', requireAdmin, async (req, res) => {
   try {
     // Only allow in development
     if (process.env.NODE_ENV === 'production') {
