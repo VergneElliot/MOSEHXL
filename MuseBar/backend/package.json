@@ -12,9 +12,7 @@
     "migration:migrate": "ts-node src/migrations/cli.ts migrate",
     "migration:rollback": "ts-node src/migrations/cli.ts rollback",
     "migration:status": "ts-node src/migrations/cli.ts status",
-    "migration:create": "ts-node src/migrations/cli.ts create",
-    "script:check-muse": "ts-node scripts/check-muse-access.ts",
-    "script:check-muse:fix": "ts-node scripts/check-muse-access.ts --fix"
+    "migration:create": "ts-node src/migrations/cli.ts create"
   },
   "keywords": [
     "pos",

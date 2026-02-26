@@ -53,41 +53,35 @@ So: **muse.rouen@gmail.com** may only exist as the establishment’s contact ema
 
 ---
 
-## 4. How to fix Muse POS access (local DB)
+## 4. How to fix Muse POS access (SQL)
 
-Use the backend script that diagnoses and optionally fixes user–establishment links.
+If a user should access the Muse POS but has `establishment_id` = null (or wrong), run the SQL below. Replace `'<MUSE_UUID>'` with the actual `id` of the Muse establishment from `establishments`.
 
-From the **backend** directory:
-
-```bash
-# 1. Diagnose: list establishments and users, and who can access Muse
-npm run script:check-muse
-
-# 2. Apply fix: set elliotpokerpro and hugo to Muse (establishment_admin and cashier)
-npm run script:check-muse:fix
+**Get Muse’s UUID:**
+```sql
+SELECT id, name FROM establishments WHERE name ILIKE '%muse%';
 ```
 
-Or with npx:
+**Attach users to Muse:**
+```sql
+-- Muse establishment admin (full POS + user management)
+UPDATE users
+SET establishment_id = '<MUSE_UUID>', role = 'establishment_admin', is_admin = false, updated_at = CURRENT_TIMESTAMP
+WHERE email = 'elliotpokerpro@gmail.com';
 
-```bash
-cd MuseBar/backend
-npx ts-node scripts/check-muse-access.ts           # diagnose
-npx ts-node scripts/check-muse-access.ts --fix     # fix
+-- Muse cashier (permissions can be set via POS “Gestion utilisateurs” after login)
+UPDATE users
+SET establishment_id = '<MUSE_UUID>', role = 'cashier', is_admin = false, updated_at = CURRENT_TIMESTAMP
+WHERE email = 'hugo.martins.76000@gmail.com';
 ```
 
-The script:
+After that, log in with **elliotpokerpro@gmail.com** to use the Muse POS.
 
-- Lists all establishments and finds the one whose name contains “Muse”.
-- Lists all users with their `role`, `establishment_id`, and `is_admin`.
-- Shows who currently has `establishment_id` = Muse (and thus can access Muse POS).
-- **Without `--fix`:** prints suggested `UPDATE` SQL so you can attach the right users to Muse.
-- **With `--fix`:** runs the updates for `elliotpokerpro@gmail.com` (Muse admin) and `hugo.martins.76000@gmail.com` (Muse cashier).
-
-After the fix, log in with **elliotpokerpro@gmail.com** (and his password). You should see the Business UI and Muse’s categories, products, and orders.
+**V1 → V2 cloud migration:** When copying production V1 data to V2, ensure the V2 migrations are applied, then run the same pattern of `UPDATE users SET establishment_id = ...` for the production user emails and the production establishment UUID. You can add a one-off migration in `migrations/files/` that runs this SQL if you prefer it to be repeatable.
 
 ---
 
-## 5. What the fix does (SQL)
+## 5. What the fix does (concept)
 
 Conceptually:
 
@@ -102,20 +96,17 @@ So:
 
 ---
 
-## 6. If the script says “User not found”
+## 6. If the user is not found
 
-Then there is no `users` row for that email. Options:
-
-- **Create a user** for that email (e.g. via System Admin or an invite flow), then run the script again with `--fix` to attach them to Muse, or  
-- Use another email that **does** exist in `users` and run the fix for that email (you can edit `scripts/check-muse-access.ts` to add more emails or change the `--fix` logic).
+Then there is no `users` row for that email. Create a user (e.g. via System Admin or invite flow), then run the `UPDATE users SET establishment_id = ...` SQL from §4 to attach them to Muse. Or use another email that already exists in `users` and run the same SQL with that email.
 
 ---
 
 ## 7. Deploying V2 on the cloud without losing data
 
 - **Backup** the production DB before any migration.  
-- Run the **same migrations** on production that you ran locally (so the schema matches, including `establishment_id`, `tips`, `change`, etc.).  
-- Run the **same kind of user–establishment check** on the production DB (you can run the script against production by pointing `DB_*` in `.env` to the cloud DB, or run the equivalent SQL by hand).  
-- Ensure the Muse establishment exists and that at least one user (e.g. elliotpokerpro) has `establishment_id` = Muse and `is_admin` = false so you can log in to the Muse POS in production.
+- Run the **same migrations** on production that you ran locally (schema with `establishment_id`, `tips`, `change`, etc.).  
+- Run the **user–establishment SQL** from §4 (or a one-off migration) on the production DB so at least one user has `establishment_id` = Muse and `is_admin` = false.  
+- Ensure the Muse establishment row exists; then you can log in to the Muse POS in production.
 
 The email/SendGrid and “create new establishment” flows are out of scope for this doc; the priority here is a working V2 cashier for Muse in line with French regulation and a clear way to get there from your current DB state.

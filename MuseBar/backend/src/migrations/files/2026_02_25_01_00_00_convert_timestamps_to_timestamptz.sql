@@ -20,6 +20,9 @@
 
 -- UP
 
+-- Drop view that depends on users.created_at/updated_at so we can alter those columns
+DROP VIEW IF EXISTS user_summary;
+
 ALTER TABLE archive_exports
   ALTER COLUMN created_at    TYPE TIMESTAMPTZ USING created_at    AT TIME ZONE 'Europe/Paris',
   ALTER COLUMN period_start  TYPE TIMESTAMPTZ USING period_start  AT TIME ZONE 'Europe/Paris',
@@ -115,6 +118,34 @@ ALTER TABLE users
   ALTER COLUMN last_login           TYPE TIMESTAMPTZ USING last_login           AT TIME ZONE 'Europe/Paris',
   ALTER COLUMN password_reset_expires TYPE TIMESTAMPTZ USING password_reset_expires AT TIME ZONE 'Europe/Paris',
   ALTER COLUMN invitation_expires   TYPE TIMESTAMPTZ USING invitation_expires   AT TIME ZONE 'Europe/Paris';
+
+-- Recreate view that depends on users (and user_role_assignments, roles, establishments)
+CREATE OR REPLACE VIEW user_summary AS
+SELECT
+    u.id,
+    u.email,
+    u.first_name,
+    u.last_name,
+    u.role AS primary_role,
+    u.is_admin,
+    u.email_verified,
+    u.last_login,
+    u.created_at,
+    u.updated_at,
+    e.name AS establishment_name,
+    e.id AS establishment_id,
+    COALESCE(
+        ARRAY_AGG(r.name) FILTER (WHERE r.name IS NOT NULL),
+        ARRAY[]::VARCHAR[]
+    ) AS assigned_roles,
+    get_user_permissions(u.id) AS permissions
+FROM users u
+LEFT JOIN establishments e ON e.id = u.establishment_id
+LEFT JOIN user_role_assignments ura ON ura.user_id = u.id AND ura.is_active = TRUE
+LEFT JOIN roles r ON r.id = ura.role_id AND r.is_active = TRUE
+GROUP BY u.id, u.email, u.first_name, u.last_name, u.role, u.is_admin,
+         u.email_verified, u.last_login, u.created_at, u.updated_at,
+         e.name, e.id;
 
 -- ============================================================
 -- DOWN (revert to TIMESTAMP WITHOUT TIME ZONE)

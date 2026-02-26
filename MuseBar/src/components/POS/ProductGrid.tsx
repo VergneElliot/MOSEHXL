@@ -32,6 +32,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({
 
   const handleAddProduct = (product: Product) => {
     const currentPrice = calculateProductPrice(product, isHappyHourActive);
+    // Exact tax (TTC): do not round — stored and summed for closures; round only in UI (formatCurrency).
     const taxAmount = currentPrice * (product.taxRate / (1 + product.taxRate));
 
     const orderItem: OrderItem = {

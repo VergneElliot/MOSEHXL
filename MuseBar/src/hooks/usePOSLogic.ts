@@ -83,9 +83,11 @@ export const usePOSLogic = (
     return currentOrder.reduce((total, item) => total + item.taxAmount, 0);
   }, [currentOrder]);
 
+  // France: prices are TTC (all tax included). orderSubtotal is the sum of line totals (TTC).
+  // orderTax is the tax component for display/legal breakdown only — do not add it on top.
   const orderTotal = useMemo(() => {
-    return orderSubtotal + orderTax;
-  }, [orderSubtotal, orderTax]);
+    return orderSubtotal;
+  }, [orderSubtotal]);
 
   // Validation logic
   const canProcessPayment = useMemo(() => {

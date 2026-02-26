@@ -17,8 +17,10 @@ import {
   Delete as DeleteIcon,
   Add as AddIcon,
   Remove as RemoveIcon,
-  Receipt as ReceiptIcon,
   Clear as ClearIcon,
+  CreditCard as CreditCardIcon,
+  LocalAtm as CashIcon,
+  Settings as OptionsIcon,
 } from '@mui/icons-material';
 import { OrderItem } from '../../types';
 
@@ -30,7 +32,12 @@ interface OrderSummaryProps {
   canProcessPayment: boolean;
   onRemoveItem: (index: number) => void;
   onClearOrder: () => void;
+  /** Open payment options dialog (split, tip, change) */
   onCheckout: () => void;
+  /** Quick payment: full order by card */
+  onQuickCard?: () => void;
+  /** Quick payment: full order by cash */
+  onQuickCash?: () => void;
   onUpdateQuantity: (index: number, newQuantity: number) => void;
   formatCurrency: (amount: number) => string;
 }
@@ -44,6 +51,8 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
   onRemoveItem,
   onClearOrder,
   onCheckout,
+  onQuickCard,
+  onQuickCash,
   onUpdateQuantity,
   formatCurrency,
 }) => {
@@ -181,21 +190,57 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
                 </Typography>
               </Box>
 
-              <Button
-                variant="contained"
-                fullWidth
-                size="large"
-                onClick={onCheckout}
-                disabled={!canProcessPayment}
-                startIcon={<ReceiptIcon />}
-                sx={{
-                  py: isMobile ? 1.5 : 2,
-                  fontSize: isMobile ? '1rem' : '1.1rem',
-                  fontWeight: 'bold',
-                }}
-              >
-                Encaisser
-              </Button>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Button
+                  variant="contained"
+                  fullWidth
+                  size="large"
+                  onClick={onQuickCard}
+                  disabled={!canProcessPayment}
+                  startIcon={<CreditCardIcon />}
+                  sx={{
+                    py: isMobile ? 1.25 : 1.5,
+                    fontSize: isMobile ? '0.95rem' : '1rem',
+                    fontWeight: 'bold',
+                    bgcolor: 'primary.main',
+                  }}
+                >
+                  Paiement CB
+                </Button>
+                <Button
+                  variant="contained"
+                  fullWidth
+                  size="large"
+                  onClick={onQuickCash}
+                  disabled={!canProcessPayment}
+                  startIcon={<CashIcon />}
+                  sx={{
+                    py: isMobile ? 1.25 : 1.5,
+                    fontSize: isMobile ? '0.95rem' : '1rem',
+                    fontWeight: 'bold',
+                    bgcolor: 'success.main',
+                    color: 'success.contrastText',
+                    '&:hover': { bgcolor: 'success.dark' },
+                  }}
+                >
+                  Paiement espèces
+                </Button>
+                <Button
+                  variant="outlined"
+                  fullWidth
+                  size="large"
+                  onClick={onCheckout}
+                  disabled={!canProcessPayment}
+                  startIcon={<OptionsIcon />}
+                  sx={{
+                    py: isMobile ? 1.25 : 1.5,
+                    fontSize: isMobile ? '0.95rem' : '1rem',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  Options de paiement
+                </Button>
+              </Box>
             </Box>
           </>
         )}

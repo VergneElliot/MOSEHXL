@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Box, Grid, Snackbar, Alert } from '@mui/material';
 import { Category, Product, OrderItem } from '../../types';
 import { usePOSState } from '../../hooks/usePOSState';
 import { usePOSLogic } from '../../hooks/usePOSLogic';
+import { usePOSAPI } from '../../hooks/usePOSAPI';
 import CategoryFilter from './CategoryFilter';
 import ProductGrid from './ProductGrid';
 import OrderSummary from './OrderSummary';
@@ -33,6 +34,14 @@ const POSContainer: React.FC<POSContainerProps> = ({
     state.searchQuery,
     isHappyHourActive
   );
+
+  const handlePaymentComplete = (message: string) => {
+    actions.setSnackbar({ open: true, message, severity: 'success' });
+  };
+  const handlePaymentError = (message: string) => {
+    actions.setSnackbar({ open: true, message, severity: 'error' });
+  };
+  const { createOrder } = usePOSAPI(handlePaymentComplete, handlePaymentError, onDataUpdate);
 
   // Event handlers
   const handleAddToOrder = (item: OrderItem) => {
@@ -67,16 +76,28 @@ const POSContainer: React.FC<POSContainerProps> = ({
     actions.setPaymentDialogOpen(true);
   };
 
+  const handleQuickPayment = useCallback(
+    async (method: 'cash' | 'card') => {
+      if (!logic.canProcessPayment || state.currentOrder.length === 0) return;
+      try {
+        await createOrder({
+          paymentMethod: method,
+          totalAmount: logic.orderTotal,
+          totalTax: logic.orderTax,
+          items: state.currentOrder,
+          tips: 0,
+          change: 0,
+        });
+        actions.clearOrder();
+      } catch {
+        // Error already reported by usePOSAPI
+      }
+    },
+    [logic.canProcessPayment, logic.orderTotal, logic.orderTax, state.currentOrder, createOrder, actions]
+  );
+
   const handleCloseSnackbar = () => {
     actions.setSnackbar({ ...state.snackbar, open: false });
-  };
-
-  const handlePaymentComplete = (message: string) => {
-    actions.setSnackbar({ open: true, message, severity: 'success' });
-  };
-
-  const handlePaymentError = (message: string) => {
-    actions.setSnackbar({ open: true, message, severity: 'error' });
   };
 
   const handleClosePaymentDialog = () => {
@@ -122,6 +143,8 @@ const POSContainer: React.FC<POSContainerProps> = ({
             onRemoveItem={actions.removeFromOrder}
             onClearOrder={actions.clearOrder}
             onCheckout={handleCheckout}
+            onQuickCard={() => handleQuickPayment('card')}
+            onQuickCash={() => handleQuickPayment('cash')}
             onUpdateQuantity={handleUpdateQuantity}
             formatCurrency={logic.formatCurrency}
           />
@@ -159,7 +182,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
         onClearOrder={actions.clearOrder}
       />
 
-                  {/* Future: Add other dialog components (retour, change, etc.) */}
+      {/* Future: Add other dialog components (retour, change, etc.) */}
     </Box>
   );
 };

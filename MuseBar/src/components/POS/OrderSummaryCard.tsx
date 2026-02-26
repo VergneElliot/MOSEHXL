@@ -21,7 +21,7 @@ const OrderSummaryCard: React.FC<OrderSummaryCardProps> = ({ orderSubtotal, orde
               Sous-total (HT)
             </Typography>
             <Typography variant="body1" fontWeight="medium">
-              {formatCurrency(orderSubtotal)}
+              {formatCurrency(orderSubtotal - orderTax)}
             </Typography>
           </Grid>
           <Grid item xs={6}>
