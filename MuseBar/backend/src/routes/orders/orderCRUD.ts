@@ -5,6 +5,8 @@
 
 import express from 'express';
 import { OrderModel, OrderItemModel, SubBillModel } from '../../models';
+import { LegalJournalModel } from '../../models/legalJournal';
+import { AuditTrailModel } from '../../models/auditTrail';
 import { requireAuth } from '../auth';
 import { validateBody, validateParams, commonValidations, paramValidations } from '../../middleware/validation';
 
@@ -101,6 +103,45 @@ router.post('/', validateBody(commonValidations.orderCreate), async (req, res) =
           SubBillModel.create({ order_id: order.id, payment_method: sb.payment_method, amount: sb.amount, status: 'pending' })
         )
       );
+    }
+
+    // Write to legal journal — every completed sale must be recorded.
+    // This is required by French fiscal law (Article 286-I-3 bis du CGI / NF525).
+    // We do this AFTER the order is committed to the DB. If the journal write
+    // fails we log the error but DO NOT block the response — the sale happened
+    // and must not be rolled back just because of a logging issue. The integrity
+    // check endpoint can later flag the missing entry.
+    if (status === 'completed') {
+      LegalJournalModel.logTransaction(
+        {
+          id: order.id,
+          total_amount: order.total_amount,
+          total_tax: order.total_tax,
+          payment_method: order.payment_method,
+          items: createdItems,
+          created_at: order.created_at,
+        },
+        req.user ? String(req.user.id) : undefined
+      ).catch((journalError: unknown) => {
+        console.error('[LEGAL JOURNAL] Failed to write journal entry for order', order.id, journalError);
+      });
+
+      // Write to audit trail — records who created what, when, and from where.
+      AuditTrailModel.logAction({
+        user_id: req.user ? String(req.user.id) : undefined,
+        action_type: 'ORDER_CREATED',
+        resource_type: 'ORDER',
+        resource_id: String(order.id),
+        action_details: {
+          total_amount: order.total_amount,
+          payment_method: order.payment_method,
+          item_count: createdItems.length,
+        },
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+      }).catch((auditError: unknown) => {
+        console.error('[AUDIT TRAIL] Failed to write audit entry for order', order.id, auditError);
+      });
     }
 
     res.status(201).json({ ...order, items: createdItems, sub_bills: createdSubBills });

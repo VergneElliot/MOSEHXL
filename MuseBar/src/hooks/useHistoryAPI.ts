@@ -87,78 +87,39 @@ export const useHistoryAPI = (
         setReturnError('');
 
         if (isPartial) {
-          // Process partial return
           if (selectedItems.length === 0 && !selectedTip) {
             setReturnError('Veuillez sélectionner au moins un article ou le pourboire à retourner');
             return;
           }
 
-          // Create return transactions for selected items
-          for (const itemId of selectedItems) {
-            const item = order.items.find(i => i.id === itemId);
-            if (item) {
-              await apiService.post('/orders', {
-                total_amount: -item.totalPrice,
-                total_tax: -item.taxAmount,
-                payment_method: order.paymentMethod,
-                status: 'completed',
-                notes: `RETOUR PARTIEL: ${reason} - ${item.productName}`,
-                items: [
-                  {
-                    product_id: item.productId,
-                    product_name: `RETOUR - ${item.productName}`,
-                    quantity: -item.quantity,
-                    unit_price: item.unitPrice,
-                    total_price: -item.totalPrice,
-                    tax_rate: item.taxRate,
-                    tax_amount: -item.taxAmount,
-                    happy_hour_applied: false,
-                  },
-                ],
-                sub_bills: [],
-                tips: 0,
-                change: 0,
-              });
-            }
-          }
+          // Resolve selected item IDs to DB-level numeric IDs.
+          // order.items[].id is a string from the frontend; the cancel-unified endpoint
+          // expects numeric IDs that match order_items.id in the database.
+          const numericItemIds = selectedItems
+            .map(itemId => {
+              const item = order.items.find(i => i.id === itemId);
+              return item ? Number(item.id) : null;
+            })
+            .filter((id): id is number => id !== null);
 
-          // Process tip return if selected
-          if (selectedTip && order.tips && order.tips > 0) {
-            await apiService.post('/orders', {
-              total_amount: 0,
-              total_tax: 0,
-              payment_method: order.paymentMethod,
-              status: 'completed',
-              notes: `RETOUR POURBOIRE: ${reason}`,
-              items: [],
-              sub_bills: [],
-              tips: -order.tips,
-              change: 0,
-            });
-          }
+          // Use cancel-unified: it creates the cancellation order, writes the
+          // legal journal REFUND entry, and logs the audit trail in one shot.
+          await apiService.post('/orders/payment/cancel-unified', {
+            orderId: order.id,
+            reason,
+            cancellationType: 'partial',
+            itemsToCancel: numericItemIds,
+            includeTipReversal: selectedTip && order.tips && order.tips > 0,
+          });
 
           setReturnSuccess('Retour partiel traité avec succès');
         } else {
-          // Process full return
-          await apiService.post('/orders', {
-            total_amount: -order.totalAmount,
-            total_tax: -order.taxAmount,
-            payment_method: order.paymentMethod,
-            status: 'completed',
-            notes: `RETOUR COMPLET: ${reason}`,
-            items: order.items.map(item => ({
-              product_id: item.productId,
-              product_name: `RETOUR - ${item.productName}`,
-              quantity: -item.quantity,
-              unit_price: item.unitPrice,
-              total_price: -item.totalPrice,
-              tax_rate: item.taxRate,
-              tax_amount: -item.taxAmount,
-              happy_hour_applied: false,
-            })),
-            sub_bills: [],
-            tips: order.tips ? -order.tips : 0,
-            change: order.change ? -order.change : 0,
+          // Full return — cancel-unified handles the entire order
+          await apiService.post('/orders/payment/cancel-unified', {
+            orderId: order.id,
+            reason,
+            cancellationType: 'full',
+            includeTipReversal: !!(order.tips && order.tips > 0),
           });
 
           setReturnSuccess('Retour complet traité avec succès');
@@ -171,7 +132,6 @@ export const useHistoryAPI = (
           loadStats();
         }, 1500);
       } catch (error: any) {
-        // Return processing failed
         const errorMessage =
           error.response?.data?.error || error.message || 'Erreur lors du traitement du retour';
         setReturnError(errorMessage);
