@@ -47,36 +47,18 @@ app.set('trust proxy', config.server.trustProxy);
 app.use(requestLoggerMiddleware(logger));
 app.use(createSecurityMiddleware(config, logger));
 
-// Database connection with environment-specific defaults
+// Database connection with environment-specific defaults.
+// options: '--timezone=Europe/Paris' ensures every session uses Paris time so that
+// NOW() / CURRENT_TIMESTAMP return Paris time and TIMESTAMPTZ values display correctly.
+// This must match the TIMESTAMPTZ columns — all timestamps are stored in UTC and
+// converted to/from Europe/Paris at the connection boundary.
 export const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
   database: process.env.DB_NAME || DEFAULT_DB_NAME,
   password: process.env.DB_PASSWORD || 'password',
   port: parseInt(process.env.DB_PORT || '5432'),
-});
-
-// Connecting to database
-// Lightweight DB query logging wrapper to trace SQL causing failures
-// TEMPORARY FIX: Disable database logging wrapper to prevent hanging
-// Wrap pool.query
-const originalPoolQuery = pool.query.bind(pool) as (text: any, params?: any) => Promise<any>;
-pool.query = async (text: any, params?: any) => {
-  try {
-    const result = await originalPoolQuery(text, params);
-    return result;
-  } catch (error: any) {
-    throw error;
-  }
-};
-
-// Make database pool available to routes
-app.locals.db = pool;
-
-// TEMPORARY FIX: Disable client query logging to prevent hanging
-// Patch each new client on connect to log queries
-pool.on('connect', (client) => {
-  // Disabled client query logging to prevent hanging
+  options: '--timezone=Europe/Paris',
 });
 
 // Health check route

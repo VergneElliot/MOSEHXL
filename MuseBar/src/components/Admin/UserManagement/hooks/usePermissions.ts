@@ -5,21 +5,9 @@
 
 import { useState, useCallback } from 'react';
 import { apiService } from '../../../../services/apiService';
+import { EstablishmentMember as User, ALL_PERMISSIONS as PERMISSIONS } from '../../../../types/auth';
 
-export const PERMISSIONS = [
-  { key: 'access_pos', label: 'Caisse' },
-  { key: 'access_menu', label: 'Gestion Menu' },
-  { key: 'access_happy_hour', label: 'Happy Hour' },
-  { key: 'access_history', label: 'Historique' },
-  { key: 'access_settings', label: 'Paramètres' },
-  { key: 'access_compliance', label: 'Conformité' },
-];
-
-interface User {
-  id: string;
-  email: string;
-  isAdmin: boolean;
-}
+export { PERMISSIONS };
 
 interface PermissionDialog {
   open: boolean;

@@ -1,306 +1,233 @@
-# 🏆 MOSEHXL - World-Class Enterprise POS System
+# MOSEHXL — MuseBar POS System
 
-## 🎯 Overview
+A point-of-sale and bar management system built for French hospitality businesses, with full legal compliance for French fiscal law (Article 286-I-3 bis du CGI).
 
-**MOSEHXL** is a **world-class, enterprise-grade Point of Sale (POS) system** built with modern technologies and exceptional architecture. This project represents **outstanding software engineering excellence** with perfect modularity, professional UX patterns, and bulletproof error handling.
-
-## 🌟 Key Features
-
-### **🏗️ Enterprise Architecture**
-- **Perfect Modularity**: 70+ focused modules with clear separation of concerns
-- **Type Safety**: 100% TypeScript coverage with strict type checking
-- **Multi-Tenant**: Schema-based isolation for multiple establishments
-- **Scalable**: Infinite scalability with modular architecture
-
-### **🎨 Professional User Experience**
-- **Beautiful Loading States**: Skeleton loaders and progressive loading
-- **Error Recovery**: Graceful error handling with automatic retry
-- **Responsive Design**: Mobile-first approach with accessibility
-- **Smooth Animations**: Professional micro-interactions
-
-### **🔒 Security & Reliability**
-- **JWT Authentication**: Secure role-based access control
-- **Error Boundaries**: Comprehensive error handling
-- **Data Validation**: Real-time form validation
-- **Audit Trail**: Complete action logging
-
-### **📊 Advanced Features**
-- **Legal Compliance**: French market compliance with legal receipts
-- **Thermal Printing**: ESC/POS printer integration
-- **Happy Hour Management**: Dynamic pricing and scheduling
-- **Payment Processing**: Multiple payment methods with split payments
-- **Inventory Management**: Real-time stock tracking
-- **Reporting**: Comprehensive business analytics
-
-## 🏆 Achievement Highlights
-
-### **Transformation Results**
-| **Metric** | **Before** | **After** | **Improvement** |
-|------------|------------|-----------|-----------------|
-| **Total Lines** | 4,658 monolithic | 70+ focused modules | **Massive reduction** |
-| **Largest File** | 785 lines | 652 lines | **-17% reduction** |
-| **Average File Size** | 465 lines | ~66 lines | **-86% reduction** |
-| **TypeScript Coverage** | 95% | **100%** | **Complete** |
-| **Error Handling** | Basic | **Enterprise-grade** | **World-class** |
-| **Loading States** | Basic spinners | **Professional UX** | **Exceptional** |
-
-### **Architecture Excellence**
-- ✅ **Frontend**: 100% modularized (6 major components → 42 focused modules)
-- ✅ **Backend**: 100% modularized (3 major services → 20 focused modules)
-- ✅ **Custom Hooks**: Advanced state management patterns
-- ✅ **Type Safety**: Zero 'any' types, strict TypeScript
-- ✅ **Performance**: Optimized with memoization and caching
-- ✅ **UX Patterns**: Professional loading states and animations
-
-## 🚀 Quick Start
-
-### **Prerequisites**
-- Node.js 18+ 
-- PostgreSQL 14+
-- npm or yarn
-
-### **Installation**
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd MOSEHXL
-   ```
-
-2. **Install dependencies**
-   ```bash
-   # Install frontend dependencies
-   cd MuseBar
-   npm install
-   
-   # Install backend dependencies
-   cd backend
-   npm install
-   ```
-
-3. **Environment Setup**
-   ```bash
-   # Copy environment files
-   cp .env.example .env
-   
-   # Configure your environment variables
-   # See .env.example for required variables
-   ```
-
-4. **Database Setup**
-   ```bash
-   # Create database
-   createdb mosehxl_development
-   
-   # Run migrations
-   cd backend
-   npm run migrate
-   ```
-
-5. **Start Development Servers**
-   ```bash
-   # Start backend (from backend directory)
-   npm run dev
-   
-   # Start frontend (from MuseBar directory)
-   npm start
-   ```
-
-6. **Access the Application**
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:3001
-
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 MOSEHXL/
-├── MuseBar/                          # Main application
-│   ├── src/
-│   │   ├── components/               # Modular UI components
-│   │   │   ├── ErrorBoundary/        # Error handling (5 modules)
-│   │   │   ├── LegalReceipt/         # Legal receipts (7 modules)
-│   │   │   ├── Settings/             # Settings management (9 modules)
-│   │   │   ├── PaymentDialog/        # Payment processing (8 modules)
-│   │   │   ├── HappyHour/            # Happy hour management (7 modules)
-│   │   │   ├── LegalCompliance/      # Compliance dashboard (7 modules)
-│   │   │   └── common/               # Shared components
-│   │   ├── hooks/                    # Advanced custom hooks
-│   │   │   ├── useLoadingState.ts    # Loading state management
-│   │   │   ├── useDataFetching.ts    # Data fetching with caching
-│   │   │   └── useFormValidation.ts  # Form validation framework
-│   │   ├── services/                 # API services
-│   │   └── types/                    # TypeScript definitions
-│   │
-│   └── backend/                      # TypeScript backend
-│       ├── src/
-│       │   ├── routes/               # Modular routes
-│       │   │   ├── userManagement/   # User management (6 modules)
-│       │   │   └── ...               # Other route modules
-│       │   ├── services/             # Business logic
-│       │   │   ├── thermalPrint/     # Printing service (7 modules)
-│       │   │   ├── setup/            # Setup service (7 modules)
-│       │   │   └── ...               # Other service modules
-│       │   ├── models/               # Data layer
-│       │   └── middleware/           # Express middleware
-│       └── package.json
-│
-├── docs/                             # Documentation
-├── scripts/                          # Setup scripts
-└── README.md                         # This file
+├── MuseBar/
+│   ├── backend/          # Node.js / Express / TypeScript API (port 3001)
+│   │   └── src/
+│   │       ├── middleware/   # Auth & security middleware
+│   │       ├── models/       # DB models, SQL schemas, migrations
+│   │       ├── routes/       # Express route handlers
+│   │       ├── services/     # Business logic (printing, receipts, orders)
+│   │       └── utils/        # Helpers (logger, closure scheduler)
+│   └── src/              # React / TypeScript frontend (port 3000)
+│       ├── components/   # UI components (POS, Admin, Settings, etc.)
+│       ├── hooks/        # Shared React hooks (auth, API)
+│       ├── services/     # API service layer
+│       └── types/        # Shared TypeScript types
+├── docs/                 # Developer & architecture documentation
+├── scripts/              # Deployment & setup scripts
+└── backups/              # Database backups (not committed)
 ```
 
-## 🎨 Component Architecture
+## Branches
 
-### **Frontend Components**
-Each major component has been modularized into focused, maintainable modules:
+| Branch | Purpose |
+|--------|---------|
+| `main` | Production — currently deployed at mosehxl.com |
+| `development` | V2 — clean rewrite, active development target |
 
-- **ErrorBoundary**: Error handling and recovery
-- **LegalReceipt**: Legal receipt generation and printing
-- **Settings**: Comprehensive settings management
-- **PaymentDialog**: Payment processing and validation
-- **HappyHour**: Dynamic pricing and scheduling
-- **LegalCompliance**: Compliance monitoring and reporting
+## Tech Stack
 
-### **Backend Services**
-Backend services are organized into logical, focused modules:
-
-- **ThermalPrint**: ESC/POS printer integration
-- **Setup**: Business setup and configuration
-- **UserManagement**: User and role management
-- **Authentication**: JWT-based authentication
-- **Database**: Optimized database operations
-
-## 🔧 Development
-
-### **Available Scripts**
-
-```bash
-# Frontend (from MuseBar directory)
-npm start          # Start development server
-npm run build      # Build for production
-npm run test       # Run tests
-npm run lint       # Lint code
-
-# Backend (from backend directory)
-npm run dev        # Start development server
-npm run build      # Build TypeScript
-npm run migrate    # Run database migrations
-npm run seed       # Seed database with sample data
-```
-
-### **Code Quality**
-- **ESLint**: Strict linting rules
-- **TypeScript**: 100% type coverage
-- **Prettier**: Consistent code formatting
-- **Husky**: Pre-commit hooks
-
-### **Testing**
-- **Jest**: Unit testing framework
-- **React Testing Library**: Component testing
-- **MSW**: API mocking
-
-## 🚀 Deployment
-
-### **Production Build**
-```bash
-# Build frontend
-cd MuseBar
-npm run build
-
-# Build backend
-cd backend
-npm run build
-```
-
-### **Environment Variables**
-Required environment variables for production:
-
-```env
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/mosehxl_production
-
-# JWT
-JWT_SECRET=your-jwt-secret
-
-# Email (SendGrid)
-SENDGRID_API_KEY=your-sendgrid-key
-
-# Server
-PORT=3001
-NODE_ENV=production
-```
-
-## 📊 Performance
-
-### **Optimizations Implemented**
-- **Code Splitting**: Automatic code splitting
-- **Lazy Loading**: Component lazy loading
-- **Memoization**: React.memo for performance
-- **Caching**: Intelligent data caching
-- **Bundle Optimization**: Tree shaking and minification
-
-### **Performance Metrics**
-- **Initial Load**: < 3 seconds
-- **API Response**: < 200ms
-- **Memory Usage**: < 512MB
-- **Concurrent Users**: > 100
-
-## 🔒 Security
-
-### **Security Features**
-- **JWT Authentication**: Secure token-based auth
-- **Role-Based Access**: Granular permissions
-- **Input Validation**: Comprehensive validation
-- **SQL Injection Protection**: Parameterized queries
-- **XSS Protection**: Content Security Policy
-- **CSRF Protection**: Cross-Site Request Forgery protection
-
-## 📈 Monitoring & Logging
-
-### **Error Monitoring**
-- **Global Error Boundaries**: Catch-all error handling
-- **API Error Logging**: Comprehensive error logging
-- **Performance Monitoring**: Real-time metrics
-- **User Analytics**: Usage tracking
-
-## 🤝 Contributing
-
-### **Development Guidelines**
-1. **Modular Architecture**: Keep components focused and small
-2. **Type Safety**: Use TypeScript strictly
-3. **Error Handling**: Implement comprehensive error handling
-4. **Testing**: Write tests for new features
-5. **Documentation**: Update documentation for changes
-
-### **Code Standards**
-- **File Size**: Maximum 300 lines per file
-- **TypeScript**: 100% type coverage
-- **Error Handling**: All async operations must have error handling
-- **Loading States**: All data fetching must have loading states
-
-## 📚 Documentation
-
-- [Phase 1 & 2 Completion Report](./PHASE-1-2-COMPLETION-REPORT.md)
-- [Development Branch Current State](./DEVELOPMENT-BRANCH-CURRENT-STATE.md)
-- [Modularization Improvements](./MODULARIZATION-IMPROVEMENTS-NEEDED.md)
-
-## 🎉 Conclusion
-
-**MOSEHXL represents world-class software engineering excellence!**
-
-This project demonstrates:
-- 🏆 **Perfect modularity** with 70+ focused modules
-- 🏆 **Professional UX patterns** with beautiful animations
-- 🏆 **Enterprise-grade error handling** with graceful recovery
-- 🏆 **Production-ready architecture** with comprehensive optimization
-- 🏆 **Type safety excellence** with 100% TypeScript coverage
-
-**Ready for production deployment and enterprise use!** 🚀
-
-## 📄 License
-
-This project is proprietary software. All rights reserved.
+- **Frontend**: React 18, TypeScript, Material-UI, React Router
+- **Backend**: Node.js, Express, TypeScript
+- **Database**: PostgreSQL 13+
+- **Auth**: JWT (bcrypt passwords, 12h/7d tokens)
+- **Email**: SendGrid
+- **Deployment**: Nginx reverse proxy, systemd services
 
 ---
 
-**Built with ❤️ and world-class engineering excellence** 🌟
+## Features
+
+### POS (Point of Sale)
+- Product grid with category filter and accent-normalized search
+- Cart management with quantity editing
+- Simple payment (cash/card) with change calculation and tip support
+- Split payment across multiple sub-bills with mixed cash/card
+- Happy hour pricing (percentage or fixed discount per product)
+
+### Menu Management
+- Create, edit, archive and restore categories and products
+- Soft delete when products have order history (legal preservation)
+- Hard delete when never used in orders
+
+### History
+- Full order history with search
+- Business-day statistics (CA, card/cash breakdown, top products)
+- Return/cancellation processing
+
+### Settings
+- Business information (name, address, SIRET, TVA)
+- Closure schedule configuration
+- Printer setup
+- Payment method configuration
+
+### Legal Compliance (French Law)
+See [compliance section below](#legal-compliance-french-law) for full details.
+
+### System Admin (Multi-Tenant)
+A separate interface for `system_admin` role users to manage establishments, system-level users, and security logs. Foundation for future SaaS multi-tenant expansion.
+
+---
+
+## Legal Compliance — French Law
+
+This system implements the four **ISCA pillars** required by Article 286-I-3 bis du CGI (French fiscal certification for cashier software).
+
+### Certification Requirements
+
+| Pillar | French | Implementation | Status |
+|--------|--------|----------------|--------|
+| **I** — Inaltérabilité | Immutability | Append-only `legal_journal` table with cryptographic SHA-256 hash chain. Each entry's hash includes the previous entry's hash, making the chain tamper-evident. DB trigger prevents UPDATE/DELETE on the table. | ✅ Implemented |
+| **S** — Sécurisation | Security | Audit trail in `audit_trail` table. All logins, logouts, user creation, permission changes, and order operations are logged with IP, user-agent, user ID, and timestamp. | ✅ Implemented |
+| **C** — Conservation | Preservation | Closure bulletins (`closure_bulletins` table) — daily, weekly, monthly, annual. Each bulletin captures total transactions, amounts, VAT breakdown by rate, and payment method breakdown for the period. Automatic daily closure scheduler runs at 02:00 Paris time in production. | ✅ Implemented |
+| **A** — Archivage | Archiving | Archive export system (`archive_exports` table) with digital signatures. Export in CSV, XML, PDF, JSON formats. Each export has a file hash for integrity verification. | ✅ Implemented |
+
+### What Is Logged
+
+Every completed sale writes a `SALE` entry to the legal journal. Every refund/cancellation writes a `REFUND` entry. Closure bulletins write `CLOSURE` entries. System events write `ARCHIVE` entries.
+
+> **Note (V2 current state):** The legal journal write on order creation is not yet wired in V2's `orderCRUD.ts`. This is item #1 in `DEVELOPMENT-STATE.md`.
+
+### Certification Readiness
+
+- **AFNOR NF525** — Ready after the 7 fixes in `DEVELOPMENT-STATE.md` are applied
+- **LNE certification** — Ready after the same 7 fixes
+- **Fine risk** — €7,500 per non-compliant register; system is architecturally compliant, fixes needed for runtime correctness
+
+### Compliance References
+
+- `MuseBar/backend/src/models/legal-schema.sql` — Legal tables schema
+- `MuseBar/backend/src/models/legalJournal/` — Journal operations, queries, signing, closure
+- `MuseBar/backend/src/routes/legal/` — Legal API routes
+
+---
+
+## Database Schema
+
+### Core POS Tables
+| Table | Purpose |
+|-------|---------|
+| `categories` | Product categories with default tax rate and color |
+| `products` | Products with price, tax rate, happy hour config |
+| `orders` | Orders with total, tax, payment method, tips, change |
+| `order_items` | Line items per order |
+| `sub_bills` | Sub-bills for split payments |
+
+### Legal Compliance Tables
+| Table | Purpose |
+|-------|---------|
+| `legal_journal` | Immutable transaction journal with hash chain |
+| `closure_bulletins` | Daily/weekly/monthly/annual closure bulletins |
+| `audit_trail` | User action audit log |
+| `archive_exports` | Archive export records with integrity hashes |
+| `closure_settings` | Auto-closure configuration (time, timezone, grace period) |
+
+### Auth & User Tables
+| Table | Purpose |
+|-------|---------|
+| `users` | Users with email, bcrypt hash, role, establishment link |
+| `permissions` | Available permission names |
+| `user_permissions` | User ↔ permission join table |
+| `business_settings` | Business info (name, address, SIRET, TVA) |
+
+### Multi-Tenant Tables (V2)
+| Table | Purpose |
+|-------|---------|
+| `establishments` | Tenant establishments with subscription info |
+| `user_invitations` | Pending user invitations with tokens |
+| `password_reset_requests` | Password reset tokens |
+| `email_logs` | Email delivery tracking |
+
+---
+
+## Quick Start
+
+### Prerequisites
+- Node.js v18+
+- PostgreSQL 13+
+- A `.env` file in `MuseBar/backend/` (see below)
+
+### Environment Variables (`MuseBar/backend/.env`)
+```env
+NODE_ENV=development
+PORT=3001
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=mosehxl_development
+DB_USER=postgres
+DB_PASSWORD=your_password
+JWT_SECRET=your_secret_key_minimum_32_characters
+CORS_ORIGIN=http://localhost:3000
+SENDGRID_API_KEY=your_sendgrid_key   # optional, for email features
+```
+
+### Development
+```bash
+# Backend
+cd MuseBar/backend
+npm install
+npm run dev
+
+# Frontend (separate terminal)
+cd MuseBar
+npm install
+npm start
+```
+
+### Production
+```bash
+cd scripts
+./setup-production.sh          # first-time server setup
+./start-production-servers.sh  # start backend + frontend
+```
+
+### Database Migrations
+```bash
+cd MuseBar/backend
+npm run migration:status   # check current state
+npm run migration:migrate  # apply pending migrations
+```
+
+---
+
+## API Overview
+
+| Prefix | Description |
+|--------|-------------|
+| `GET /api/health` | Health check |
+| `/api/auth` | Login, register, token refresh, user/permission management |
+| `/api/categories` | Category CRUD |
+| `/api/products` | Product CRUD |
+| `/api/orders` | Order CRUD, payment operations, cancellations |
+| `/api/legal/journal` | Legal journal entries, integrity verification |
+| `/api/legal/closure` | Closure bulletin creation and retrieval |
+| `/api/legal/compliance` | Compliance status and reports |
+| `/api/legal/archive` | Archive exports |
+| `/api/user-management` | User invitations (legacy roles/team routes dismounted) |
+| `/api/establishments` | Establishment CRUD |
+| `/api/setup` | Initial setup wizard |
+| `/api/docs` | Swagger/OpenAPI documentation |
+
+---
+
+## User Roles
+
+| Role | Interface | Access |
+|------|-----------|--------|
+| `system_admin` | System Admin UI | Full system — establishments, users, security logs |
+| `establishment_admin` | Business UI | All POS tabs based on permissions |
+| `cashier` | Business UI | POS tabs granted by admin |
+
+Granular permissions (granted per user): `access_pos`, `access_menu`, `access_happy_hour`, `access_history`, `access_settings`, `access_compliance`. Establishment admins receive all permissions by default.
+
+---
+
+## License
+
+Copyright © 2024 Elliot Vergne. All rights reserved. Proprietary and confidential.

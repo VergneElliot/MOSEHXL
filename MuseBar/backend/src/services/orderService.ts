@@ -35,9 +35,9 @@ export interface SubBillData {
 }
 
 export class OrderService {
-  static async getAllOrders() {
+  static async getAllOrders(establishmentId: string) {
     try {
-      const orders = await OrderModel.getAll();
+      const orders = await OrderModel.getAll(establishmentId);
       
       // Include items and sub-bills for each order
       const ordersWithDetails = await Promise.all(
@@ -63,9 +63,9 @@ export class OrderService {
     }
   }
 
-  static async getOrderById(id: number) {
+  static async getOrderById(id: number, establishmentId: string) {
     try {
-      const order = await OrderModel.getById(id);
+      const order = await OrderModel.getById(id, establishmentId);
       if (!order) {
         throw new AppError('Commande introuvable', 404);
       }
@@ -93,12 +93,12 @@ export class OrderService {
     }
   }
 
-  static async createOrder(orderData: CreateOrderData, userContext?: { id: string; ip: string; userAgent: string }) {
+  static async createOrder(orderData: CreateOrderData, establishmentId: string, userContext?: { id: string; ip: string; userAgent: string }) {
     try {
       // Validate order data
       await this.validateOrderData(orderData);
 
-      // Create the main order
+      // Create the main order scoped to this establishment
       const order = await OrderModel.create({
         total_amount: orderData.total_amount,
         total_tax: orderData.total_tax,
@@ -106,8 +106,9 @@ export class OrderService {
         status: orderData.status,
         notes: orderData.notes || '',
         tips: orderData.tips || 0,
-        change: orderData.change || 0
-      });
+        change: orderData.change || 0,
+        establishment_id: establishmentId,
+      }, establishmentId);
 
       // Create order items
       const createdItems = [];
@@ -167,14 +168,14 @@ export class OrderService {
     }
   }
 
-  static async updateOrderStatus(id: number, status: 'pending' | 'completed' | 'cancelled', userContext?: { id: string; ip: string; userAgent: string }) {
+  static async updateOrderStatus(id: number, status: 'pending' | 'completed' | 'cancelled', establishmentId: string, userContext?: { id: string; ip: string; userAgent: string }) {
     try {
-      const order = await OrderModel.getById(id);
+      const order = await OrderModel.getById(id, establishmentId);
       if (!order) {
         throw new AppError('Commande introuvable', 404);
       }
 
-      const updatedOrder = await OrderModel.update(id, { status });
+      const updatedOrder = await OrderModel.update(id, { status }, establishmentId);
 
       // Future: Create audit trail entry
       // Note: Implement when AuditTrailModel.createEntry is available

@@ -108,7 +108,7 @@ const AppRouter: React.FC<AppRouterProps> = ({
 
   const filteredTabs = TABS.filter(tab => {
     // Filter out system admin tabs - they should only see business admin tabs
-    if (tab.adminOnly) return user?.is_admin && user?.role !== 'system_admin';
+    if (tab.adminOnly) return user?.role === 'establishment_admin';
     if (tab.permission) return user?.permissions?.includes(tab.permission);
     return true;
   });
@@ -183,8 +183,8 @@ const AppRouter: React.FC<AppRouterProps> = ({
           {tab.value === 'settings' && <Settings />}
           {tab.value === 'compliance' && <LegalComplianceDashboard />}
           {tab.value === 'closures' && <ClosureContainer />}
-          {tab.value === 'user_management' && user?.is_admin && <UserManagement token={token} />}
-          {tab.value === 'audit_trail' && user?.is_admin && <AuditTrailDashboard token={token} />}
+          {tab.value === 'user_management' && user?.role === 'establishment_admin' && <UserManagement token={token} />}
+          {tab.value === 'audit_trail' && user?.role === 'establishment_admin' && <AuditTrailDashboard token={token} />}
         </TabPanel>
       ))}
     </Paper>

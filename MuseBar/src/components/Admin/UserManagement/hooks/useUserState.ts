@@ -4,13 +4,7 @@
  */
 
 import { useState, useCallback } from 'react';
-
-interface User {
-  id: string;
-  email: string;
-  isAdmin: boolean;
-  permissions?: string[];
-}
+import { EstablishmentMember as User } from '../../../../types/auth';
 
 export const useUserState = () => {
   const [users, setUsers] = useState<User[]>([]);

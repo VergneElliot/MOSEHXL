@@ -9,11 +9,14 @@ import { requireAuth, requireAdmin } from '../auth';
 
 const router = express.Router();
 
+// All compliance routes require authentication.
+router.use(requireAuth);
+
 /**
  * GET compliance status
  * GET /api/legal/compliance/status
  */
-router.get('/status', requireAuth, requireAdmin, async (req, res) => {
+router.get('/status', requireAdmin, async (req, res) => {
   try {
     const integrity = await LegalJournalModel.verifyJournalIntegrity();
     
@@ -43,7 +46,7 @@ router.get('/status', requireAuth, requireAdmin, async (req, res) => {
  * GET compliance report
  * GET /api/legal/compliance/report
  */
-router.get('/report', requireAuth, requireAdmin, async (req, res) => {
+router.get('/report', requireAdmin, async (req, res) => {
   try {
     const { start_date, end_date } = req.query;
     

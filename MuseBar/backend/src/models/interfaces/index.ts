@@ -6,13 +6,14 @@
 // Order-related interfaces
 export interface Order {
   id: number;
+  establishment_id: string | null;
   total_amount: number;
   total_tax: number;
   payment_method: 'cash' | 'card' | 'split';
   status: 'pending' | 'completed' | 'cancelled';
   notes?: string;
-  tips?: number; // Pourboire
-  change?: number; // Monnaie rendue
+  tips?: number;
+  change?: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -46,6 +47,7 @@ export interface SubBill {
 // Product-related interfaces
 export interface Category {
   id: number;
+  establishment_id: string | null;
   name: string;
   default_tax_rate: number;
   color: string;
@@ -56,6 +58,7 @@ export interface Category {
 
 export interface Product {
   id: number;
+  establishment_id: string | null;
   name: string;
   price: number;
   tax_rate: number;
@@ -71,6 +74,7 @@ export interface Product {
 // Business settings interface
 export interface BusinessSettings {
   id: number;
+  establishment_id: string | null;
   name: string;
   address: string;
   phone: string;
@@ -80,20 +84,8 @@ export interface BusinessSettings {
   updated_at: Date;
 }
 
-// User-related interfaces
-export interface User {
-  id: number;
-  email: string;
-  first_name?: string;
-  last_name?: string;
-  role: string;
-  is_admin: boolean;
-  is_active: boolean;
-  email_verified: boolean;
-  last_login?: Date;
-  created_at: Date;
-  updated_at: Date;
-}
+// User types — single source of truth is models/user.ts
+export type { UserRow, AuthenticatedUser } from '../user';
 
 // Legal interfaces
 export interface JournalEntry {

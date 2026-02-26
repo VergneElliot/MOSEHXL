@@ -5,6 +5,7 @@
 
 import express from 'express';
 import { requireAuth, requireAdmin } from './auth';
+import { pool } from '../app';
 import { EstablishmentCreationOrchestrator } from '../services/establishment';
 import { validateParams, validateBody, paramValidations } from '../middleware/validation';
 import { Logger } from '../utils/logger';
@@ -54,18 +55,19 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
 // GET /api/enhanced-establishments/stats - Get establishment creation statistics
 router.get('/stats', requireAuth, requireAdmin, async (req, res) => {
   try {
-    // TEMPORARY FIX: Return mock stats to avoid hanging
-    const stats = {
-      total_establishments: 1,
-      pending_setup: 0,
-      active: 1,
-      suspended: 0,
-      this_month: 1
-    };
-    
+    const result = await pool.query(`
+      SELECT
+        COUNT(*)::text                                                          AS total_establishments,
+        COUNT(*) FILTER (WHERE status = 'pending_setup')::text                  AS pending_setup,
+        COUNT(*) FILTER (WHERE status = 'active')::text                         AS active,
+        COUNT(*) FILTER (WHERE status = 'suspended')::text                      AS suspended,
+        COUNT(*) FILTER (WHERE created_at >= date_trunc('month', NOW()))::text   AS this_month
+      FROM establishments
+    `);
+
     res.json({
       success: true,
-      data: stats
+      data: result.rows[0]
     });
   } catch (error) {
     logger.error(

@@ -25,8 +25,6 @@ function isRoleRequest(req: Request): req is RoleRequest {
   return req.user !== undefined && 
          typeof req.user.id === 'number' &&
          typeof req.user.email === 'string' &&
-         typeof req.user.first_name === 'string' &&
-         typeof req.user.last_name === 'string' &&
          typeof req.user.role === 'string' &&
          typeof req.user.is_admin === 'boolean';
 }

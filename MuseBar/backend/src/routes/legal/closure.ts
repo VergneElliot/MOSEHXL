@@ -6,9 +6,12 @@
 import express from 'express';
 import { LegalJournalModel } from '../../models/legalJournal';
 import { requireAuth, requireAdmin } from '../auth';
-// Consolidated closure-specific routes only
 
 const router = express.Router();
+
+// All closure routes require authentication.
+// Closure bulletins are legally binding fiscal documents (NF 525).
+router.use(requireAuth);
 
 /**
  * POST create daily closure bulletin

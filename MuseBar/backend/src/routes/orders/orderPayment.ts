@@ -12,6 +12,16 @@ import { validateBody } from '../../middleware/validation';
 
 const router = express.Router();
 
+/** Extracts establishment_id from the authenticated request or rejects with 403. */
+function getEstablishmentId(req: express.Request, res: express.Response): string | null {
+  const id = req.user?.establishment_id;
+  if (!id) {
+    res.status(403).json({ error: 'No establishment associated with this account' });
+    return null;
+  }
+  return id;
+}
+
 /**
  * POST quick item return (retour)
  * POST /api/orders/payment/retour
@@ -24,6 +34,8 @@ router.post(
     { field: 'reason', required: true },
   ]),
   async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
     const { item, reason, paymentMethod = 'cash' } = req.body as {
       item: {
@@ -48,14 +60,15 @@ router.post(
     const itemTaxAmount = totalPrice * taxRate / (1 + taxRate);
     const netAmount = totalPrice - itemTaxAmount;
     
-    // Create negative order
+    // Create negative order (retour) scoped to this establishment
     const order = await OrderModel.create({
       total_amount: -totalPrice,
       total_tax: -itemTaxAmount,
       payment_method: paymentMethod,
       status: 'completed',
-      notes: `RETOUR direct - Article: ${item.productName} - Raison: ${reason} - Paiement: ${paymentMethod}`
-    });
+      notes: `RETOUR direct - Article: ${item.productName} - Raison: ${reason} - Paiement: ${paymentMethod}`,
+      establishment_id: establishmentId,
+    }, establishmentId);
     
     // Create negative order item
     const retourItem = await OrderItemModel.create({
@@ -137,6 +150,8 @@ router.post(
     { field: 'reason', required: true },
   ]),
   async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
     const { orderId, reason, cancellationType = 'full', itemsToCancel, includeTipReversal = false } = req.body as {
       orderId: number;
@@ -156,8 +171,8 @@ router.post(
       return res.status(400).json({ error: 'Invalid cancellation type' });
     }
     
-    // Get the original order
-    const originalOrder = await OrderModel.getById(orderId);
+    // Get the original order — scoped to this establishment
+    const originalOrder = await OrderModel.getById(orderId, establishmentId);
     if (!originalOrder) {
       return res.status(404).json({ error: 'Order not found' });
     }
@@ -209,14 +224,15 @@ router.post(
       cancellationAmount += originalOrder.tips;
     }
     
-    // Create cancellation order
+    // Create cancellation order scoped to this establishment
     const cancellationOrder = await OrderModel.create({
       total_amount: -cancellationAmount,
       total_tax: -cancellationTax,
       payment_method: originalOrder.payment_method,
       status: 'completed',
-      notes: `ANNULATION - ${cancellationType.toUpperCase()} - Raison: ${reason} - Order ID: ${orderId}`
-    });
+      notes: `ANNULATION - ${cancellationType.toUpperCase()} - Raison: ${reason} - Order ID: ${orderId}`,
+      establishment_id: establishmentId,
+    }, establishmentId);
     
     // Create cancellation items
     const cancellationOrderItems = await Promise.all(

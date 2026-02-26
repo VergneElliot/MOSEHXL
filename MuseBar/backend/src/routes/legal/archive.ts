@@ -9,11 +9,14 @@ import { requireAuth, requireAdmin } from '../auth';
 
 const router = express.Router();
 
+// All archive routes require authentication.
+router.use(requireAuth);
+
 /**
  * POST create archive
  * POST /api/legal/archive/create
  */
-router.post('/create', requireAuth, requireAdmin, async (req, res) => {
+router.post('/create', requireAdmin, async (req, res) => {
   try {
     const { archiveType, startDate, endDate, description } = req.body;
     
@@ -44,7 +47,7 @@ router.post('/create', requireAuth, requireAdmin, async (req, res) => {
  * GET archives list
  * GET /api/legal/archive/list
  */
-router.get('/list', requireAuth, requireAdmin, async (req, res) => {
+router.get('/list', requireAdmin, async (req, res) => {
   try {
     const { type, limit = 50, offset = 0 } = req.query;
     
@@ -65,7 +68,7 @@ router.get('/list', requireAuth, requireAdmin, async (req, res) => {
  * GET archive details
  * GET /api/legal/archive/:id
  */
-router.get('/:id', requireAuth, requireAdmin, async (req, res) => {
+router.get('/:id', requireAdmin, async (req, res) => {
   try {
     const archiveId = parseInt(req.params.id);
     if (isNaN(archiveId)) {
@@ -91,7 +94,7 @@ router.get('/:id', requireAuth, requireAdmin, async (req, res) => {
  * POST export archive
  * POST /api/legal/archive/:id/export
  */
-router.post('/:id/export', requireAuth, requireAdmin, async (req, res) => {
+router.post('/:id/export', requireAdmin, async (req, res) => {
   try {
     const archiveId = parseInt(req.params.id);
     if (isNaN(archiveId)) {

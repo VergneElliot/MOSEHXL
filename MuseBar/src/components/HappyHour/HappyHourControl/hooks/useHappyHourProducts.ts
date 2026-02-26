@@ -33,52 +33,31 @@ export const useHappyHourProducts = ({ onProductUpdate }: UseHappyHourProductsPr
    * Note: This would need to be implemented in the actual data service
    */
   const updateProductDiscount = useCallback(async (
-    productId: string,
-    discountType: 'percentage' | 'fixed',
-    discountValue: number
+    _productId: string,
+    _discountType: 'percentage' | 'fixed',
+    _discountValue: number
   ) => {
-    try {
-      // TODO: Implement product-specific discount updates
-      console.log('Update product discount:', { productId, discountType, discountValue });
-      onProductUpdate();
-    } catch (error) {
-      console.error('Failed to update product discount:', error);
-      throw error;
-    }
-  }, [onProductUpdate]);
+    throw new Error('Product-specific discount updates not yet implemented');
+  }, []);
 
   /**
    * Remove product-specific happy hour discount
    * Note: This would need to be implemented in the actual data service
    */
-  const removeProductDiscount = useCallback(async (productId: string) => {
-    try {
-      // TODO: Implement product-specific discount removal
-      console.log('Remove product discount:', productId);
-      onProductUpdate();
-    } catch (error) {
-      console.error('Failed to remove product discount:', error);
-      throw error;
-    }
-  }, [onProductUpdate]);
+  const removeProductDiscount = useCallback(async (_productId: string) => {
+    throw new Error('Product-specific discount removal not yet implemented');
+  }, []);
 
   /**
    * Toggle product happy hour eligibility
    * Note: This would need to be implemented in the actual data service
    */
   const toggleProductEligibility = useCallback(async (
-    productId: string,
-    isEligible: boolean
+    _productId: string,
+    _isEligible: boolean
   ) => {
-    try {
-      // TODO: Implement product eligibility toggle
-      console.log('Toggle product eligibility:', { productId, isEligible });
-      onProductUpdate();
-    } catch (error) {
-      console.error('Failed to toggle product eligibility:', error);
-      throw error;
-    }
-  }, [onProductUpdate]);
+    throw new Error('Product eligibility toggle not yet implemented');
+  }, []);
 
   /**
    * Get effective discount for a product during happy hour

@@ -6,216 +6,163 @@ import { validateBody, validateParams, commonValidations, paramValidations } fro
 
 const router = express.Router();
 
-// GET all categories
+// All category routes require authentication.
+// establishment_id is extracted from the JWT on every request — no client can override it.
+router.use(requireAuth);
+
+/** Extracts establishment_id from the authenticated request or rejects with 403. */
+function getEstablishmentId(req: express.Request, res: express.Response): string | null {
+  const id = req.user?.establishment_id;
+  if (!id) {
+    res.status(403).json({ error: 'No establishment associated with this account' });
+    return null;
+  }
+  return id;
+}
+
+// GET /api/categories
 router.get('/', async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
-    const categories = await CategoryModel.getAll();
+    const categories = await CategoryModel.getAll(establishmentId);
     res.json(categories);
   } catch (error) {
-    console.error('Error fetching categories:', error);
     res.status(500).json({ error: 'Failed to fetch categories' });
   }
 });
 
-// GET archived categories
+// GET /api/categories/archived
 router.get('/archived', async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
-    const categories = await CategoryModel.getAllArchived();
+    const categories = await CategoryModel.getAllArchived(establishmentId);
     res.json(categories);
   } catch (error) {
-    console.error('Error fetching archived categories:', error);
     res.status(500).json({ error: 'Failed to fetch archived categories' });
   }
 });
 
-// GET all categories including archived
+// GET /api/categories/all (active + archived)
 router.get('/all', async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
-    const categories = await CategoryModel.getAllIncludingArchived();
+    const categories = await CategoryModel.getAllIncludingArchived(establishmentId);
     res.json(categories);
   } catch (error) {
-    console.error('Error fetching all categories:', error);
     res.status(500).json({ error: 'Failed to fetch all categories' });
   }
 });
 
-// GET category by ID
+// GET /api/categories/:id
 router.get('/:id', validateParams([paramValidations.id]), async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
     const id = parseInt(req.params.id);
-
-    const category = await CategoryModel.getById(id);
-    if (!category) {
-      return res.status(404).json({ error: 'Category not found' });
-    }
-
+    const category = await CategoryModel.getById(id, establishmentId);
+    if (!category) return res.status(404).json({ error: 'Category not found' });
     res.json(category);
   } catch (error) {
-    console.error('Error fetching category:', error);
     res.status(500).json({ error: 'Failed to fetch category' });
   }
 });
 
-// POST create new category
-router.post('/', requireAuth, validateBody(commonValidations.categoryCreate), async (req, res) => {
+// POST /api/categories
+router.post('/', validateBody(commonValidations.categoryCreate), async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
     const { name, default_tax_rate, color } = req.body;
-
-    const category = await CategoryModel.create(name, default_tax_rate, color || '#1976d2');
-
-    // Log audit trail
-    const ip = req.ip;
-    const userAgent = req.headers['user-agent'];
-    const userId = req.user ? String(req.user.id) : undefined;
+    const category = await CategoryModel.create(name, default_tax_rate, color || '#1976d2', establishmentId);
     await AuditTrailModel.logAction({
-      user_id: userId,
+      user_id: String(req.user!.id),
       action_type: 'CREATE_CATEGORY',
       resource_type: 'CATEGORY',
       resource_id: String(category.id),
-      action_details: { name, default_tax_rate, color },
-      ip_address: ip,
-      user_agent: userAgent
-    });
-
+      action_details: { name, default_tax_rate, color, establishmentId },
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+    }).catch(() => {});
     res.status(201).json(category);
   } catch (error) {
-    console.error('Error creating category:', error);
     res.status(500).json({ error: 'Failed to create category' });
   }
 });
 
-// PUT update category
-router.put('/:id', requireAuth, validateParams([paramValidations.id]), async (req, res) => {
+// PUT /api/categories/:id
+router.put('/:id', validateParams([paramValidations.id]), async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
     const id = parseInt(req.params.id);
-
     const { name, default_tax_rate, color } = req.body;
-
-    const category = await CategoryModel.update(id, name, default_tax_rate, color || '#1976d2');
-    if (!category) {
-      return res.status(404).json({ error: 'Category not found' });
-    }
-
-    // Log audit trail
-    const ip = req.ip;
-    const userAgent = req.headers['user-agent'];
-    const userId = req.user ? String(req.user.id) : undefined;
+    const category = await CategoryModel.update(id, name, default_tax_rate, color || '#1976d2', establishmentId);
+    if (!category) return res.status(404).json({ error: 'Category not found' });
     await AuditTrailModel.logAction({
-      user_id: userId,
+      user_id: String(req.user!.id),
       action_type: 'UPDATE_CATEGORY',
       resource_type: 'CATEGORY',
       resource_id: String(id),
       action_details: { name, default_tax_rate, color },
-      ip_address: ip,
-      user_agent: userAgent
-    });
-
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+    }).catch(() => {});
     res.json(category);
   } catch (error) {
-    console.error('Error updating category:', error);
     res.status(500).json({ error: 'Failed to update category' });
   }
 });
 
-// DELETE category
-router.delete('/:id', requireAuth, validateParams([paramValidations.id]), async (req, res) => {
+// DELETE /api/categories/:id
+router.delete('/:id', validateParams([paramValidations.id]), async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
     const id = parseInt(req.params.id);
-
-    const result = await CategoryModel.delete(id);
-    if (!result.deleted) {
-      return res.status(404).json({ error: 'Category not found' });
-    }
-
-    // Log audit trail with appropriate action type
-    const ip = req.ip;
-    const userAgent = req.headers['user-agent'];
-    const userId = req.user ? String(req.user.id) : undefined;
-    
-    const actionType = result.action === 'hard' ? 'DELETE_CATEGORY' : 'ARCHIVE_CATEGORY';
-    
-    try {
-      await AuditTrailModel.logAction({
-        user_id: userId,
-        action_type: actionType,
-        resource_type: 'CATEGORY',
-        resource_id: String(id),
-        action_details: { 
-          category_id: id, 
-          deletion_type: result.action,
-          reason: result.reason 
-        },
-        ip_address: ip,
-        user_agent: userAgent
-      });
-    } catch (error) {
-      console.error('Audit log error:', error);
-    }
-
-    // User-friendly response messages
-    const message = result.action === 'hard' 
+    const result = await CategoryModel.delete(id, establishmentId);
+    if (!result.deleted) return res.status(404).json({ error: 'Category not found' });
+    await AuditTrailModel.logAction({
+      user_id: String(req.user!.id),
+      action_type: result.action === 'hard' ? 'DELETE_CATEGORY' : 'ARCHIVE_CATEGORY',
+      resource_type: 'CATEGORY',
+      resource_id: String(id),
+      action_details: { deletion_type: result.action, reason: result.reason },
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+    }).catch(() => {});
+    const message = result.action === 'hard'
       ? 'Catégorie supprimée définitivement avec succès'
       : 'Catégorie archivée avec succès (préservation légale requise)';
-
-    res.json({ 
-      message,
-      action: result.action,
-      reason: result.reason
-    });
-  } catch (error: any) {
-    console.error('Error deleting category:', error);
-    
-    // User-friendly error messages
-    let message = 'Échec de la suppression de la catégorie.';
-    let statusCode = 500;
-    
-    if (error && error.message) {
-      if (error.message.includes('contains products')) {
-        message = 'Impossible de supprimer la catégorie : elle contient encore des produits. Veuillez d\'abord supprimer ou déplacer tous les produits.';
-        statusCode = 400;
-      } else {
-        message = error.message;
-      }
-    }
-    
-    res.status(statusCode).json({ error: message });
+    res.json({ message, action: result.action, reason: result.reason });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete category' });
   }
 });
 
-// POST restore category
-router.post('/:id/restore', requireAuth, validateParams([paramValidations.id]), async (req, res) => {
+// POST /api/categories/:id/restore
+router.post('/:id/restore', validateParams([paramValidations.id]), async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
     const id = parseInt(req.params.id);
-
-    const restored = await CategoryModel.restore(id);
-    if (!restored) {
-      return res.status(404).json({ error: 'Category not found or already active' });
-    }
-
-    // Log audit trail
-    const ip = req.ip;
-    const userAgent = req.headers['user-agent'];
-    const userId = req.user ? String(req.user.id) : undefined;
-    
-    try {
-      await AuditTrailModel.logAction({
-        user_id: userId,
-        action_type: 'RESTORE_CATEGORY',
-        resource_type: 'CATEGORY',
-        resource_id: String(id),
-        action_details: { category_id: id },
-        ip_address: ip,
-        user_agent: userAgent
-      });
-    } catch (error) {
-      console.error('Audit log error:', error);
-    }
-
+    const restored = await CategoryModel.restore(id, establishmentId);
+    if (!restored) return res.status(404).json({ error: 'Category not found or already active' });
+    await AuditTrailModel.logAction({
+      user_id: String(req.user!.id),
+      action_type: 'RESTORE_CATEGORY',
+      resource_type: 'CATEGORY',
+      resource_id: String(id),
+      action_details: { category_id: id },
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+    }).catch(() => {});
     res.json({ message: 'Catégorie restaurée avec succès' });
   } catch (error) {
-    console.error('Error restoring category:', error);
-    res.status(500).json({ error: 'Échec de la restauration de la catégorie' });
+    res.status(500).json({ error: 'Failed to restore category' });
   }
 });
 
-export default router; 
+export default router;

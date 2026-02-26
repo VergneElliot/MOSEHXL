@@ -9,11 +9,10 @@ import { Logger } from '../../utils/logger';
 import { UserInvitationService } from '../../services/userInvitationService';
 import { ServiceInitialization } from './types';
 
-// Import modular routes
+// Import modular routes.
+// Only invitationRoutes is mounted — user CRUD, team stats, and role management
+// are handled by /api/auth/users (establishment-scoped routes in auth.ts).
 import { invitationRoutes, initializeInvitationRoutes } from './invitationRoutes';
-import { userRoutes, initializeUserRoutes } from './userRoutes';
-import { teamRoutes, initializeTeamRoutes } from './teamRoutes';
-import { roleRoutes, initializeRoleRoutes } from './roleRoutes';
 
 // Types export
 export type {
@@ -67,29 +66,18 @@ class UserManagementRouter {
         config
       };
 
-      // Initialize all route modules
+      // Initialize and mount only the invitation module.
+      // User CRUD, team, and roles are served by /api/auth/users (see auth.ts).
       initializeInvitationRoutes(services);
-      initializeUserRoutes(services);
-      initializeTeamRoutes(services);
-      initializeRoleRoutes(services);
-
-      // Mount route modules
       this.router.use('/invitations', invitationRoutes);
-      this.router.use('/users', userRoutes);
-      this.router.use('/team', teamRoutes);
-      this.router.use('/roles', roleRoutes);
 
-      // Health check endpoint
       this.router.get('/health', (req, res) => {
         res.json({
           success: true,
           message: 'User management service is healthy',
           timestamp: new Date().toISOString(),
           modules: {
-            invitations: 'active',
-            users: 'active',
-            team: 'active',
-            roles: 'active'
+            invitations: 'active'
           }
         });
       });
@@ -139,11 +127,5 @@ export default function createUserManagementRouter(config: EnvironmentConfig, lo
   return userManagementRouter.initialize(config, logger);
 }
 
-// Individual route exports for granular usage
-export {
-  invitationRoutes,
-  userRoutes,
-  teamRoutes,
-  roleRoutes
-};
+export { invitationRoutes };
 

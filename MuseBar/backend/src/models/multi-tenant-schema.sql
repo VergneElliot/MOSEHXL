@@ -277,6 +277,8 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create a view for user summary with role information
+-- Note: u.is_active is intentionally omitted here — the column will be added to users
+-- in a future migration when table/session management features are implemented.
 CREATE OR REPLACE VIEW user_summary AS
 SELECT 
     u.id,
@@ -285,7 +287,6 @@ SELECT
     u.last_name,
     u.role as primary_role,
     u.is_admin,
-    u.is_active,
     u.email_verified,
     u.last_login,
     u.created_at,
@@ -302,7 +303,7 @@ LEFT JOIN establishments e ON e.id = u.establishment_id
 LEFT JOIN user_role_assignments ura ON ura.user_id = u.id AND ura.is_active = TRUE
 LEFT JOIN roles r ON r.id = ura.role_id AND r.is_active = TRUE
 GROUP BY u.id, u.email, u.first_name, u.last_name, u.role, u.is_admin, 
-         u.is_active, u.email_verified, u.last_login, u.created_at, u.updated_at,
+         u.email_verified, u.last_login, u.created_at, u.updated_at,
          e.name, e.id;
 
 -- Comments for documentation
