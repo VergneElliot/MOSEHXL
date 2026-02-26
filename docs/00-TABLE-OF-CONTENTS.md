@@ -17,3 +17,4 @@ Each chapter is self-contained. Read them in order, or jump to whatever you need
 | 08 | [Audit & Full Course](./08-AUDIT-AND-FULL-COURSE.md) | Code audit, redundant code, architecture assessment, and complete file-by-file course for developers |
 | 09 | [Database Architecture Compatibility](./09-DATABASE-ARCHITECTURE-COMPATIBILITY.md) | What the DB must have for current code; migration CLI vs reference schemas; verification queries |
 | 10 | [Multi-tenant and Muse POS access](./10-MULTI-TENANT-AND-MUSE-POS-ACCESS.md) | How user–establishment links work; how to log in to Muse POS; script to fix lost links |
+| — | [Session summary: POS tax, payment, cleanup](./SESSION-SUMMARY-POS-TAX-PAYMENT-AND-CLEANUP.md) | Handoff: TTC tax fix, exact tax storage, cash/card only, three payment buttons, migrations, code cleanup |
