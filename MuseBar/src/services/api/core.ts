@@ -4,7 +4,6 @@ import { registerSetTokenFunction } from '../authHelper';
 let authToken: string | null = null;
 
 export function setToken(token: string | null) {
-  console.log('🔐 api/core: setToken called with:', token ? 'Token present' : 'null');
   authToken = token;
 }
 
@@ -27,9 +26,6 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
 
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`;
-    console.log('🔐 api/core: Adding Authorization header to request');
-  } else {
-    console.log('🔐 api/core: No auth token available for request');
   }
 
   if (options.headers && typeof options.headers === 'object' && !(options.headers instanceof Headers)) {

@@ -12,27 +12,12 @@ export const useEstablishments = () => {
     try {
       setLoading(true);
       setError(null);
-      
-      // Debug: Check authentication state
-      console.log('🔍 useEstablishments: Starting loadEstablishments');
-      console.log('🔍 useEstablishments: localStorage auth_token:', localStorage.getItem('auth_token') ? 'Present' : 'Missing');
-      
-      // Ensure token is set before making API call
       ensureAuthentication();
-      
-      console.log('🔍 useEstablishments: About to call EstablishmentService.getEstablishments()');
       const response = await EstablishmentService.getEstablishments();
-      console.log('🔍 useEstablishments: Got response:', response);
       setEstablishments(response.establishments);
     } catch (err: any) {
       const errorMessage = err.message || 'Erreur lors du chargement des établissements';
       setError(errorMessage);
-      console.error('❌ useEstablishments: Error loading establishments:', err);
-      
-      // Don't disconnect on timeout errors - just show error message
-      if (errorMessage.includes('timeout')) {
-        console.log('🔄 useEstablishments: Timeout error - keeping user logged in');
-      }
     } finally {
       setLoading(false);
     }
@@ -46,22 +31,12 @@ export const useEstablishments = () => {
     try {
       setLoading(true);
       setError(null);
-      
-      // Ensure token is set before making API call
       ensureAuthentication();
-      
-    // console.debug('useEstablishments: Creating establishment...', data);
-      
       const response = await EstablishmentService.createEstablishment(data);
-    // console.debug('useEstablishments: Creation response:', response);
-      
-      // Reload establishments to get updated list
       await loadEstablishments();
-      
       return response;
     } catch (err) {
       setError('Erreur lors de la création de l\'établissement');
-      console.error('❌ useEstablishments: Error creating establishment:', err);
       throw err;
     }
   };
@@ -70,18 +45,11 @@ export const useEstablishments = () => {
     try {
       setLoading(true);
       setError(null);
-    // console.debug('useEstablishments: Deleting establishment...', id);
-      
       await EstablishmentService.deleteEstablishment(id);
-    // console.debug('useEstablishments: Deletion successful');
-      
-      // Reload establishments to get updated list
       await loadEstablishments();
-      
       return { success: true };
     } catch (err) {
       setError('Erreur lors de la suppression de l\'établissement');
-      console.error('❌ useEstablishments: Error deleting establishment:', err);
       throw err;
     }
   };

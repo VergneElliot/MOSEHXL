@@ -6,7 +6,6 @@ export class ApiService {
   private static token: string | null = null;
 
   public static setToken(token: string | null) { 
-    console.log('🔍 ApiService: setToken called with:', token ? 'Token present' : 'null');
     ApiService.token = token; 
     apiCore.setToken(token); 
   }

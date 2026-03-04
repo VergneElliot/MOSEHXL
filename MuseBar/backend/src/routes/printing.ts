@@ -3,6 +3,7 @@ import { PrintingServiceFactory, IPrintingService, PrintingConfig } from '../ser
 import { pool } from '../app';
 import { authenticateToken } from '../middleware/auth';
 import { EstablishmentModel } from '../models/establishment';
+import { getLogger } from '../utils/logger';
 
 const router = Router();
 
@@ -54,7 +55,7 @@ async function getPrintingService(establishmentId: number): Promise<IPrintingSer
     
     return service;
   } catch (error) {
-    console.error('Error getting printing service:', error);
+    getLogger().error('Error getting printing service', error instanceof Error ? error : undefined);
     
     // Fallback to browser printing
     const fallbackService = await PrintingServiceFactory.create({
@@ -90,7 +91,7 @@ router.get('/status', authenticateToken, ensureEstablishment, async (req: Reques
       establishment_id: user.establishment_id
     });
   } catch (error) {
-    console.error('Error checking printer status:', error);
+    getLogger().error('Error checking printer status', error instanceof Error ? error : undefined);
     res.status(500).json({ 
       error: 'Failed to check printer status',
       message: error instanceof Error ? error.message : 'Unknown error'
@@ -111,7 +112,7 @@ router.get('/printers', authenticateToken, ensureEstablishment, async (req: Requ
       establishment_id: user.establishment_id
     });
   } catch (error) {
-    console.error('Error listing printers:', error);
+    getLogger().error('Error listing printers', error instanceof Error ? error : undefined);
     res.status(500).json({ 
       error: 'Failed to list printers',
       message: error instanceof Error ? error.message : 'Unknown error'
@@ -130,7 +131,7 @@ router.post('/test', authenticateToken, ensureEstablishment, async (req: Request
     
     res.json(result);
   } catch (error) {
-    console.error('Error test printing:', error);
+    getLogger().error('Error test printing', error instanceof Error ? error : undefined);
     res.status(500).json({ 
       error: 'Test print failed',
       message: error instanceof Error ? error.message : 'Unknown error'
@@ -270,7 +271,7 @@ router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, async (
       receipt_data: receiptData
     });
   } catch (error) {
-    console.error('Error printing receipt:', error);
+    getLogger().error('Error printing receipt', error instanceof Error ? error : undefined);
     res.status(500).json({ 
       error: 'Failed to print receipt',
       message: error instanceof Error ? error.message : 'Unknown error'
@@ -366,7 +367,7 @@ router.post('/closure/:bulletinId', authenticateToken, ensureEstablishment, asyn
       bulletin_data: bulletinData
     });
   } catch (error) {
-    console.error('Error printing closure bulletin:', error);
+    getLogger().error('Error printing closure bulletin', error instanceof Error ? error : undefined);
     res.status(500).json({ 
       error: 'Failed to print closure bulletin',
       message: error instanceof Error ? error.message : 'Unknown error'
@@ -391,7 +392,7 @@ router.get('/configuration', authenticateToken, ensureEstablishment, async (req:
       establishment_id: user.establishment_id
     });
   } catch (error) {
-    console.error('Error getting printing configuration:', error);
+    getLogger().error('Error getting printing configuration', error instanceof Error ? error : undefined);
     res.status(500).json({ 
       error: 'Failed to get printing configuration',
       message: error instanceof Error ? error.message : 'Unknown error'
@@ -434,7 +435,7 @@ router.post('/configuration', authenticateToken, ensureEstablishment, async (req
       message: 'Printing configuration updated successfully'
     });
   } catch (error) {
-    console.error('Error updating printing configuration:', error);
+    getLogger().error('Error updating printing configuration', error instanceof Error ? error : undefined);
     res.status(500).json({ 
       error: 'Failed to update printing configuration',
       message: error instanceof Error ? error.message : 'Unknown error'
@@ -468,7 +469,7 @@ router.get('/history', authenticateToken, ensureEstablishment, async (req: Reque
       offset: parseInt(offset as string)
     });
   } catch (error) {
-    console.error('Error getting printing history:', error);
+    getLogger().error('Error getting printing history', error instanceof Error ? error : undefined);
     res.status(500).json({ 
       error: 'Failed to get printing history',
       message: error instanceof Error ? error.message : 'Unknown error'

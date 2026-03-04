@@ -18,7 +18,7 @@ export class RequestLogger {
       const startTime = Date.now();
       const requestId = RequestLogger.generateRequestId();
       
-      console.log(`[REQUEST_LOGGER] Starting request ${req.method} ${req.path} with ID: ${requestId}`);
+      logger.debug(`Request started: ${req.method} ${req.path}`, { requestId });
       
       // Add request ID to request object
       req.requestId = requestId;
@@ -82,7 +82,7 @@ export class RequestLogger {
         );
       });
       
-      console.log(`[REQUEST_LOGGER] Request ${req.method} ${req.path} middleware completed, calling next()`);
+      logger.debug(`Request middleware completed: ${req.method} ${req.path}`);
       next();
     };
   }

@@ -8,6 +8,7 @@ import {
   PrintingConfig 
 } from './types';
 import { PrintingServiceFactory } from './PrintingServiceFactory';
+import { getLogger } from '../../utils/logger';
 
 export class CompositePrintingService implements IPrintingService {
   private services: IPrintingService[] = [];
@@ -41,10 +42,10 @@ export class CompositePrintingService implements IPrintingService {
         const service = await this.createService(providerConfig);
         if (service) {
           this.services.push(service);
-          console.log(`✅ Initialized ${providerConfig.provider} printing service`);
+          getLogger().info(`Initialized ${providerConfig.provider} printing service`);
         }
       } catch (error) {
-        console.warn(`⚠️  Failed to initialize ${providerConfig.provider}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        getLogger().warn(`Failed to initialize ${providerConfig.provider}`, { error: error instanceof Error ? error.message : 'Unknown error' });
       }
     }
 
@@ -57,7 +58,7 @@ export class CompositePrintingService implements IPrintingService {
     }
 
     this.isInitialized = true;
-    console.log(`Composite printing service initialized with ${this.services.length} providers`);
+    getLogger().info(`Composite printing service initialized with ${this.services.length} providers`);
   }
 
   async printReceipt(data: ReceiptData): Promise<PrintResult> {
@@ -73,11 +74,11 @@ export class CompositePrintingService implements IPrintingService {
       const serviceName = this.getServiceName(service);
       
       try {
-        console.log(`🖨️  Attempting to print receipt with ${serviceName}...`);
+        getLogger().debug(`Attempting to print receipt with ${serviceName}`);
         const result = await service.printReceipt(data);
         
         if (result.success) {
-          console.log(`✅ Successfully printed with ${serviceName}`);
+          getLogger().info(`Printed receipt with ${serviceName}`);
           
           // Log to printing history
           await this.logPrintingHistory('receipt', serviceName, 'success', result);
@@ -93,12 +94,12 @@ export class CompositePrintingService implements IPrintingService {
           };
         } else {
           errors.push(`${serviceName}: ${result.message}`);
-          console.warn(`⚠️  ${serviceName} failed: ${result.message}`);
+          getLogger().warn(`${serviceName} failed to print receipt`, { message: result.message });
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         errors.push(`${serviceName}: ${errorMessage}`);
-        console.error(`❌ ${serviceName} error:`, error);
+        getLogger().error(`${serviceName} receipt print error`, error instanceof Error ? error : new Error(errorMessage));
       }
     }
 
@@ -129,11 +130,11 @@ export class CompositePrintingService implements IPrintingService {
       const serviceName = this.getServiceName(service);
       
       try {
-        console.log(`🖨️  Attempting to print closure bulletin with ${serviceName}...`);
+        getLogger().debug(`Attempting to print closure bulletin with ${serviceName}`);
         const result = await service.printClosureBulletin(data);
         
         if (result.success) {
-          console.log(`✅ Successfully printed with ${serviceName}`);
+          getLogger().info(`Printed closure bulletin with ${serviceName}`);
           
           // Log to printing history
           await this.logPrintingHistory('closure_bulletin', serviceName, 'success', result);
@@ -149,12 +150,12 @@ export class CompositePrintingService implements IPrintingService {
           };
         } else {
           errors.push(`${serviceName}: ${result.message}`);
-          console.warn(`⚠️  ${serviceName} failed: ${result.message}`);
+          getLogger().warn(`${serviceName} failed to print closure bulletin`, { message: result.message });
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         errors.push(`${serviceName}: ${errorMessage}`);
-        console.error(`❌ ${serviceName} error:`, error);
+        getLogger().error(`${serviceName} closure bulletin print error`, error instanceof Error ? error : new Error(errorMessage));
       }
     }
 
@@ -193,7 +194,7 @@ export class CompositePrintingService implements IPrintingService {
           };
         }
       } catch (error) {
-        console.warn(`Error checking printer status:`, error);
+        getLogger().warn('Error checking printer status', { error: error instanceof Error ? error.message : error });
       }
     }
 
@@ -221,7 +222,7 @@ export class CompositePrintingService implements IPrintingService {
           provider: `composite->${p.provider}`
         })));
       } catch (error) {
-        console.warn(`Error listing printers:`, error);
+        getLogger().warn('Error listing printers', { error: error instanceof Error ? error.message : error });
       }
     }
 
@@ -241,11 +242,11 @@ export class CompositePrintingService implements IPrintingService {
       const serviceName = this.getServiceName(service);
       
       try {
-        console.log(`🖨️  Attempting test print with ${serviceName}...`);
+        getLogger().debug(`Attempting test print with ${serviceName}`);
         const result = await service.testPrint(printerId);
         
         if (result.success) {
-          console.log(`✅ Test print successful with ${serviceName}`);
+          getLogger().info(`Test print successful with ${serviceName}`);
           
           return {
             ...result,
@@ -258,12 +259,12 @@ export class CompositePrintingService implements IPrintingService {
           };
         } else {
           errors.push(`${serviceName}: ${result.message}`);
-          console.warn(`⚠️  ${serviceName} test print failed: ${result.message}`);
+          getLogger().warn(`${serviceName} test print failed`, { message: result.message });
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         errors.push(`${serviceName}: ${errorMessage}`);
-        console.error(`❌ ${serviceName} test print error:`, error);
+        getLogger().error(`${serviceName} test print error`, error instanceof Error ? error : new Error(errorMessage));
       }
     }
 
@@ -290,7 +291,7 @@ export class CompositePrintingService implements IPrintingService {
       await service.initialize();
       return service;
     } catch (error) {
-      console.error(`Failed to create ${config.provider} service:`, error);
+      getLogger().error(`Failed to create ${config.provider} printing service`, error instanceof Error ? error : undefined);
       return null;
     }
   }
@@ -324,22 +325,10 @@ export class CompositePrintingService implements IPrintingService {
     status: string, 
     metadata: any
   ): Promise<void> {
-    // In production, this would log to database
-    // For now, just console log
-    console.log(`[Printing History] Type: ${printType}, Provider: ${provider}, Status: ${status}`, metadata);
-    
-    // TODO: Implement database logging when schema is applied
-    /*
     try {
-      await pool.query(
-        `INSERT INTO printing_history 
-         (establishment_id, print_type, provider, status, metadata) 
-         VALUES ($1, $2, $3, $4, $5)`,
-        [this.config.establishmentId, printType, provider, status, JSON.stringify(metadata)]
-      );
+      getLogger().info(`Printing history: ${printType}`, { provider, status, ...metadata });
     } catch (error) {
-      console.error('Failed to log printing history:', error);
+      getLogger().error('Failed to log printing history', error instanceof Error ? error : undefined);
     }
-    */
   }
 }
