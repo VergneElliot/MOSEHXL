@@ -6,6 +6,7 @@
 import { PoolClient } from 'pg';
 import { Logger } from '../../utils/logger';
 import { randomUUID } from 'crypto';
+import { InvitationQueries } from '../../utils/database';
 
 /**
  * Invitation data interface
@@ -117,7 +118,7 @@ export class EstablishmentInvitationManager {
   }
 
   /**
-   * Validate invitation token
+   * Validate invitation token (uses shared InvitationQueries.getInvitationByToken).
    */
   public async validateInvitationToken(
     client: PoolClient,
@@ -128,38 +129,18 @@ export class EstablishmentInvitationManager {
     error?: string;
   }> {
     try {
-      const invitationQuery = `
-        SELECT * FROM user_invitations 
-        WHERE invitation_token = $1 
-        AND status = 'pending' 
-        AND expires_at > NOW()
-      `;
-
-      const result = await client.query(invitationQuery, [token]);
-
-      if (result.rows.length === 0) {
-        return {
-          isValid: false,
-          error: 'Invalid or expired invitation token'
-        };
+      const invitation = await InvitationQueries.getInvitationByToken(client, token);
+      if (!invitation) {
+        return { isValid: false, error: 'Invalid or expired invitation token' };
       }
-
-      return {
-        isValid: true,
-        invitation: result.rows[0]
-      };
-
+      return { isValid: true, invitation };
     } catch (error) {
       this.logger.error(
         'Error validating invitation token',
         { error: error as Error, token: token.substring(0, 8) + '...' },
         'ESTABLISHMENT_INVITATION_MANAGER'
       );
-
-      return {
-        isValid: false,
-        error: 'Failed to validate invitation token'
-      };
+      return { isValid: false, error: 'Failed to validate invitation token' };
     }
   }
 

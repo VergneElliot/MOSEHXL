@@ -5,6 +5,7 @@
 
 import { pool } from '../../app';
 import { Logger } from '../../utils/logger';
+import { InvitationQueries } from '../../utils/database';
 import { ValidationError, DatabaseError } from '../../middleware/errorHandler';
 import { 
   EstablishmentInvitationData, 
@@ -145,46 +146,29 @@ export class InvitationValidator {
   }
 
   /**
-   * Validate invitation token
+   * Validate invitation token (uses shared InvitationQueries.getInvitationByToken).
    */
   public async validateInvitationToken(token: string): Promise<InvitationValidationResult> {
     try {
       if (!token) {
-        return {
-          isValid: false,
-          message: 'Token is required'
-        };
+        return { isValid: false, message: 'Token is required' };
       }
-
-      const result = await pool.query(`
-        SELECT * FROM user_invitations 
-        WHERE invitation_token = $1 AND status = 'pending' AND expires_at > CURRENT_TIMESTAMP
-      `, [token]);
-
-      if (result.rows.length === 0) {
-        return {
-          isValid: false,
-          message: 'Invalid or expired invitation token'
-        };
+      const invitation = await InvitationQueries.getInvitationByToken(pool, token);
+      if (!invitation) {
+        return { isValid: false, message: 'Invalid or expired invitation token' };
       }
-
       return {
         isValid: true,
         message: 'Token is valid',
-        invitation: result.rows[0] as InvitationRecord
+        invitation: invitation as InvitationRecord
       };
-
     } catch (error) {
       this.logger.error(
         'Error validating invitation token',
         error as Error,
         'INVITATION_VALIDATOR'
       );
-      
-      return {
-        isValid: false,
-        message: 'Token validation failed due to system error'
-      };
+      return { isValid: false, message: 'Token validation failed due to system error' };
     }
   }
 

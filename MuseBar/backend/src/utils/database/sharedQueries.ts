@@ -410,17 +410,24 @@ export class InvitationQueries {
   }
 
   /**
-   * Get invitation by token
+   * Get pending, non-expired invitation by token (single source of truth).
+   * Use this wherever you need to validate an invitation for setup/acceptance.
+   * Query: invitation_token = $1 AND status = 'pending' AND expires_at > CURRENT_TIMESTAMP.
+   * Returns the invitation row with establishment_id, establishment_name, establishment_email, establishment_status, or null.
    */
   static async getInvitationByToken(
     client: PoolClient | typeof pool,
     token: string
   ) {
     const result = await client.query(`
-      SELECT ui.*, e.id as establishment_id, e.name as establishment_name, e.email as establishment_email
+      SELECT ui.*,
+             e.id AS establishment_id,
+             e.name AS establishment_name,
+             e.email AS establishment_email,
+             e.status AS establishment_status
       FROM user_invitations ui
       LEFT JOIN establishments e ON ui.establishment_id = e.id
-      WHERE ui.invitation_token = $1 
+      WHERE ui.invitation_token = $1
         AND ui.status = 'pending'
         AND ui.expires_at > CURRENT_TIMESTAMP
     `, [token]);

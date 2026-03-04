@@ -6,6 +6,7 @@
 import bcrypt from 'bcrypt';
 import { pool } from '../../app';
 import { Logger } from '../../utils/logger';
+import { InvitationQueries } from '../../utils/database';
 import { EstablishmentModel, CreateEstablishmentData } from '../../models/establishment';
 import { 
   InvitationAcceptanceData, 
@@ -31,13 +32,8 @@ export class InvitationAcceptance {
     try {
       await client.query('BEGIN');
 
-      // Find invitation
-      const invitationResult = await client.query(`
-        SELECT * FROM user_invitations 
-        WHERE invitation_token = $1 AND status = 'pending' AND expires_at > CURRENT_TIMESTAMP
-      `, [acceptanceData.token]);
-
-      if (invitationResult.rows.length === 0) {
+      const invitation = await InvitationQueries.getInvitationByToken(client, acceptanceData.token);
+      if (!invitation) {
         return {
           success: false,
           message: 'Invalid or expired invitation token',
@@ -45,12 +41,12 @@ export class InvitationAcceptance {
         };
       }
 
-      const invitation: InvitationRecord = invitationResult.rows[0];
+      const invitationRecord = invitation as InvitationRecord;
 
       // Create establishment
       const establishmentData: CreateEstablishmentData = {
-        name: invitation.establishment_name,
-        email: invitation.email,
+        name: invitationRecord.establishment_name ?? invitationRecord.email,
+        email: invitationRecord.email,
         subscription_plan: 'basic'
       };
 
@@ -66,10 +62,10 @@ export class InvitationAcceptance {
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING id
       `, [
-        invitation.email,
+        invitationRecord.email,
         hashedPassword,
         acceptanceData.firstName || 'Admin',
-        acceptanceData.lastName || invitation.establishment_name,
+        acceptanceData.lastName || invitationRecord.establishment_name,
         'establishment_admin',
         establishment.id,
         true,
@@ -82,14 +78,14 @@ export class InvitationAcceptance {
         UPDATE user_invitations 
         SET status = 'accepted', accepted_at = CURRENT_TIMESTAMP
         WHERE id = $1
-      `, [invitation.id]);
+      `, [invitationRecord.id]);
 
       await client.query('COMMIT');
 
       this.logger.info(
         'Establishment invitation accepted successfully',
         {
-          invitationId: invitation.id,
+          invitationId: invitationRecord.id,
           establishmentId: establishment.id,
           establishmentName: establishment.name,
           adminUserId: userResult.rows[0].id
@@ -135,13 +131,8 @@ export class InvitationAcceptance {
     try {
       await client.query('BEGIN');
 
-      // Find invitation
-      const invitationResult = await client.query(`
-        SELECT * FROM user_invitations 
-        WHERE invitation_token = $1 AND status = 'pending' AND expires_at > CURRENT_TIMESTAMP
-      `, [acceptanceData.token]);
-
-      if (invitationResult.rows.length === 0) {
+      const invitation = await InvitationQueries.getInvitationByToken(client, acceptanceData.token);
+      if (!invitation) {
         return {
           success: false,
           message: 'Invalid or expired invitation token',
@@ -149,10 +140,10 @@ export class InvitationAcceptance {
         };
       }
 
-      const invitation: InvitationRecord = invitationResult.rows[0];
+      const invitationRecord = invitation as InvitationRecord;
 
       // Verify establishment still exists
-      const establishment = await EstablishmentModel.getById(invitation.establishment_id!);
+      const establishment = await EstablishmentModel.getById(invitationRecord.establishment_id!);
       if (!establishment) {
         return {
           success: false,
@@ -171,13 +162,13 @@ export class InvitationAcceptance {
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING id
       `, [
-        invitation.email,
+        invitationRecord.email,
         hashedPassword,
         acceptanceData.firstName || 'User',
         acceptanceData.lastName || 'User',
-        invitation.role,
-        invitation.establishment_id,
-        invitation.role === 'establishment_admin',
+        invitationRecord.role,
+        invitationRecord.establishment_id,
+        invitationRecord.role === 'establishment_admin',
         true,
         true
       ]);
@@ -187,18 +178,18 @@ export class InvitationAcceptance {
         UPDATE user_invitations 
         SET status = 'accepted', accepted_at = CURRENT_TIMESTAMP
         WHERE id = $1
-      `, [invitation.id]);
+      `, [invitationRecord.id]);
 
       await client.query('COMMIT');
 
       this.logger.info(
         'User invitation accepted successfully',
         {
-          invitationId: invitation.id,
+          invitationId: invitationRecord.id,
           userId: userResult.rows[0].id,
-          userEmail: invitation.email,
-          role: invitation.role,
-          establishmentId: invitation.establishment_id
+          userEmail: invitationRecord.email,
+          role: invitationRecord.role,
+          establishmentId: invitationRecord.establishment_id
         },
         'INVITATION_ACCEPTANCE'
       );
@@ -206,7 +197,7 @@ export class InvitationAcceptance {
       return {
         success: true,
         userId: userResult.rows[0].id,
-        establishmentId: invitation.establishment_id,
+        establishmentId: invitationRecord.establishment_id,
         message: 'User account created successfully',
         emailSent: false
       };
@@ -298,12 +289,8 @@ export class InvitationAcceptance {
    */
   public async getInvitationDetails(token: string): Promise<InvitationRecord | null> {
     try {
-      const result = await pool.query(`
-        SELECT * FROM user_invitations 
-        WHERE invitation_token = $1 AND status = 'pending' AND expires_at > CURRENT_TIMESTAMP
-      `, [token]);
-
-      return result.rows[0] || null;
+      const row = await InvitationQueries.getInvitationByToken(pool, token);
+      return row as InvitationRecord | null;
 
     } catch (error) {
       this.logger.error(
