@@ -130,6 +130,7 @@ router.put('/:id', validateParams([paramValidations.id]), async (req, res) => {
     if (req.body.happy_hour_discount_percent !== undefined) updateData.happy_hour_discount_percent = req.body.happy_hour_discount_percent;
     if (req.body.happy_hour_discount_fixed !== undefined) updateData.happy_hour_discount_fixed = req.body.happy_hour_discount_fixed;
     if (req.body.is_happy_hour_eligible !== undefined) updateData.is_happy_hour_eligible = req.body.is_happy_hour_eligible;
+    if (req.body.is_active !== undefined) updateData.is_active = req.body.is_active === true;
 
     if (Object.keys(updateData).length === 0) return res.status(400).json({ error: 'No valid fields to update' });
 
