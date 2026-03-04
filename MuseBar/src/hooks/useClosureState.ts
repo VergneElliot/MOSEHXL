@@ -1,28 +1,8 @@
 import { useState } from 'react';
 import { useSnackbar } from './useSnackbar';
+import type { ClosureBulletin } from '../types';
 
-export interface ClosureBulletin {
-  id: number;
-  closure_type: 'DAILY' | 'MONTHLY' | 'ANNUAL';
-  period_start: string;
-  period_end: string;
-  total_transactions: number;
-  total_amount: number;
-  total_vat: number;
-  vat_breakdown: {
-    vat_10: { amount: number; vat: number };
-    vat_20: { amount: number; vat: number };
-  };
-  payment_methods_breakdown: { [key: string]: number };
-  first_sequence: number;
-  last_sequence: number;
-  closure_hash: string;
-  is_closed: boolean;
-  closed_at: string | null;
-  created_at: string;
-  tips_total?: number;
-  change_total?: number;
-}
+export type { ClosureBulletin };
 
 export interface ClosureState {
   // Data state

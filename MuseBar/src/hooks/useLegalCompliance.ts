@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiService } from '../services/apiService';
+import type { ClosureBulletin } from '../types';
 
 interface ComplianceStatus {
   compliance_status: {
@@ -37,19 +38,6 @@ interface JournalEntry {
   order_id?: number;
   vat_amount?: number;
   payment_method?: string;
-}
-
-interface ClosureBulletin {
-  id: number;
-  closure_type: string;
-  closure_date: string;
-  total_transactions: number;
-  total_amount: number;
-  hash: string;
-  period_start?: string;
-  period_end?: string;
-  total_vat?: number;
-  is_closed?: boolean;
 }
 
 interface LegalComplianceState {
