@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { OrderItem } from '../types';
+import { useSnackbar } from './useSnackbar';
 
 export interface POSState {
   // Order management
@@ -64,9 +65,12 @@ export interface POSActions {
   }) => void;
   showSuccess: (message: string) => void;
   showError: (message: string) => void;
+  closeSnackbar: () => void;
 }
 
 export const usePOSState = (): [POSState, POSActions] => {
+  const snackbarApi = useSnackbar();
+
   // Order management state
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -90,13 +94,6 @@ export const usePOSState = (): [POSState, POSActions] => {
     'card-to-cash'
   );
 
-  // Notification state
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: '',
-    severity: 'success' as 'success' | 'error' | 'info',
-  });
-
   // Order actions
   const addToOrder = (item: OrderItem) => {
     setCurrentOrder(prev => [...prev, item]);
@@ -108,15 +105,6 @@ export const usePOSState = (): [POSState, POSActions] => {
 
   const clearOrder = () => {
     setCurrentOrder([]);
-  };
-
-  // Notification helpers
-  const showSuccess = (message: string) => {
-    setSnackbar({ open: true, message, severity: 'success' });
-  };
-
-  const showError = (message: string) => {
-    setSnackbar({ open: true, message, severity: 'error' });
   };
 
   const state: POSState = {
@@ -133,7 +121,7 @@ export const usePOSState = (): [POSState, POSActions] => {
     changeDialogOpen,
     changeAmount,
     changeDirection,
-    snackbar,
+    snackbar: snackbarApi.snackbar,
   };
 
   const actions: POSActions = {
@@ -153,9 +141,10 @@ export const usePOSState = (): [POSState, POSActions] => {
     setChangeDialogOpen,
     setChangeAmount,
     setChangeDirection,
-    setSnackbar,
-    showSuccess,
-    showError,
+    setSnackbar: snackbarApi.setSnackbar,
+    showSuccess: snackbarApi.showSuccess,
+    showError: snackbarApi.showError,
+    closeSnackbar: snackbarApi.closeSnackbar,
   };
 
   return [state, actions];
