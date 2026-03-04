@@ -53,22 +53,16 @@ export const usePerformanceMonitor = (
 
       // Log slow renders
       if (renderTime > mergedConfig.threshold) {
-        const message = `🐌 Slow render detected in ${componentName}: ${renderTime.toFixed(2)}ms`;
-
         if (mergedConfig.logToConsole) {
-          // Performance warning: slow render detected
+          console.warn(`Slow render in ${componentName}: ${renderTime.toFixed(2)}ms`);
         }
-
-        // Send to analytics if configured
         if (mergedConfig.sendToAnalytics) {
-          // Example: send to analytics service
           // analytics.track('slow_render', { component: componentName, renderTime });
         }
       }
 
-      // Log all renders in development
       if (mergedConfig.logToConsole && process.env.NODE_ENV === 'development') {
-        // Performance log: component render time
+        console.debug(`${componentName} render: ${renderTime.toFixed(2)}ms`);
       }
     },
     [componentName, mergedConfig]

@@ -38,4 +38,5 @@ Each chapter is self-contained. Read them in order, or jump to whatever you need
 | 29 | [Redundant standalone vs directory files](./29-REDUNDANT-STANDALONE-FILES-FIX.md) | Why shim files and duplicate route files were removed and how we consolidated establishments |
 | 30 | [Redundant frontend files (standalone vs directory)](./30-REDUNDANT-FRONTEND-FILES-FIX.md) | Why 14 frontend shim files were removed and how resolution uses directory index |
 | 31 | [Dead frontend modules and middleware](./31-DEAD-FRONTEND-MODULES-AND-MIDDLEWARE-FIX.md) | Why skeletons/ and loadingStates/ were removed and validateBusinessInfo was added to the route chain |
+| 32 | [Dead code within files](./32-DEAD-CODE-WITHIN-FILES-FIX.md) | Why we removed Mongoose handling, localStorage methods, fake PDF, unused methods/variables (audit #24) |
 | — | [Session summary: POS tax, payment, cleanup](./SESSION-SUMMARY-POS-TAX-PAYMENT-AND-CLEANUP.md) | Handoff: TTC tax fix, exact tax storage, cash/card only, three payment buttons, migrations, code cleanup |

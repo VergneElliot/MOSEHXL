@@ -3,7 +3,7 @@
  * Orchestrates the complete establishment account creation flow
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Box, Container, Paper, Typography, Alert, CircularProgress } from '@mui/material';
 import { SetupState, SetupActions } from './types';
@@ -34,8 +34,8 @@ const EstablishmentAccountCreation: React.FC = () => {
     successMessage: null
   });
 
-  // Setup actions
-  const setupActions: SetupActions = {
+  // Setup actions (memoized so useEffect dependency is stable)
+  const setupActions: SetupActions = useMemo(() => ({
     setCurrentStep: (step: number) => {
       setSetupState(prev => ({ ...prev, currentStep: step }));
     },
@@ -82,7 +82,7 @@ const EstablishmentAccountCreation: React.FC = () => {
         successMessage: null
       }));
     }
-  };
+  }), []);
 
   // Custom hook for setup logic
   const {
@@ -93,11 +93,10 @@ const EstablishmentAccountCreation: React.FC = () => {
   useEffect(() => {
     if (token) {
       // Token exists, proceed directly to account creation (step 1 is already completed in initial state)
-      // No need to do anything, we start at step 2
     } else {
       setupActions.setError('No invitation token provided');
     }
-  }, [token]);
+  }, [token, setupActions]);
 
   // Handle step completion
   const handleStepComplete = (stepId: number, data?: any) => {
