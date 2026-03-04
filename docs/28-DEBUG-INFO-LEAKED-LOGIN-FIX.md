@@ -6,7 +6,7 @@ This doc explains **why** showing backend URL, host, and init status on the logi
 
 ## 1. What was the problem?
 
-In **MuseBar/src/components/Auth/Login.tsx**, the component had:
+In **MuseBar/src/components/auth/Login.tsx**, the component had:
 
 - A **`debugInfo`** state string, populated in a `useEffect` by calling the API config, then formatting:  
   `Backend: ${baseURL} | Host: ${currentHost} | Ready: ${isInitialized}` (or a debug error message).

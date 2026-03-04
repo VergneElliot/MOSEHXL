@@ -44,4 +44,5 @@ Each chapter is self-contained. Read them in order, or jump to whatever you need
 | 35 | [Currency format deduplication](./35-CURRENCY-FORMAT-DEDUPLICATION-AUDIT-27.md) | Single formatCurrency util for Euro (fr-FR) instead of 11 duplicated formatters (audit #27) |
 | 36 | [Snackbar pattern deduplication](./36-SNACKBAR-PATTERN-DEDUPLICATION-AUDIT-28.md) | Shared useSnackbar hook instead of duplicated showSuccess/showError/closeSnackbar in 3 hooks (audit #28) |
 | 37 | [ClosureBulletin type unification](./37-CLOSURE-BULLETIN-TYPE-UNIFICATION-AUDIT-29.md) | Single ClosureBulletin type in types/api.ts instead of 3+ definitions with different shapes (audit #29) |
+| 38 | [Case sensitivity: Auth vs auth](./38-CASE-SENSITIVITY-AUTH-DIRECTORY-FIX.md) | Single lowercase auth/ directory so imports work on macOS and Windows (case-insensitive FS) |
 | — | [Session summary: POS tax, payment, cleanup](./SESSION-SUMMARY-POS-TAX-PAYMENT-AND-CLEANUP.md) | Handoff: TTC tax fix, exact tax storage, cash/card only, three payment buttons, migrations, code cleanup |

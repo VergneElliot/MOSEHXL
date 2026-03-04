@@ -101,7 +101,7 @@ MOSEHXL/
 │   │   │   ├── Legal/                 ← Legal compliance dashboard, receipts
 │   │   │   ├── Closure/               ← Closure bulletin management
 │   │   │   ├── HappyHour/            ← Happy hour configuration
-│   │   │   ├── Auth/                  ← Login component
+│   │   │   ├── auth/                  ← Login and auth-related components
 │   │   │   ├── Admin/                 ← User management, audit trail
 │   │   │   ├── SystemAdmin/           ← System admin interface (establishments, system users)
 │   │   │   ├── Setup/                 ← Business setup wizard
