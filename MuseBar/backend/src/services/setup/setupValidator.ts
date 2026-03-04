@@ -4,6 +4,7 @@
  */
 
 import { PoolClient } from 'pg';
+import { InvitationQueries } from '../../utils/database';
 import { BusinessSetupRequest, InvitationValidation, InvitationData, UserExistsResult, SetupValidationError } from './types';
 import {
   validateSetupData as vrValidateSetupData,
@@ -116,21 +117,11 @@ export class SetupValidator {
       throw new Error(tokenErrors[0].message);
     }
 
-    // Check invitation in database
-    const invitationQuery = await client.query(`
-      SELECT ui.*, e.id as establishment_id, e.name as establishment_name, e.status as establishment_status
-      FROM user_invitations ui
-      LEFT JOIN establishments e ON ui.establishment_id = e.id
-      WHERE ui.invitation_token = $1 
-        AND ui.status = 'pending'
-        AND ui.expires_at > CURRENT_TIMESTAMP
-    `, [invitationToken]);
-
-    if (invitationQuery.rows.length === 0) {
+    // Check invitation in database (shared InvitationQueries.getInvitationByToken)
+    const invitation = await InvitationQueries.getInvitationByToken(client, invitationToken);
+    if (!invitation) {
       throw new Error('Invalid or expired invitation token');
     }
-
-    const invitation = invitationQuery.rows[0];
 
     // Check if establishment is already active
     if (invitation.establishment_status === 'active') {

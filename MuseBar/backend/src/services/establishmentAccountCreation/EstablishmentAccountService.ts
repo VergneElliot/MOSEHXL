@@ -5,6 +5,7 @@
 
 import { Pool } from 'pg';
 import { Logger } from '../../utils/logger';
+import { InvitationQueries } from '../../utils/database';
 import { 
   EstablishmentAccountCreationRequest,
   EstablishmentAccountCreationResponse 
@@ -103,45 +104,20 @@ export class EstablishmentAccountService {
   }
 
   /**
-   * Validate invitation token
+   * Validate invitation token (uses shared InvitationQueries.getInvitationByToken).
    */
   private async validateInvitationToken(client: any, token: string): Promise<any> {
     try {
-      const query = `
-        SELECT ui.*, e.id as establishment_id, e.name as establishment_name, 
-               e.email as establishment_email, e.status as establishment_status
-        FROM user_invitations ui
-        LEFT JOIN establishments e ON ui.establishment_id = e.id
-        WHERE ui.invitation_token = $1 
-          AND ui.status = 'pending'
-          AND ui.expires_at > CURRENT_TIMESTAMP
-      `;
-
-      const result = await client.query(query, [token]);
-
-      if (result.rows.length === 0) {
-        return {
-          isValid: false,
-          error: 'Invalid or expired invitation token'
-        };
+      const invitation = await InvitationQueries.getInvitationByToken(client, token);
+      if (!invitation) {
+        return { isValid: false, error: 'Invalid or expired invitation token' };
       }
-
-      const invitation = result.rows[0];
-
       if (!invitation.establishment_id) {
-        return {
-          isValid: false,
-          error: 'Invitation not associated with an establishment'
-        };
+        return { isValid: false, error: 'Invitation not associated with an establishment' };
       }
-
       if (invitation.establishment_status === 'active') {
-        return {
-          isValid: false,
-          error: 'Establishment setup already completed'
-        };
+        return { isValid: false, error: 'Establishment setup already completed' };
       }
-
       return {
         isValid: true,
         establishment: {

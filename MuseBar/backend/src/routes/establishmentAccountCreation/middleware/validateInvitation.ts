@@ -5,6 +5,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { pool } from '../../../app';
+import { InvitationQueries } from '../../../utils/database';
 import { InvitationValidationResult } from '../types';
 import { Logger } from '../../../utils/logger';
 
@@ -68,7 +69,7 @@ export const validateInvitation = async (
 };
 
 /**
- * Validate invitation token against database
+ * Validate invitation token (uses shared InvitationQueries.getInvitationByToken).
  */
 async function validateInvitationToken(
   client: any,
@@ -77,46 +78,18 @@ async function validateInvitationToken(
 ): Promise<InvitationValidationResult> {
   try {
     logger.info('Starting database query for invitation validation');
-    const query = `
-      SELECT ui.*, e.id as establishment_id, e.name as establishment_name, 
-             e.email as establishment_email, e.status as establishment_status
-      FROM user_invitations ui
-      LEFT JOIN establishments e ON ui.establishment_id = e.id
-      WHERE ui.invitation_token = $1 
-        AND ui.status = 'pending'
-        AND ui.expires_at > CURRENT_TIMESTAMP
-    `;
+    const invitation = await InvitationQueries.getInvitationByToken(client, token);
+    logger.info('SQL query completed', { found: !!invitation });
 
-    logger.info('Executing SQL query...');
-    const result = await client.query(query, [token]);
-    logger.info('SQL query completed', { rowCount: result.rows.length });
-
-    if (result.rows.length === 0) {
-      return {
-        isValid: false,
-        token,
-        error: 'Invalid or expired invitation token'
-      };
+    if (!invitation) {
+      return { isValid: false, token, error: 'Invalid or expired invitation token' };
     }
-
-    const invitation = result.rows[0];
-
     if (!invitation.establishment_id) {
-      return {
-        isValid: false,
-        token,
-        error: 'Invitation not associated with an establishment'
-      };
+      return { isValid: false, token, error: 'Invitation not associated with an establishment' };
     }
-
     if (invitation.establishment_status === 'active') {
-      return {
-        isValid: false,
-        token,
-        error: 'Establishment setup already completed'
-      };
+      return { isValid: false, token, error: 'Establishment setup already completed' };
     }
-
     return {
       isValid: true,
       token,
@@ -129,10 +102,6 @@ async function validateInvitationToken(
     };
   } catch (error) {
     logger.error('Database error during invitation validation', error as Error);
-    return {
-      isValid: false,
-      token,
-      error: 'Database error during validation'
-    };
+    return { isValid: false, token, error: 'Database error during validation' };
   }
 }

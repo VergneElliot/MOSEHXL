@@ -6,6 +6,7 @@
 import { randomUUID } from 'crypto';
 import { pool } from '../../app';
 import { Logger } from '../../utils/logger';
+import { InvitationQueries } from '../../utils/database';
 import { 
   EstablishmentInvitationData, 
   UserInvitationData, 
@@ -156,17 +157,12 @@ export class InvitationCreator {
   }
 
   /**
-   * Get invitation by token
+   * Get invitation by token (uses shared InvitationQueries.getInvitationByToken).
    */
   public async getInvitationByToken(token: string): Promise<InvitationRecord | null> {
     try {
-      const result = await pool.query(`
-        SELECT * FROM user_invitations 
-        WHERE invitation_token = $1 AND status = 'pending' AND expires_at > CURRENT_TIMESTAMP
-      `, [token]);
-
-      return result.rows[0] || null;
-
+      const row = await InvitationQueries.getInvitationByToken(pool, token);
+      return row as InvitationRecord | null;
     } catch (error) {
       this.logger.error(
         'Failed to get invitation by token',

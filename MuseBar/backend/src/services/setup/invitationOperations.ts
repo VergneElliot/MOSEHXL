@@ -4,6 +4,7 @@
  */
 
 import { PoolClient } from 'pg';
+import { InvitationQueries } from '../../utils/database';
 import {
   InvitationValidation,
   InvitationData,
@@ -159,24 +160,13 @@ export class InvitationOperations {
     token: string
   ) {
     try {
-      // Get invitation details with establishment info
-      const invitationQuery = await client.query(`
-        SELECT ui.*, e.status as establishment_status, e.name as establishment_name
-        FROM user_invitations ui
-        LEFT JOIN establishments e ON ui.establishment_id = e.id
-        WHERE ui.invitation_token = $1 AND ui.status = 'pending'
-      `, [token]);
-
-      if (invitationQuery.rows.length === 0) {
+      const invitation = await InvitationQueries.getInvitationByToken(client, token);
+      if (!invitation) {
         throw new Error('Invalid or expired invitation token');
       }
-
-      const invitation = invitationQuery.rows[0];
-      
       if (invitation.establishment_status === 'active') {
         throw new Error('Establishment setup already completed');
       }
-
       return invitation;
 
     } catch (error) {
