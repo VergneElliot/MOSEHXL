@@ -102,35 +102,6 @@ export class BusinessInfoValidator {
   }
 
   /**
-   * Validate SIRET checksum (simplified Luhn algorithm)
-   */
-  private validateSiretChecksum(siret: string): boolean {
-    try {
-      // Simplified SIRET validation - in production, use proper SIRET validation library
-      const digits = siret.split('').map(Number);
-      let sum = 0;
-      let isEven = false;
-
-      for (let i = digits.length - 1; i >= 0; i--) {
-        let digit = digits[i];
-        if (isEven) {
-          digit *= 2;
-          if (digit > 9) {
-            digit -= 9;
-          }
-        }
-        sum += digit;
-        isEven = !isEven;
-      }
-
-      return sum % 10 === 0;
-    } catch (error) {
-      this.logger.warn('SIRET checksum validation failed', { siret, error });
-      return false;
-    }
-  }
-
-  /**
    * Sanitize business information
    */
   public sanitizeBusinessInfo(businessInfo: BusinessInfo): BusinessInfo {

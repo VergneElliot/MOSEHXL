@@ -106,24 +106,6 @@ const BusinessInfoStep: React.FC<BusinessInfoStepProps> = ({
     }));
   };
 
-  const validateAllFields = (): boolean => {
-    const newErrors: { [key: string]: string } = {};
-    let isValid = true;
-
-    // Use the current businessInfo state for validation
-    Object.keys(businessInfo).forEach(key => {
-      const field = key as keyof BusinessInfo;
-      const error = validateField(field, businessInfo[field]);
-      if (error) {
-        newErrors[field] = error;
-        isValid = false;
-      }
-    });
-
-    setErrors(newErrors);
-    return isValid;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     

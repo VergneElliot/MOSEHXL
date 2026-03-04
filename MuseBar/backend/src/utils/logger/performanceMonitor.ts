@@ -56,8 +56,6 @@ export class PerformanceMonitor {
    */
   public static time<T>(operation: string, fn: () => T, metadata?: Record<string, any>): T {
     const timer = PerformanceMonitor.startTimer(operation);
-    const startTime = Date.now();
-    
     try {
       const result = fn();
       timer({ ...metadata, success: true });

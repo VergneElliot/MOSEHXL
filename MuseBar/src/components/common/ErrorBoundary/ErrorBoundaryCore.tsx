@@ -12,7 +12,6 @@ import { ErrorDisplay } from './ErrorDisplay';
  */
 export class ErrorBoundaryCore extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   private resetTimeoutId: number | null = null;
-  private reportError: ((error: Error, errorInfo: ErrorInfo, errorId: string) => Promise<void>) | null = null;
 
   constructor(props: ErrorBoundaryProps) {
     super(props);
@@ -43,7 +42,7 @@ export class ErrorBoundaryCore extends Component<ErrorBoundaryProps, ErrorBounda
    * Component did catch error
    */
   async componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    const { onError, enableReporting = true } = this.props;
+    const { onError } = this.props;
     const { errorId } = this.state;
 
     // Update state with error info
@@ -60,11 +59,6 @@ export class ErrorBoundaryCore extends Component<ErrorBoundaryProps, ErrorBounda
     // Call custom error handler
     if (onError && errorId) {
       onError(error, errorInfo, errorId);
-    }
-
-    // Report error if enabled
-    if (enableReporting && this.reportError && errorId) {
-      await this.reportError(error, errorInfo, errorId);
     }
   }
 

@@ -231,17 +231,6 @@ function normalizeError(err: unknown): NormalizedError {
     return { message: 'Authentication token expired', statusCode: 401, errorCode: 'AUTHENTICATION_ERROR', isOperational: true };
   }
 
-  // Validation / Cast (e.g. Mongoose-style)
-  if (e && e.name === 'ValidationError') {
-    const msg = e.errors && typeof e.errors === 'object'
-      ? Object.values(e.errors).map((v: any) => v.message || v).join(', ')
-      : e.message || 'Validation failed';
-    return { message: msg, statusCode: 400, errorCode: 'VALIDATION_ERROR', details: e.errors, isOperational: true };
-  }
-  if (e && e.name === 'CastError') {
-    return { message: 'Invalid identifier format', statusCode: 400, errorCode: 'VALIDATION_ERROR', isOperational: true };
-  }
-
   // Network / external
   if (e && (e.code === 'ECONNREFUSED' || e.code === 'ENOTFOUND')) {
     return { message: 'Service temporarily unavailable', statusCode: 502, errorCode: 'EXTERNAL_SERVICE_ERROR', isOperational: true };
