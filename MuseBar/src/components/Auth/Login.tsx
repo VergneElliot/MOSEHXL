@@ -22,24 +22,18 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<string>('');
 
-  // Already imported as singleton instance
-
+  // Ensure API config (backend URL etc.) is initialized before login attempts
   useEffect(() => {
-    const loadDebugInfo = async () => {
+    const initApi = async () => {
       try {
         const { apiConfig } = await import('../../config/api');
         await apiConfig.initialize();
-        const info = apiConfig.getConnectionInfo();
-        setDebugInfo(
-          `Backend: ${info.baseURL} | Host: ${info.currentHost} | Ready: ${info.isInitialized}`
-        );
-      } catch (error) {
-        setDebugInfo(`Debug error: ${error}`);
+      } catch {
+        // Config init failure will surface when user submits login
       }
     };
-    loadDebugInfo();
+    initApi();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -163,20 +157,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               }}
             >
               {error}
-            </Alert>
-          )}
-          {debugInfo && (
-            <Alert
-              severity="info"
-              sx={{
-                mt: 1,
-                '& .MuiAlert-message': {
-                  fontSize: { xs: '0.8rem', sm: '0.75rem' },
-                  wordBreak: 'break-all',
-                },
-              }}
-            >
-              Debug: {debugInfo}
             </Alert>
           )}
           <Box mt={2} display="flex" justifyContent="flex-end">
