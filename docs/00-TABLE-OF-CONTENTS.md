@@ -25,4 +25,7 @@ Each chapter is self-contained. Read them in order, or jump to whatever you need
 | 16 | [Security: SQL keyword stripping fix](./16-SECURITY-SQL-KEYWORD-STRIPPING-FIX.md) | Why stripping SQL keywords corrupts data and doesn’t protect; rely on parameterized queries |
 | 17 | [Legal journal multi-tenancy fix](./17-LEGAL-JOURNAL-MULTI-TENANCY-FIX.md) | Why closure bulletins must be per-establishment and how scheduler, archive, and routes were updated |
 | 18 | [Printing and products schema fix](./18-PRINTING-PRODUCTS-SCHEMA-FIX.md) | Why printing/products must query the establishment schema and how routes and models were updated |
+| 19 | [Security: Unauthenticated endpoints fix](./19-SECURITY-UNAUTHENTICATED-ENDPOINTS-FIX.md) | Why every sensitive endpoint must use auth middleware and how email-test and admin-dashboard routes were secured |
+| 20 | [Dual database pool removal](./20-DUAL-DATABASE-POOL-REMOVAL.md) | Why we removed the unused config/database module and keep a single pool in app.ts |
+| 21 | [Triple error handling consolidation](./21-TRIPLE-ERROR-HANDLING-CONSOLIDATION.md) | Why we merged to one error hierarchy, one asyncHandler, and one global handler |
 | — | [Session summary: POS tax, payment, cleanup](./SESSION-SUMMARY-POS-TAX-PAYMENT-AND-CLEANUP.md) | Handoff: TTC tax fix, exact tax storage, cash/card only, three payment buttons, migrations, code cleanup |

@@ -1,6 +1,8 @@
 /**
  * Standard Error Handler
- * Centralized error handling patterns to ensure consistency across services
+ * Programmatic error types and helpers (StandardError, ErrorHandler.handleDatabaseOperation, etc.).
+ * The app's HTTP error middleware (Express) lives in middleware/errorHandler.ts — use that for
+ * route-level errors and a single global handler.
  */
 
 import { Logger } from '../logger';

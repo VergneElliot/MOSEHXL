@@ -13,8 +13,8 @@ const router = express.Router();
 const config = getEnvironmentConfig();
 const logger = Logger.getInstance(config);
 
-// GET /api/admin-dashboard/test - Minimal test endpoint to isolate the error
-router.get('/test', (req, res) => {
+// GET /api/admin-dashboard/test - Minimal test endpoint; requires auth and admin like other dashboard routes
+router.get('/test', requireAuth, requireAdmin, (req, res) => {
   try {
     res.json({
       success: true,

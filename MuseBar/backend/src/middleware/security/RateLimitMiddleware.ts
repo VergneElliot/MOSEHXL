@@ -74,7 +74,7 @@ export class RateLimitMiddleware {
         // Set rate limit headers
         this.setRateLimitHeaders(res, maxRequests, 0, entry.resetTime, retryAfter);
 
-        throw new RateLimitError(`Trop de requêtes. Réessayez dans ${retryAfter} secondes.`);
+        return next(new RateLimitError(`Trop de requêtes. Réessayez dans ${retryAfter} secondes.`));
       }
 
       // Set rate limit headers
