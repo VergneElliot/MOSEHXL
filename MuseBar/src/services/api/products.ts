@@ -13,7 +13,7 @@ export async function getProducts(): Promise<Product[]> {
     isHappyHourEligible: prod.is_happy_hour_eligible,
     happyHourDiscountType: prod.happy_hour_discount_percent ? 'percentage' : 'fixed',
     happyHourDiscountValue: parseFloat(prod.happy_hour_discount_percent || prod.happy_hour_discount_fixed || '0') / 100,
-    isActive: true,
+    isActive: prod.is_active !== false,
     createdAt: new Date(prod.created_at),
     updatedAt: new Date(prod.updated_at),
   }));
@@ -71,14 +71,14 @@ export async function createProduct(product: Omit<Product, 'id' | 'createdAt' | 
   return {
     id: result.id.toString(),
     name: result.name,
-    description: product.description,
+    description: result.description ?? product.description ?? '',
     price: parseFloat(result.price),
     taxRate: parseFloat(result.tax_rate) / 100,
     categoryId: result.category_id.toString(),
     isHappyHourEligible: result.is_happy_hour_eligible,
     happyHourDiscountType: product.happyHourDiscountType,
     happyHourDiscountValue: product.happyHourDiscountValue,
-    isActive: true,
+    isActive: result.is_active !== false,
     createdAt: new Date(result.created_at),
     updatedAt: new Date(result.updated_at),
   };
@@ -98,19 +98,20 @@ export async function updateProduct(id: string, product: Partial<Product>): Prom
     updateData.happy_hour_discount_fixed = product.happyHourDiscountValue;
     updateData.happy_hour_discount_percent = null;
   }
+  if (product.isActive !== undefined) updateData.is_active = product.isActive;
 
   const result = await request<any>(`/products/${id}`, { method: 'PUT', body: JSON.stringify(updateData) });
   return {
     id: result.id.toString(),
     name: result.name,
-    description: product.description || '',
+    description: result.description ?? product.description ?? '',
     price: parseFloat(result.price),
     taxRate: parseFloat(result.tax_rate) / 100,
     categoryId: result.category_id.toString(),
     isHappyHourEligible: result.is_happy_hour_eligible,
-    happyHourDiscountType: product.happyHourDiscountType || 'percentage',
-    happyHourDiscountValue: product.happyHourDiscountValue || 0,
-    isActive: true,
+    happyHourDiscountType: product.happyHourDiscountType ?? (result.happy_hour_discount_percent != null ? 'percentage' : 'fixed'),
+    happyHourDiscountValue: product.happyHourDiscountValue ?? parseFloat(result.happy_hour_discount_percent || result.happy_hour_discount_fixed || '0') / 100,
+    isActive: result.is_active !== false,
     createdAt: new Date(result.created_at),
     updatedAt: new Date(result.updated_at),
   };
