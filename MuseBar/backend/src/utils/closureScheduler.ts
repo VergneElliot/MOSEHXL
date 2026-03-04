@@ -45,7 +45,7 @@ export class ClosureScheduler {
     // Closure scheduler stopped
   }
 
-  // Check if closure should be executed
+  // Check if closure should be executed (runs per-establishment for multi-tenancy).
   static async checkAndExecuteClosure() {
     try {
       const settings = await this.getClosureSettings();
@@ -54,32 +54,12 @@ export class ClosureScheduler {
         return;
       }
 
-      // All date logic uses Paris time — the system is France-only.
       const nowParis = moment.tz(new Date(), settings.timezone);
-      const todayParis = nowParis.format('YYYY-MM-DD'); // Paris calendar date
-
-      // Check if today's business day has already been closed.
-      // DATE(period_start) is evaluated in Paris time via the pool timezone setting.
-      const closureQuery = `
-        SELECT id FROM closure_bulletins
-        WHERE closure_type = 'DAILY'
-        AND DATE(period_start AT TIME ZONE 'Europe/Paris') = $1
-        AND is_closed = TRUE
-        ORDER BY created_at DESC
-        LIMIT 1
-      `;
-      const closureResult = await pool.query(closureQuery, [todayParis]);
-
-      if (closureResult.rows.length > 0) {
-        return;
-      }
-
       const shouldClose = await this.shouldExecuteClosure(settings, nowParis);
 
       if (shouldClose) {
         await this.executeAutomaticClosure(nowParis.toDate());
       }
-
     } catch (error) {
       throw error;
     }
@@ -120,48 +100,56 @@ export class ClosureScheduler {
     return false;
   }
 
-  // Execute automatic closure
+  // Execute automatic closure for each establishment (multi-tenant: one bulletin per establishment).
   static async executeAutomaticClosure(now: Date) {
     try {
-      // Fetch closure settings
       const settings = await this.getClosureSettings();
       const closureTime = settings.daily_closure_time || '02:00';
       const timezone = settings.timezone || 'Europe/Paris';
 
-      // Determine which business day to close
-      // If closure time is in the AM and now is after closure time, close previous day
       const nowTz = moment.tz(now, timezone);
       const closureHour = parseInt(closureTime.split(':')[0], 10);
       let businessDay = nowTz.clone();
       if (closureHour < 12 && nowTz.hour() < closureHour) {
-        // Before closure time, close previous day
         businessDay = businessDay.subtract(1, 'day');
       }
       businessDay.set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
+      const businessDayDate = businessDay.toDate();
 
-      // Create closure bulletin for the correct business day
-      const closureBulletin = await LegalJournalModel.createDailyClosure(businessDay.toDate());
-      
-      // Log the automatic closure
-      await AuditTrailModel.logAction({
-        action_type: 'AUTO_CLOSURE_EXECUTED',
-        resource_type: 'CLOSURE_BULLETIN',
-        resource_id: closureBulletin.id.toString(),
-        action_details: {
-          closure_type: 'DAILY',
-          period_start: businessDay.toISOString(),
-          transaction_count: closureBulletin.total_transactions,
-          total_amount: closureBulletin.total_amount,
-          closure_time: now.toISOString(),
-          trigger: 'AUTOMATIC'
-        },
-        ip_address: 'system',
-        user_agent: 'ClosureScheduler'
-      });
+      // Get all establishments so each gets its own daily closure
+      const establishmentsResult = await pool.query('SELECT id FROM establishments');
+      const establishmentIds: string[] = establishmentsResult.rows.map((r: { id: string }) => r.id);
 
-      // Automatic closure completed successfully
-      
-      return closureBulletin;
+      const closed: Array<{ establishmentId: string; bulletinId: number }> = [];
+      for (const establishmentId of establishmentIds) {
+        try {
+          const closureBulletin = await LegalJournalModel.createDailyClosure(businessDayDate, establishmentId);
+          closed.push({ establishmentId, bulletinId: closureBulletin.id });
+          await AuditTrailModel.logAction({
+            action_type: 'AUTO_CLOSURE_EXECUTED',
+            resource_type: 'CLOSURE_BULLETIN',
+            resource_id: closureBulletin.id.toString(),
+            action_details: {
+              closure_type: 'DAILY',
+              establishment_id: establishmentId,
+              period_start: businessDay.toISOString(),
+              transaction_count: closureBulletin.total_transactions,
+              total_amount: closureBulletin.total_amount,
+              closure_time: now.toISOString(),
+              trigger: 'AUTOMATIC'
+            },
+            ip_address: 'system',
+            user_agent: 'ClosureScheduler'
+          });
+        } catch (err) {
+          if (err instanceof Error && err.message.includes('already exists')) {
+            continue; // This establishment already closed for this period
+          }
+          throw err;
+        }
+      }
+
+      return closed;
       
     } catch (error) {
       // Failed to execute automatic closure

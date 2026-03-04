@@ -21,4 +21,8 @@ Each chapter is self-contained. Read them in order, or jump to whatever you need
 | 12 | [Security: Invitation token leak fix](./12-SECURITY-INVITATION-TOKEN-LEAK-FIX.md) | Why invitation tokens must not be returned in API responses and how it was fixed |
 | 13 | [Security: Env files not tracked](./13-SECURITY-ENV-FILES-NOT-TRACKED.md) | Why .env.development/.production must not be in Git and how they were untracked |
 | 14 | [Security: SQL injection fix](./14-SECURITY-SQL-INJECTION-FIX.md) | Why schema/column interpolation is dangerous and how we validate or whitelist |
+| 15 | [Schema creation divergence fix](./15-SCHEMA-CREATION-DIVERGENCE-FIX.md) | Why two schema creators broke the POS and how we unified on SchemaManager |
+| 16 | [Security: SQL keyword stripping fix](./16-SECURITY-SQL-KEYWORD-STRIPPING-FIX.md) | Why stripping SQL keywords corrupts data and doesn’t protect; rely on parameterized queries |
+| 17 | [Legal journal multi-tenancy fix](./17-LEGAL-JOURNAL-MULTI-TENANCY-FIX.md) | Why closure bulletins must be per-establishment and how scheduler, archive, and routes were updated |
+| 18 | [Printing and products schema fix](./18-PRINTING-PRODUCTS-SCHEMA-FIX.md) | Why printing/products must query the establishment schema and how routes and models were updated |
 | — | [Session summary: POS tax, payment, cleanup](./SESSION-SUMMARY-POS-TAX-PAYMENT-AND-CLEANUP.md) | Handoff: TTC tax fix, exact tax storage, cash/card only, three payment buttons, migrations, code cleanup |

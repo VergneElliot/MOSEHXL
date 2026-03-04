@@ -156,21 +156,30 @@ export class JournalQueries {
   }
 
   /**
-   * Get closure bulletins
-   * @param type - Optional closure type filter
-   * @returns Array of closure bulletins
+   * Get closure bulletins (optionally filtered by type and/or establishment for multi-tenancy).
    */
-  static async getClosureBulletins(type?: 'DAILY' | 'MONTHLY' | 'ANNUAL'): Promise<ClosureBulletin[]> {
+  static async getClosureBulletins(
+    type?: 'DAILY' | 'MONTHLY' | 'ANNUAL',
+    establishmentId?: string
+  ): Promise<ClosureBulletin[]> {
     let query = 'SELECT * FROM closure_bulletins';
     const values: any[] = [];
-    
+    const conditions: string[] = [];
+
     if (type) {
-      query += ' WHERE closure_type = $1';
+      conditions.push(`closure_type = $${values.length + 1}`);
       values.push(type);
     }
-    
+    if (establishmentId !== undefined && establishmentId !== null) {
+      conditions.push(`(establishment_id IS NOT DISTINCT FROM $${values.length + 1})`);
+      values.push(establishmentId);
+    }
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+
     query += ' ORDER BY period_start DESC';
-    
+
     const result = await pool.query(query, values);
     // Parse JSON fields and ensure tips_total/change_total are present
     return result.rows.map((row: any) => ({
@@ -183,9 +192,8 @@ export class JournalQueries {
   }
 
   /**
-   * Insert a closure bulletin
-   * @param closureData - Closure bulletin data
-   * @returns The created closure bulletin
+   * Insert a closure bulletin (scoped to one establishment for multi-tenancy).
+   * @param establishmentId - UUID of the establishment this bulletin belongs to
    */
   static async insertClosureBulletin(
     closureType: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL',
@@ -200,14 +208,15 @@ export class JournalQueries {
     changeTotal: number,
     firstSequence: number,
     lastSequence: number,
-    closureHash: string
+    closureHash: string,
+    establishmentId: string
   ): Promise<ClosureBulletin> {
     const query = `
       INSERT INTO closure_bulletins (
         closure_type, period_start, period_end, total_transactions, total_amount, 
         total_vat, vat_breakdown, payment_methods_breakdown, tips_total, change_total, first_sequence, 
-        last_sequence, closure_hash, is_closed, closed_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        last_sequence, closure_hash, is_closed, closed_at, establishment_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       RETURNING *
     `;
 
@@ -226,7 +235,8 @@ export class JournalQueries {
       lastSequence,
       closureHash,
       true,
-      new Date()
+      new Date(),
+      establishmentId
     ];
 
     const result = await pool.query(query, values);
@@ -234,22 +244,20 @@ export class JournalQueries {
   }
 
   /**
-   * Check if a closure bulletin already exists for a period
-   * @param type - Closure type
-   * @param startDate - Period start date
-   * @param endDate - Period end date
-   * @returns True if bulletin exists
+   * Check if a closure bulletin already exists for a period and establishment (multi-tenant).
    */
   static async closureBulletinExists(
     type: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL',
     startDate: Date,
-    endDate: Date
+    endDate: Date,
+    establishmentId: string
   ): Promise<boolean> {
     const query = `
       SELECT id FROM closure_bulletins 
       WHERE closure_type = $1 AND period_start = $2 AND period_end = $3
+        AND (establishment_id IS NOT DISTINCT FROM $4)
     `;
-    const result = await pool.query(query, [type, startDate, endDate]);
+    const result = await pool.query(query, [type, startDate, endDate, establishmentId]);
     return result.rows.length > 0;
   }
 }

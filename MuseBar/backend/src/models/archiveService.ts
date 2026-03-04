@@ -26,6 +26,8 @@ export interface ExportData {
   period_end?: Date;
   format: 'CSV' | 'XML' | 'PDF' | 'JSON';
   created_by: string;
+  /** Required for DAILY exports so the closure bulletin is scoped to one establishment. */
+  establishment_id?: string;
 }
 
 export class ArchiveService {
@@ -141,7 +143,10 @@ export class ArchiveService {
     switch (exportData.export_type) {
       case 'DAILY':
         if (exportData.period_start) {
-          const closure = await LegalJournalModel.createDailyClosure(exportData.period_start);
+          if (!exportData.establishment_id) {
+            throw new Error('DAILY export requires establishment_id for multi-tenant legal journal.');
+          }
+          const closure = await LegalJournalModel.createDailyClosure(exportData.period_start, exportData.establishment_id);
           data = {
             export_type: 'DAILY',
             period: {

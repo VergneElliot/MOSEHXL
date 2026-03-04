@@ -83,7 +83,9 @@ export class InputSanitizationService {
   }
 
   /**
-   * Sanitize string input
+   * Sanitize string input.
+   * Does NOT strip SQL keywords — that would corrupt legitimate data (e.g. "Select Blend Coffee")
+   * and provides no real protection; SQL injection is prevented by parameterized queries only.
    */
   public static sanitizeString(str: string): string {
     return str
@@ -95,8 +97,6 @@ export class InputSanitizationService {
       .replace(/onload\s*=/gi, '')
       .replace(/onerror\s*=/gi, '')
       .replace(/onclick\s*=/gi, '')
-      // Remove potential SQL injection vectors
-      .replace(/(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION)\b)/gi, '')
       // Trim and limit length
       .trim()
       .substring(0, 10000); // Reasonable length limit
@@ -119,7 +119,8 @@ export class InputSanitizationService {
   }
 
   /**
-   * Check for potentially dangerous patterns
+   * Check for potentially dangerous patterns (XSS-style only).
+   * SQL keywords are not treated as dangerous; SQL injection is prevented by parameterized queries.
    */
   public static containsDangerousPatterns(str: string): boolean {
     const dangerousPatterns = [
@@ -130,7 +131,6 @@ export class InputSanitizationService {
       /onload=/i,
       /onerror=/i,
       /onclick=/i,
-      /\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION)\b/i,
     ];
 
     return dangerousPatterns.some(pattern => pattern.test(str));
