@@ -21,10 +21,14 @@ The app uses **only** migrations in `MuseBar/backend/src/migrations/files/` that
 |------|---------|
 | `2025_09_12_07_30_00_remove_email_unique_constraints.sql` | Drops unique constraints on `users.email` and `establishments.email`; adds non-unique indexes. |
 | `2026_02_25_00_00_00_add_pos_columns_and_establishment_isolation.sql` | Adds `tips`, `change`, `establishment_id` to orders; `description` to order_items; `establishment_id` to categories, products, orders, sub_bills, business_settings; creates indexes. **This is the migration that makes the DB compatible with current code.** |
+| `2026_02_25_00_15_00_create_setup_progress_tables.sql` | Creates `establishment_setup_progress` and `establishment_setup_steps` (and adds missing columns if tables already existed from older scripts). |
+| `2026_02_25_00_30_00_create_status_transitions_table.sql` | Creates `establishment_status_transitions`. |
 | `2026_02_25_01_00_00_convert_timestamps_to_timestamptz.sql` | Converts timestamp columns to TIMESTAMPTZ (Europe/Paris) for legal journal and closure correctness. |
+| `2026_02_26_01_00_00_accounting_decimal_precision.sql` | Accounting decimal precision. |
+| `2026_02_26_02_00_00_add_establishment_id_to_closure_bulletins.sql` | Adds establishment scoping to closure bulletins. |
 
 **Not used by the CLI:**  
-Everything in `MuseBar/backend/src/migrations/*.sql` (e.g. `add-establishment-fields.sql`, `create-status-transitions-table.sql`) and the reference schemas in `models/*.sql` are **not** run by `npm run migration:migrate`. They are reference or manual scripts.
+Root-level SQL files in `MuseBar/backend/src/migrations/*.sql` (e.g. `add-establishment-fields.sql`, `remove-email-unique-constraints.sql`) and the reference schemas in `models/*.sql` are **not** run by `npm run migration:migrate`. They are reference or manual scripts. The tables `establishment_setup_progress`, `establishment_setup_steps`, and `establishment_status_transitions` are now created by timestamped migrations in `files/` (see [24-MIGRATION-CHAIN-FRESH-DB-FIX.md](./24-MIGRATION-CHAIN-FRESH-DB-FIX.md)).
 
 ### 1.2 Reference schemas (documentation / manual setup)
 
@@ -144,7 +148,7 @@ Plus the whole **establishments** table and **users** extensions from multi-tena
 
 | Area | Status | Notes |
 |------|--------|------|
-| Migration CLI | ✅ One migration in `files/` (email constraints). Format and flow are correct. | Add any new schema changes as migrations in `files/` with `-- UP` / `-- DOWN`. |
+| Migration CLI | ✅ All schema changes in `files/` with correct order. Setup progress and status-transitions tables are in the chain (see doc 24). | Add any new schema changes as migrations in `files/` with `-- UP` / `-- DOWN`. |
 | Reference schemas | ⚠️ Out of date | schema.sql and multi-tenant-schema do not define `establishment_id` (or tips/change/description). Use this doc + migration as source of truth. |
 | Code vs DB contract | ✅ Clear | Models and routes consistently assume the columns in §2. If your DB has them, the app is compatible. |
 | Legal tables | ✅ | legal-schema matches what legalJournal/ and auditTrail models expect. |

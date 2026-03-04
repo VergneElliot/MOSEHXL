@@ -57,9 +57,7 @@ ALTER TABLE email_logs
 
 ALTER TABLE establishment_setup_progress
   ALTER COLUMN created_at    TYPE TIMESTAMPTZ USING created_at    AT TIME ZONE 'Europe/Paris',
-  ALTER COLUMN updated_at    TYPE TIMESTAMPTZ USING updated_at    AT TIME ZONE 'Europe/Paris',
-  ALTER COLUMN started_at    TYPE TIMESTAMPTZ USING started_at    AT TIME ZONE 'Europe/Paris',
-  ALTER COLUMN completed_at  TYPE TIMESTAMPTZ USING completed_at  AT TIME ZONE 'Europe/Paris';
+  ALTER COLUMN last_updated  TYPE TIMESTAMPTZ USING last_updated  AT TIME ZONE 'Europe/Paris';
 
 ALTER TABLE establishment_setup_steps
   ALTER COLUMN created_at    TYPE TIMESTAMPTZ USING created_at    AT TIME ZONE 'Europe/Paris',
