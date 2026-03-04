@@ -272,7 +272,7 @@ Each major feature has a Container + sub-components.
 | `Legal/` | Legal compliance dashboard, receipts |
 | `Closure/` | Closure bulletin management |
 | `HappyHour/` | Happy hour control and schedule |
-| `Auth/` | Login form |
+| `auth/` | Login form and auth flows (invitation, password reset) |
 | `Admin/` | User management, audit trail, establishment management |
 | `SystemAdmin/` | System admin UI — establishments, users, security logs |
 | `Setup/` | Business setup wizard |

@@ -7,7 +7,7 @@ import { useHappyHour } from './hooks/useHappyHour';
 import { useDataManagement } from './hooks/useDataManagement';
 import AppRouter from './components/common/AppRouter';
 import SystemAdminRouter from './components/common/SystemAdminRouter';
-import { Login } from './components/Auth';
+import { Login } from './components/auth';
 import InvitationAcceptance from './components/InvitationAcceptance';
 import { AppHeader } from './components/common/AppHeader';
 import { BusinessSetupWizard } from './components/Setup';
