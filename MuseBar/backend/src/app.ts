@@ -81,6 +81,8 @@ import establishmentSearchRouter from './routes/establishmentSearch';
 import setupRouter from './routes/setup';
 import emailTestRouter from './routes/emailTest';
 import establishmentAccountCreationRouter from './routes/establishmentAccountCreation';
+import printingRouter from './routes/printing';
+import printingCompatRouter from './routes/printingCompat';
 
 app.use('/api/categories', categoriesRouter);
 app.use('/api/products', productsRouter);
@@ -93,6 +95,8 @@ app.use('/api/admin-dashboard', adminDashboardRouter);
 app.use('/api/establishment-search', establishmentSearchRouter);
 app.use('/api/setup', setupRouter);
 app.use('/api/establishment-account-creation', establishmentAccountCreationRouter);
+app.use('/api/printing', printingRouter);
+app.use('/', printingCompatRouter);
 
 // Development-only email test routes
 if (NODE_ENV === 'development') {
