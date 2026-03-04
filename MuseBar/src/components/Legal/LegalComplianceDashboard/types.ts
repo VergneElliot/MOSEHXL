@@ -3,6 +3,10 @@
  * Centralized type definitions for the compliance system
  */
 
+import type { ClosureBulletin } from '../../../types';
+
+export type { ClosureBulletin };
+
 export interface ComplianceStatus {
   compliance_status: {
     journal_integrity: string;
@@ -36,18 +40,6 @@ export interface JournalEntry {
   payment_method: string;
   created_at: string;
   hash: string;
-}
-
-export interface ClosureBulletin {
-  id: string;
-  closure_type: string;
-  period_start: string | null;
-  period_end: string | null;
-  total_transactions: number;
-  total_amount: number;
-  total_vat: number | null;
-  is_closed: boolean;
-  created_at: string;
 }
 
 export interface ComplianceState {
