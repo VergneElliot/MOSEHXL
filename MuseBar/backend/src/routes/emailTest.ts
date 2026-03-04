@@ -1,12 +1,14 @@
 /**
  * Email Test Routes
- * Development-only endpoints for testing email functionality
+ * Development-only endpoints for testing email functionality.
+ * All routes require authentication and admin role so only authorized users can send test emails or view config/logs.
  */
 
 import { Router } from 'express';
 import { EmailService } from '../services/email/EmailService';
 import { Logger } from '../utils/logger';
 import { getEnvironmentConfig } from '../config/environment';
+import { requireAuth, requireAdmin } from './auth';
 
 const router = Router();
 const config = getEnvironmentConfig();
@@ -15,8 +17,9 @@ const logger = Logger.getInstance(config);
 /**
  * Test email configuration
  * POST /api/test-email
+ * Requires: authenticated, admin.
  */
-router.post('/test-email', async (req, res) => {
+router.post('/test-email', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { to, subject = 'MuseBar Email Test', message = 'This is a test email from MuseBar V2 Development' } = req.body;
 
@@ -107,8 +110,9 @@ Sent at: ${new Date().toISOString()}
 /**
  * Get email configuration status
  * GET /api/email-status
+ * Requires: authenticated, admin.
  */
-router.get('/email-status', async (req, res) => {
+router.get('/email-status', requireAuth, requireAdmin, async (req, res) => {
   try {
     const emailService = EmailService.getInstance();
     
@@ -137,8 +141,9 @@ router.get('/email-status', async (req, res) => {
 /**
  * Get email logs
  * GET /api/email-logs
+ * Requires: authenticated, admin.
  */
-router.get('/email-logs', async (req, res) => {
+router.get('/email-logs', requireAuth, requireAdmin, async (req, res) => {
   try {
     const emailService = EmailService.getInstance();
     const logs = emailService.getAllEmailLogs();

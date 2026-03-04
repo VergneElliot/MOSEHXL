@@ -5,7 +5,7 @@
 
 import { pool } from '../../app';
 import { Logger } from '../../utils/logger';
-import { ValidationError, DatabaseError } from '../../middleware/errorHandling';
+import { ValidationError, DatabaseError } from '../../middleware/errorHandler';
 import { 
   EstablishmentInvitationData, 
   UserInvitationData, 

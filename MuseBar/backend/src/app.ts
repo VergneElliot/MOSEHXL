@@ -105,10 +105,12 @@ if (NODE_ENV === 'development') {
 app.use('/api/docs', docsRouter);
 
 // Client error logging endpoint
-import { asyncHandler } from './middleware/errorHandling';
+import { asyncHandler, notFound, createErrorHandler } from './middleware/errorHandler';
+import { initializeErrorRecovery as initErrorRecovery } from './utils/errorRecovery';
+
 app.post('/api/client-errors', asyncHandler(async (req: any, res: any) => {
   const errorData = req.body;
-  
+
   logger.error(
     `Client Error [${errorData.errorId}]: ${errorData.message}`,
     new Error(errorData.message),
@@ -118,23 +120,14 @@ app.post('/api/client-errors', asyncHandler(async (req: any, res: any) => {
     },
     'CLIENT_ERROR_HANDLER'
   );
-  
+
   res.json({ success: true, message: 'Error logged successfully' });
 }));
 
-// Error handling middleware
-import { createEnhancedErrorHandler } from './middleware/errorHandling';
-import { initializeErrorRecovery as initErrorRecovery } from './utils/errorRecovery';
-import { notFound } from './middleware/errorHandler';
-
-// Initialize error recovery system
+// Error handling: single unified handler (replaces former errorHandler + errorHandling)
 initErrorRecovery(logger);
-
-// Use enhanced error handler
-const enhancedErrorHandler = createEnhancedErrorHandler(logger);
-// 404 handler
 app.use(notFound);
-app.use(enhancedErrorHandler);
+app.use(createErrorHandler(logger));
 
 // Initialize services
 
