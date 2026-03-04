@@ -6,6 +6,7 @@
 import { useState, useCallback } from 'react';
 import { LocalSubBill } from '../../../../types';
 import { PaymentState, SimplePaymentMethod, SplitType } from '../types';
+import { formatCurrency } from '../../../../utils/formatCurrency';
 
 const defaultState: PaymentState = {
   tabValue: 0,
@@ -20,16 +21,6 @@ const defaultState: PaymentState = {
 
 export const usePaymentState = () => {
   const [state, setState] = useState<PaymentState>(defaultState);
-
-  /**
-   * Format currency amount
-   */
-  const formatCurrency = useCallback((amount: number): string => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(amount);
-  }, []);
 
   /**
    * Set simple payment method

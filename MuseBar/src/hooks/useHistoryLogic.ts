@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { Order } from '../types';
+import { formatCurrency } from '../utils/formatCurrency';
 
 export interface HistoryLogic {
   filteredOrders: Order[];
@@ -55,14 +56,6 @@ export const useHistoryLogic = (orders: Order[], search: string): HistoryLogic =
       return false;
     });
   }, [orders, search]);
-
-  // Utility functions
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(amount);
-  };
 
   const formatDateTime = (date: Date | string): string => {
     const dateObj = typeof date === 'string' ? new Date(date) : date;

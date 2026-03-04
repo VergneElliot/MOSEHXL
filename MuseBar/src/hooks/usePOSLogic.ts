@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { OrderItem, Product, Category } from '../types';
+import { formatCurrency } from '../utils/formatCurrency';
 
 // Function to normalize accents for search
 const normalizeAccents = (str: string): string => {
@@ -93,14 +94,6 @@ export const usePOSLogic = (
   const canProcessPayment = useMemo(() => {
     return currentOrder.length > 0 && orderTotal > 0;
   }, [currentOrder.length, orderTotal]);
-
-  // Utility functions
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(amount);
-  };
 
   return {
     filteredProducts,

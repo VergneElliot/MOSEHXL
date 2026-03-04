@@ -41,4 +41,5 @@ Each chapter is self-contained. Read them in order, or jump to whatever you need
 | 32 | [Dead code within files](./32-DEAD-CODE-WITHIN-FILES-FIX.md) | Why we removed Mongoose handling, localStorage methods, fake PDF, unused methods/variables (audit #24) |
 | 33 | [Debug console.log everywhere](./33-DEBUG-CONSOLE-LOG-AUDIT-25-FIX.md) | Why we replaced console with structured logger (backend) and removed debug/auth logs (frontend, audit #25) |
 | 34 | [Self-HTTP proxy in printing compat](./34-SELF-HTTP-PROXY-PRINTING-COMPAT-FIX.md) | Why printingCompat used in-process calls instead of axios to self (audit #26) |
+| 35 | [Currency format deduplication](./35-CURRENCY-FORMAT-DEDUPLICATION-AUDIT-27.md) | Single formatCurrency util for Euro (fr-FR) instead of 11 duplicated formatters (audit #27) |
 | — | [Session summary: POS tax, payment, cleanup](./SESSION-SUMMARY-POS-TAX-PAYMENT-AND-CLEANUP.md) | Handoff: TTC tax fix, exact tax storage, cash/card only, three payment buttons, migrations, code cleanup |
