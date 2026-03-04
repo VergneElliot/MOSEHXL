@@ -23,6 +23,7 @@ import {
   LocalAtm as CashIcon,
 } from '@mui/icons-material';
 import { PaymentConfirmationProps } from './types';
+import { formatCurrency } from '../../../utils/formatCurrency';
 
 /**
  * Payment Confirmation Component
@@ -38,13 +39,6 @@ export const PaymentConfirmation: React.FC<PaymentConfirmationProps> = ({
   onConfirm,
   onCancel,
 }) => {
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(amount);
-  };
-
   const totalWithTips = orderTotal + (parseFloat(tips) || 0);
   const tipsAmount = parseFloat(tips) || 0;
 

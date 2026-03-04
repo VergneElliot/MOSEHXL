@@ -17,6 +17,7 @@ import {
   Calculate as CalculateIcon,
 } from '@mui/icons-material';
 import { PaymentCalculatorProps } from './types';
+import { formatCurrency } from '../../../utils/formatCurrency';
 
 /**
  * Payment Calculator Component
@@ -32,13 +33,6 @@ export const PaymentCalculator: React.FC<PaymentCalculatorProps> = ({
   isValid,
   disabled = false,
 }) => {
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(amount);
-  };
-
   const totalWithTips = orderTotal + (parseFloat(tips) || 0);
 
   return (

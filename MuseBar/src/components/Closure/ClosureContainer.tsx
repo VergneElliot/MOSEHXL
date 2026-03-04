@@ -14,6 +14,7 @@ import { useClosureState } from '../../hooks/useClosureState';
 import { useClosureAPI } from '../../hooks/useClosureAPI';
 import ClosureStatusCards from './ClosureStatusCards';
 import BulletinsTable from './BulletinsTable';
+import { formatCurrency } from '../../utils/formatCurrency';
 
 const ClosureContainer: React.FC = () => {
   const theme = useTheme();
@@ -68,13 +69,6 @@ const ClosureContainer: React.FC = () => {
   };
 
   // Utility functions
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(amount);
-  };
-
   const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleDateString('fr-FR');
   };

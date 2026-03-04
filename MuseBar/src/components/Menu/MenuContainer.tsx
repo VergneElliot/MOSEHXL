@@ -16,6 +16,7 @@ import CategorySection from './CategorySection';
 import ProductSection from './ProductSection';
 import CategoryDialog from './CategoryDialog';
 import ProductDialog from './ProductDialog';
+import { formatCurrency } from '../../utils/formatCurrency';
 
 interface MenuContainerProps {
   categories: Category[];
@@ -84,14 +85,6 @@ const MenuContainer: React.FC<MenuContainerProps> = ({ categories, products, onD
 
   const handleCloseSnackbar = () => {
     actions.closeSnackbar();
-  };
-
-  // Utility functions
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(amount);
   };
 
   return (

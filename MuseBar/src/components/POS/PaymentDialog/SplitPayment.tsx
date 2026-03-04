@@ -25,6 +25,7 @@ import {
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { SplitPaymentProps } from './types';
+import { formatCurrency } from '../../../utils/formatCurrency';
 
 /**
  * Split Payment Component
@@ -42,13 +43,6 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
   loading,
   onConfirm,
 }) => {
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(amount);
-  };
-
   const totalSplit = subBills.reduce((sum, bill) => sum + bill.total, 0);
   const isValidSplit = Math.abs(totalSplit - orderTotal) < 0.01;
 

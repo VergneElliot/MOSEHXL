@@ -17,6 +17,7 @@ import {
   JournalEntry,
   ClosureBulletin,
 } from './types';
+import { formatCurrency } from '../../../utils/formatCurrency';
 
 /**
  * Default compliance state
@@ -167,16 +168,6 @@ export const useCompliance = (): UseComplianceReturn => {
     } catch (error) {
       return 'Date invalide';
     }
-  }, []);
-
-  /**
-   * Format currency amount
-   */
-  const formatCurrency = useCallback((amount: number): string => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(amount);
   }, []);
 
   /**

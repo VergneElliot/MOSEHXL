@@ -22,6 +22,7 @@ import {
   Box,
 } from '@mui/material';
 import { ComplianceReportsProps } from './types';
+import { formatCurrency } from '../../../utils/formatCurrency';
 
 /**
  * Compliance Reports Component
@@ -49,13 +50,6 @@ export const ComplianceReports: React.FC<ComplianceReportsProps> = ({
     } catch (error) {
       return 'Date invalide';
     }
-  };
-
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(amount);
   };
 
   return (
