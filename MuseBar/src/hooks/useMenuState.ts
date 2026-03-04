@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Category, Product } from '../types';
+import { useSnackbar } from './useSnackbar';
 
 export interface CategoryFormData {
   name: string;
@@ -94,6 +95,8 @@ const initialProductForm: ProductFormData = {
 };
 
 export const useMenuState = (): [MenuState, MenuActions] => {
+  const snackbarApi = useSnackbar();
+
   // Dialog states
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [productDialogOpen, setProductDialogOpen] = useState(false);
@@ -108,13 +111,6 @@ export const useMenuState = (): [MenuState, MenuActions] => {
   // Form states
   const [categoryForm, setCategoryForm] = useState<CategoryFormData>(initialCategoryForm);
   const [productForm, setProductForm] = useState<ProductFormData>(initialProductForm);
-
-  // UI states
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: '',
-    severity: 'success' as 'success' | 'error',
-  });
 
   // Dialog helper actions
   const openCategoryDialog = (category?: Category) => {
@@ -178,19 +174,6 @@ export const useMenuState = (): [MenuState, MenuActions] => {
     setProductForm(initialProductForm);
   };
 
-  // UI helper actions
-  const showSuccess = (message: string) => {
-    setSnackbar({ open: true, message, severity: 'success' });
-  };
-
-  const showError = (message: string) => {
-    setSnackbar({ open: true, message, severity: 'error' });
-  };
-
-  const closeSnackbar = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
-  };
-
   const state: MenuState = {
     categoryDialogOpen,
     productDialogOpen,
@@ -201,7 +184,7 @@ export const useMenuState = (): [MenuState, MenuActions] => {
     archivedCategories,
     categoryForm,
     productForm,
-    snackbar,
+    snackbar: snackbarApi.snackbar as MenuState['snackbar'],
   };
 
   const actions: MenuActions = {
@@ -221,10 +204,10 @@ export const useMenuState = (): [MenuState, MenuActions] => {
     updateCategoryForm,
     updateProductForm,
     resetForms,
-    setSnackbar,
-    showSuccess,
-    showError,
-    closeSnackbar,
+    setSnackbar: snackbarApi.setSnackbar,
+    showSuccess: snackbarApi.showSuccess,
+    showError: snackbarApi.showError,
+    closeSnackbar: snackbarApi.closeSnackbar,
   };
 
   return [state, actions];

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSnackbar } from './useSnackbar';
 
 export interface ClosureBulletin {
   id: number;
@@ -99,6 +100,8 @@ export interface ClosureActions {
 }
 
 export const useClosureState = (): [ClosureState, ClosureActions] => {
+  const snackbarApi = useSnackbar();
+
   // Data state
   const [bulletins, setBulletins] = useState<ClosureBulletin[]>([]);
   const [loading, setLoading] = useState(true);
@@ -124,13 +127,6 @@ export const useClosureState = (): [ClosureState, ClosureActions] => {
     'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL'
   >('DAILY');
 
-  // UI state
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: '',
-    severity: 'success' as 'success' | 'error',
-  });
-
   // Helper actions
   const openBulletinDetails = (bulletin: ClosureBulletin) => {
     setSelectedBulletin(bulletin);
@@ -152,18 +148,6 @@ export const useClosureState = (): [ClosureState, ClosureActions] => {
     setPrintBulletin(null);
   };
 
-  const showSuccess = (message: string) => {
-    setSnackbar({ open: true, message, severity: 'success' });
-  };
-
-  const showError = (message: string) => {
-    setSnackbar({ open: true, message, severity: 'error' });
-  };
-
-  const closeSnackbar = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
-  };
-
   const addBulletin = (bulletin: ClosureBulletin) => {
     setBulletins(prev => [bulletin, ...prev]);
   };
@@ -171,7 +155,7 @@ export const useClosureState = (): [ClosureState, ClosureActions] => {
   const clearMessages = () => {
     setError(null);
     setMonthlyStatsError(null);
-    closeSnackbar();
+    snackbarApi.closeSnackbar();
   };
 
   const state: ClosureState = {
@@ -192,7 +176,7 @@ export const useClosureState = (): [ClosureState, ClosureActions] => {
     selectedDate,
     filterType,
     selectedClosureType,
-    snackbar,
+    snackbar: snackbarApi.snackbar as ClosureState['snackbar'],
   };
 
   const actions: ClosureActions = {
@@ -217,10 +201,10 @@ export const useClosureState = (): [ClosureState, ClosureActions] => {
     setSelectedDate,
     setFilterType,
     setSelectedClosureType,
-    setSnackbar,
-    showSuccess,
-    showError,
-    closeSnackbar,
+    setSnackbar: snackbarApi.setSnackbar,
+    showSuccess: snackbarApi.showSuccess,
+    showError: snackbarApi.showError,
+    closeSnackbar: snackbarApi.closeSnackbar,
     addBulletin,
     clearMessages,
   };

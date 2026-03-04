@@ -97,7 +97,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
   );
 
   const handleCloseSnackbar = () => {
-    actions.setSnackbar({ ...state.snackbar, open: false });
+    actions.closeSnackbar();
   };
 
   const handleClosePaymentDialog = () => {
