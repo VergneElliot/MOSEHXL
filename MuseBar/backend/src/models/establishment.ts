@@ -145,6 +145,20 @@ export class EstablishmentModel {
   }
 
   /**
+   * Resolve establishment schema name for use in schema-qualified queries (e.g. "schema".orders).
+   * Use this whenever a route or model must query establishment-specific tables (orders, products, etc.).
+   * @throws Error if establishment not found or schema_name format is invalid for SQL safety
+   */
+  public static async getSchemaNameForEstablishment(establishmentId: string): Promise<string> {
+    const establishment = await this.getById(establishmentId);
+    if (!establishment) {
+      throw new Error('Establishment not found');
+    }
+    assertValidSchemaName(establishment.schema_name);
+    return establishment.schema_name;
+  }
+
+  /**
    * Get establishment by ID
    */
   public static async getById(id: string): Promise<Establishment | null> {

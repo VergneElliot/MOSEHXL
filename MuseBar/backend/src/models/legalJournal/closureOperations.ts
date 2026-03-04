@@ -11,31 +11,33 @@ import { pool } from '../../app';
 
 export class ClosureOperations {
   /**
-   * Create daily closure bulletin
+   * Create daily closure bulletin for one establishment (multi-tenant: only that establishment's orders).
    * @param date - The date to create closure for
+   * @param establishmentId - UUID of the establishment (required for data isolation)
    * @returns The created closure bulletin
    */
-  static async createDailyClosure(date: Date): Promise<ClosureBulletin> {
+  static async createDailyClosure(date: Date, establishmentId: string): Promise<ClosureBulletin> {
     // Set timezone for French business operations
     const timezone = 'Europe/Paris';
     
     // Get business day period (from 02:00 current day to 01:59:59 next day)
     const { start, end } = getBusinessDayPeriod(date, '02:00', timezone);
 
-    // Check if closure already exists
-    const exists = await JournalQueries.closureBulletinExists('DAILY', start.toDate(), end.toDate());
+    // Check if closure already exists for this establishment
+    const exists = await JournalQueries.closureBulletinExists('DAILY', start.toDate(), end.toDate(), establishmentId);
     if (exists) {
       throw new Error('Daily closure bulletin already exists for this period');
     }
 
-    // Get orders for the period
+    // Get orders for the period for this establishment only (multi-tenant)
     const ordersQuery = `
       SELECT * FROM orders 
       WHERE created_at >= $1 AND created_at <= $2 
       AND status IN ('completed', 'paid')
+      AND establishment_id = $3
       ORDER BY created_at ASC
     `;
-    const ordersResult = await pool.query(ordersQuery, [start.toDate(), end.toDate()]);
+    const ordersResult = await pool.query(ordersQuery, [start.toDate(), end.toDate(), establishmentId]);
     const orders = ordersResult.rows;
     const orderIds = orders.map((o: { id: number }) => o.id);
 
@@ -74,7 +76,7 @@ export class ClosureOperations {
     const closureData = `DAILY|${date.toISOString().split('T')[0]}|${totalTransactions}|${totalAmount}|${totalVat}|${firstSequence}|${lastSequence}`;
     const closureHash = JournalSigning.generateClosureHash(closureData);
 
-    // Insert closure bulletin
+    // Insert closure bulletin (scoped to this establishment)
     return await JournalQueries.insertClosureBulletin(
       'DAILY',
       start.toDate(),
@@ -88,14 +90,15 @@ export class ClosureOperations {
       changeTotal,
       firstSequence,
       lastSequence,
-      closureHash
+      closureHash,
+      establishmentId
     );
   }
 
   /**
-   * Create weekly closure bulletin
+   * Create weekly closure bulletin for one establishment.
    */
-  static async createWeeklyClosure(date: Date): Promise<ClosureBulletin> {
+  static async createWeeklyClosure(date: Date, establishmentId: string): Promise<ClosureBulletin> {
     // Get the start of the week (Monday) and end of the week (Sunday)
     const startOfWeek = new Date(date);
     const dayOfWeek = startOfWeek.getDay();
@@ -107,54 +110,56 @@ export class ClosureOperations {
     endOfWeek.setDate(endOfWeek.getDate() + 6);
     endOfWeek.setHours(23, 59, 59, 999);
 
-    return await this.createPeriodClosure('WEEKLY', startOfWeek, endOfWeek, date);
+    return await this.createPeriodClosure('WEEKLY', startOfWeek, endOfWeek, date, establishmentId);
   }
 
   /**
-   * Create monthly closure bulletin
+   * Create monthly closure bulletin for one establishment.
    */
-  static async createMonthlyClosure(date: Date): Promise<ClosureBulletin> {
+  static async createMonthlyClosure(date: Date, establishmentId: string): Promise<ClosureBulletin> {
     // Get the start and end of the month
     const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
     const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
 
-    return await this.createPeriodClosure('MONTHLY', startOfMonth, endOfMonth, date);
+    return await this.createPeriodClosure('MONTHLY', startOfMonth, endOfMonth, date, establishmentId);
   }
 
   /**
-   * Create annual closure bulletin
+   * Create annual closure bulletin for one establishment.
    */
-  static async createAnnualClosure(date: Date): Promise<ClosureBulletin> {
+  static async createAnnualClosure(date: Date, establishmentId: string): Promise<ClosureBulletin> {
     // Get the start and end of the year
     const startOfYear = new Date(date.getFullYear(), 0, 1);
     const endOfYear = new Date(date.getFullYear(), 11, 31, 23, 59, 59, 999);
 
-    return await this.createPeriodClosure('ANNUAL', startOfYear, endOfYear, date);
+    return await this.createPeriodClosure('ANNUAL', startOfYear, endOfYear, date, establishmentId);
   }
 
   /**
-   * Generic period closure creation
+   * Generic period closure creation for one establishment (multi-tenant).
    */
   private static async createPeriodClosure(
     closureType: ClosureType,
     startDate: Date,
     endDate: Date,
-    referenceDate: Date
+    referenceDate: Date,
+    establishmentId: string
   ): Promise<ClosureBulletin> {
-    // Check if closure already exists
-    const exists = await JournalQueries.closureBulletinExists(closureType, startDate, endDate);
+    // Check if closure already exists for this establishment
+    const exists = await JournalQueries.closureBulletinExists(closureType, startDate, endDate, establishmentId);
     if (exists) {
       throw new Error(`${closureType.toLowerCase()} closure bulletin already exists for this period`);
     }
 
-    // Get orders for the period
+    // Get orders for the period for this establishment only
     const ordersQuery = `
       SELECT * FROM orders 
       WHERE created_at >= $1 AND created_at <= $2 
       AND status IN ('completed', 'paid')
+      AND establishment_id = $3
       ORDER BY created_at ASC
     `;
-    const ordersResult = await pool.query(ordersQuery, [startDate, endDate]);
+    const ordersResult = await pool.query(ordersQuery, [startDate, endDate, establishmentId]);
     const orders = ordersResult.rows;
 
     // Calculate aggregated totals
@@ -199,15 +204,19 @@ export class ClosureOperations {
       changeTotal,
       firstSequence,
       lastSequence,
-      closureHash
+      closureHash,
+      establishmentId
     );
   }
 
   /**
-   * Get closure bulletins
+   * Get closure bulletins (optionally filtered by type and/or establishment).
    */
-  static async getClosureBulletins(type?: 'DAILY' | 'MONTHLY' | 'ANNUAL'): Promise<ClosureBulletin[]> {
-    return await JournalQueries.getClosureBulletins(type);
+  static async getClosureBulletins(
+    type?: 'DAILY' | 'MONTHLY' | 'ANNUAL',
+    establishmentId?: string
+  ): Promise<ClosureBulletin[]> {
+    return await JournalQueries.getClosureBulletins(type, establishmentId);
   }
 }
 

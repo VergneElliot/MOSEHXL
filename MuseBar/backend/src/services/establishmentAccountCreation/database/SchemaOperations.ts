@@ -1,6 +1,6 @@
 import { PoolClient } from 'pg';
 import { Logger } from '../../../utils/logger';
-import { AuditTrailModel } from '../../../models/auditTrail';
+import { SchemaManager } from '../../../services/SchemaManager';
 
 export interface SchemaCreationData {
   establishmentId: string;
@@ -21,7 +21,8 @@ export class SchemaOperations {
   }
 
   /**
-   * Create establishment-specific schema for data isolation
+   * Create establishment-specific schema for data isolation.
+   * Uses SchemaManager so the same tables exist as in the admin-creation flow (orders, order_items, products, categories, legal_journal, audit_trail).
    */
   public async createEstablishmentSchema(
     client: PoolClient,
@@ -38,8 +39,10 @@ export class SchemaOperations {
       await client.query(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`);
       this.logger.info('Establishment schema created', { schemaName, establishmentId });
 
-      // 2. Create basic tables in the schema
-      const tablesCreated = await this.createBasicTables(client, schemaName);
+      // 2. Create tables using SchemaManager (single source of truth — same structure as admin-creation flow)
+      SchemaManager.initialize(this.logger);
+      await SchemaManager.createEstablishmentSchema(client, schemaName);
+      const tablesCreated = ['orders', 'order_items', 'products', 'categories', 'legal_journal', 'audit_trail'];
 
       // 3. Set up permissions for the schema
       await this.setupSchemaPermissions(client, schemaName, establishmentId);
@@ -79,100 +82,6 @@ export class SchemaOperations {
     } catch (error) {
       this.logger.error('Failed to create establishment schema', error as Error);
       throw new Error(`Failed to create establishment schema: ${(error as Error).message}`);
-    }
-  }
-
-  /**
-   * Create basic tables in the establishment schema
-   */
-  private async createBasicTables(client: PoolClient, schemaName: string): Promise<string[]> {
-    const tablesCreated: string[] = [];
-
-    try {
-      // 1. Create menu_items table
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS "${schemaName}".menu_items (
-          id SERIAL PRIMARY KEY,
-          name VARCHAR(255) NOT NULL,
-          description TEXT,
-          price DECIMAL(10,2) NOT NULL,
-          category VARCHAR(100),
-          is_available BOOLEAN DEFAULT true,
-          created_at TIMESTAMP DEFAULT NOW(),
-          updated_at TIMESTAMP DEFAULT NOW()
-        )
-      `);
-      tablesCreated.push('menu_items');
-
-      // 2. Create orders table
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS "${schemaName}".orders (
-          id SERIAL PRIMARY KEY,
-          order_number VARCHAR(50) UNIQUE NOT NULL,
-          table_number VARCHAR(20),
-          customer_name VARCHAR(255),
-          total_amount DECIMAL(10,2) NOT NULL,
-          status VARCHAR(50) DEFAULT 'pending',
-          payment_status VARCHAR(50) DEFAULT 'unpaid',
-          created_at TIMESTAMP DEFAULT NOW(),
-          updated_at TIMESTAMP DEFAULT NOW()
-        )
-      `);
-      tablesCreated.push('orders');
-
-      // 3. Create order_items table
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS "${schemaName}".order_items (
-          id SERIAL PRIMARY KEY,
-          order_id INTEGER REFERENCES "${schemaName}".orders(id) ON DELETE CASCADE,
-          menu_item_id INTEGER REFERENCES "${schemaName}".menu_items(id),
-          quantity INTEGER NOT NULL DEFAULT 1,
-          unit_price DECIMAL(10,2) NOT NULL,
-          total_price DECIMAL(10,2) NOT NULL,
-          notes TEXT,
-          created_at TIMESTAMP DEFAULT NOW()
-        )
-      `);
-      tablesCreated.push('order_items');
-
-      // 4. Create transactions table
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS "${schemaName}".transactions (
-          id SERIAL PRIMARY KEY,
-          order_id INTEGER REFERENCES "${schemaName}".orders(id),
-          amount DECIMAL(10,2) NOT NULL,
-          payment_method VARCHAR(50) NOT NULL,
-          payment_status VARCHAR(50) DEFAULT 'completed',
-          transaction_reference VARCHAR(255),
-          created_at TIMESTAMP DEFAULT NOW()
-        )
-      `);
-      tablesCreated.push('transactions');
-
-      // 5. Create tables table (for table management)
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS "${schemaName}".tables (
-          id SERIAL PRIMARY KEY,
-          table_number VARCHAR(20) UNIQUE NOT NULL,
-          capacity INTEGER NOT NULL,
-          status VARCHAR(50) DEFAULT 'available',
-          current_order_id INTEGER REFERENCES "${schemaName}".orders(id),
-          created_at TIMESTAMP DEFAULT NOW(),
-          updated_at TIMESTAMP DEFAULT NOW()
-        )
-      `);
-      tablesCreated.push('tables');
-
-      this.logger.info('Basic tables created in establishment schema', { 
-        schemaName, 
-        tablesCreated: tablesCreated.length 
-      });
-
-      return tablesCreated;
-
-    } catch (error) {
-      this.logger.error('Failed to create basic tables in schema', error as Error);
-      throw new Error(`Failed to create basic tables: ${(error as Error).message}`);
     }
   }
 

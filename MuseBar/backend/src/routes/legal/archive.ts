@@ -24,12 +24,17 @@ router.post('/create', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Archive type, start date, and end date are required' });
     }
     
+    const establishmentId = req.user?.establishment_id ?? undefined;
+    if (archiveType === 'DAILY' && !establishmentId) {
+      return res.status(400).json({ error: 'DAILY archive requires an authenticated user with establishment context.' });
+    }
     const archive = await ArchiveService.exportData({
       export_type: archiveType as 'DAILY' | 'MONTHLY' | 'ANNUAL' | 'FULL',
       period_start: new Date(startDate),
       period_end: new Date(endDate),
       format: 'JSON',
-      created_by: String(req.user?.id || 'system')
+      created_by: String(req.user?.id || 'system'),
+      establishment_id: establishmentId
     });
     
     res.status(201).json({

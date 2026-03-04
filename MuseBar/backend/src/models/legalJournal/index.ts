@@ -86,25 +86,25 @@ export class LegalJournalModel {
     return await JournalQueries.getEntriesForOrder(orderId);
   }
 
-  // Closure operations
-  static async createDailyClosure(date: Date) {
-    return await ClosureOperations.createDailyClosure(date);
+  // Closure operations (establishmentId required for multi-tenant data isolation)
+  static async createDailyClosure(date: Date, establishmentId: string) {
+    return await ClosureOperations.createDailyClosure(date, establishmentId);
   }
 
-  static async createWeeklyClosure(date: Date) {
-    return await ClosureOperations.createWeeklyClosure(date);
+  static async createWeeklyClosure(date: Date, establishmentId: string) {
+    return await ClosureOperations.createWeeklyClosure(date, establishmentId);
   }
 
-  static async createMonthlyClosure(date: Date) {
-    return await ClosureOperations.createMonthlyClosure(date);
+  static async createMonthlyClosure(date: Date, establishmentId: string) {
+    return await ClosureOperations.createMonthlyClosure(date, establishmentId);
   }
 
-  static async createAnnualClosure(date: Date) {
-    return await ClosureOperations.createAnnualClosure(date);
+  static async createAnnualClosure(date: Date, establishmentId: string) {
+    return await ClosureOperations.createAnnualClosure(date, establishmentId);
   }
 
-  static async getClosureBulletins(type?: 'DAILY' | 'MONTHLY' | 'ANNUAL') {
-    return await ClosureOperations.getClosureBulletins(type);
+  static async getClosureBulletins(type?: 'DAILY' | 'MONTHLY' | 'ANNUAL', establishmentId?: string) {
+    return await ClosureOperations.getClosureBulletins(type, establishmentId);
   }
 }
 

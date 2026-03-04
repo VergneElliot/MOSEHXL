@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { PrintingServiceFactory, IPrintingService, PrintingConfig } from '../services/printing';
 import { pool } from '../app';
 import { authenticateToken } from '../middleware/auth';
+import { EstablishmentModel } from '../models/establishment';
 
 const router = Router();
 
@@ -143,8 +144,10 @@ router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, async (
     const user = (req as any).user;
     const orderId = parseInt(req.params.orderId);
     const { type = 'detailed' } = req.query;
-    
-    // Get receipt data from database
+    const establishmentId = user.establishment_id;
+
+    // Query establishment-specific schema so we only see this tenant's orders/products (multi-tenant isolation)
+    const schemaName = await EstablishmentModel.getSchemaNameForEstablishment(establishmentId);
     const receiptResult = await pool.query(
       `SELECT 
         o.id as order_id,
@@ -154,7 +157,7 @@ router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, async (
         o.payment_method,
         o.created_at,
         o.tips,
-        o.change_given as change,
+        o.change AS change,
         o.receipt_hash,
         json_agg(
           json_build_object(
@@ -171,13 +174,13 @@ router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, async (
         e.email as business_email,
         e.siret,
         e.tax_identification
-      FROM orders o
-      JOIN establishments e ON o.establishment_id = e.id
-      LEFT JOIN order_items oi ON o.id = oi.order_id
-      LEFT JOIN products p ON oi.product_id = p.id
-      WHERE o.id = $1 AND o.establishment_id = $2
+      FROM "${schemaName}".orders o
+      JOIN public.establishments e ON e.id = $2
+      LEFT JOIN "${schemaName}".order_items oi ON o.id = oi.order_id
+      LEFT JOIN "${schemaName}".products p ON oi.product_id = p.id
+      WHERE o.id = $1
       GROUP BY o.id, e.id`,
-      [orderId, user.establishment_id]
+      [orderId, establishmentId]
     );
 
     if (receiptResult.rows.length === 0) {
