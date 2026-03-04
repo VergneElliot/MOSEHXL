@@ -1,19 +1,17 @@
 /**
  * Establishment Service
- * Handles establishment business logic and operations
+ * Handles establishment business logic and operations (list, get, delete, legacy create).
+ * Lives in establishment/ directory; enhanced creation uses EstablishmentCreationOrchestrator.
  */
 
-import { pool } from '../app';
+import { pool } from '../../app';
 import crypto from 'crypto';
-import { EstablishmentModel, CreateEstablishmentData, Establishment } from '../models/establishment';
-import { AuditTrailModel } from '../models/auditTrail';
-import { EmailService } from './email';
-import { Logger } from '../utils/logger';
-import { getEnvironmentConfig } from '../config/environment';
+import { EstablishmentModel, CreateEstablishmentData } from '../../models/establishment';
+import { AuditTrailModel } from '../../models/auditTrail';
+import { EmailService } from '../email';
+import { Logger } from '../../utils/logger';
+import { getEnvironmentConfig } from '../../config/environment';
 
-/**
- * Create establishment request interface
- */
 export interface CreateEstablishmentRequest {
   name: string;
   phone: string;
@@ -24,9 +22,6 @@ export interface CreateEstablishmentRequest {
   owner_email: string;
 }
 
-/**
- * Create establishment response interface
- */
 export interface CreateEstablishmentResponse {
   message: string;
   establishment: {
@@ -34,21 +29,14 @@ export interface CreateEstablishmentResponse {
     name: string;
     email: string;
     status: string;
-    /** Invitation sent to owner by email; token/link are never returned in API. */
   };
 }
 
-/**
- * Get establishments response interface
- */
 export interface GetEstablishmentsResponse {
   establishments: any[];
   total: number;
 }
 
-/**
- * Establishment Service Class
- */
 export class EstablishmentService {
   private logger: Logger;
 
@@ -56,9 +44,6 @@ export class EstablishmentService {
     this.logger = logger;
   }
 
-  /**
-   * Create new establishment with business setup invitation
-   */
   public async createEstablishment(
     data: CreateEstablishmentRequest,
     createdByUserId: string,
@@ -66,10 +51,8 @@ export class EstablishmentService {
     userAgent?: string
   ): Promise<CreateEstablishmentResponse> {
     try {
-      // Validate required fields
       this.validateCreateEstablishmentData(data);
 
-      // Check if establishment with same name already exists (name should still be unique)
       const existingEst = await pool.query(
         'SELECT id FROM establishments WHERE name = $1',
         [data.name]
@@ -79,14 +62,11 @@ export class EstablishmentService {
         throw new Error('Establishment with this name already exists');
       }
 
-      // Generate invitation token
       const invitationToken = crypto.randomBytes(32).toString('hex');
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-      // Initialize EstablishmentModel
       EstablishmentModel.initialize(this.logger);
 
-      // Create establishment with isolated schema
       const establishment = await EstablishmentModel.createEstablishment({
         name: data.name,
         email: data.owner_email,
@@ -95,7 +75,6 @@ export class EstablishmentService {
         subscription_plan: data.subscription_plan || 'basic'
       });
 
-      // Update establishment with additional fields and status
       await pool.query(`
         UPDATE establishments SET 
           tva_number = $1,
@@ -105,7 +84,6 @@ export class EstablishmentService {
         WHERE id = $3
       `, [data.tva_number, data.siret_number, establishment.id]);
 
-      // Create invitation record
       await this.createInvitationRecord(
         data.owner_email,
         establishment.id,
@@ -115,7 +93,6 @@ export class EstablishmentService {
         data.name
       );
 
-      // Log the action
       await AuditTrailModel.logAction({
         user_id: createdByUserId,
         action_type: 'CREATE_ESTABLISHMENT',
@@ -130,7 +107,6 @@ export class EstablishmentService {
         user_agent: userAgent
       });
 
-      // Send invitation email
       await this.sendSetupInvitationEmail(
         data.owner_email,
         data.name,
@@ -157,23 +133,16 @@ export class EstablishmentService {
           status: 'setup_required'
         }
       };
-
     } catch (error) {
       this.logger.error(
         'Failed to create establishment',
-        { 
-          error: error as Error,
-          establishmentData: data 
-        },
+        { error: error as Error, establishmentData: data },
         'ESTABLISHMENT_SERVICE'
       );
       throw error;
     }
   }
 
-  /**
-   * Get all establishments with pagination support
-   */
   public async getAllEstablishments(): Promise<GetEstablishmentsResponse> {
     try {
       const result = await pool.query(`
@@ -198,23 +167,20 @@ export class EstablishmentService {
     }
   }
 
-  /**
-   * Get establishment details by ID
-   */
   public async getEstablishmentById(id: string): Promise<{
     establishment: any;
     invitations: any[];
   }> {
     try {
-      const result = await pool.query(`
-        SELECT * FROM establishments WHERE id = $1
-      `, [id]);
+      const result = await pool.query(
+        'SELECT * FROM establishments WHERE id = $1',
+        [id]
+      );
 
       if (result.rows.length === 0) {
         throw new Error('Establishment not found');
       }
 
-      // Get pending invitations for this establishment
       const invitations = await pool.query(`
         SELECT email, role, status, created_at, expires_at
         FROM user_invitations 
@@ -229,25 +195,16 @@ export class EstablishmentService {
     } catch (error) {
       this.logger.error(
         'Failed to fetch establishment',
-        { 
-          error: error as Error,
-          establishmentId: id 
-        },
+        { error: error as Error, establishmentId: id },
         'ESTABLISHMENT_SERVICE'
       );
       throw error;
     }
   }
 
-  /**
-   * Delete establishment and all associated data
-   */
   public async deleteEstablishment(id: string): Promise<void> {
     try {
-      // Initialize EstablishmentModel
       EstablishmentModel.initialize(this.logger);
-
-      // Delete establishment using the model (this will also drop the schema)
       await EstablishmentModel.deleteEstablishment(id);
 
       this.logger.info(
@@ -258,34 +215,24 @@ export class EstablishmentService {
     } catch (error) {
       this.logger.error(
         'Failed to delete establishment',
-        { 
-          error: error as Error,
-          establishmentId: id 
-        },
+        { error: error as Error, establishmentId: id },
         'ESTABLISHMENT_SERVICE'
       );
       throw error;
     }
   }
 
-  /**
-   * Validate create establishment data
-   */
   private validateCreateEstablishmentData(data: CreateEstablishmentRequest): void {
     if (!data.name || !data.owner_email || !data.phone || !data.address) {
       throw new Error('Missing required fields: name, owner_email, phone, address');
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(data.owner_email)) {
       throw new Error('Invalid email format for owner_email');
     }
   }
 
-  /**
-   * Create invitation record in database
-   */
   private async createInvitationRecord(
     ownerEmail: string,
     establishmentId: string,
@@ -300,20 +247,17 @@ export class EstablishmentService {
         inviter_user_id, inviter_name, establishment_name, status, created_at
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', CURRENT_TIMESTAMP)
     `, [
-      ownerEmail, 
-      'establishment_admin', 
-      establishmentId, 
-      invitationToken, 
-      expiresAt, 
+      ownerEmail,
+      'establishment_admin',
+      establishmentId,
+      invitationToken,
+      expiresAt,
       inviterUserId,
       'System Administrator',
       establishmentName
     ]);
   }
 
-  /**
-   * Send setup invitation email to establishment owner
-   */
   private async sendSetupInvitationEmail(
     ownerEmail: string,
     establishmentName: string,
@@ -340,7 +284,7 @@ export class EstablishmentService {
         'establishment_setup',
         ownerEmail,
         {
-          ownerName: ownerEmail.split('@')[0], // Use email prefix as name for now
+          ownerName: ownerEmail.split('@')[0],
           establishmentName: establishmentName,
           inviterName: 'System Administrator',
           setupUrl: setupUrl,
@@ -356,15 +300,13 @@ export class EstablishmentService {
     } catch (emailError) {
       this.logger.error(
         'Failed to send setup invitation email',
-        { 
+        {
           error: emailError as Error,
-          ownerEmail, 
-          establishmentName 
+          ownerEmail,
+          establishmentName
         },
         'ESTABLISHMENT_SERVICE'
       );
-      // Don't fail the establishment creation if email fails
-      // The invitation token is still created and can be used manually
     }
   }
 }

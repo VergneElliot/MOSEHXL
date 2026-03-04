@@ -28,7 +28,7 @@ export interface GetEstablishmentsResponse {
 
 export class EstablishmentService {
   static async createEstablishment(data: CreateEstablishmentRequest): Promise<CreateEstablishmentResponse> {
-    const response = await apiService.post<CreateEstablishmentResponse>('/enhanced-establishments', data);
+    const response = await apiService.post<CreateEstablishmentResponse>('/establishments', data);
     return response.data;
   }
 
@@ -63,7 +63,7 @@ export class EstablishmentService {
         suspended: string;
         this_month: string;
       };
-    }>('/enhanced-establishments/stats');
+    }>('/establishments/stats');
     return response.data.data;
   }
 

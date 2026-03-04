@@ -35,4 +35,5 @@ Each chapter is self-contained. Read them in order, or jump to whatever you need
 | 26 | [Product isActive hardcoded](./26-PRODUCT-ISACTIVE-HARDCODED-FIX.md) | Why products API hardcoded isActive: true and how we use the real DB value and persist it on update |
 | 27 | [Double API call on mount (legal compliance)](./27-DOUBLE-API-CALL-LEGAL-COMPLIANCE-FIX.md) | Why two identical useEffects caused double fetches and how we keep a single load-on-mount effect |
 | 28 | [Debug info leaked on login](./28-DEBUG-INFO-LEAKED-LOGIN-FIX.md) | Why backend URL/host/init status must not be shown to all users and how we removed the debug Alert |
+| 29 | [Redundant standalone vs directory files](./29-REDUNDANT-STANDALONE-FILES-FIX.md) | Why shim files and duplicate route files were removed and how we consolidated establishments |
 | — | [Session summary: POS tax, payment, cleanup](./SESSION-SUMMARY-POS-TAX-PAYMENT-AND-CLEANUP.md) | Handoff: TTC tax fix, exact tax storage, cash/card only, three payment buttons, migrations, code cleanup |

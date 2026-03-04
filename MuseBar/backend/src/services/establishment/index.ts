@@ -3,6 +3,14 @@
  * Clean exports for all establishment-related functionality
  */
 
+// Legacy CRUD service (list, get, delete, simple create with invitation)
+export {
+  EstablishmentService,
+  CreateEstablishmentRequest,
+  CreateEstablishmentResponse,
+  GetEstablishmentsResponse
+} from './EstablishmentService';
+
 // Main orchestrator
 export { EstablishmentCreationOrchestrator, EnhancedCreateEstablishmentResponse } from './EstablishmentCreationOrchestrator';
 
