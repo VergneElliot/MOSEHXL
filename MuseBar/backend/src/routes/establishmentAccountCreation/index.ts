@@ -43,10 +43,12 @@ router.post('/complete',
     { field: 'businessInfo', required: true }
   ]),
   validateInvitation,
+  validateBusinessInfo,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       logger.info('Route handler started for establishment account creation');
-      const { token, password, businessInfo } = req.body as EstablishmentAccountCreationRequest;
+      const { token, password } = req.body as EstablishmentAccountCreationRequest;
+      const businessInfo = req.validatedBusinessInfo ?? req.body.businessInfo;
       const invitation = req.invitationValidation;
 
       logger.info('Extracted request data', { tokenPreview: token.substring(0, 8) + '...', businessType: businessInfo.businessType });

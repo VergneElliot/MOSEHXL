@@ -37,4 +37,5 @@ Each chapter is self-contained. Read them in order, or jump to whatever you need
 | 28 | [Debug info leaked on login](./28-DEBUG-INFO-LEAKED-LOGIN-FIX.md) | Why backend URL/host/init status must not be shown to all users and how we removed the debug Alert |
 | 29 | [Redundant standalone vs directory files](./29-REDUNDANT-STANDALONE-FILES-FIX.md) | Why shim files and duplicate route files were removed and how we consolidated establishments |
 | 30 | [Redundant frontend files (standalone vs directory)](./30-REDUNDANT-FRONTEND-FILES-FIX.md) | Why 14 frontend shim files were removed and how resolution uses directory index |
+| 31 | [Dead frontend modules and middleware](./31-DEAD-FRONTEND-MODULES-AND-MIDDLEWARE-FIX.md) | Why skeletons/ and loadingStates/ were removed and validateBusinessInfo was added to the route chain |
 | — | [Session summary: POS tax, payment, cleanup](./SESSION-SUMMARY-POS-TAX-PAYMENT-AND-CLEANUP.md) | Handoff: TTC tax fix, exact tax storage, cash/card only, three payment buttons, migrations, code cleanup |
