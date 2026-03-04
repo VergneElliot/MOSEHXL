@@ -48,6 +48,18 @@ export interface UpdateEstablishmentData {
 }
 
 /**
+ * Schema names are generated as establishment_<uuid> or establishment_<id>.
+ * Only this format is safe to interpolate into SQL (no semicolons, quotes, or SQL keywords).
+ */
+const SAFE_SCHEMA_NAME_REGEX = /^establishment_[a-zA-Z0-9_]{1,64}$/;
+
+function assertValidSchemaName(schemaName: string): void {
+  if (!SAFE_SCHEMA_NAME_REGEX.test(schemaName)) {
+    throw new Error(`Invalid schema name format (refused for SQL safety): ${schemaName}`);
+  }
+}
+
+/**
  * Professional Establishment Model
  */
 export class EstablishmentModel {
@@ -290,6 +302,7 @@ export class EstablishmentModel {
       if (!establishment) {
         throw new Error('Establishment not found');
       }
+      assertValidSchemaName(establishment.schema_name);
 
       // 1) Clean dependent records to satisfy foreign keys
       // a) Remove business_settings row linked to this establishment
@@ -356,7 +369,9 @@ export class EstablishmentModel {
         throw new Error('Establishment not found');
       }
 
-      // Get orders count and revenue from establishment schema
+      assertValidSchemaName(establishment.schema_name);
+
+      // Get orders count and revenue from establishment schema (schema_name validated above)
       const ordersResult = await pool.query(`
         SELECT COUNT(*) as total_orders, COALESCE(SUM(total_amount), 0) as total_revenue
         FROM "${establishment.schema_name}".orders

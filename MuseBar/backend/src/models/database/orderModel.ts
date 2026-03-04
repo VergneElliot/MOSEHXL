@@ -7,6 +7,11 @@
 import { pool } from '../../app';
 import { Order, OrderItem, SubBill } from '../interfaces';
 
+/** Only these columns may be set by update(); prevents SQL injection via object keys. */
+const ALLOWED_ORDER_UPDATE_FIELDS = [
+  'total_amount', 'total_tax', 'payment_method', 'status', 'notes', 'tips', 'change'
+] as const;
+
 export const OrderModel = {
   async getAll(establishmentId: string): Promise<Order[]> {
     const result = await pool.query(
@@ -45,7 +50,11 @@ export const OrderModel = {
   },
 
   async update(id: number, order: Partial<Order>, establishmentId: string): Promise<Order | null> {
-    const fields = Object.keys(order).filter(key => key !== 'id' && key !== 'establishment_id');
+    const allowedSet = new Set<string>(ALLOWED_ORDER_UPDATE_FIELDS);
+    const fields = (Object.keys(order) as string[]).filter(key => allowedSet.has(key));
+    if (fields.length === 0) {
+      return this.getById(id, establishmentId);
+    }
     const setClause = fields.map((field, index) => `${field} = $${index + 3}`).join(', ');
     const query = `UPDATE orders SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND establishment_id = $2 RETURNING *`;
     const rec = order as Record<string, unknown>;

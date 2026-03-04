@@ -6,6 +6,12 @@
 import { pool } from '../../app';
 import { Product, Category } from '../interfaces';
 
+/** Only these columns may be set by ProductModel.update(); prevents SQL injection via object keys. */
+const ALLOWED_PRODUCT_UPDATE_FIELDS = [
+  'name', 'price', 'tax_rate', 'category_id',
+  'happy_hour_discount_percent', 'happy_hour_discount_fixed', 'is_happy_hour_eligible', 'is_active'
+] as const;
+
 export const CategoryModel = {
   async getAll(establishmentId: string): Promise<Category[]> {
     const result = await pool.query(
@@ -161,7 +167,11 @@ export const ProductModel = {
   },
 
   async update(id: number, product: Partial<Product>, establishmentId: string): Promise<Product | null> {
-    const fields = Object.keys(product).filter(key => key !== 'id' && key !== 'establishment_id');
+    const allowedSet = new Set<string>(ALLOWED_PRODUCT_UPDATE_FIELDS);
+    const fields = (Object.keys(product) as string[]).filter(key => allowedSet.has(key));
+    if (fields.length === 0) {
+      return this.getById(id, establishmentId);
+    }
     const setClause = fields.map((field, index) => `${field} = $${index + 3}`).join(', ');
     const query = `UPDATE products SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND establishment_id = $2 AND is_active = TRUE RETURNING *`;
     const rec = product as Record<string, unknown>;
