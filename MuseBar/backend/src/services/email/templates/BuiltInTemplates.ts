@@ -11,6 +11,9 @@
 
 import { EmailTemplate, BuiltInTemplateId } from './types';
 import { UserInvitationTemplate } from './userInvitationTemplate';
+import { EstablishmentInvitationTemplate } from './establishmentInvitationTemplate';
+import { UserInvitationReminderTemplate, EstablishmentInvitationReminderTemplate } from './invitationReminderTemplate';
+import { InvitationCancelledTemplate } from './invitationCancelledTemplate';
 import { PasswordResetTemplate } from './passwordResetTemplate';
 import { EmailVerificationTemplate } from './emailVerificationTemplate';
 import { EstablishmentSetupTemplate } from './establishmentSetupTemplate';
@@ -29,6 +32,10 @@ export class BuiltInTemplates {
 
     // Add all templates to the map using specialized modules
     templates.set(BuiltInTemplateId.USER_INVITATION, UserInvitationTemplate.getTemplate());
+    templates.set(BuiltInTemplateId.ESTABLISHMENT_INVITATION, EstablishmentInvitationTemplate.getTemplate());
+    templates.set(BuiltInTemplateId.USER_INVITATION_REMINDER, UserInvitationReminderTemplate.getTemplate());
+    templates.set(BuiltInTemplateId.ESTABLISHMENT_INVITATION_REMINDER, EstablishmentInvitationReminderTemplate.getTemplate());
+    templates.set(BuiltInTemplateId.INVITATION_CANCELLED, InvitationCancelledTemplate.getTemplate());
     templates.set(BuiltInTemplateId.PASSWORD_RESET, PasswordResetTemplate.getTemplate());
     templates.set(BuiltInTemplateId.EMAIL_VERIFICATION, EmailVerificationTemplate.getTemplate());
     templates.set(BuiltInTemplateId.ESTABLISHMENT_SETUP, EstablishmentSetupTemplate.getTemplate());
@@ -44,19 +51,22 @@ export class BuiltInTemplates {
     switch (templateId) {
       case BuiltInTemplateId.USER_INVITATION:
         return UserInvitationTemplate.getTemplate();
-      
+      case BuiltInTemplateId.ESTABLISHMENT_INVITATION:
+        return EstablishmentInvitationTemplate.getTemplate();
+      case BuiltInTemplateId.USER_INVITATION_REMINDER:
+        return UserInvitationReminderTemplate.getTemplate();
+      case BuiltInTemplateId.ESTABLISHMENT_INVITATION_REMINDER:
+        return EstablishmentInvitationReminderTemplate.getTemplate();
+      case BuiltInTemplateId.INVITATION_CANCELLED:
+        return InvitationCancelledTemplate.getTemplate();
       case BuiltInTemplateId.PASSWORD_RESET:
         return PasswordResetTemplate.getTemplate();
-      
       case BuiltInTemplateId.EMAIL_VERIFICATION:
         return EmailVerificationTemplate.getTemplate();
-      
       case BuiltInTemplateId.ESTABLISHMENT_SETUP:
         return EstablishmentSetupTemplate.getTemplate();
-      
       case BuiltInTemplateId.ESTABLISHMENT_CREATED:
         return EstablishmentCreatedTemplate.getTemplate();
-      
       default:
         return null;
     }
@@ -68,6 +78,10 @@ export class BuiltInTemplates {
   public static getTemplateIds(): BuiltInTemplateId[] {
     return [
       BuiltInTemplateId.USER_INVITATION,
+      BuiltInTemplateId.ESTABLISHMENT_INVITATION,
+      BuiltInTemplateId.USER_INVITATION_REMINDER,
+      BuiltInTemplateId.ESTABLISHMENT_INVITATION_REMINDER,
+      BuiltInTemplateId.INVITATION_CANCELLED,
       BuiltInTemplateId.PASSWORD_RESET,
       BuiltInTemplateId.EMAIL_VERIFICATION,
       BuiltInTemplateId.ESTABLISHMENT_SETUP,

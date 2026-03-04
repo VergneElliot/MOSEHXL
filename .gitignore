@@ -145,9 +145,6 @@ keys/
 # Database exports
 exports/
 
-# Package-lock files (keep only one version)
-package-lock.json
-
 # Production specific files
 production.env
 staging.env

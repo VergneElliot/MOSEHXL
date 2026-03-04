@@ -31,4 +31,5 @@ Each chapter is self-contained. Read them in order, or jump to whatever you need
 | 22 | [Establishment/setup flows and invitation consolidation](./22-ESTABLISHMENT-SETUP-FLOWS-AND-INVITATION-CONSOLIDATION.md) | Five overlapping flows (#12), single invitation query (#13), and how to evolve |
 | 23 | [Password validation single rule set](./23-PASSWORD-VALIDATION-SINGLE-RULE-SET.md) | Why one password policy everywhere and how we consolidated to utils/passwordValidation |
 | 24 | [Migration chain broken on fresh DB](./24-MIGRATION-CHAIN-FRESH-DB-FIX.md) | Why migrate failed on fresh DB and how we moved setup/status-transitions into the timestamped chain |
+| 25 | [package-lock and email templates](./25-PACKAGE-LOCK-AND-EMAIL-TEMPLATES-FIX.md) | Why lockfile must be committed (CI/reproducible builds) and why missing invitation templates threw at runtime |
 | — | [Session summary: POS tax, payment, cleanup](./SESSION-SUMMARY-POS-TAX-PAYMENT-AND-CLEANUP.md) | Handoff: TTC tax fix, exact tax storage, cash/card only, three payment buttons, migrations, code cleanup |

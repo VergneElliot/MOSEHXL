@@ -49,6 +49,10 @@ export enum TemplateCategory {
  */
 export enum BuiltInTemplateId {
   USER_INVITATION = 'user_invitation',
+  ESTABLISHMENT_INVITATION = 'establishment_invitation',
+  USER_INVITATION_REMINDER = 'user_invitation_reminder',
+  ESTABLISHMENT_INVITATION_REMINDER = 'establishment_invitation_reminder',
+  INVITATION_CANCELLED = 'invitation_cancelled',
   PASSWORD_RESET = 'password_reset',
   EMAIL_VERIFICATION = 'email_verification',
   ESTABLISHMENT_SETUP = 'establishment_setup',
