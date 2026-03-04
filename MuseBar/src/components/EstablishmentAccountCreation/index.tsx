@@ -118,13 +118,7 @@ const EstablishmentAccountCreation: React.FC = () => {
 
   // Handle final setup completion
   const handleCompleteSetup = async () => {
-    console.log('🚀 Starting account creation...');
-    console.log('Token:', token);
-    console.log('Business Info:', setupState.businessInfo);
-    console.log('Password:', setupState.password ? '***' : 'MISSING');
-    
     if (!token || !setupState.businessInfo || !setupState.password) {
-      console.error('❌ Missing required information');
       setupActions.setError('Missing required information');
       return;
     }
@@ -133,17 +127,13 @@ const EstablishmentAccountCreation: React.FC = () => {
     setupActions.setError(null);
 
     try {
-      console.log('📡 Calling createAccount API...');
       const result = await createAccount({
-        token: token, // Use the token from URL params
+        token: token,
         password: setupState.password,
         businessInfo: setupState.businessInfo
       });
 
-      console.log('📡 API Response:', result);
-
       if (result.success) {
-        console.log('✅ Account creation successful!');
         setupActions.completeStep(3);
         setupActions.setCompleted(true);
         setupActions.setSuccessMessage('🎉 Account created successfully! You will now be redirected to your POS system.');
@@ -159,11 +149,9 @@ const EstablishmentAccountCreation: React.FC = () => {
           });
         }, 2000);
       } else {
-        console.error('❌ Account creation failed:', result.error || result.message);
         setupActions.setError(result.error || result.message || 'Failed to create account');
       }
     } catch (error: unknown) {
-      console.error('❌ Unexpected error:', error);
       setupActions.setError('An unexpected error occurred');
     } finally {
       setupActions.setLoading(false);

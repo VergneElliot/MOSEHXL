@@ -17,14 +17,7 @@ export function getAuthToken(): string | null {
 
 export function ensureAuthentication(): void {
   const token = getAuthToken();
-  console.log('🔐 ensureAuthentication: Token from localStorage:', token ? 'Present' : 'Missing');
-  console.log('🔐 ensureAuthentication: setTokenFunction available:', !!setTokenFunction);
-  
   if (token && setTokenFunction) {
-    // Set token synchronously to avoid race conditions
     setTokenFunction(token);
-    console.log('🔐 ensureAuthentication: Token set successfully');
-  } else {
-    console.log('🔐 ensureAuthentication: Cannot set token - missing token or setTokenFunction');
   }
 }

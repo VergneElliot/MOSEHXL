@@ -36,12 +36,8 @@ export const usePaymentSettings = ({
     onLoadingChange(true);
     try {
       // TODO: Implement when API endpoint is available
-      // const response = await apiService.get<PaymentSettings>('/settings/payment');
-      // onUpdate({ ...defaultPaymentSettings, ...response });
-      console.log('Payment settings loaded (placeholder)');
       onUpdate(defaultPaymentSettings);
     } catch (error) {
-      console.error('Error loading payment settings:', error);
       onUpdate(defaultPaymentSettings);
     } finally {
       onLoadingChange(false);
@@ -91,10 +87,7 @@ export const usePaymentSettings = ({
     onSavingChange(true);
     try {
       // TODO: Implement API call for payment settings
-      // await apiService.post('/settings/payment', paymentSettings);
-      console.log('Payment settings saved:', paymentSettings);
     } catch (error) {
-      console.error('Error saving payment settings:', error);
       throw error;
     } finally {
       onSavingChange(false);

@@ -119,7 +119,7 @@ export const useSettings = (): UseSettingsReturn => {
         paymentHook.loadPaymentSettings(),
       ]);
     } catch (error) {
-      console.error('Error loading settings:', error);
+      // Error loading settings
     } finally {
       setState(prev => ({ ...prev, loading: false }));
     }
@@ -131,11 +131,8 @@ export const useSettings = (): UseSettingsReturn => {
   const testPrinter = async (): Promise<void> => {
     setState(prev => ({ ...prev, saving: true }));
     try {
-      // TODO: Implement printer test
-      console.log('Testing printer...');
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000)); // TODO: Replace with real printer test API
     } catch (error) {
-      console.error('Error testing printer:', error);
       throw error;
     } finally {
       setState(prev => ({ ...prev, saving: false }));
@@ -174,7 +171,6 @@ export const useSettings = (): UseSettingsReturn => {
     testPrinter,
     checkPrinterStatus: async () => {
       // TODO: Implement printer status check
-      console.log('Checking printer status...');
     },
   };
 };

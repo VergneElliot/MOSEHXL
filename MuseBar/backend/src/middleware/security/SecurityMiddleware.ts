@@ -67,7 +67,7 @@ export class SecurityMiddlewareFactory {
       res: Response, 
       next: NextFunction
     ) => {
-      SecurityMiddlewareFactory.executeMiddlewares(middlewares, req, res, next);
+      SecurityMiddlewareFactory.executeMiddlewares(logger, middlewares, req, res, next);
     };
 
     // Attach cleanup method
@@ -89,6 +89,7 @@ export class SecurityMiddlewareFactory {
    * Execute middleware chain
    */
   private static executeMiddlewares(
+    logger: Logger,
     middlewares: SecurityMiddlewareFunction[],
     req: Request,
     res: Response,
@@ -98,22 +99,20 @@ export class SecurityMiddlewareFactory {
 
     const runNext = (err?: any) => {
       if (err) {
-        console.log(`[SECURITY_MIDDLEWARE] Error in middleware ${index}:`, err);
+        logger.warn(`Security middleware error at index ${index}`, { error: err?.message ?? err });
         return next(err);
       }
       
       if (index >= middlewares.length) {
-        console.log(`[SECURITY_MIDDLEWARE] All middlewares completed for ${req.method} ${req.path}`);
         return next();
       }
 
       const middleware = middlewares[index];
-      console.log(`[SECURITY_MIDDLEWARE] Executing middleware ${index} for ${req.method} ${req.path}`);
       index++;
       try {
         middleware(req, res, runNext);
       } catch (error) {
-        console.log(`[SECURITY_MIDDLEWARE] Exception in middleware ${index-1}:`, error);
+        logger.warn(`Security middleware exception at index ${index - 1}`, { error: error instanceof Error ? error.message : error });
         next(error);
       }
     };
