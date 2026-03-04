@@ -1,14 +1,9 @@
+import { getPasswordValidationErrors } from '../../../utils/passwordValidation';
 import { BusinessSetupRequest, SetupValidationError } from '../types';
 
+/** Uses shared password rules so setup accepts the same passwords as invitation/account-creation flows. */
 export function validatePassword(password: string): SetupValidationError[] {
-  const errors: SetupValidationError[] = [];
-  if (!password) return errors;
-  if (password.length < 8) errors.push({ field: 'password', message: 'Password must be at least 8 characters long' });
-  if (!/(?=.*[a-z])/.test(password)) errors.push({ field: 'password', message: 'Password must contain at least one lowercase letter' });
-  if (!(/(?=.*[A-Z])/.test(password))) errors.push({ field: 'password', message: 'Password must contain at least one uppercase letter' });
-  if (!(/(?=.*\d)/.test(password))) errors.push({ field: 'password', message: 'Password must contain at least one number' });
-  if (!(/(?=.*[!@#$%^&*(),.?":{}|<>])/.test(password))) errors.push({ field: 'password', message: 'Password must contain at least one special character' });
-  return errors;
+  return getPasswordValidationErrors(password) as SetupValidationError[];
 }
 
 export function validateEmails(userEmail: string, contactEmail: string): SetupValidationError[] {

@@ -6,6 +6,7 @@
 import { Pool } from 'pg';
 import { Logger } from '../../utils/logger';
 import { InvitationQueries } from '../../utils/database';
+import { validatePassword as validatePasswordShared } from '../../utils/passwordValidation';
 import { 
   EstablishmentAccountCreationRequest,
   EstablishmentAccountCreationResponse 
@@ -137,25 +138,9 @@ export class EstablishmentAccountService {
     }
   }
 
-  /**
-   * Validate password strength
-   */
+  /** Validate password (uses shared utils/passwordValidation). */
   private validatePassword(password: string): { isValid: boolean; error?: string } {
-    if (password.length < 8) {
-      return {
-        isValid: false,
-        error: 'Password must be at least 8 characters long'
-      };
-    }
-
-    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
-      return {
-        isValid: false,
-        error: 'Password must contain at least one uppercase letter, one lowercase letter, and one number'
-      };
-    }
-
-    return { isValid: true };
+    return validatePasswordShared(password);
   }
 
   /**

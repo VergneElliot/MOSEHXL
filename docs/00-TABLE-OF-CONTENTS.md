@@ -29,4 +29,5 @@ Each chapter is self-contained. Read them in order, or jump to whatever you need
 | 20 | [Dual database pool removal](./20-DUAL-DATABASE-POOL-REMOVAL.md) | Why we removed the unused config/database module and keep a single pool in app.ts |
 | 21 | [Triple error handling consolidation](./21-TRIPLE-ERROR-HANDLING-CONSOLIDATION.md) | Why we merged to one error hierarchy, one asyncHandler, and one global handler |
 | 22 | [Establishment/setup flows and invitation consolidation](./22-ESTABLISHMENT-SETUP-FLOWS-AND-INVITATION-CONSOLIDATION.md) | Five overlapping flows (#12), single invitation query (#13), and how to evolve |
+| 23 | [Password validation single rule set](./23-PASSWORD-VALIDATION-SINGLE-RULE-SET.md) | Why one password policy everywhere and how we consolidated to utils/passwordValidation |
 | — | [Session summary: POS tax, payment, cleanup](./SESSION-SUMMARY-POS-TAX-PAYMENT-AND-CLEANUP.md) | Handoff: TTC tax fix, exact tax storage, cash/card only, three payment buttons, migrations, code cleanup |

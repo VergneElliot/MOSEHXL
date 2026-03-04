@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from './errorHandler';
+import { validatePassword } from '../utils/passwordValidation';
 
 // Basic validation functions
 export const isValidId = (id: string): boolean => {
@@ -118,7 +119,7 @@ export const commonValidations = {
   // User validations
   userCreate: [
     { field: 'email', required: true, validator: isValidEmail, message: 'Format d\'email invalide' },
-    { field: 'password', required: true, validator: (val: string) => isValidString(val, 8, 128), message: 'Le mot de passe doit contenir entre 8 et 128 caractères' },
+    { field: 'password', required: true, validator: (val: string) => validatePassword(val).isValid, message: 'Le mot de passe doit faire 8–128 caractères avec majuscule, minuscule et un chiffre' },
     { field: 'firstName', required: true, validator: (val: string) => isValidString(val, 2, 50), message: 'Le prénom doit contenir entre 2 et 50 caractères' },
     { field: 'lastName', required: true, validator: (val: string) => isValidString(val, 2, 50), message: 'Le nom doit contenir entre 2 et 50 caractères' }
   ]
