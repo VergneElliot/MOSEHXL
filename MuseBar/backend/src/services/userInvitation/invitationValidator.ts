@@ -6,6 +6,7 @@
 import { pool } from '../../app';
 import { Logger } from '../../utils/logger';
 import { InvitationQueries } from '../../utils/database';
+import { validatePassword as validatePasswordShared } from '../../utils/passwordValidation';
 import { ValidationError, DatabaseError } from '../../middleware/errorHandler';
 import { 
   EstablishmentInvitationData, 
@@ -173,50 +174,13 @@ export class InvitationValidator {
   }
 
   /**
-   * Validate password strength
+   * Validate password (uses shared utils/passwordValidation so all flows accept the same passwords).
    */
   public validatePassword(password: string): InvitationValidationResult {
-    if (!password) {
-      return {
-        isValid: false,
-        message: 'Password is required'
-      };
+    const result = validatePasswordShared(password);
+    if (!result.isValid) {
+      return { isValid: false, message: result.error ?? 'Invalid password' };
     }
-
-    if (password.length < 8) {
-      return {
-        isValid: false,
-        message: 'Password must be at least 8 characters long'
-      };
-    }
-
-    // Check for at least one uppercase letter
-    if (!/[A-Z]/.test(password)) {
-      return {
-        isValid: false,
-        message: 'Password must contain at least one uppercase letter'
-      };
-    }
-
-    // Check for at least one lowercase letter
-    if (!/[a-z]/.test(password)) {
-      return {
-        isValid: false,
-        message: 'Password must contain at least one lowercase letter'
-      };
-    }
-
-    // Check for at least one number
-    if (!/\d/.test(password)) {
-      return {
-        isValid: false,
-        message: 'Password must contain at least one number'
-      };
-    }
-
-    return {
-      isValid: true,
-      message: 'Password is valid'
-    };
+    return { isValid: true, message: 'Password is valid' };
   }
 }

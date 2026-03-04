@@ -2,6 +2,7 @@ import { PoolClient } from 'pg';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { Logger } from '../../../utils/logger';
+import { validatePassword } from '../../../utils/passwordValidation';
 import { AuditTrailModel } from '../../../models/auditTrail';
 
 export interface UserAccountData {
@@ -138,9 +139,9 @@ export class UserAccountOperations {
       return { isValid: false, error: 'Invalid email format' };
     }
 
-    // Password validation
-    if (!password || password.length < 8) {
-      return { isValid: false, error: 'Password must be at least 8 characters long' };
+    const passwordCheck = validatePassword(password ?? '');
+    if (!passwordCheck.isValid) {
+      return { isValid: false, error: passwordCheck.error ?? 'Invalid password' };
     }
 
     // Establishment ID validation
@@ -178,38 +179,14 @@ export class UserAccountOperations {
   }
 
   /**
-   * Verify password strength
+   * Verify password strength (uses shared utils/passwordValidation — same rule as all other flows).
    */
   public validatePasswordStrength(password: string): { isValid: boolean; error?: string; score?: number } {
-    if (password.length < 8) {
-      return { isValid: false, error: 'Password must be at least 8 characters long' };
+    const result = validatePassword(password);
+    if (!result.isValid) {
+      return { isValid: false, error: result.error };
     }
-
-    if (password.length > 128) {
-      return { isValid: false, error: 'Password must be less than 128 characters long' };
-    }
-
-    // Basic password strength checks
-    const hasUpperCase = /[A-Z]/.test(password);
-    const hasLowerCase = /[a-z]/.test(password);
-    const hasNumbers = /\d/.test(password);
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-
-    let score = 0;
-    if (hasUpperCase) score++;
-    if (hasLowerCase) score++;
-    if (hasNumbers) score++;
-    if (hasSpecialChar) score++;
-    if (password.length >= 12) score++;
-
-    if (score < 3) {
-      return { 
-        isValid: false, 
-        error: 'Password must contain at least 3 of: uppercase letters, lowercase letters, numbers, special characters',
-        score 
-      };
-    }
-
+    const score = [/[A-Z]/.test(password), /[a-z]/.test(password), /\d/.test(password)].filter(Boolean).length + (password.length >= 12 ? 1 : 0);
     return { isValid: true, score };
   }
 }

@@ -8,6 +8,7 @@ import { validateBody } from '../../middleware/validation';
 import { validateInvitation } from './middleware/validateInvitation';
 import { validateBusinessInfo } from './middleware/validateBusinessInfo';
 import { Logger } from '../../utils/logger';
+import { validatePassword } from '../../utils/passwordValidation';
 import { pool } from '../../app';
 import { EstablishmentAccountService } from '../../services/establishmentAccountCreation/EstablishmentAccountService';
 import { 
@@ -50,12 +51,12 @@ router.post('/complete',
 
       logger.info('Extracted request data', { tokenPreview: token.substring(0, 8) + '...', businessType: businessInfo.businessType });
 
-      // Password validation
-      if (password.length < 8) {
-        logger.warn('Password validation failed - too short');
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.isValid) {
+        logger.warn('Password validation failed', { error: passwordValidation.error });
         return res.status(400).json({
           success: false,
-          error: 'Password must be at least 8 characters long'
+          error: passwordValidation.error ?? 'Invalid password'
         });
       }
 
