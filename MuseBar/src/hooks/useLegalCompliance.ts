@@ -151,11 +151,6 @@ export const useLegalCompliance = (): [LegalComplianceState, LegalComplianceActi
     [state.closureBulletins.length, loadClosureBulletins]
   );
 
-  // Load initial compliance data
-  useEffect(() => {
-    loadComplianceData();
-  }, [loadComplianceData]);
-
   const actions: LegalComplianceActions = {
     loadComplianceData,
     loadJournalEntries,
