@@ -1,4 +1,5 @@
 -- Legal compliance tables for French fiscal requirements
+-- Source of truth: migrations in migrations/files/. Types/precision aligned with post-migration state (audit #42).
 -- These tables implement the ISCA pillars (Inaltérabilité, Sécurisation, Conservation, Archivage)
 
 -- Append-only legal journal for transaction immutability
@@ -7,16 +8,16 @@ CREATE TABLE IF NOT EXISTS legal_journal (
     sequence_number INTEGER NOT NULL UNIQUE, -- Sequential numbering for legal compliance
     transaction_type VARCHAR(20) NOT NULL CHECK (transaction_type IN ('SALE', 'REFUND', 'CORRECTION', 'CLOSURE', 'ARCHIVE')),
     order_id INTEGER REFERENCES orders(id), -- Link to business transaction
-    amount DECIMAL(10,2) NOT NULL, -- Transaction amount
-    vat_amount DECIMAL(10,2) NOT NULL, -- VAT amount
+    amount DECIMAL(12,4) NOT NULL, -- Transaction amount (exact precision for legal)
+    vat_amount DECIMAL(12,4) NOT NULL, -- VAT amount
     payment_method VARCHAR(50) NOT NULL,
     transaction_data JSONB NOT NULL, -- Complete transaction details
     previous_hash VARCHAR(64) NOT NULL, -- Hash chain for integrity
     current_hash VARCHAR(64) NOT NULL UNIQUE, -- Current transaction hash
-    timestamp TIMESTAMP NOT NULL, -- Transaction timestamp
+    timestamp TIMESTAMPTZ NOT NULL, -- Transaction timestamp (TIMESTAMPTZ for hash correctness)
     user_id VARCHAR(100), -- User who performed the transaction
     register_id VARCHAR(100) NOT NULL, -- Cash register identifier
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     
     -- Legal constraints
     CONSTRAINT sequence_positive CHECK (sequence_number >= 0)
@@ -27,19 +28,19 @@ CREATE TABLE IF NOT EXISTS legal_journal (
 CREATE TABLE IF NOT EXISTS closure_bulletins (
     id SERIAL PRIMARY KEY,
     closure_type VARCHAR(10) NOT NULL CHECK (closure_type IN ('DAILY', 'MONTHLY', 'ANNUAL')),
-    period_start TIMESTAMP NOT NULL,
-    period_end TIMESTAMP NOT NULL,
+    period_start TIMESTAMPTZ NOT NULL,
+    period_end TIMESTAMPTZ NOT NULL,
     total_transactions INTEGER NOT NULL DEFAULT 0,
-    total_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
-    total_vat DECIMAL(12,2) NOT NULL DEFAULT 0,
+    total_amount DECIMAL(12,4) NOT NULL DEFAULT 0,
+    total_vat DECIMAL(12,4) NOT NULL DEFAULT 0,
     vat_breakdown JSONB NOT NULL, -- VAT totals by rate (10%, 20%)
     payment_methods_breakdown JSONB NOT NULL, -- Totals by payment method
     first_sequence INTEGER, -- First transaction sequence in period
     last_sequence INTEGER, -- Last transaction sequence in period
     closure_hash VARCHAR(64) NOT NULL, -- Closure integrity hash
     is_closed BOOLEAN NOT NULL DEFAULT FALSE,
-    closed_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    closed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     
     -- Legal constraints
     CONSTRAINT period_valid CHECK (period_end >= period_start),
@@ -59,7 +60,7 @@ CREATE TABLE IF NOT EXISTS audit_trail (
     ip_address INET, -- User IP address
     user_agent TEXT, -- Browser/client information
     session_id VARCHAR(100), -- Session identifier
-    timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     
     -- Note: Indexes will be created separately below
 );
@@ -68,8 +69,8 @@ CREATE TABLE IF NOT EXISTS audit_trail (
 CREATE TABLE IF NOT EXISTS archive_exports (
     id SERIAL PRIMARY KEY,
     export_type VARCHAR(20) NOT NULL CHECK (export_type IN ('DAILY', 'MONTHLY', 'ANNUAL', 'FULL')),
-    period_start TIMESTAMP,
-    period_end TIMESTAMP,
+    period_start TIMESTAMPTZ,
+    period_end TIMESTAMPTZ,
     file_path VARCHAR(500) NOT NULL, -- Path to exported file
     file_hash VARCHAR(64) NOT NULL, -- File integrity hash
     file_size BIGINT NOT NULL, -- File size in bytes
@@ -77,8 +78,8 @@ CREATE TABLE IF NOT EXISTS archive_exports (
     digital_signature TEXT, -- Digital signature for authenticity
     export_status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (export_status IN ('PENDING', 'COMPLETED', 'FAILED', 'VERIFIED')),
     created_by VARCHAR(100), -- User who created the export
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    verified_at TIMESTAMP, -- When the export was verified
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    verified_at TIMESTAMPTZ, -- When the export was verified
     
     -- Legal constraints
     CONSTRAINT file_size_positive CHECK (file_size > 0),

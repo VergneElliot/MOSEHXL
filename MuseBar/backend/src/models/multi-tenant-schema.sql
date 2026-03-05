@@ -1,4 +1,5 @@
 -- Multi-Tenant Database Schema
+-- Source of truth: migrations in migrations/files/. Types aligned with post-migration state (audit #42).
 -- Supports establishment-based data isolation and user management
 
 -- Establishments table (tenants)
@@ -11,8 +12,8 @@ CREATE TABLE IF NOT EXISTS establishments (
     schema_name VARCHAR(50) NOT NULL UNIQUE,
     subscription_plan VARCHAR(50) DEFAULT 'basic',
     subscription_status VARCHAR(20) DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     
     CONSTRAINT valid_subscription_plan CHECK (subscription_plan IN ('basic', 'premium', 'enterprise')),
     CONSTRAINT valid_subscription_status CHECK (subscription_status IN ('active', 'suspended', 'cancelled'))
@@ -27,11 +28,11 @@ ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'cashier',
 ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE,
 ADD COLUMN IF NOT EXISTS email_verification_token VARCHAR(255),
 ADD COLUMN IF NOT EXISTS password_reset_token VARCHAR(255),
-ADD COLUMN IF NOT EXISTS password_reset_expires TIMESTAMP,
+ADD COLUMN IF NOT EXISTS password_reset_expires TIMESTAMPTZ,
 ADD COLUMN IF NOT EXISTS invitation_token VARCHAR(255),
-ADD COLUMN IF NOT EXISTS invitation_expires TIMESTAMP,
-ADD COLUMN IF NOT EXISTS last_login TIMESTAMP,
-ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ADD COLUMN IF NOT EXISTS invitation_expires TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
 
 -- Update existing users to have verified emails (backward compatibility)
 UPDATE users SET email_verified = TRUE WHERE email_verified IS NULL;
@@ -60,10 +61,10 @@ CREATE TABLE IF NOT EXISTS user_invitations (
     first_name VARCHAR(100),
     last_name VARCHAR(100),
     invitation_token VARCHAR(255) NOT NULL UNIQUE,
-    expires_at TIMESTAMP NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'pending', -- 'pending', 'accepted', 'expired', 'cancelled'
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    accepted_at TIMESTAMP,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    accepted_at TIMESTAMPTZ,
     
     CONSTRAINT valid_invitation_status CHECK (status IN ('pending', 'accepted', 'expired', 'cancelled')),
     CONSTRAINT valid_invitation_role CHECK (role IN ('cashier', 'manager', 'supervisor', 'establishment_admin', 'system_admin'))
@@ -82,9 +83,9 @@ CREATE TABLE IF NOT EXISTS password_reset_requests (
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     email VARCHAR(200) NOT NULL,
     reset_token VARCHAR(255) NOT NULL UNIQUE,
-    expires_at TIMESTAMP NOT NULL,
-    used_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     ip_address INET,
     user_agent TEXT
 );
@@ -105,11 +106,11 @@ CREATE TABLE IF NOT EXISTS email_logs (
     provider_message_id VARCHAR(255),
     tracking_id VARCHAR(100),
     error_message TEXT,
-    sent_at TIMESTAMP,
-    delivered_at TIMESTAMP,
-    opened_at TIMESTAMP,
-    clicked_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    sent_at TIMESTAMPTZ,
+    delivered_at TIMESTAMPTZ,
+    opened_at TIMESTAMPTZ,
+    clicked_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     
     CONSTRAINT valid_email_status CHECK (status IN ('pending', 'sent', 'failed', 'delivered', 'bounced', 'opened', 'clicked'))
 );
@@ -130,8 +131,8 @@ CREATE TABLE IF NOT EXISTS roles (
     permissions JSONB NOT NULL DEFAULT '[]',
     is_system_role BOOLEAN DEFAULT FALSE,
     is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     
     UNIQUE(name, establishment_id)
 );
@@ -157,8 +158,8 @@ CREATE TABLE IF NOT EXISTS user_role_assignments (
     role_id UUID REFERENCES roles(id) ON DELETE CASCADE,
     establishment_id UUID REFERENCES establishments(id),
     assigned_by INTEGER REFERENCES users(id),
-    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP, -- For temporary role assignments
+    assigned_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMPTZ, -- For temporary role assignments
     is_active BOOLEAN DEFAULT TRUE,
     
     UNIQUE(user_id, role_id, establishment_id)

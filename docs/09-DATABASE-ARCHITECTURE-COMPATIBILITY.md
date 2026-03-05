@@ -149,7 +149,7 @@ Plus the whole **establishments** table and **users** extensions from multi-tena
 | Area | Status | Notes |
 |------|--------|------|
 | Migration CLI | ✅ All schema changes in `files/` with correct order. Setup progress and status-transitions tables are in the chain (see doc 24). | Add any new schema changes as migrations in `files/` with `-- UP` / `-- DOWN`. |
-| Reference schemas | ⚠️ Out of date | schema.sql and multi-tenant-schema do not define `establishment_id` (or tips/change/description). Use this doc + migration as source of truth. |
+| Reference schemas | ✅ Aligned (audit #42) | schema.sql, legal-schema.sql, multi-tenant-schema.sql document types/precision matching post-migration state. establishment_id and rate_limit_store are added by migrations (documented in schema.sql reference block). |
 | Code vs DB contract | ✅ Clear | Models and routes consistently assume the columns in §2. If your DB has them, the app is compatible. |
 | Legal tables | ✅ | legal-schema matches what legalJournal/ and auditTrail models expect. |
 | User/role tables | ✅ | user.ts and auth routes expect users.establishment_id and role; multi-tenant-schema defines them. |

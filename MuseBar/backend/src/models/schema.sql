@@ -1,3 +1,6 @@
+-- Reference schema: source of truth is migrations in migrations/files/.
+-- This file documents the intended shape (types/precision/columns) to match post-migration state (audit #42).
+
 -- Create categories table
 CREATE TABLE IF NOT EXISTS categories (
     id SERIAL PRIMARY KEY,
@@ -5,8 +8,8 @@ CREATE TABLE IF NOT EXISTS categories (
     default_tax_rate DECIMAL(5,2) DEFAULT 20.00,
     color VARCHAR(7) DEFAULT '#1976d2',
     is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create products table
@@ -20,20 +23,22 @@ CREATE TABLE IF NOT EXISTS products (
     happy_hour_discount_fixed DECIMAL(10,2) DEFAULT NULL,
     is_happy_hour_eligible BOOLEAN DEFAULT true,
     is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create orders table
 CREATE TABLE IF NOT EXISTS orders (
     id SERIAL PRIMARY KEY,
-    total_amount DECIMAL(10,2) NOT NULL,
-    total_tax DECIMAL(10,2) NOT NULL,
+    total_amount DECIMAL(12,4) NOT NULL,
+    total_tax DECIMAL(12,4) NOT NULL,
     payment_method VARCHAR(20) DEFAULT 'cash', -- 'cash', 'card', 'split'
     status VARCHAR(20) DEFAULT 'completed', -- 'pending', 'completed', 'cancelled'
     notes TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    tips DECIMAL(10,2) DEFAULT 0,
+    change DECIMAL(10,2) DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create order_items table
@@ -43,14 +48,15 @@ CREATE TABLE IF NOT EXISTS order_items (
     product_id INTEGER REFERENCES products(id),
     product_name VARCHAR(100) NOT NULL,
     quantity INTEGER NOT NULL,
-    unit_price DECIMAL(10,2) NOT NULL,
-    total_price DECIMAL(10,2) NOT NULL,
+    unit_price DECIMAL(12,4) NOT NULL,
+    total_price DECIMAL(12,4) NOT NULL,
     tax_rate DECIMAL(5,2) NOT NULL,
-    tax_amount DECIMAL(10,2) NOT NULL,
+    tax_amount DECIMAL(12,4) NOT NULL,
     happy_hour_applied BOOLEAN DEFAULT false,
     happy_hour_discount_amount DECIMAL(10,2) DEFAULT 0,
     sub_bill_id INTEGER DEFAULT NULL, -- For split payments
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    description TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create sub_bills table for split payments
@@ -58,18 +64,18 @@ CREATE TABLE IF NOT EXISTS sub_bills (
     id SERIAL PRIMARY KEY,
     order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
     payment_method VARCHAR(20) NOT NULL, -- 'cash', 'card'
-    amount DECIMAL(10,2) NOT NULL,
+    amount DECIMAL(12,4) NOT NULL,
     status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'paid'
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
--- Users table for authentication
+-- Users table for authentication (extended by multi-tenant-schema.sql)
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     email VARCHAR(150) NOT NULL,
     password_hash VARCHAR(200) NOT NULL,
     is_admin BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Permissions table
@@ -137,5 +143,28 @@ CREATE TABLE IF NOT EXISTS business_settings (
     email VARCHAR(100) NOT NULL,
     siret VARCHAR(20) NOT NULL,
     tax_identification VARCHAR(30) NOT NULL,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-); 
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Reference: columns/tables added by migrations (do not run if using migration:migrate).
+-- add_pos_columns_and_establishment_isolation: establishment_id on POS tables
+-- rate_limit_store: shared rate limit table (audit #40)
+-- Run these only when syncing reference schema manually without the migration CLI:
+/*
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS establishment_id UUID REFERENCES establishments(id) ON DELETE CASCADE;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS establishment_id UUID REFERENCES establishments(id) ON DELETE CASCADE;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS establishment_id UUID REFERENCES establishments(id) ON DELETE CASCADE;
+ALTER TABLE sub_bills ADD COLUMN IF NOT EXISTS establishment_id UUID REFERENCES establishments(id) ON DELETE CASCADE;
+ALTER TABLE business_settings ADD COLUMN IF NOT EXISTS establishment_id UUID REFERENCES establishments(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_categories_establishment_id ON categories(establishment_id);
+CREATE INDEX IF NOT EXISTS idx_products_establishment_id ON products(establishment_id);
+CREATE INDEX IF NOT EXISTS idx_orders_establishment_id ON orders(establishment_id);
+CREATE INDEX IF NOT EXISTS idx_sub_bills_establishment_id ON sub_bills(establishment_id);
+CREATE INDEX IF NOT EXISTS idx_business_settings_establishment_id ON business_settings(establishment_id);
+
+CREATE TABLE IF NOT EXISTS rate_limit_store (
+  key         TEXT PRIMARY KEY,
+  count       INT NOT NULL DEFAULT 0,
+  reset_time  TIMESTAMPTZ NOT NULL
+);
+*/ 
