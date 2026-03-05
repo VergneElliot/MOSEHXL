@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { DataService } from '../services/dataService';
 import { Category, Product } from '../types';
 import { CategoryFormData, ProductFormData } from './useMenuState';
@@ -215,18 +215,34 @@ export const useMenuAPI = (
     }
   }, [dataService, setArchivedCategories, showError]);
 
-  return {
-    createCategory,
-    updateCategory,
-    deleteCategory,
-    archiveCategory,
-    restoreCategory,
-    createProduct,
-    updateProduct,
-    deleteProduct,
-    archiveProduct,
-    restoreProduct,
-    loadArchivedProducts,
-    loadArchivedCategories,
-  };
+  return useMemo(
+    () => ({
+      createCategory,
+      updateCategory,
+      deleteCategory,
+      archiveCategory,
+      restoreCategory,
+      createProduct,
+      updateProduct,
+      deleteProduct,
+      archiveProduct,
+      restoreProduct,
+      loadArchivedProducts,
+      loadArchivedCategories,
+    }),
+    [
+      createCategory,
+      updateCategory,
+      deleteCategory,
+      archiveCategory,
+      restoreCategory,
+      createProduct,
+      updateProduct,
+      deleteProduct,
+      archiveProduct,
+      restoreProduct,
+      loadArchivedProducts,
+      loadArchivedCategories,
+    ]
+  );
 };

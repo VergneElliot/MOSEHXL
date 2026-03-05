@@ -155,10 +155,13 @@ export const useHistoryAPI = (
     await Promise.all([loadOrders(), loadStats()]);
   }, [loadOrders, loadStats]);
 
-  return {
-    loadOrders,
-    loadStats,
-    processReturn,
-    refreshData,
-  };
+  return useMemo(
+    () => ({
+      loadOrders,
+      loadStats,
+      processReturn,
+      refreshData,
+    }),
+    [loadOrders, loadStats, processReturn, refreshData]
+  );
 };
