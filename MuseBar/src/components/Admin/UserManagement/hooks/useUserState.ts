@@ -28,7 +28,7 @@ export const useUserState = () => {
   /**
    * Update a specific user in the list
    */
-  const updateUser = useCallback((userId: string, updates: Partial<User>) => {
+  const updateUser = useCallback((userId: number, updates: Partial<User>) => {
     setUsers(prev => 
       prev.map(user => 
         user.id === userId ? { ...user, ...updates } : user
@@ -39,7 +39,7 @@ export const useUserState = () => {
   /**
    * Remove a user from the list
    */
-  const removeUser = useCallback((userId: string) => {
+  const removeUser = useCallback((userId: number) => {
     setUsers(prev => prev.filter(user => user.id !== userId));
   }, []);
 

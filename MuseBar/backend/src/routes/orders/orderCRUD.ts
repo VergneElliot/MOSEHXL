@@ -7,23 +7,14 @@ import express from 'express';
 import { OrderModel, OrderItemModel, SubBillModel } from '../../models';
 import { LegalJournalModel } from '../../models/legalJournal';
 import { AuditTrailModel } from '../../models/auditTrail';
-import { requireAuth } from '../auth';
+import { Logger } from '../../utils/logger';
+import { getEstablishmentId, requireAuth } from '../auth';
 import { validateBody, validateParams, commonValidations, paramValidations } from '../../middleware/validation';
 
 const router = express.Router();
+const logger = Logger.getInstance();
 
-// All order routes require authentication.
 router.use(requireAuth);
-
-/** Extracts establishment_id from the authenticated request or rejects with 403. */
-function getEstablishmentId(req: express.Request, res: express.Response): string | null {
-  const id = req.user?.establishment_id;
-  if (!id) {
-    res.status(403).json({ error: 'No establishment associated with this account' });
-    return null;
-  }
-  return id;
-}
 
 /**
  * GET /api/orders — order history for this establishment
@@ -79,7 +70,7 @@ router.post('/', validateBody(commonValidations.orderCreate), async (req, res) =
     );
 
     const createdItems = await Promise.all(
-      items.map(async (item: any) =>
+      items.map(async (item: { product_id?: number; product_name: string; quantity: number; unit_price: number; total_price: number; tax_rate: number; tax_amount: number; happy_hour_applied?: boolean; happy_hour_discount_amount?: number; description?: string }) =>
         OrderItemModel.create({
           order_id: order.id,
           product_id: item.product_id,
@@ -96,12 +87,13 @@ router.post('/', validateBody(commonValidations.orderCreate), async (req, res) =
       )
     );
 
-    let createdSubBills: any[] = [];
+    let createdSubBills: Array<{ id: number; order_id: number; payment_method: string; amount: number; status: string }> = [];
     if (payment_method === 'split' && Array.isArray(sub_bills)) {
       createdSubBills = await Promise.all(
-        sub_bills.map(async (sb: any) =>
-          SubBillModel.create({ order_id: order.id, payment_method: sb.payment_method, amount: sb.amount, status: 'pending' })
-        )
+        sub_bills.map(async (sb: { payment_method: string; amount: number }) => {
+          const method: 'cash' | 'card' = sb.payment_method === 'card' ? 'card' : 'cash';
+          return SubBillModel.create({ order_id: order.id, payment_method: method, amount: sb.amount, status: 'pending' });
+        })
       );
     }
 
@@ -123,7 +115,7 @@ router.post('/', validateBody(commonValidations.orderCreate), async (req, res) =
         },
         req.user ? String(req.user.id) : undefined
       ).catch((journalError: unknown) => {
-        console.error('[LEGAL JOURNAL] Failed to write journal entry for order', order.id, journalError);
+        logger.error(`Failed to write legal journal entry for order ${order.id}`, journalError instanceof Error ? journalError : new Error(String(journalError)), 'LEGAL_JOURNAL');
       });
 
       // Write to audit trail — records who created what, when, and from where.
@@ -140,7 +132,7 @@ router.post('/', validateBody(commonValidations.orderCreate), async (req, res) =
         ip_address: req.ip,
         user_agent: req.headers['user-agent'],
       }).catch((auditError: unknown) => {
-        console.error('[AUDIT TRAIL] Failed to write audit entry for order', order.id, auditError);
+        logger.error(`Failed to write audit trail entry for order ${order.id}`, auditError instanceof Error ? auditError : new Error(String(auditError)), 'AUDIT_TRAIL');
       });
     }
 

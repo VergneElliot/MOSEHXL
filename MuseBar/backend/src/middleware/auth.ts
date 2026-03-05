@@ -100,5 +100,19 @@ export function requirePermission(permission: string) {
   };
 }
 
+/**
+ * Extract establishment_id from the authenticated request.
+ * Sends 403 and returns null if user has no establishment (e.g. system admin without context).
+ * Use after requireAuth. Single source of truth for establishment-scoped routes.
+ */
+export function getEstablishmentId(req: Request, res: Response): string | null {
+  const id = req.user?.establishment_id;
+  if (!id) {
+    res.status(403).json({ error: 'No establishment associated with this account' });
+    return null;
+  }
+  return id;
+}
+
 /** @deprecated Use requireAuth instead. Kept for printing routes backward compat. */
 export const authenticateToken = requireAuth;

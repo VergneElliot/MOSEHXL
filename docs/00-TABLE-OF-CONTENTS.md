@@ -65,6 +65,7 @@ These are organized chronologically. Each entry corresponds to one specific issu
 | 34 | [Self-HTTP Proxy Fix](./patch-notes/34-SELF-HTTP-PROXY-PRINTING-COMPAT-FIX.md) | Replaced axios-to-self calls in printing compat with direct in-process function calls |
 | 48 | [Circular Logger Re-export](./patch-notes/48-CIRCULAR-LOGGER-RE-EXPORT-AUDIT-41-FIX.md) | Broke circular import cycle in logger module by removing re-export from index |
 | 43 | [Per-Request Service Instantiation](./patch-notes/43-PER-REQUEST-SERVICE-INSTANTIATION-AUDIT-36-FIX.md) | Changed services from per-request `new` to module-level singletons |
+| 56 | [Technical Audit Clean Base & V2 Readiness](./patch-notes/56-TECHNICAL-AUDIT-CLEAN-BASE-AND-V2-READINESS.md) | Migrations (closure tips/change/weekly, users.is_active, rate_limit_store, V1 backfill), single change endpoint, API base URL, dead code removal, single getEstablishmentId/formatDate, README/schema updates |
 
 ### Code Deduplication & Type Safety
 
@@ -76,6 +77,7 @@ These are organized chronologically. Each entry corresponds to one specific issu
 | 39 | [React Router Types Fix](./patch-notes/39-REACT-ROUTER-TYPES-AUDIT-32-FIX.md) | Removed stale @types/react-router-dom (v5 types) since v6 ships its own |
 | 41 | [Any Types Reduction](./patch-notes/41-ANY-TYPES-REDUCTION-AUDIT-34-FIX.md) | Replaced `any` with proper types in closure, auth, API, history, and POS code |
 | 44 | [Empty Catch Blocks](./patch-notes/44-EMPTY-CATCH-BLOCKS-AUDIT-37-FIX.md) | Added error logging to previously silent catch blocks in auth user creation |
+| 57 | [Backend Build: Logger & SubBill Fix](./patch-notes/57-BACKEND-BUILD-LOGGER-AND-SUBBILL-FIX.md) | Logger calls fixed to match (message, error, category) signature; payment_method narrowed to 'cash' \| 'card' for SubBill creation |
 
 ### Performance Fixes
 

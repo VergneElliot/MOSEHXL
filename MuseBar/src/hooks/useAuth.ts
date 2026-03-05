@@ -63,9 +63,7 @@ export const useAuth = (): AuthState & AuthActions => {
       const data = response.data;
       setUser(data);
       setPermissions(data.permissions || []);
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      // Token expired or invalid, logout required
+    } catch {
       logout();
     }
   }, [logout]);

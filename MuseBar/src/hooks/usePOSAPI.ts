@@ -109,21 +109,9 @@ export const usePOSAPI = (
   const processChange = useCallback(
     async (changeData: ChangeData) => {
       try {
-        const notes =
-          changeData.direction === 'card-to-cash'
-            ? `Changement de caisse: ${changeData.amount}€ - Carte vers Espèces`
-            : `Changement de caisse: ${changeData.amount}€ - Espèces vers Carte`;
-
-        const response = await apiService.post('/orders', {
-          total_amount: 0,
-          total_tax: 0,
-          payment_method: 'cash',
-          status: 'completed',
-          notes,
-          items: [],
-          sub_bills: [],
-          tips: 0,
-          change: changeData.amount,
+        const response = await apiService.post('/orders/payment/change', {
+          amount: changeData.amount,
+          direction: changeData.direction,
         });
 
         onSuccess('Changement de caisse effectué');

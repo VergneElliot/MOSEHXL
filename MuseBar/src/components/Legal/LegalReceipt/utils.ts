@@ -4,22 +4,10 @@
  */
 
 import { formatCurrency } from '../../../utils/formatCurrency';
+import { formatDate } from '../../../utils/formatDate';
 import { VatBreakdownItem, ReceiptCalculations, ReceiptFormatting } from './types';
 
-export { formatCurrency };
-
-/**
- * Format date for receipt display
- */
-export const formatDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleString('fr-FR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
+export { formatCurrency, formatDate };
 
 /**
  * Calculate VAT breakdown and totals

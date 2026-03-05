@@ -7,20 +7,12 @@ import express from 'express';
 import { OrderModel, OrderItemModel, SubBillModel } from '../../models';
 import { LegalJournalModel } from '../../models/legalJournal';
 import { AuditTrailModel } from '../../models/auditTrail';
-import { requireAuth } from '../auth';
+import { Logger } from '../../utils/logger';
+import { getEstablishmentId, requireAuth } from '../auth';
 import { validateBody } from '../../middleware/validation';
 
 const router = express.Router();
-
-/** Extracts establishment_id from the authenticated request or rejects with 403. */
-function getEstablishmentId(req: express.Request, res: express.Response): string | null {
-  const id = req.user?.establishment_id;
-  if (!id) {
-    res.status(403).json({ error: 'No establishment associated with this account' });
-    return null;
-  }
-  return id;
-}
+const logger = Logger.getInstance();
 
 /**
  * POST quick item return (retour)
@@ -105,7 +97,7 @@ router.post(
         req.user ? String(req.user.id) : undefined
       );
     } catch (journalError) {
-      console.error('Legal journal error (retour):', journalError);
+      logger.error(`Legal journal error (retour) for order ${order.id}`, journalError instanceof Error ? journalError : new Error(String(journalError)), 'LEGAL_JOURNAL');
     }
     
     // Log audit trail
@@ -122,8 +114,8 @@ router.post(
         ip_address: ip,
         user_agent: userAgent
       });
-    } catch (error) {
-      console.error('Audit log error (retour):', error);
+    } catch (auditError) {
+      logger.error(`Audit log error (retour) for order ${order.id}`, auditError instanceof Error ? auditError : new Error(String(auditError)), 'AUDIT_TRAIL');
     }
     
     res.status(201).json({
@@ -131,9 +123,10 @@ router.post(
       retour_order: order,
       retour_item: retourItem
     });
-  } catch (error: any) {
-    console.error('Error processing retour:', error);
-    res.status(500).json({ error: 'Erreur lors du retour de l\'article', details: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Error processing retour', error instanceof Error ? error : new Error(message), 'ORDER_PAYMENT');
+    res.status(500).json({ error: 'Erreur lors du retour de l\'article', details: message });
   }
 }
 );
@@ -276,7 +269,7 @@ router.post(
         req.user ? String(req.user.id) : undefined
       );
     } catch (journalError) {
-      console.error('Legal journal error (cancellation):', journalError);
+      logger.error(`Legal journal error (cancellation) for order ${cancellationOrder.id}`, journalError instanceof Error ? journalError : new Error(String(journalError)), 'LEGAL_JOURNAL');
     }
     
     // Log audit trail
@@ -299,8 +292,8 @@ router.post(
         ip_address: ip,
         user_agent: userAgent
       });
-    } catch (error) {
-      console.error('Audit log error (cancellation):', error);
+    } catch (auditError) {
+      logger.error(`Audit log error (cancellation) for order ${cancellationOrder.id}`, auditError instanceof Error ? auditError : new Error(String(auditError)), 'AUDIT_TRAIL');
     }
     
     res.status(201).json({
@@ -309,11 +302,77 @@ router.post(
       cancellation_items: cancellationOrderItems,
       cancelled_amount: -cancellationAmount
     });
-  } catch (error: any) {
-    console.error('Error processing cancellation:', error);
-    res.status(500).json({ error: 'Erreur lors de l\'annulation', details: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Error processing cancellation', error instanceof Error ? error : new Error(message), 'ORDER_PAYMENT');
+    res.status(500).json({ error: 'Erreur lors de l\'annulation', details: message });
   }
 }
 );
 
-export default router; 
+/**
+ * POST cash register change operation ("Faire de la Monnaie")
+ * POST /api/orders/payment/change
+ *
+ * Records a zero-total order that tracks a cash↔card exchange in the register.
+ */
+router.post(
+  '/change',
+  requireAuth,
+  validateBody([
+    { field: 'amount', required: true },
+    { field: 'direction', required: true },
+  ]),
+  async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
+  try {
+    const { amount, direction } = req.body as {
+      amount: number;
+      direction: 'card-to-cash' | 'cash-to-card';
+    };
+
+    if (!['card-to-cash', 'cash-to-card'].includes(direction)) {
+      return res.status(400).json({ error: 'Direction must be "card-to-cash" or "cash-to-card"' });
+    }
+    if (typeof amount !== 'number' || amount <= 0 || !Number.isFinite(amount)) {
+      return res.status(400).json({ error: 'Amount must be a positive number' });
+    }
+
+    const label = direction === 'card-to-cash'
+      ? `Faire de la Monnaie: ${amount}€ - Carte vers Espèces`
+      : `Faire de la Monnaie: ${amount}€ - Espèces vers Carte`;
+
+    const order = await OrderModel.create({
+      total_amount: 0,
+      total_tax: 0,
+      payment_method: 'cash',
+      status: 'completed',
+      notes: label,
+      establishment_id: establishmentId,
+      tips: 0,
+      change: amount,
+    }, establishmentId);
+
+    // Audit trail
+    const userId = req.user ? String(req.user.id) : undefined;
+    AuditTrailModel.logAction({
+      user_id: userId,
+      action_type: 'CASH_REGISTER_CHANGE',
+      resource_type: 'ORDER',
+      resource_id: String(order.id),
+      action_details: { amount, direction },
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+    }).catch((err: unknown) => {
+      logger.error('Audit log error (change)', err instanceof Error ? err : new Error(String(err)), 'AUDIT_TRAIL');
+    });
+
+    res.status(201).json({ message: 'Changement de caisse enregistré', order });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Erreur lors du changement de caisse', details: message });
+  }
+});
+
+export default router;

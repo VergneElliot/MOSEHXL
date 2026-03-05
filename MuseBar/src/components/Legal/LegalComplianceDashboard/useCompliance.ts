@@ -3,7 +3,7 @@
  * Centralized state management and business logic for legal compliance
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import React from 'react';
 import {
   CheckCircle,
@@ -17,7 +17,9 @@ import {
   JournalEntry,
   ClosureBulletin,
 } from './types';
+import { ApiService } from '../../../services/apiService';
 import { formatCurrency } from '../../../utils/formatCurrency';
+import { formatDate as formatDateUtil } from '../../../utils/formatDate';
 
 /**
  * Default compliance state
@@ -37,78 +39,45 @@ const defaultState: ComplianceState = {
  */
 export const useCompliance = (): UseComplianceReturn => {
   const [state, setState] = useState<ComplianceState>(defaultState);
+  const apiService = useMemo(() => ApiService.getInstance(), []);
 
-  /**
-   * Load compliance data from API
-   */
   const loadComplianceData = useCallback(async () => {
     setState(prev => ({ ...prev, loading: true, error: null }));
     
     try {
-      // Mock API call - replace with actual API
-      const response = await fetch('/api/compliance/status');
-      if (!response.ok) {
-        throw new globalThis.Error('Failed to load compliance data');
-      }
-      
-      const complianceStatus: ComplianceStatus = await response.json();
+      const response = await apiService.get<ComplianceStatus>('/legal/compliance/status');
       
       setState(prev => ({
         ...prev,
-        complianceStatus,
+        complianceStatus: response.data,
         loading: false,
       }));
     } catch (error) {
-      console.error('Error loading compliance data:', error);
       setState(prev => ({
         ...prev,
-        error: error instanceof globalThis.Error ? error.message : 'Unknown error',
+        error: error instanceof globalThis.Error ? error.message : 'Erreur de chargement',
         loading: false,
       }));
     }
-  }, []);
+  }, [apiService]);
 
-  /**
-   * Load journal entries
-   */
   const loadJournalEntries = useCallback(async () => {
     try {
-      const response = await fetch('/api/legal/journal/entries');
-      if (!response.ok) {
-        throw new globalThis.Error('Failed to load journal entries');
-      }
-      
-      const journalEntries: JournalEntry[] = await response.json();
-      
-      setState(prev => ({
-        ...prev,
-        journalEntries,
-      }));
-    } catch (error) {
-      console.error('Error loading journal entries:', error);
+      const response = await apiService.get<JournalEntry[]>('/legal/journal/entries');
+      setState(prev => ({ ...prev, journalEntries: response.data }));
+    } catch {
+      // Journal entries are non-critical; swallow to avoid blocking UI
     }
-  }, []);
+  }, [apiService]);
 
-  /**
-   * Load closure bulletins
-   */
   const loadClosureBulletins = useCallback(async () => {
     try {
-      const response = await fetch('/api/legal/closures');
-      if (!response.ok) {
-        throw new globalThis.Error('Failed to load closure bulletins');
-      }
-      
-      const closureBulletins: ClosureBulletin[] = await response.json();
-      
-      setState(prev => ({
-        ...prev,
-        closureBulletins,
-      }));
-    } catch (error) {
-      console.error('Error loading closure bulletins:', error);
+      const response = await apiService.get<ClosureBulletin[]>('/legal/closures');
+      setState(prev => ({ ...prev, closureBulletins: response.data }));
+    } catch {
+      // Closures are non-critical; swallow to avoid blocking UI
     }
-  }, []);
+  }, [apiService]);
 
   /**
    * Show journal dialog
@@ -154,21 +123,7 @@ export const useCompliance = (): UseComplianceReturn => {
   /**
    * Format date string
    */
-  const formatDate = useCallback((date: string): string => {
-    if (!date) return 'N/A';
-    
-    try {
-      return new Date(date).toLocaleDateString('fr-FR', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch (error) {
-      return 'Date invalide';
-    }
-  }, []);
+  const formatDate = useCallback((date: string): string => formatDateUtil(date), []);
 
   /**
    * Get integrity status color

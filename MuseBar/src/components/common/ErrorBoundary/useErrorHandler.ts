@@ -4,6 +4,7 @@
  */
 
 import { useCallback } from 'react';
+import { apiConfig } from '../../../config/api';
 import { ErrorInfo, ErrorSeverity, ErrorReport, UseErrorHandlerReturn } from './types';
 
 /**
@@ -42,8 +43,7 @@ export const useErrorHandler = (): UseErrorHandlerReturn => {
         },
       };
 
-      // Send to backend error reporting endpoint
-      const response = await fetch('/api/client-errors', {
+      const response = await fetch(apiConfig.getEndpoint('/api/client-errors'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -70,10 +70,8 @@ export const useErrorHandler = (): UseErrorHandlerReturn => {
         });
       }
 
-      console.log(`✅ Error reported successfully [${errorId}]`);
-    } catch (reportingError) {
-      console.error('❌ Failed to report error:', reportingError);
-      console.error('Original error that failed to report:', error);
+    } catch {
+      // Error reporting itself failed — nothing else to do client-side
     }
   }, []);
 

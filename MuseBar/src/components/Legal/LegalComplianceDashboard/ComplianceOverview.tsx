@@ -25,6 +25,7 @@ import {
   Archive,
   Visibility,
 } from '@mui/icons-material';
+import { formatDate } from '../../../utils/formatDate';
 import { ComplianceOverviewProps } from './types';
 
 /**
@@ -65,24 +66,6 @@ export const ComplianceOverview: React.FC<ComplianceOverviewProps> = ({
         return 'warning';
       default:
         return 'default';
-    }
-  };
-
-
-
-  const formatDate = (date: string): string => {
-    if (!date) return 'N/A';
-    
-    try {
-      return new Date(date).toLocaleDateString('fr-FR', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch (error) {
-      return 'Date invalide';
     }
   };
 

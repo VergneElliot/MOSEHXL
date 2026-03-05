@@ -5,13 +5,13 @@
 
 import express from 'express';
 import { LegalJournalModel } from '../../models/legalJournal';
+import { Logger } from '../../utils/logger';
 import { pool } from '../../app';
 import { requireAuth, requireAdmin } from '../auth';
 
 const router = express.Router();
+const logger = Logger.getInstance();
 
-// All journal routes require authentication.
-// The legal journal is an immutable fiscal record (NF 525).
 router.use(requireAuth);
 
 /**
@@ -27,8 +27,8 @@ router.get('/verify', async (req, res) => {
       verified_at: new Date().toISOString(),
       compliance: 'Article 286-I-3 bis du CGI'
     });
-  } catch (error) {
-    console.error('Error verifying journal integrity:', error);
+  } catch (error: unknown) {
+    logger.error('Error verifying journal integrity', error instanceof Error ? error : new Error(String(error)), 'LEGAL_JOURNAL');
     res.status(500).json({ error: 'Failed to verify journal integrity' });
   }
 });
@@ -42,7 +42,7 @@ router.get('/entries', async (req, res) => {
     const { start_date, end_date, limit = 100, offset = 0 } = req.query;
     
     let query = 'SELECT * FROM legal_journal ORDER BY sequence_number DESC';
-    const values: any[] = [];
+    const values: (string | number)[] = [];
     
     if (start_date && end_date) {
       query = `
@@ -50,7 +50,7 @@ router.get('/entries', async (req, res) => {
         WHERE timestamp >= $1 AND timestamp <= $2 
         ORDER BY sequence_number DESC
       `;
-      values.push(start_date, end_date);
+      values.push(start_date as string, end_date as string);
     }
     
     query += ` LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
@@ -58,7 +58,6 @@ router.get('/entries', async (req, res) => {
     
     const result = await pool.query(query, values);
     
-    // Get total count for pagination
     const countQuery = start_date && end_date 
       ? 'SELECT COUNT(*) FROM legal_journal WHERE timestamp >= $1 AND timestamp <= $2'
       : 'SELECT COUNT(*) FROM legal_journal';
@@ -72,8 +71,8 @@ router.get('/entries', async (req, res) => {
       offset: parseInt(offset as string),
       compliance_note: 'Journal entries are immutable per French fiscal law'
     });
-  } catch (error) {
-    console.error('Error fetching journal entries:', error);
+  } catch (error: unknown) {
+    logger.error('Error fetching journal entries', error instanceof Error ? error : new Error(String(error)), 'LEGAL_JOURNAL');
     res.status(500).json({ error: 'Failed to fetch journal entries' });
   }
 });
@@ -99,14 +98,13 @@ router.get('/stats', requireAdmin, async (req, res) => {
     `;
     
     const statsResult = await pool.query(statsQuery);
-    const stats = statsResult.rows[0];
     
     res.json({
-      statistics: stats,
+      statistics: statsResult.rows[0],
       compliance_note: 'Journal statistics for regulatory reporting'
     });
-  } catch (error) {
-    console.error('Error fetching journal statistics:', error);
+  } catch (error: unknown) {
+    logger.error('Error fetching journal statistics', error instanceof Error ? error : new Error(String(error)), 'LEGAL_JOURNAL');
     res.status(500).json({ error: 'Failed to fetch journal statistics' });
   }
 });
@@ -117,26 +115,20 @@ router.get('/stats', requireAdmin, async (req, res) => {
  */
 router.post('/reset', requireAdmin, async (req, res) => {
   try {
-    // Only allow in development
     if (process.env.NODE_ENV === 'production') {
       return res.status(403).json({ error: 'Journal reset not allowed in production' });
     }
     
-    const resetQuery = 'DELETE FROM legal_journal';
-    await pool.query(resetQuery);
-    
-    // Reset sequence
-    const resetSequenceQuery = 'ALTER SEQUENCE legal_journal_id_seq RESTART WITH 1';
-    await pool.query(resetSequenceQuery);
+    await pool.query('DELETE FROM legal_journal');
+    await pool.query('ALTER SEQUENCE legal_journal_id_seq RESTART WITH 1');
     
     res.json({
       message: 'Journal reset successfully (development only)',
-      note: 'This operation is only allowed in development environment'
     });
-  } catch (error) {
-    console.error('Error resetting journal:', error);
+  } catch (error: unknown) {
+    logger.error('Error resetting journal', error instanceof Error ? error : new Error(String(error)), 'LEGAL_JOURNAL');
     res.status(500).json({ error: 'Failed to reset journal' });
   }
 });
 
-export default router; 
+export default router;

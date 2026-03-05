@@ -1,24 +1,12 @@
 import express from 'express';
 import { CategoryModel } from '../models';
 import { AuditTrailModel } from '../models/auditTrail';
-import { requireAuth } from './auth';
+import { getEstablishmentId, requireAuth } from './auth';
 import { validateBody, validateParams, commonValidations, paramValidations } from '../middleware/validation';
 
 const router = express.Router();
 
-// All category routes require authentication.
-// establishment_id is extracted from the JWT on every request — no client can override it.
 router.use(requireAuth);
-
-/** Extracts establishment_id from the authenticated request or rejects with 403. */
-function getEstablishmentId(req: express.Request, res: express.Response): string | null {
-  const id = req.user?.establishment_id;
-  if (!id) {
-    res.status(403).json({ error: 'No establishment associated with this account' });
-    return null;
-  }
-  return id;
-}
 
 // GET /api/categories
 router.get('/', async (req, res) => {

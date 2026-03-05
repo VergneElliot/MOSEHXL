@@ -23,6 +23,7 @@ import {
 } from '@mui/material';
 import { ComplianceReportsProps } from './types';
 import { formatCurrency } from '../../../utils/formatCurrency';
+import { formatDate } from '../../../utils/formatDate';
 
 /**
  * Compliance Reports Component
@@ -36,22 +37,6 @@ export const ComplianceReports: React.FC<ComplianceReportsProps> = ({
   onCloseClosuresDialog,
   loading = false,
 }) => {
-  const formatDate = (date: string): string => {
-    if (!date) return 'N/A';
-    
-    try {
-      return new Date(date).toLocaleDateString('fr-FR', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch (error) {
-      return 'Date invalide';
-    }
-  };
-
   return (
     <>
       {/* Journal Entries Dialog */}

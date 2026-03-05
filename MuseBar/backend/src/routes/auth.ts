@@ -9,6 +9,7 @@ import { Logger } from '../utils/logger';
 // statements keep working without a mass-rename.
 import {
   generateToken,
+  getEstablishmentId,
   requireAuth,
   requireAdmin,
   requireEstablishmentAdmin,
@@ -18,6 +19,7 @@ import type { JwtPayload } from '../middleware/auth';
 
 export {
   generateToken,
+  getEstablishmentId,
   requireAuth,
   requireAdmin,
   requireEstablishmentAdmin,

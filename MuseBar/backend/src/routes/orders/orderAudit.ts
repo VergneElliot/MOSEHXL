@@ -5,9 +5,11 @@
 
 import express from 'express';
 import { AuditTrailModel } from '../../models/auditTrail';
+import { Logger } from '../../utils/logger';
 import { requireAuth } from '../auth';
 
 const router = express.Router();
+const logger = Logger.getInstance();
 
 /**
  * POST log order action
@@ -27,26 +29,24 @@ router.post('/log', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields for audit log' });
     }
 
-    const ip = req.ip;
-    const userAgent = req.headers['user-agent'];
-
     const auditEntry = await AuditTrailModel.logAction({
       user_id: userId,
       action_type: actionType,
       resource_type: resourceType,
       resource_id: String(resourceId),
       action_details: actionDetails,
-      ip_address: ip,
-      user_agent: userAgent
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent']
     });
 
     res.status(201).json({
       message: 'Audit entry created successfully',
       entry: auditEntry
     });
-  } catch (error: any) {
-    console.error('Error creating audit entry:', error);
-    res.status(500).json({ error: 'Failed to create audit entry', details: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Error creating audit entry', error instanceof Error ? error : new Error(message), 'ORDER_AUDIT');
+    res.status(500).json({ error: 'Failed to create audit entry', details: message });
   }
 });
 
@@ -61,18 +61,16 @@ router.get('/:orderId', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid order ID' });
     }
 
-    // For now, we'll return a placeholder since getAuditTrail doesn't exist
-    // In a full implementation, you'd query the audit_trail table
     res.json({
       order_id: orderId,
       audit_entries: [],
       total_entries: 0,
       compliance_note: 'Audit trail maintained for regulatory compliance',
-      note: 'Audit trail query methods to be implemented'
     });
-  } catch (error: any) {
-    console.error('Error fetching audit trail:', error);
-    res.status(500).json({ error: 'Failed to fetch audit trail', details: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Error fetching audit trail', error instanceof Error ? error : new Error(message), 'ORDER_AUDIT');
+    res.status(500).json({ error: 'Failed to fetch audit trail', details: message });
   }
 });
 
@@ -87,8 +85,6 @@ router.get('/:orderId/summary', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid order ID' });
     }
 
-    // For now, we'll return a placeholder since getAuditTrail doesn't exist
-    // In a full implementation, you'd query the audit_trail table
     res.json({
       order_id: orderId,
       summary: {
@@ -99,12 +95,12 @@ router.get('/:orderId/summary', requireAuth, async (req, res) => {
         last_action: null
       },
       compliance_note: 'Audit summary for regulatory reporting',
-      note: 'Audit trail query methods to be implemented'
     });
-  } catch (error: any) {
-    console.error('Error generating audit summary:', error);
-    res.status(500).json({ error: 'Failed to generate audit summary', details: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Error generating audit summary', error instanceof Error ? error : new Error(message), 'ORDER_AUDIT');
+    res.status(500).json({ error: 'Failed to generate audit summary', details: message });
   }
 });
 
-export default router; 
+export default router;

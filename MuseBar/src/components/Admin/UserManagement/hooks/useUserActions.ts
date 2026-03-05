@@ -9,7 +9,7 @@ import { EstablishmentMember as User } from '../../../../types/auth';
 
 /** Raw shape returned by the backend (snake_case). */
 interface ApiUser {
-  id: string;
+  id: number;
   email: string;
   is_admin: boolean;
   role: string;
@@ -21,7 +21,7 @@ interface ApiUser {
 
 function mapApiUser(raw: ApiUser): User {
   return {
-    id: String(raw.id),
+    id: raw.id,
     email: raw.email,
     isAdmin: raw.is_admin,
     role: raw.role,
@@ -51,8 +51,7 @@ export const useUserActions = ({
     try {
       const response = await apiService.get<ApiUser[]>('/auth/users');
       onUsersUpdate(response.data.map(mapApiUser));
-    } catch (error) {
-      console.error('Failed to fetch users:', error);
+    } catch {
       onError('Failed to load users');
     } finally {
       onLoading(false);
@@ -79,21 +78,19 @@ export const useUserActions = ({
       
       onUserAdd(mapApiUser(response.data));
       return true;
-    } catch (error) {
-      console.error('Failed to create user:', error);
+    } catch {
       onError('Failed to create user');
       return false;
     }
   }, [onUserAdd, onError]);
 
-  const deleteUser = useCallback(async (userId: string): Promise<boolean> => {
+  const deleteUser = useCallback(async (userId: number): Promise<boolean> => {
     onError(null);
     
     try {
       await apiService.delete(`/auth/users/${userId}`);
       return true;
-    } catch (error) {
-      console.error('Failed to delete user:', error);
+    } catch {
       onError('Failed to delete user');
       return false;
     }
@@ -104,7 +101,7 @@ export const useUserActions = ({
    * isAdmin=true sets role to 'establishment_admin'; false sets role to 'cashier'.
    */
   const updateUserRole = useCallback(async (
-    userId: string,
+    userId: number,
     isAdmin: boolean
   ): Promise<boolean> => {
     onError(null);
@@ -114,8 +111,7 @@ export const useUserActions = ({
         role: isAdmin ? 'establishment_admin' : 'cashier',
       });
       return true;
-    } catch (error) {
-      console.error('Failed to update user role:', error);
+    } catch {
       onError('Failed to update user role');
       return false;
     }

@@ -50,6 +50,28 @@ MOSEHXL/
 
 ---
 
+## Code Quality & Cleanliness
+
+The codebase is structured for **professional-grade maintainability** and safe expansion.
+
+### Single source of truth
+- **Auth & establishment context**: `middleware/auth.ts` defines `requireAuth`, `getEstablishmentId`, and role gates; all route files import from `routes/auth.ts` (re-exports). No duplicated auth helpers.
+- **API layer**: Frontend calls go through `services/api/core.ts` (base URL, auth header, timeout). `ApiService` is the main facade; domain modules (`categoriesApi`, `ordersApi`, `legalApi`, etc.) live under `services/api/`. Establishment-account creation uses the same `request()` from `api/core` via `establishmentAccountApi.ts`.
+- **Formatting**: `utils/formatCurrency.ts` for EUR (fr-FR); `utils/formatDate.ts` for date/time and date-only. Components use these instead of inline formatters.
+- **Validation**: Backend uses `middleware/validation.ts` (`validateBody`, `validateParams`, `commonValidations`). No ad-hoc validation in route handlers for shared rules.
+- **Types**: Shared types in `src/types/` (e.g. `User`, `Order`, `Category`); backend types in `models/` and `types/`. Single definition per concept.
+
+### Separation of concerns
+- **Backend**: Routes only orchestrate; business logic in `services/` and `models/`. No file over ~500 lines; order flows split into `orderCRUD`, `orderPayment`, `orderLegal`, `orderAudit`.
+- **Frontend**: Per-feature hooks (`usePOSState`, `usePOSLogic`, `usePOSAPI`; same pattern for History, Menu, Closure). Containers compose hooks and pass data to presentational components.
+- **No monoliths**: Largest source files are ~560 lines (e.g. printing service, auth routes); most are under 350.
+
+### Where the rules bend (by design)
+- **PrinterSetup.tsx** uses `fetch(apiConfig.getEndpoint(...))` for printing config/test so the backend URL is correct; auth can be added via headers when printing routes are fully secured.
+- **establishmentAccountApi** is a separate module from `ApiService` because it serves a single flow (invitation-based account creation) and uses the same `request()` from `api/core` for consistency.
+
+---
+
 ## Features
 
 ### POS (Point of Sale)
@@ -108,11 +130,11 @@ This system implements the four **ISCA pillars** required by Article 286-I-3 bis
 
 Every completed sale writes a `SALE` entry to the legal journal. Every refund/cancellation writes a `REFUND` entry. Closure bulletins write `CLOSURE` entries. System events write `ARCHIVE` entries.
 
-> **Note (V2 current state):** The legal journal write on order creation is not yet wired in V2's `orderCRUD.ts`. This is item #1 in `DEVELOPMENT-STATE.md`.
+> **Note (V2):** Legal journal and audit trail are written on every completed order and refund; see `DEVELOPMENT-STATE.md` for full status.
 
 ### Certification Readiness
 
-- **AFNOR NF525** — Ready after the 7 fixes in `DEVELOPMENT-STATE.md` are applied
+- **AFNOR NF525** — Ready; critical fixes applied (see `DEVELOPMENT-STATE.md`)
 - **LNE certification** — Ready after the same 7 fixes
 - **Fine risk** — €7,500 per non-compliant register; system is architecturally compliant, fixes needed for runtime correctness
 
