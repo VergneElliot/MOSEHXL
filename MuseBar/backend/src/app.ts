@@ -143,7 +143,7 @@ app.listen(config.server.port, '0.0.0.0', () => {
   // Start the automatic closure scheduler (only in production)
   if (NODE_ENV === 'production') {
     ClosureScheduler.start().catch(error => {
-      console.error('❌ Failed to start closure scheduler:', error);
+      logger.error('Failed to start closure scheduler', error instanceof Error ? error : new Error(String(error)));
     });
     // Automatic closure scheduler started
   } else {

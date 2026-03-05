@@ -5,7 +5,7 @@
  * Single source of truth for the frontend — import from here, don't redefine.
  */
 export interface User {
-  id: string;
+  id: number;
   email: string;
   is_admin: boolean;
   role: string;
@@ -21,7 +21,7 @@ export interface User {
  * Uses camelCase `isAdmin` because the API response is mapped in useUserActions.
  */
 export interface EstablishmentMember {
-  id: string;
+  id: number;
   email: string;
   isAdmin: boolean;
   role: string;

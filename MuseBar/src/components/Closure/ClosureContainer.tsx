@@ -15,6 +15,7 @@ import { useClosureAPI } from '../../hooks/useClosureAPI';
 import ClosureStatusCards from './ClosureStatusCards';
 import BulletinsTable from './BulletinsTable';
 import { formatCurrency } from '../../utils/formatCurrency';
+import { formatDateOnly as formatDate } from '../../utils/formatDate';
 
 const ClosureContainer: React.FC = () => {
   const theme = useTheme();
@@ -66,11 +67,6 @@ const ClosureContainer: React.FC = () => {
 
   const handleDownload = (_bulletin: Parameters<typeof actions.setPrintBulletin>[0]) => {
     // Future: Implement download functionality
-  };
-
-  // Utility functions
-  const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('fr-FR');
   };
 
   const getClosureTypeLabel = (type: string): string => {

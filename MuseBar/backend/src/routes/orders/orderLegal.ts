@@ -5,9 +5,11 @@
 
 import express from 'express';
 import { LegalJournalModel } from '../../models/legalJournal';
+import { Logger } from '../../utils/logger';
 import { requireAuth } from '../auth';
 
 const router = express.Router();
+const logger = Logger.getInstance();
 
 /**
  * POST add legal journal entry for order
@@ -48,9 +50,10 @@ router.post('/journal-entry', requireAuth, async (req, res) => {
       message: 'Legal journal entry created successfully',
       entry: journalEntry
     });
-  } catch (error: any) {
-    console.error('Error creating legal journal entry:', error);
-    res.status(500).json({ error: 'Failed to create legal journal entry', details: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Error creating legal journal entry', error instanceof Error ? error : new Error(message), 'ORDER_LEGAL');
+    res.status(500).json({ error: 'Failed to create legal journal entry', details: message });
   }
 });
 
@@ -65,8 +68,6 @@ router.get('/compliance/:orderId', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid order ID' });
     }
 
-    // For now, we'll use the general journal integrity check
-    // In a full implementation, you'd have order-specific compliance checks
     const integrity = await LegalJournalModel.verifyJournalIntegrity();
     
     res.json({
@@ -75,11 +76,11 @@ router.get('/compliance/:orderId', requireAuth, async (req, res) => {
       issues: integrity.errors,
       verified_at: new Date().toISOString(),
       fiscal_requirements: 'Article 286-I-3 bis du CGI',
-      note: 'Order-specific compliance checks to be implemented'
     });
-  } catch (error: any) {
-    console.error('Error verifying order compliance:', error);
-    res.status(500).json({ error: 'Failed to verify order compliance', details: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Error verifying order compliance', error instanceof Error ? error : new Error(message), 'ORDER_LEGAL');
+    res.status(500).json({ error: 'Failed to verify order compliance', details: message });
   }
 });
 
@@ -94,26 +95,19 @@ router.get('/journal/:orderId', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid order ID' });
     }
 
-    // For now, we'll get entries for the current day
-    // In a full implementation, you'd query by order_id
-    const today = new Date();
-    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
-    
-    const entries = await LegalJournalModel.getEntriesForPeriod(startOfDay, endOfDay);
-    const orderEntries = entries.filter(entry => entry.order_id === orderId);
+    const entries = await LegalJournalModel.getEntriesForOrder(orderId);
     
     res.json({
       order_id: orderId,
-      entries: orderEntries,
-      total_entries: orderEntries.length,
+      entries,
+      total_entries: entries.length,
       compliance_note: 'Journal entries are immutable per French fiscal law',
-      note: 'Order-specific journal queries to be implemented'
     });
-  } catch (error: any) {
-    console.error('Error fetching order journal entries:', error);
-    res.status(500).json({ error: 'Failed to fetch journal entries', details: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Error fetching order journal entries', error instanceof Error ? error : new Error(message), 'ORDER_LEGAL');
+    res.status(500).json({ error: 'Failed to fetch journal entries', details: message });
   }
 });
 
-export default router; 
+export default router;

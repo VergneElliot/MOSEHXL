@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS legal_journal (
 -- Closure bulletins for periodic data consolidation
 CREATE TABLE IF NOT EXISTS closure_bulletins (
     id SERIAL PRIMARY KEY,
-    closure_type VARCHAR(10) NOT NULL CHECK (closure_type IN ('DAILY', 'MONTHLY', 'ANNUAL')),
+    closure_type VARCHAR(10) NOT NULL CHECK (closure_type IN ('DAILY', 'WEEKLY', 'MONTHLY', 'ANNUAL')),
     period_start TIMESTAMPTZ NOT NULL,
     period_end TIMESTAMPTZ NOT NULL,
     total_transactions INTEGER NOT NULL DEFAULT 0,
@@ -35,12 +35,15 @@ CREATE TABLE IF NOT EXISTS closure_bulletins (
     total_vat DECIMAL(12,4) NOT NULL DEFAULT 0,
     vat_breakdown JSONB NOT NULL, -- VAT totals by rate (10%, 20%)
     payment_methods_breakdown JSONB NOT NULL, -- Totals by payment method
+    tips_total DECIMAL(12,4) NOT NULL DEFAULT 0, -- Aggregate tips in closure period
+    change_total DECIMAL(12,4) NOT NULL DEFAULT 0, -- Aggregate change in closure period
     first_sequence INTEGER, -- First transaction sequence in period
     last_sequence INTEGER, -- Last transaction sequence in period
     closure_hash VARCHAR(64) NOT NULL, -- Closure integrity hash
     is_closed BOOLEAN NOT NULL DEFAULT FALSE,
     closed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    establishment_id UUID REFERENCES establishments(id) ON DELETE CASCADE, -- Multi-tenant isolation
     
     -- Legal constraints
     CONSTRAINT period_valid CHECK (period_end >= period_start),

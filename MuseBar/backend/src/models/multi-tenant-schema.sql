@@ -278,8 +278,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create a view for user summary with role information
--- Note: u.is_active is intentionally omitted here — the column will be added to users
--- in a future migration when table/session management features are implemented.
+-- Note: users.is_active is added by migration 2026_02_26_03_00_00_add_users_is_active.sql
 CREATE OR REPLACE VIEW user_summary AS
 SELECT 
     u.id,

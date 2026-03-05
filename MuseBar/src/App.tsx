@@ -15,7 +15,6 @@ import { BusinessSetupWizard } from './components/Setup';
 import EstablishmentAccountCreation from './components/EstablishmentAccountCreation';
 
 function App() {
-  // const location = useLocation();
   const {
     user,
     token,
@@ -50,10 +49,8 @@ function App() {
     const initializeApp = async () => {
       try {
         await apiConfig.initialize();
-      } catch (error) {
-        // Log error but don't break app initialization
-        // Error will be handled by error boundary if needed
-        console.error('Failed to initialize API configuration:', error);
+      } catch {
+        // API config initialization failed — will use fallback URL
       }
     };
 
