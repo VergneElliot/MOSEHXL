@@ -122,15 +122,28 @@ export class UserModel {
     return [];
   }
 
+  /**
+   * Replace all permissions for a user in one transaction.
+   * Uses a single DELETE plus one INSERT...SELECT (batch) instead of 2N+1 queries.
+   */
   static async setUserPermissions(userId: number, permissions: string[]): Promise<void> {
-    // Remove all current permissions
-    await pool.query('DELETE FROM user_permissions WHERE user_id = $1', [userId]);
-    // Add new permissions
-    for (const perm of permissions) {
-      const permRes = await pool.query('SELECT id FROM permissions WHERE name = $1', [perm]);
-      if (permRes.rows.length > 0) {
-        await pool.query('INSERT INTO user_permissions (user_id, permission_id) VALUES ($1, $2)', [userId, permRes.rows[0].id]);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('DELETE FROM user_permissions WHERE user_id = $1', [userId]);
+      if (permissions.length > 0) {
+        await client.query(
+          `INSERT INTO user_permissions (user_id, permission_id)
+           SELECT $1, p.id FROM permissions p WHERE p.name = ANY($2::text[])`,
+          [userId, permissions]
+        );
       }
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
     }
   }
 } 
