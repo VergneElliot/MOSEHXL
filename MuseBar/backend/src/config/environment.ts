@@ -195,7 +195,8 @@ export const getEnvironmentConfig = (): EnvironmentConfig => {
       archiveSecretKey: process.env.ARCHIVE_SECRET_KEY,
       bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS || '12'),
       rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
-      rateLimitMaxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
+      // Default tuned for POS: menus, history, orders, change ops, refetches — almost all traffic is authenticated
+      rateLimitMaxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '500'),
     },
 
     app: {
