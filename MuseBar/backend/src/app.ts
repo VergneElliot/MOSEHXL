@@ -44,11 +44,7 @@ app.use(express.json());
 // Trust proxy if configured
 app.set('trust proxy', config.server.trustProxy);
 
-// Request logging and security middleware
-app.use(requestLoggerMiddleware(logger));
-app.use(createSecurityMiddleware(config, logger));
-
-// Database connection from validated config (no fallback passwords).
+// Database connection from validated config (created before security so rate limiting can use shared store).
 // options: timezone ensures every session uses the app default so that
 // NOW() / CURRENT_TIMESTAMP and TIMESTAMPTZ display align with Paris.
 export const pool = new Pool({
@@ -62,6 +58,10 @@ export const pool = new Pool({
   idleTimeoutMillis: config.database.idleTimeoutMillis,
   options: `--timezone=${DEFAULT_APP_TIMEZONE}`,
 });
+
+// Request logging and security middleware (pool passed so rate limit store is shared across processes)
+app.use(requestLoggerMiddleware(logger));
+app.use(createSecurityMiddleware(config, logger, { pool }));
 
 // Health check route
 app.get('/api/health', (req, res) => {
