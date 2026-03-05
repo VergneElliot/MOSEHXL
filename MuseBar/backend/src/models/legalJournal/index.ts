@@ -87,8 +87,8 @@ export class LegalJournalModel {
   }
 
   // Closure operations (establishmentId required for multi-tenant data isolation)
-  static async createDailyClosure(date: Date, establishmentId: string) {
-    return await ClosureOperations.createDailyClosure(date, establishmentId);
+  static async createDailyClosure(date: Date, establishmentId: string, timezone?: string) {
+    return await ClosureOperations.createDailyClosure(date, establishmentId, timezone);
   }
 
   static async createWeeklyClosure(date: Date, establishmentId: string) {

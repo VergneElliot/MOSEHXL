@@ -1,4 +1,5 @@
 import { pool } from '../app';
+import { DEFAULT_APP_TIMEZONE } from '../config/timezone';
 import { LegalJournalModel } from '../models/legalJournal';
 import { AuditTrailModel } from '../models/auditTrail';
 import moment from 'moment-timezone';
@@ -78,7 +79,7 @@ export class ClosureScheduler {
     return {
       auto_closure_enabled: settings.auto_closure_enabled === 'true',
       daily_closure_time: settings.daily_closure_time || '02:00',
-      timezone: settings.timezone || 'Europe/Paris',
+      timezone: settings.timezone || DEFAULT_APP_TIMEZONE,
       grace_period_minutes: parseInt(settings.closure_grace_period_minutes || '30')
     };
   }
@@ -105,7 +106,7 @@ export class ClosureScheduler {
     try {
       const settings = await this.getClosureSettings();
       const closureTime = settings.daily_closure_time || '02:00';
-      const timezone = settings.timezone || 'Europe/Paris';
+      const timezone = settings.timezone || DEFAULT_APP_TIMEZONE;
 
       const nowTz = moment.tz(now, timezone);
       const closureHour = parseInt(closureTime.split(':')[0], 10);
@@ -123,7 +124,7 @@ export class ClosureScheduler {
       const closed: Array<{ establishmentId: string; bulletinId: number }> = [];
       for (const establishmentId of establishmentIds) {
         try {
-          const closureBulletin = await LegalJournalModel.createDailyClosure(businessDayDate, establishmentId);
+          const closureBulletin = await LegalJournalModel.createDailyClosure(businessDayDate, establishmentId, timezone);
           closed.push({ establishmentId, bulletinId: closureBulletin.id });
           await AuditTrailModel.logAction({
             action_type: 'AUTO_CLOSURE_EXECUTED',

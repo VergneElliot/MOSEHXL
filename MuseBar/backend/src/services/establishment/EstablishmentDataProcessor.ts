@@ -7,6 +7,7 @@ import { PoolClient } from 'pg';
 import { Logger } from '../../utils/logger';
 import { EnhancedCreateEstablishmentRequest } from './EstablishmentValidator';
 import { randomUUID } from 'crypto';
+import { DEFAULT_APP_TIMEZONE } from '../../config/timezone';
 
 /**
  * Establishment record interface
@@ -89,7 +90,7 @@ export class EstablishmentDataProcessor {
       data.tva_number || null,
       data.siret_number || null,
       data.business_type || 'other',
-      data.timezone || 'Europe/Paris',
+      data.timezone || DEFAULT_APP_TIMEZONE,
       data.language || 'fr'
     ];
 
