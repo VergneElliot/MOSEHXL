@@ -1,12 +1,12 @@
 /**
  * Responsive layout for the cashier (Caisse): menu + order.
- * - Wide (≥ md): side-by-side Grid (menu 8 cols, order 4 cols).
+ * - Wide (≥ md): two-column flex layout (menu ~2/3, order ~1/3) so height/overflow chain works for scroll and payment buttons.
  * - Narrow (< md): tabbed view (Menu | Commande) so only one panel is visible at a time.
  * Single responsibility: layout only; no POS state or business logic.
  */
 
 import React, { useState } from 'react';
-import { Box, Grid, Tabs, Tab, useTheme, useMediaQuery } from '@mui/material';
+import { Box, Tabs, Tab, useTheme, useMediaQuery } from '@mui/material';
 import { RestaurantMenu as MenuIcon, ShoppingCart as CartIcon } from '@mui/icons-material';
 
 export interface POSLayoutProps {
@@ -57,23 +57,49 @@ const POSLayout: React.FC<POSLayoutProps> = ({
     setTabValue(newValue);
   };
 
+  // Wide: two-column flex layout (no MUI Grid) so height/overflow chain works reliably
   if (!isNarrow) {
     return (
-      <Grid container spacing={2} sx={{ flexGrow: 1 }}>
-        <Grid item xs={12} md={8}>
-          <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {menuContent}
-          </Box>
-        </Grid>
-        <Grid item xs={12} md={4}>
+      <Box
+        sx={{
+          display: 'flex',
+          flex: 1,
+          minHeight: 0,
+          width: '100%',
+          overflow: 'hidden',
+          gap: 2,
+        }}
+      >
+        <Box
+          sx={{
+            flex: '1 1 0',
+            minWidth: 0,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
+          {menuContent}
+        </Box>
+        <Box
+          sx={{
+            flex: '0 0 33.333%',
+            minWidth: 0,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
           {orderContent}
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
     );
   }
 
   return (
-    <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
       <Tabs
         value={tabValue}
         onChange={handleTabChange}

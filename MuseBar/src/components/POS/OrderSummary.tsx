@@ -66,7 +66,7 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
   };
 
   return (
-    <Card sx={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+    <Card sx={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <CardContent sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <Box sx={{ flexShrink: 0 }} display="flex" justifyContent="space-between" alignItems="center" mb={2}>
           <Typography variant="h6" component="h2">
