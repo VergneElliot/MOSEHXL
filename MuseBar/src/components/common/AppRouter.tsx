@@ -30,15 +30,35 @@ interface TabPanelProps {
 
 function TabPanel(props: TabPanelProps) {
   const { children, value, index, ...other } = props;
+  const isActive = value === index;
   return (
     <div
       role="tabpanel"
-      hidden={value !== index}
+      hidden={!isActive}
       id={`simple-tabpanel-${index}`}
       aria-labelledby={`simple-tab-${index}`}
+      style={{
+        flex: isActive ? 1 : 0,
+        minHeight: isActive ? 0 : undefined,
+        display: isActive ? 'flex' : 'none',
+        flexDirection: 'column',
+      }}
       {...other}
     >
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+      {isActive && (
+        <Box
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            p: 3,
+          }}
+        >
+          {children}
+        </Box>
+      )}
     </div>
   );
 }
@@ -118,7 +138,16 @@ const AppRouter: React.FC<AppRouterProps> = ({
   };
 
   return (
-    <Paper sx={{ width: '100%' }}>
+    <Paper
+      sx={{
+        width: '100%',
+        flex: 1,
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}
+    >
       <Tabs
         value={tabValue}
         onChange={handleTabChange}

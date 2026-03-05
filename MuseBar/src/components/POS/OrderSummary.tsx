@@ -66,9 +66,9 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
   };
 
   return (
-    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+    <Card sx={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      <CardContent sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <Box sx={{ flexShrink: 0 }} display="flex" justifyContent="space-between" alignItems="center" mb={2}>
           <Typography variant="h6" component="h2">
             Commande ({currentOrder.length} article{currentOrder.length > 1 ? 's' : ''})
           </Typography>
@@ -92,8 +92,9 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
           </Box>
         ) : (
           <>
-            <List sx={{ flexGrow: 1, overflow: 'auto', maxHeight: '300px' }}>
-              {currentOrder.map((item, index) => (
+            <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+              <List sx={{ py: 0 }}>
+                {currentOrder.map((item, index) => (
                 <React.Fragment key={`${item.id}-${index}`}>
                   <ListItem sx={{ px: 0, py: 1 }}>
                     <Box sx={{ width: '100%' }}>
@@ -164,11 +165,12 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
                   {index < currentOrder.length - 1 && <Divider />}
                 </React.Fragment>
               ))}
-            </List>
+              </List>
+            </Box>
 
             <Divider sx={{ my: 2 }} />
 
-            <Box>
+            <Box sx={{ flexShrink: 0 }}>
               <Box display="flex" justifyContent="space-between" mb={1}>
                 <Typography variant="body2">Sous-total HT:</Typography>
                 <Typography variant="body2">{formatCurrency(orderSubtotal - orderTax)}</Typography>
