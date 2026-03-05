@@ -201,13 +201,13 @@ In production, `CORS_ORIGIN` would include `https://mosehxl.com`.
 Rate limiting blocks users who send too many requests (brute-force attacks, denial of service):
 
 ```typescript
-// In middleware/security/RateLimitMiddleware.ts:
-// "Allow max 100 requests per 15 minutes per IP address"
+// In config/environment.ts (overridable via RATE_LIMIT_* env vars):
+// Default tuned for POS: menus, history, orders, refetches — almost all traffic is authenticated
 rateLimitWindowMs: 900000,   // 15 minutes
-rateLimitMaxRequests: 100,
+rateLimitMaxRequests: 500,   // per user (when authenticated) or per IP (when not)
 ```
 
-If someone tries to brute-force the login (guessing passwords), they get blocked after 100 attempts in 15 minutes with a `429 Too Many Requests` response.
+If someone sends too many requests (e.g. brute-force login), they get blocked after the limit with a `429 Too Many Requests` response. The default is set high enough that normal POS usage (loading menus, history, orders, “faire de la monnaie”, etc.) does not hit the limit.
 
 ### How counters are stored
 
