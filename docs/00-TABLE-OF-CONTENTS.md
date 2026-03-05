@@ -56,4 +56,5 @@ Each chapter is self-contained. Read them in order, or jump to whatever you need
 | 47 | [In-memory rate limiting](./47-IN-MEMORY-RATE-LIMITING-AUDIT-40-FIX.md) | PostgreSQL-backed rate limit store so limits work across processes and survive restart (audit #40) |
 | 48 | [Circular logger re-export](./48-CIRCULAR-LOGGER-RE-EXPORT-AUDIT-41-FIX.md) | Remove Logger re-export from utils/logger/index.ts to break index → parent → children cycle (audit #41) |
 | 49 | [Schema SQL files outdated](./49-SCHEMA-SQL-FILES-OUTDATED-AUDIT-42-FIX.md) | Align schema.sql, legal-schema.sql, multi-tenant-schema.sql with post-migration types and precision (audit #42) |
+| 50 | [CI/CD pipeline issues](./50-CICD-PIPELINE-ISSUES-AUDIT-43-FIX.md) | Deploy step explicit; performance job paths+DB; .lighthouserc.json; actions v4/v3 (audit #43) |
 | — | [Session summary: POS tax, payment, cleanup](./SESSION-SUMMARY-POS-TAX-PAYMENT-AND-CLEANUP.md) | Handoff: TTC tax fix, exact tax storage, cash/card only, three payment buttons, migrations, code cleanup |
