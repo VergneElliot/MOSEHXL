@@ -12,6 +12,7 @@ import { getEnvironmentConfig } from '../config/environment';
 const router = express.Router();
 const config = getEnvironmentConfig();
 const logger = Logger.getInstance(config);
+const dashboardService = new DashboardDataService(logger);
 
 // GET /api/admin-dashboard/test - Minimal test endpoint; requires auth and admin like other dashboard routes
 router.get('/test', requireAuth, requireAdmin, (req, res) => {
@@ -32,8 +33,6 @@ router.get('/test', requireAuth, requireAdmin, (req, res) => {
 // GET /api/admin-dashboard/metrics - Get comprehensive dashboard metrics
 router.get('/metrics', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const dashboardService = new DashboardDataService(logger);
-    
     // Get database client
     const { pool } = await import('../app');
     const client = await pool.connect();

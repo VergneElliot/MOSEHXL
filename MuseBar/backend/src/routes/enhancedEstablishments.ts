@@ -17,11 +17,12 @@ import { getEnvironmentConfig } from '../config/environment';
 const router = express.Router();
 const config = getEnvironmentConfig();
 const logger = Logger.getInstance(config);
+const establishmentService = new EstablishmentService(logger);
+const establishmentCreationOrchestrator = new EstablishmentCreationOrchestrator(logger);
 
 // GET /api/establishments - List all establishments (system admin only)
 router.get('/', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const establishmentService = new EstablishmentService(logger);
     const result = await establishmentService.getAllEstablishments();
     res.json(result);
   } catch (error) {
@@ -80,7 +81,6 @@ router.get('/health', (req, res) => {
 router.get('/:id', requireAuth, requireAdmin, validateParams([paramValidations.id]), async (req, res) => {
   try {
     const { id } = req.params;
-    const establishmentService = new EstablishmentService(logger);
     const result = await establishmentService.getEstablishmentById(id);
     res.json(result);
   } catch (error) {
@@ -101,7 +101,6 @@ router.get('/:id', requireAuth, requireAdmin, validateParams([paramValidations.i
 router.delete('/:id', requireAuth, requireAdmin, validateParams([paramValidations.id]), async (req, res) => {
   try {
     const { id } = req.params;
-    const establishmentService = new EstablishmentService(logger);
     await establishmentService.deleteEstablishment(id);
     res.json({ success: true, message: 'Establishment deleted successfully' });
   } catch (error) {
@@ -127,8 +126,7 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
       body_keys: Object.keys(req.body)
     }, 'ENHANCED_ESTABLISHMENTS_ROUTE');
 
-    const establishmentCreationService = new EstablishmentCreationOrchestrator(logger);
-    const result = await establishmentCreationService.createEstablishment(
+    const result = await establishmentCreationOrchestrator.createEstablishment(
       req.body,
       String(req.user!.id),
       req.ip,
