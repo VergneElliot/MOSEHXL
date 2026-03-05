@@ -1,7 +1,10 @@
 /**
- * Logger Module - Clean Exports
- * Provides a modular logging system with specialized components
- * Maintains backward compatibility while providing access to focused modules
+ * Logger Module - Clean Exports (building blocks only)
+ * Provides a modular logging system with specialized components.
+ *
+ * Application-facing API (Logger, requestLoggerMiddleware, getLogger, etc.) lives in
+ * the parent module utils/logger.ts. Do not re-export from '../logger' here to avoid
+ * a circular dependency: index → parent → children (audit #41).
  */
 
 // Core classes
@@ -20,6 +23,3 @@ export type {
 // Formatters and transports
 export { formatLogEntry, writeToConsole } from './logFormatters';
 export { FileTransport } from './logTransport';
-
-// Default export for main logger access
-export { Logger } from '../logger';
