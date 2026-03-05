@@ -1,30 +1,32 @@
 /**
  * Rate Limiting Middleware
- * Handles request rate limiting with memory-based storage
+ * Uses a store adapter: in-memory (single process, resets on restart) or
+ * PostgreSQL (shared across processes, survives restart). See audit #40.
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { Pool } from 'pg';
 import { EnvironmentConfig } from '../../config/environment';
 import { Logger } from '../../utils/logger';
 import { RateLimitError } from '../errorHandler';
-import { RateLimitStore, RateLimitStats, SecurityMiddlewareFunction } from './types';
+import { IRateLimitStoreAdapter, RateLimitStats, SecurityMiddlewareFunction } from './types';
+import { InMemoryRateLimitStore } from './InMemoryRateLimitStore';
+import { PostgresRateLimitStore } from './PostgresRateLimitStore';
 
-/**
- * Rate Limiting Middleware Class
- */
 export class RateLimitMiddleware {
-  private store: RateLimitStore = {};
+  private store: IRateLimitStoreAdapter;
   private config: EnvironmentConfig;
   private logger: Logger;
   private cleanupInterval: NodeJS.Timeout;
 
-  constructor(config: EnvironmentConfig, logger: Logger) {
+  constructor(config: EnvironmentConfig, logger: Logger, pool?: Pool) {
     this.config = config;
     this.logger = logger;
-
-    // Clean up expired entries every 5 minutes
+    this.store = pool ? new PostgresRateLimitStore(pool) : new InMemoryRateLimitStore();
     this.cleanupInterval = setInterval(() => {
-      this.cleanup();
+      this.store.cleanup().catch((err) => {
+        this.logger.warn('Rate limit store cleanup failed', { error: err?.message ?? err });
+      });
     }, 5 * 60 * 1000);
   }
 
@@ -33,65 +35,50 @@ export class RateLimitMiddleware {
    */
   public createMiddleware(): SecurityMiddlewareFunction {
     return (req: Request, res: Response, next: NextFunction) => {
-      const key = this.getKey(req);
-      const now = Date.now();
-      const windowMs = this.config.security.rateLimitWindowMs;
-      const maxRequests = this.config.security.rateLimitMaxRequests;
-
-      // Initialize or get existing entry
-      if (!this.store[key] || now > this.store[key].resetTime) {
-        this.store[key] = {
-          count: 1,
-          resetTime: now + windowMs,
-        };
-      } else {
-        this.store[key].count++;
-      }
-
-      const entry = this.store[key];
-
-      // Check if limit exceeded
-      if (entry.count > maxRequests) {
-        const resetTime = new Date(entry.resetTime);
-        const retryAfter = Math.ceil((entry.resetTime - now) / 1000);
-
-        // Log rate limit violation
-        this.logger.security(
-          'Rate limit exceeded',
-          'MEDIUM',
-          {
-            ip: req.ip,
-            userAgent: req.headers['user-agent'],
-            url: req.originalUrl,
-            count: entry.count,
-            limit: maxRequests,
-            resetTime: resetTime.toISOString(),
-          },
-          req.requestId,
-          req.user?.id ? parseInt(String(req.user.id)) : undefined
-        );
-
-        // Set rate limit headers
-        this.setRateLimitHeaders(res, maxRequests, 0, entry.resetTime, retryAfter);
-
-        return next(new RateLimitError(`Trop de requêtes. Réessayez dans ${retryAfter} secondes.`));
-      }
-
-      // Set rate limit headers
-      this.setRateLimitHeaders(
-        res, 
-        maxRequests, 
-        Math.max(0, maxRequests - entry.count), 
-        entry.resetTime
-      );
-
-      next();
+      this.run(req, res, next).catch(next);
     };
   }
 
-  /**
-   * Set rate limit headers
-   */
+  private async run(req: Request, res: Response, next: NextFunction): Promise<void> {
+    const key = this.getKey(req);
+    const windowMs = this.config.security.rateLimitWindowMs;
+    const maxRequests = this.config.security.rateLimitMaxRequests;
+
+    const entry = await this.store.incrementAndGet(key, windowMs);
+    const now = Date.now();
+
+    if (entry.count > maxRequests) {
+      const resetTime = new Date(entry.resetTime);
+      const retryAfter = Math.ceil((entry.resetTime - now) / 1000);
+
+      this.logger.security(
+        'Rate limit exceeded',
+        'MEDIUM',
+        {
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+          url: req.originalUrl,
+          count: entry.count,
+          limit: maxRequests,
+          resetTime: resetTime.toISOString(),
+        },
+        req.requestId,
+        req.user?.id ? parseInt(String(req.user.id)) : undefined
+      );
+
+      this.setRateLimitHeaders(res, maxRequests, 0, entry.resetTime, retryAfter);
+      return next(new RateLimitError(`Trop de requêtes. Réessayez dans ${retryAfter} secondes.`));
+    }
+
+    this.setRateLimitHeaders(
+      res,
+      maxRequests,
+      Math.max(0, maxRequests - entry.count),
+      entry.resetTime
+    );
+    next();
+  }
+
   private setRateLimitHeaders(
     res: Response,
     limit: number,
@@ -104,77 +91,47 @@ export class RateLimitMiddleware {
       'X-RateLimit-Remaining': remaining.toString(),
       'X-RateLimit-Reset': resetTime.toString(),
     };
-
     if (retryAfter !== undefined) {
       headers['Retry-After'] = retryAfter.toString();
     }
-
     res.set(headers);
   }
 
-  /**
-   * Generate rate limit key based on IP and user
-   */
   private getKey(req: Request): string {
     const userId = req.user?.id;
     return userId ? `user:${userId}` : `ip:${req.ip}`;
   }
 
   /**
-   * Clean up expired entries
-   */
-  private cleanup(): void {
-    const now = Date.now();
-    let cleaned = 0;
-
-    for (const key in this.store) {
-      if (this.store[key].resetTime < now) {
-        delete this.store[key];
-        cleaned++;
-      }
-    }
-
-    if (cleaned > 0) {
-      this.logger.debug(
-        'Rate limit store cleanup completed',
-        { cleanedEntries: cleaned, remainingEntries: Object.keys(this.store).length },
-        'RATE_LIMIT'
-      );
-    }
-  }
-
-  /**
    * Get rate limit statistics
    */
-  public getStats(): RateLimitStats {
-    const entries = Object.entries(this.store)
-      .map(([key, data]) => ({ key, ...data }))
+  public async getStats(): Promise<RateLimitStats> {
+    const entries = await this.store.getEntriesForStats();
+    const sorted = entries
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
-
     return {
-      totalKeys: Object.keys(this.store).length,
-      topIPs: entries,
+      totalKeys: entries.length,
+      topIPs: sorted,
     };
   }
 
   /**
    * Reset rate limit for a specific key
    */
-  public resetKey(key: string): boolean {
-    if (this.store[key]) {
-      delete this.store[key];
+  public async resetKey(key: string): Promise<boolean> {
+    const ok = await this.store.resetKey(key);
+    if (ok) {
       this.logger.debug('Rate limit reset for key', { key }, 'RATE_LIMIT');
-      return true;
     }
-    return false;
+    return ok;
   }
 
   /**
    * Get current count for a key
    */
-  public getKeyCount(key: string): number {
-    return this.store[key]?.count || 0;
+  public async getKeyCount(key: string): Promise<number> {
+    return this.store.getCount?.(key) ?? 0;
   }
 
   /**
@@ -184,5 +141,6 @@ export class RateLimitMiddleware {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
     }
+    this.store.destroy?.();
   }
 }

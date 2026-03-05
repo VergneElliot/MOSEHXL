@@ -53,4 +53,5 @@ Each chapter is self-contained. Read them in order, or jump to whatever you need
 | 44 | [Empty catch blocks in auth](./44-EMPTY-CATCH-BLOCKS-AUDIT-37-FIX.md) | Capture and log errors in create-user catch blocks (audit #37) |
 | 45 | [Math.random for request IDs](./45-MATH-RANDOM-REQUEST-IDS-AUDIT-38-FIX.md) | Use crypto.randomUUID() for request IDs in request logger (audit #38) |
 | 46 | [X-Powered-By removal](./46-X-POWERED-BY-REMOVAL-AUDIT-39-FIX.md) | Remove X-Powered-By from security headers to avoid fingerprinting (audit #39) |
+| 47 | [In-memory rate limiting](./47-IN-MEMORY-RATE-LIMITING-AUDIT-40-FIX.md) | PostgreSQL-backed rate limit store so limits work across processes and survive restart (audit #40) |
 | — | [Session summary: POS tax, payment, cleanup](./SESSION-SUMMARY-POS-TAX-PAYMENT-AND-CLEANUP.md) | Handoff: TTC tax fix, exact tax storage, cash/card only, three payment buttons, migrations, code cleanup |

@@ -54,10 +54,10 @@ export class SecurityMiddlewareFactory {
       middlewares.push(InputSanitizationService.createMiddleware(logger));
     }
 
-    // Rate limiting
+    // Rate limiting (use pool when provided so limits are shared across processes and survive restart)
     let rateLimitMiddleware: RateLimitMiddleware | null = null;
     if (opts.enableRateLimit) {
-      rateLimitMiddleware = new RateLimitMiddleware(config, logger);
+      rateLimitMiddleware = new RateLimitMiddleware(config, logger, opts.pool);
       middlewares.push(rateLimitMiddleware.createMiddleware());
     }
 
@@ -77,9 +77,9 @@ export class SecurityMiddlewareFactory {
       }
     };
 
-    // Attach stats method
-    securityMiddleware.getStats = (): RateLimitStats | null => {
-      return rateLimitMiddleware ? rateLimitMiddleware.getStats() : null;
+    // Attach stats method (async when using shared store)
+    securityMiddleware.getStats = (): Promise<RateLimitStats | null> => {
+      return rateLimitMiddleware ? rateLimitMiddleware.getStats() : Promise.resolve(null);
     };
 
     return securityMiddleware;
