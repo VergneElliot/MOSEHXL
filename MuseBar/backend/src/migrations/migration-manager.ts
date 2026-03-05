@@ -251,10 +251,13 @@ export class MigrationManager {
   }
 
   /**
-   * Create a new migration file
+   * Create a new migration file.
+   * Filename must match parseMigrationFile regex: YYYY_MM_DD_HH_MM_SS_name.sql (audit #45).
    */
   createMigration(name: string): void {
-    const timestamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0];
+    const d = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const timestamp = `${d.getUTCFullYear()}_${pad(d.getUTCMonth() + 1)}_${pad(d.getUTCDate())}_${pad(d.getUTCHours())}_${pad(d.getUTCMinutes())}_${pad(d.getUTCSeconds())}`;
     const filename = `${timestamp}_${name.replace(/\s+/g, '_')}.sql`;
     const filePath = path.join(this.migrationsPath, filename);
 
