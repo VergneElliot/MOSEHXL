@@ -27,8 +27,8 @@ The app uses **only** migrations in `MuseBar/backend/src/migrations/files/` that
 | `2026_02_26_01_00_00_accounting_decimal_precision.sql` | Accounting decimal precision. |
 | `2026_02_26_02_00_00_add_establishment_id_to_closure_bulletins.sql` | Adds establishment scoping to closure bulletins. |
 
-**Not used by the CLI:**  
-Root-level SQL files in `MuseBar/backend/src/migrations/*.sql` (e.g. `add-establishment-fields.sql`, `remove-email-unique-constraints.sql`) and the reference schemas in `models/*.sql` are **not** run by `npm run migration:migrate`. They are reference or manual scripts. The tables `establishment_setup_progress`, `establishment_setup_steps`, and `establishment_status_transitions` are now created by timestamped migrations in `files/` (see [24-MIGRATION-CHAIN-FRESH-DB-FIX.md](./24-MIGRATION-CHAIN-FRESH-DB-FIX.md)).
+**Not run by the CLI:**  
+The reference schemas in `models/*.sql` are **not** run by `npm run migration:migrate`; they are for documentation and manual bootstrap. All schema changes applied by the app are in `migrations/files/` (timestamped migrations). Orphan root-level SQL files were removed; establishment fields and email-constraint changes are in the chain (see [24-MIGRATION-CHAIN-FRESH-DB-FIX.md](./24-MIGRATION-CHAIN-FRESH-DB-FIX.md), [51-ORPHAN-MIGRATION-SQL-FILES-AUDIT-44-FIX.md](./51-ORPHAN-MIGRATION-SQL-FILES-AUDIT-44-FIX.md)).
 
 ### 1.2 Reference schemas (documentation / manual setup)
 
