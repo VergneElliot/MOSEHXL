@@ -8,6 +8,7 @@ import { useDataManagement } from './hooks/useDataManagement';
 import AppRouter from './components/common/AppRouter';
 import SystemAdminRouter from './components/common/SystemAdminRouter';
 import { Login } from './components/auth';
+import type { User } from './types';
 import InvitationAcceptance from './components/InvitationAcceptance';
 import { AppHeader } from './components/common/AppHeader';
 import { BusinessSetupWizard } from './components/Setup';
@@ -59,7 +60,7 @@ function App() {
     initializeApp();
   }, []);
 
-  const handleLogin = (jwt: string, userObj: any, rememberMeFlag: boolean, expiresIn: string) => {
+  const handleLogin = (jwt: string, userObj: User, rememberMeFlag: boolean, expiresIn: string) => {
     // Persist auth
     login(jwt, userObj, rememberMeFlag, expiresIn);
     // After login, if not system admin, ensure POS loads fresh data for user's establishment
@@ -106,7 +107,7 @@ function App() {
             </Container>
           ) : isSystemAdmin ? (
             // System Admin Interface - Full screen, no container
-            <SystemAdminRouter user={user} />
+            <SystemAdminRouter user={user!} />
           ) : (
             // Business Interface - Traditional layout
             <>
@@ -114,11 +115,11 @@ function App() {
                 isHappyHourActive={isHappyHourActive}
                 timeUntilHappyHour={timeUntilHappyHour}
                 onLogout={handleLogout}
-                user={user}
+                user={user!}
               />
               <Container maxWidth="xl" sx={{ mt: 2 }}>
                 <AppRouter
-                  user={user}
+                  user={user!}
                   token={token!}
                   categories={categories}
                   products={products}

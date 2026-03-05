@@ -11,9 +11,10 @@ import {
   Checkbox,
 } from '@mui/material';
 import { apiService } from '../../services/apiService';
+import type { User } from '../../types';
 
 interface LoginProps {
-  onLogin: (token: string, user: any, rememberMe: boolean, expiresIn: string) => void;
+  onLogin: (token: string, user: User, rememberMe: boolean, expiresIn: string) => void;
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
@@ -44,7 +45,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       // Use apiService to automatically handle network configuration
       const response = await apiService.post<{
         token: string;
-        user: any;
+        user: User;
         expiresIn: string;
       }>('/auth/login', {
         email,
@@ -53,9 +54,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       });
       const data = response.data;
       onLogin(data.token, data.user, rememberMe, data.expiresIn);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Login error:', err);
-      setError(err.message || 'Erreur réseau ou serveur');
+      setError(err instanceof Error ? err.message : 'Erreur réseau ou serveur');
     } finally {
       setLoading(false);
     }

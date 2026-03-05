@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import type { SelectChangeEvent } from '@mui/material';
 import {
   Card,
   CardContent,
@@ -49,7 +50,7 @@ export const HappyHourForm: React.FC<HappyHourFormProps> = ({
     });
   };
 
-  const handleDiscountTypeChange = (event: any) => {
+  const handleDiscountTypeChange = (event: SelectChangeEvent<'fixed' | 'percentage'>) => {
     onSettingsChange({
       ...settings,
       discountType: event.target.value as 'percentage' | 'fixed',

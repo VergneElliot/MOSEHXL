@@ -62,9 +62,9 @@ export class ApiService {
   // Generic HTTP methods for other components
   async get<T>(endpoint: string): Promise<{ data: T }> { const data = await this.request<T>(endpoint); return { data }; }
 
-  async post<T>(endpoint: string, data?: any): Promise<{ data: T }> { const res = await this.request<T>(endpoint, { method: 'POST', body: data ? JSON.stringify(data) : undefined }); return { data: res }; }
+  async post<T>(endpoint: string, data?: unknown): Promise<{ data: T }> { const res = await this.request<T>(endpoint, { method: 'POST', body: data ? JSON.stringify(data) : undefined }); return { data: res }; }
 
-  async put<T>(endpoint: string, data?: any): Promise<{ data: T }> { const res = await this.request<T>(endpoint, { method: 'PUT', body: data ? JSON.stringify(data) : undefined }); return { data: res }; }
+  async put<T>(endpoint: string, data?: unknown): Promise<{ data: T }> { const res = await this.request<T>(endpoint, { method: 'PUT', body: data ? JSON.stringify(data) : undefined }); return { data: res }; }
 
   async delete<T>(endpoint: string): Promise<{ data: T }> { const res = await this.request<T>(endpoint, { method: 'DELETE' }); return { data: res }; }
 

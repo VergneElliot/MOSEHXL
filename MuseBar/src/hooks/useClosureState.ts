@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useSnackbar } from './useSnackbar';
-import type { ClosureBulletin } from '../types';
+import type { ClosureBulletin, ClosureTodayStatus, LiveMonthlyStats } from '../types';
 
 export type { ClosureBulletin };
 
@@ -10,9 +10,9 @@ export interface ClosureState {
   loading: boolean;
   error: string | null;
   creating: boolean;
-  todayStatus: unknown;
-  closureSettings: unknown;
-  monthlyStats: unknown;
+  todayStatus: ClosureTodayStatus | null;
+  closureSettings: Record<string, string>;
+  monthlyStats: LiveMonthlyStats | null;
   monthlyStatsError: string | null;
 
   // Dialog state
@@ -42,9 +42,9 @@ export interface ClosureActions {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setCreating: (creating: boolean) => void;
-  setTodayStatus: (status: unknown) => void;
-  setClosureSettings: (settings: unknown) => void;
-  setMonthlyStats: (stats: unknown) => void;
+  setTodayStatus: (status: ClosureTodayStatus | null) => void;
+  setClosureSettings: (settings: Record<string, string>) => void;
+  setMonthlyStats: (stats: LiveMonthlyStats | null) => void;
   setMonthlyStatsError: (error: string | null) => void;
 
   // Dialog actions
@@ -87,9 +87,9 @@ export const useClosureState = (): [ClosureState, ClosureActions] => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const [todayStatus, setTodayStatus] = useState<any>(null);
-  const [closureSettings, setClosureSettings] = useState<any>({});
-  const [monthlyStats, setMonthlyStats] = useState<any>(null);
+  const [todayStatus, setTodayStatus] = useState<ClosureTodayStatus | null>(null);
+  const [closureSettings, setClosureSettings] = useState<Record<string, string>>({});
+  const [monthlyStats, setMonthlyStats] = useState<LiveMonthlyStats | null>(null);
   const [monthlyStatsError, setMonthlyStatsError] = useState<string | null>(null);
 
   // Dialog state

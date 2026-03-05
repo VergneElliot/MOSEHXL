@@ -20,7 +20,7 @@ import { ClosureContainer } from '../Closure';
 import { UserManagement, AuditTrailDashboard } from '../Admin';
 
 // Types
-import { Category, Product } from '../../types';
+import { Category, Product, User } from '../../types';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -44,7 +44,7 @@ function TabPanel(props: TabPanelProps) {
 }
 
 interface AppRouterProps {
-  user: any;
+  user: User;
   token: string;
   categories: Category[];
   products: Product[];

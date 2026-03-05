@@ -13,11 +13,11 @@ export class SetupService {
     try {
       const response = await apiService.get<InvitationValidation>(`/setup/validate/${token}`);
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         isValid: false,
         token,
-        error: error.response?.data?.error || 'Invalid or expired invitation token'
+        error: (error as { response?: { data?: { error?: string } } }).response?.data?.error || 'Invalid or expired invitation token'
       };
     }
   }

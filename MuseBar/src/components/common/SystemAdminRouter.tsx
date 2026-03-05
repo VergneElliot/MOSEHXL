@@ -7,9 +7,10 @@ import {
   SystemUsersPage,
   SystemSecurityLogsPage
 } from '../SystemAdmin';
+import type { User } from '../../types';
 
 interface SystemAdminRouterProps {
-  user: any;
+  user: User;
 }
 
 const SystemAdminRouter: React.FC<SystemAdminRouterProps> = ({ user }) => {

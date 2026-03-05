@@ -1,13 +1,18 @@
 import { useState } from 'react';
 import { Order } from '../types';
 
+export interface BusinessDayPeriod {
+  start: string;
+  end: string;
+}
+
 export interface HistoryStats {
   caJour: number;
   ventesJour: number;
   topProduits: Array<{ name: string; qty: number }>;
   cardTotal: number;
   cashTotal: number;
-  businessDayPeriod: any;
+  businessDayPeriod: BusinessDayPeriod | null;
 }
 
 export interface HistoryState {
@@ -20,7 +25,7 @@ export interface HistoryState {
 
   // Receipt dialog state
   receiptDialogOpen: boolean;
-  currentReceipt: any;
+  currentReceipt: Order | null;
   receiptType: 'detailed' | 'summary';
 
   // Return dialog state
@@ -45,7 +50,7 @@ export interface HistoryActions {
 
   // Receipt actions
   setReceiptDialogOpen: (open: boolean) => void;
-  setCurrentReceipt: (receipt: any) => void;
+  setCurrentReceipt: (receipt: Order | null) => void;
   setReceiptType: (type: 'detailed' | 'summary') => void;
   openReceiptDialog: (order: Order, type: 'detailed' | 'summary') => void;
   closeReceiptDialog: () => void;
@@ -84,7 +89,7 @@ export const useHistoryState = (): [HistoryState, HistoryActions] => {
 
   // Receipt dialog state
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
-  const [currentReceipt, setCurrentReceipt] = useState<any>(null);
+  const [currentReceipt, setCurrentReceipt] = useState<Order | null>(null);
   const [receiptType, setReceiptType] = useState<'detailed' | 'summary'>('detailed');
 
   // Return dialog state
