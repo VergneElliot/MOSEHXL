@@ -107,13 +107,15 @@ const POSContainer: React.FC<POSContainerProps> = ({
 
   const menuContent = (
     <>
-      <CategoryFilter
-        categories={categories}
-        selectedCategory={state.selectedCategory}
-        searchQuery={state.searchQuery}
-        onCategorySelect={actions.setSelectedCategory}
-        onSearchChange={actions.setSearchQuery}
-      />
+      <Box sx={{ flexShrink: 0 }}>
+        <CategoryFilter
+          categories={categories}
+          selectedCategory={state.selectedCategory}
+          searchQuery={state.searchQuery}
+          onCategorySelect={actions.setSelectedCategory}
+          onSearchChange={actions.setSearchQuery}
+        />
+      </Box>
       <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         <ProductGrid
           products={logic.filteredProducts}
@@ -144,12 +146,14 @@ const POSContainer: React.FC<POSContainerProps> = ({
   );
 
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <POSLayout
-        menuContent={menuContent}
-        orderContent={orderContent}
-        orderBadge={state.currentOrder.length}
-      />
+    <Box sx={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', width: '100%' }}>
+        <POSLayout
+          menuContent={menuContent}
+          orderContent={orderContent}
+          orderBadge={state.currentOrder.length}
+        />
+      </Box>
 
       {/* Snackbar for notifications */}
       <Snackbar
