@@ -44,9 +44,6 @@ export class SecurityHeadersService {
       
       // Feature Policy / Permissions Policy
       'Permissions-Policy': SecurityHeadersService.buildPermissionsPolicy(),
-      
-      // Server identification
-      'X-Powered-By': config.app.name,
     };
 
     // HTTP Strict Transport Security (HTTPS only in production)
