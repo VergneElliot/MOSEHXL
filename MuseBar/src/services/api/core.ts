@@ -47,14 +47,21 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
     clearTimeout(timeoutId);
     
     if (!res.ok) {
-      // Handle specific HTTP errors
       if (res.status === 401) {
-        // Clear invalid token and redirect to login
         localStorage.removeItem('auth_token');
         window.location.href = '/login';
         throw new Error('Session expired - please login again');
       }
-      throw new Error(`HTTP error! status: ${res.status}`);
+      let message = `HTTP error! status: ${res.status}`;
+      try {
+        const body = await res.json() as { error?: string };
+        if (body?.error && typeof body.error === 'string') {
+          message = body.error;
+        }
+      } catch {
+        // ignore parse failure
+      }
+      throw new Error(message);
     }
     return res.json();
   } catch (error) {
