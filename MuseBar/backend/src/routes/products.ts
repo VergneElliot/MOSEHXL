@@ -1,7 +1,6 @@
 import express from 'express';
 import { ProductModel } from '../models';
 import { AuditTrailModel } from '../models/auditTrail';
-import { EstablishmentModel } from '../models/establishment';
 import { requireAuth } from './auth';
 import { validateBody, validateParams, commonValidations, paramValidations } from '../middleware/validation';
 import { pool } from '../app';
@@ -157,10 +156,11 @@ router.delete('/:id', validateParams([paramValidations.id]), async (req, res) =>
   if (!establishmentId) return;
   try {
     const id = parseInt(req.params.id);
-    const schemaName = await EstablishmentModel.getSchemaNameForEstablishment(establishmentId);
     const orderItemsResult = await pool.query(
-      `SELECT COUNT(*) FROM "${schemaName}".order_items WHERE product_id = $1`,
-      [id]
+      `SELECT COUNT(*) FROM order_items oi
+       JOIN orders o ON o.id = oi.order_id
+       WHERE oi.product_id = $1 AND o.establishment_id = $2`,
+      [id, establishmentId]
     );
     const hasOrderItems = parseInt(orderItemsResult.rows[0].count, 10) > 0;
     const deleted = await ProductModel.delete(id, establishmentId);
