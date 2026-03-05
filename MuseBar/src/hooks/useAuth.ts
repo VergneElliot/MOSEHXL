@@ -54,10 +54,7 @@ export const useAuth = (): AuthState & AuthActions => {
 
   const checkAuthStatus = useCallback(async () => {
     try {
-      // Add delay to ensure API is ready
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Ensure API config is ready
+      // Gate on API config: initialize once if not yet ready (no sleep hack — audit #48)
       if (!apiConfig.isReady()) {
         await apiConfig.initialize();
       }

@@ -61,4 +61,5 @@ Each chapter is self-contained. Read them in order, or jump to whatever you need
 | 52 | [Migration CLI filename format](./52-MIGRATION-CLI-FILENAME-FORMAT-AUDIT-45-FIX.md) | createMigration() generates YYYY_MM_DD_HH_MM_SS so created files are parsed (audit #45) |
 | 53 | [Infinite re-render loops](./53-INFINITE-RERENDER-LOOPS-AUDIT-46-FIX.md) | Memoize api return in useClosureAPI, useHistoryAPI, useMenuAPI so useEffect([api]) is stable (audit #46) |
 | 54 | [establishmentAccountApi bypass](./54-ESTABLISHMENT-ACCOUNT-API-BYPASS-AUDIT-47-FIX.md) | Use api/core request() for auth, timeout, 401; centralize base URL (audit #47) |
+| 55 | [useAuth 100ms sleep hack](./55-USE-AUTH-100MS-SLEEP-AUDIT-48-FIX.md) | Remove sleep; gate on apiConfig.isReady() / initialize() only (audit #48) |
 | — | [Session summary: POS tax, payment, cleanup](./SESSION-SUMMARY-POS-TAX-PAYMENT-AND-CLEANUP.md) | Handoff: TTC tax fix, exact tax storage, cash/card only, three payment buttons, migrations, code cleanup |
