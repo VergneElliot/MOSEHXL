@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { Box, Grid, Snackbar, Alert } from '@mui/material';
+import { Box, Snackbar, Alert } from '@mui/material';
 import { Category, Product, OrderItem } from '../../types';
 import { usePOSState } from '../../hooks/usePOSState';
 import { usePOSLogic } from '../../hooks/usePOSLogic';
@@ -7,6 +7,7 @@ import { usePOSAPI } from '../../hooks/usePOSAPI';
 import CategoryFilter from './CategoryFilter';
 import ProductGrid from './ProductGrid';
 import OrderSummary from './OrderSummary';
+import POSLayout from './POSLayout';
 import PaymentDialog from './PaymentDialog';
 
 interface POSContainerProps {
@@ -104,52 +105,51 @@ const POSContainer: React.FC<POSContainerProps> = ({
     actions.setPaymentDialogOpen(false);
   };
 
+  const menuContent = (
+    <>
+      <CategoryFilter
+        categories={categories}
+        selectedCategory={state.selectedCategory}
+        searchQuery={state.searchQuery}
+        onCategorySelect={actions.setSelectedCategory}
+        onSearchChange={actions.setSearchQuery}
+      />
+      <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+        <ProductGrid
+          products={logic.filteredProducts}
+          isHappyHourActive={isHappyHourActive}
+          onAddToOrder={handleAddToOrder}
+          calculateProductPrice={logic.calculateProductPrice}
+          formatCurrency={logic.formatCurrency}
+        />
+      </Box>
+    </>
+  );
+
+  const orderContent = (
+    <OrderSummary
+      currentOrder={state.currentOrder}
+      orderTotal={logic.orderTotal}
+      orderTax={logic.orderTax}
+      orderSubtotal={logic.orderSubtotal}
+      canProcessPayment={logic.canProcessPayment}
+      onRemoveItem={actions.removeFromOrder}
+      onClearOrder={actions.clearOrder}
+      onCheckout={handleCheckout}
+      onQuickCard={() => handleQuickPayment('card')}
+      onQuickCash={() => handleQuickPayment('cash')}
+      onUpdateQuantity={handleUpdateQuantity}
+      formatCurrency={logic.formatCurrency}
+    />
+  );
+
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Grid container spacing={2} sx={{ flexGrow: 1 }}>
-        {/* Left side - Products */}
-        <Grid item xs={12} md={8}>
-          <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {/* Category Filter and Search */}
-            <CategoryFilter
-              categories={categories}
-              selectedCategory={state.selectedCategory}
-              searchQuery={state.searchQuery}
-              onCategorySelect={actions.setSelectedCategory}
-              onSearchChange={actions.setSearchQuery}
-            />
-
-            {/* Product Grid */}
-            <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
-              <ProductGrid
-                products={logic.filteredProducts}
-                isHappyHourActive={isHappyHourActive}
-                onAddToOrder={handleAddToOrder}
-                calculateProductPrice={logic.calculateProductPrice}
-                formatCurrency={logic.formatCurrency}
-              />
-            </Box>
-          </Box>
-        </Grid>
-
-        {/* Right side - Order Summary */}
-        <Grid item xs={12} md={4}>
-          <OrderSummary
-            currentOrder={state.currentOrder}
-            orderTotal={logic.orderTotal}
-            orderTax={logic.orderTax}
-            orderSubtotal={logic.orderSubtotal}
-            canProcessPayment={logic.canProcessPayment}
-            onRemoveItem={actions.removeFromOrder}
-            onClearOrder={actions.clearOrder}
-            onCheckout={handleCheckout}
-            onQuickCard={() => handleQuickPayment('card')}
-            onQuickCash={() => handleQuickPayment('cash')}
-            onUpdateQuantity={handleUpdateQuantity}
-            formatCurrency={logic.formatCurrency}
-          />
-        </Grid>
-      </Grid>
+      <POSLayout
+        menuContent={menuContent}
+        orderContent={orderContent}
+        orderBadge={state.currentOrder.length}
+      />
 
       {/* Snackbar for notifications */}
       <Snackbar
