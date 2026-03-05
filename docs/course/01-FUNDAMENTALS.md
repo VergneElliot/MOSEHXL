@@ -1,6 +1,6 @@
 # Chapter 1 — Fundamentals
 
-Before touching any code in this project, you need to understand the tools it's built with. This chapter explains each one from scratch.
+Before touching any code in this project, you need to understand the tools it's built with. This chapter explains each one from scratch — no prior programming knowledge assumed.
 
 ---
 
@@ -201,14 +201,46 @@ The `.gitignore` file lists what Git should ignore (node_modules, .env, build ar
 
 ---
 
+---
+
+## What Is a "Monorepo" Structure?
+
+Our project contains two separate applications (frontend and backend) inside one Git repository:
+
+```
+MOSEHXL/
+├── MuseBar/
+│   ├── backend/     ← One application (the API server)
+│   │   └── package.json
+│   └── src/         ← Another application (the web interface)
+├── package.json     ← Frontend's package.json (at MuseBar/ level)
+```
+
+This is common for small-to-medium projects. The alternative would be two separate repositories, but keeping them together makes it easier to ensure they stay compatible with each other — if you change an API endpoint name in the backend, you can update the frontend call in the same commit.
+
+---
+
+## What Is "Compiling" vs "Running"?
+
+You'll see two modes:
+
+1. **Development mode** (`npm run dev` for backend, `npm start` for frontend): Your code is compiled and run in real-time. When you save a file, it automatically recompiles and restarts. This is fast and convenient for development.
+
+2. **Production mode** (`npm run build` then `npm start`): Your TypeScript is compiled to JavaScript once (creating a `dist/` folder for backend, a `build/` folder for frontend), and then the compiled JavaScript runs. This is what happens on the real server.
+
+The key takeaway: TypeScript is a **development tool**. What actually runs on the server (or in the browser) is always JavaScript. TypeScript is just there to help you catch bugs before the code runs.
+
+---
+
 ## Summary
 
 | Concept | What it is | Where in the project |
 |---------|-----------|---------------------|
-| TypeScript | JavaScript with types | Every `.ts` and `.tsx` file |
+| TypeScript | JavaScript with types — catches bugs at compile time | Every `.ts` and `.tsx` file |
 | Node.js | Server-side JavaScript runtime | Backend runs on it |
 | npm | Package manager + script runner | `package.json`, `npm install`, `npm run dev` |
 | API | HTTP endpoints the frontend calls | `backend/src/routes/` |
 | JSON | Data format between frontend and backend | Every request/response body |
 | Environment variables | Config that stays out of code | `.env` file, `process.env.*` |
 | Git | Version control | branches, commits, `.gitignore` |
+| Compile | Convert TypeScript to JavaScript | `npm run build`, or on-the-fly with `ts-node` |

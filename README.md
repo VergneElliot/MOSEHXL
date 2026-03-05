@@ -9,18 +9,24 @@ MOSEHXL/
 ├── MuseBar/
 │   ├── backend/          # Node.js / Express / TypeScript API (port 3001)
 │   │   └── src/
-│   │       ├── middleware/   # Auth & security middleware
-│   │       ├── models/       # DB models, SQL schemas, migrations
-│   │       ├── routes/       # Express route handlers
-│   │       ├── services/     # Business logic (printing, receipts, orders)
-│   │       └── utils/        # Helpers (logger, closure scheduler)
+│   │       ├── config/       # Environment validation, timezone
+│   │       ├── middleware/    # Auth (JWT), validation, security stack
+│   │       ├── models/       # DB models, SQL schemas, legal journal
+│   │       ├── routes/       # Express route handlers (orders/, legal/, etc.)
+│   │       ├── services/     # Business logic (email, printing, setup, establishment)
+│   │       ├── utils/        # Logger, closure scheduler, thermal printing
+│   │       └── migrations/   # Database migration CLI and SQL files
 │   └── src/              # React / TypeScript frontend (port 3000)
-│       ├── components/   # UI components (POS, Admin, Settings, etc.)
-│       ├── hooks/        # Shared React hooks (auth, API)
-│       ├── services/     # API service layer
-│       └── types/        # Shared TypeScript types
-├── docs/                 # Developer & architecture documentation
+│       ├── components/   # UI components (POS, Admin, Settings, Legal, etc.)
+│       ├── hooks/        # Custom React hooks (state/logic/API per feature)
+│       ├── services/     # API service layer and data caching
+│       ├── types/        # Shared TypeScript type definitions
+│       └── utils/        # Utilities (currency formatting, performance)
+├── docs/                 # Documentation (learning course + patch notes)
+│   ├── course/           # 10-chapter progressive learning guide
+│   └── patch-notes/      # 45 fix/improvement documents from code audit
 ├── scripts/              # Deployment & setup scripts
+├── .github/workflows/    # CI/CD pipeline (GitHub Actions)
 └── backups/              # Database backups (not committed)
 ```
 
@@ -33,12 +39,14 @@ MOSEHXL/
 
 ## Tech Stack
 
-- **Frontend**: React 18, TypeScript, Material-UI, React Router
-- **Backend**: Node.js, Express, TypeScript
-- **Database**: PostgreSQL 13+
-- **Auth**: JWT (bcrypt passwords, 12h/7d tokens)
-- **Email**: SendGrid
+- **Frontend**: React 18, TypeScript, Material-UI 5, React Router 6
+- **Backend**: Node.js 18+, Express 4, TypeScript 5
+- **Database**: PostgreSQL 13+ with schema-based multi-tenancy
+- **Auth**: JWT (bcrypt passwords, 12h/7d token expiry)
+- **Email**: SendGrid (with Nodemailer fallback)
+- **Security**: PostgreSQL-backed rate limiting, CORS, input sanitization, security headers
 - **Deployment**: Nginx reverse proxy, systemd services
+- **CI/CD**: GitHub Actions (lint, type-check, test, security scan, Lighthouse)
 
 ---
 
@@ -50,28 +58,36 @@ MOSEHXL/
 - Simple payment (cash/card) with change calculation and tip support
 - Split payment across multiple sub-bills with mixed cash/card
 - Happy hour pricing (percentage or fixed discount per product)
+- TTC pricing model (French standard — tax included in displayed prices)
 
 ### Menu Management
 - Create, edit, archive and restore categories and products
 - Soft delete when products have order history (legal preservation)
 - Hard delete when never used in orders
+- Cascade archiving: archiving a category archives all its products
 
 ### History
-- Full order history with search
-- Business-day statistics (CA, card/cash breakdown, top products)
+- Full order history with search (by ID, date, payment method, amount)
+- Business-day statistics (revenue, card/cash breakdown, top products)
 - Return/cancellation processing
 
 ### Settings
 - Business information (name, address, SIRET, TVA)
-- Closure schedule configuration
+- Closure schedule configuration (daily closure time, auto-closure toggle, grace period)
 - Printer setup
 - Payment method configuration
 
 ### Legal Compliance (French Law)
-See [compliance section below](#legal-compliance-french-law) for full details.
+See [compliance section below](#legal-compliance--french-law) for full details.
 
 ### System Admin (Multi-Tenant)
-A separate interface for `system_admin` role users to manage establishments, system-level users, and security logs. Foundation for future SaaS multi-tenant expansion.
+A separate interface for `system_admin` role users to manage:
+- Establishments (create, invite, monitor)
+- System-level users
+- Security logs and audit trail
+- Dashboard with platform-wide metrics
+
+Foundation for future SaaS multi-tenant expansion.
 
 ---
 
@@ -85,8 +101,8 @@ This system implements the four **ISCA pillars** required by Article 286-I-3 bis
 |--------|--------|----------------|--------|
 | **I** — Inaltérabilité | Immutability | Append-only `legal_journal` table with cryptographic SHA-256 hash chain. Each entry's hash includes the previous entry's hash, making the chain tamper-evident. DB trigger prevents UPDATE/DELETE on the table. | ✅ Implemented |
 | **S** — Sécurisation | Security | Audit trail in `audit_trail` table. All logins, logouts, user creation, permission changes, and order operations are logged with IP, user-agent, user ID, and timestamp. | ✅ Implemented |
-| **C** — Conservation | Preservation | Closure bulletins (`closure_bulletins` table) — daily, weekly, monthly, annual. Each bulletin captures total transactions, amounts, VAT breakdown by rate, and payment method breakdown for the period. Automatic daily closure scheduler runs at 02:00 Paris time in production. | ✅ Implemented |
-| **A** — Archivage | Archiving | Archive export system (`archive_exports` table) with digital signatures. Export in CSV, XML, PDF, JSON formats. Each export has a file hash for integrity verification. | ✅ Implemented |
+| **C** — Conservation | Preservation | Closure bulletins (`closure_bulletins` table) — daily, weekly, monthly, annual. Each bulletin captures total transactions, amounts, VAT breakdown by rate, and payment method breakdown for the period. Automatic daily closure scheduler runs at 02:00 Paris time in production. Bulletins are scoped per-establishment for multi-tenant isolation. | ✅ Implemented |
+| **A** — Archivage | Archiving | Archive export system (`archive_exports` table) with HMAC-SHA256 digital signatures. Export in CSV, XML, JSON formats. Each export has a file hash for integrity verification. Archive secret key is required in production (no hardcoded fallbacks). | ✅ Implemented |
 
 ### What Is Logged
 
@@ -113,19 +129,19 @@ Every completed sale writes a `SALE` entry to the legal journal. Every refund/ca
 ### Core POS Tables
 | Table | Purpose |
 |-------|---------|
-| `categories` | Product categories with default tax rate and color |
-| `products` | Products with price, tax rate, happy hour config |
-| `orders` | Orders with total, tax, payment method, tips, change |
-| `order_items` | Line items per order |
+| `categories` | Product categories with default tax rate, color, and establishment scoping |
+| `products` | Products with price (TTC), tax rate, happy hour config, establishment scoping |
+| `orders` | Orders with total, tax, payment method, tips, change, establishment scoping |
+| `order_items` | Line items per order with exact tax amounts (DECIMAL 12,4 precision) |
 | `sub_bills` | Sub-bills for split payments |
 
 ### Legal Compliance Tables
 | Table | Purpose |
 |-------|---------|
-| `legal_journal` | Immutable transaction journal with hash chain |
-| `closure_bulletins` | Daily/weekly/monthly/annual closure bulletins |
-| `audit_trail` | User action audit log |
-| `archive_exports` | Archive export records with integrity hashes |
+| `legal_journal` | Immutable transaction journal with SHA-256 hash chain |
+| `closure_bulletins` | Daily/weekly/monthly/annual closure bulletins (per-establishment) |
+| `audit_trail` | User action audit log (who, what, when, where) |
+| `archive_exports` | Archive export records with HMAC integrity signatures |
 | `closure_settings` | Auto-closure configuration (time, timezone, grace period) |
 
 ### Auth & User Tables
@@ -133,16 +149,19 @@ Every completed sale writes a `SALE` entry to the legal journal. Every refund/ca
 |-------|---------|
 | `users` | Users with email, bcrypt hash, role, establishment link |
 | `permissions` | Available permission names |
-| `user_permissions` | User ↔ permission join table |
-| `business_settings` | Business info (name, address, SIRET, TVA) |
+| `user_permissions` | User-to-permission join table (batch INSERT...SELECT) |
+| `business_settings` | Business info (name, address, SIRET, TVA) per establishment |
 
-### Multi-Tenant Tables (V2)
+### Multi-Tenant Tables
 | Table | Purpose |
 |-------|---------|
-| `establishments` | Tenant establishments with subscription info |
-| `user_invitations` | Pending user invitations with tokens |
+| `establishments` | Tenant establishments with subscription info and schema isolation |
+| `user_invitations` | Pending user invitations with secure tokens |
 | `password_reset_requests` | Password reset tokens |
 | `email_logs` | Email delivery tracking |
+| `establishment_setup_progress` | Setup wizard progress tracking |
+| `establishment_status_transitions` | Establishment lifecycle audit |
+| `rate_limit_store` | PostgreSQL-backed rate limit counters (shared across processes) |
 
 ---
 
@@ -165,6 +184,7 @@ DB_PASSWORD=your_password
 JWT_SECRET=your_secret_key_minimum_32_characters
 CORS_ORIGIN=http://localhost:3000
 SENDGRID_API_KEY=your_sendgrid_key   # optional, for email features
+ARCHIVE_SECRET_KEY=your_archive_key  # required in production, optional in dev
 ```
 
 ### Development
@@ -192,6 +212,8 @@ cd scripts
 cd MuseBar/backend
 npm run migration:status   # check current state
 npm run migration:migrate  # apply pending migrations
+npm run migration:rollback # undo the last migration
+npm run migration:create   # create a new migration file
 ```
 
 ---
@@ -202,16 +224,19 @@ npm run migration:migrate  # apply pending migrations
 |--------|-------------|
 | `GET /api/health` | Health check |
 | `/api/auth` | Login, register, token refresh, user/permission management |
-| `/api/categories` | Category CRUD |
-| `/api/products` | Product CRUD |
+| `/api/categories` | Category CRUD (establishment-scoped) |
+| `/api/products` | Product CRUD (establishment-scoped) |
 | `/api/orders` | Order CRUD, payment operations, cancellations |
+| `/api/orders/payment` | Retour, cancel-unified (refund/cancellation endpoints) |
 | `/api/legal/journal` | Legal journal entries, integrity verification |
 | `/api/legal/closure` | Closure bulletin creation and retrieval |
 | `/api/legal/compliance` | Compliance status and reports |
-| `/api/legal/archive` | Archive exports |
-| `/api/user-management` | User invitations (legacy roles/team routes dismounted) |
-| `/api/establishments` | Establishment CRUD |
+| `/api/legal/archive` | Archive exports with digital signatures |
+| `/api/user-management` | User invitations |
+| `/api/establishments` | Establishment CRUD (system admin) |
+| `/api/enhanced-establishments` | Establishment creation workflow and stats |
 | `/api/setup` | Initial setup wizard |
+| `/api/establishment-account-creation` | Invitation-based account setup |
 | `/api/docs` | Swagger/OpenAPI documentation |
 
 ---
@@ -228,6 +253,33 @@ Granular permissions (granted per user): `access_pos`, `access_menu`, `access_ha
 
 ---
 
+## Documentation
+
+Full documentation lives in the `docs/` folder:
+
+- **[Table of Contents](docs/00-TABLE-OF-CONTENTS.md)** — Start here for navigation
+- **[Course](docs/course/)** — 10-chapter progressive learning guide (beginner-friendly)
+- **[Patch Notes](docs/patch-notes/)** — 45 documented fixes from the code audit
+- **[Development State](DEVELOPMENT-STATE.md)** — Current status, 7 critical fixes, known issues
+
+---
+
+## Code Quality Measures Applied
+
+After a comprehensive code audit, 45 fixes were applied covering:
+
+- **Security**: Removed hardcoded secrets, fixed SQL injection vectors, secured unauthenticated endpoints, removed server fingerprinting headers, replaced Math.random with crypto.randomUUID
+- **Architecture**: Consolidated error handling into one system, removed dual database pools, unified schema creation, consolidated password validation rules
+- **Dead Code**: Removed unused controllers, services, shim files, debug console.logs, Mongoose handling remnants
+- **Performance**: Fixed N+1 queries, moved rate limiting to PostgreSQL, fixed infinite React re-render loops, converted per-request service instantiation to singletons
+- **Type Safety**: Replaced `any` types with proper TypeScript types, unified ClosureBulletin type, removed stale type packages
+- **Legal Compliance**: Scoped closure bulletins per-establishment, fixed timezone strategy, aligned schema SQL files with actual database state
+- **CI/CD**: Fixed pipeline configuration, Lighthouse integration, GitHub Actions versions
+
+See the [patch notes](docs/patch-notes/) for detailed documentation of every change.
+
+---
+
 ## License
 
-Copyright © 2024 Elliot Vergne. All rights reserved. Proprietary and confidential.
+Copyright © 2024-2026 Elliot Vergne. All rights reserved. Proprietary and confidential.

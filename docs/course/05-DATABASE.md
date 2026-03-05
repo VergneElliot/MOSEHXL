@@ -264,6 +264,24 @@ When `pool.query(...)` is called, it grabs an available connection, runs the que
 
 ---
 
+## Decimal Precision for Money
+
+A critical detail for any system that handles money: never use **floating point** types (`float`, `double`, `real`) for monetary amounts. They have rounding errors:
+
+```
+0.1 + 0.2 = 0.30000000000000004  (in JavaScript/floating point)
+```
+
+Instead, PostgreSQL provides `DECIMAL(precision, scale)`:
+- `DECIMAL(10,2)` — up to 10 digits, 2 after the decimal point (good for display amounts: 12345678.99)
+- `DECIMAL(12,4)` — up to 12 digits, 4 after the decimal point (good for exact accounting)
+
+Our system uses `DECIMAL(12,4)` for tax amounts and monetary values that need accounting precision (order totals, tax amounts, closure bulletin totals). This extra precision means that when you sum up thousands of line items for a monthly closure, the total is exact — no rounding drift accumulates.
+
+For **display**, amounts are rounded to 2 decimal places (e.g., `12.50 €`). For **storage and computation**, the exact 4-decimal value is preserved. This was added by a migration (`2026_02_26_01_00_00_accounting_decimal_precision.sql`).
+
+---
+
 ## Our Database Tables at a Glance
 
 ### POS Core
@@ -315,6 +333,70 @@ When `pool.query(...)` is called, it grabs an available connection, runs the que
 
 ---
 
+### Multi-Tenant & Auth
+
+```
+┌─────────────────────┐     ┌────────────────┐     ┌───────────────────┐
+│   establishments    │     │     users      │     │  user_permissions │
+├─────────────────────┤     ├────────────────┤     ├───────────────────┤
+│ id (UUID)           │◄────│ establishment_id│     │ user_id           │
+│ name                │     │ id             │────►│ permission_id     │
+│ email               │     │ email          │     └───────────────────┘
+│ schema_name         │     │ password_hash  │              │
+│ subscription_plan   │     │ role           │              │
+│ subscription_status │     │ is_admin       │     ┌────────▼──────────┐
+└─────────────────────┘     └────────────────┘     │   permissions    │
+                                                    ├───────────────────┤
+                                                    │ id               │
+                                                    │ name             │
+                                                    └───────────────────┘
+```
+
+### Infrastructure
+
+```
+┌──────────────────────────┐     ┌───────────────────────────────┐
+│   rate_limit_store      │     │  establishment_setup_progress  │
+├──────────────────────────┤     ├───────────────────────────────┤
+│ key (TEXT, PK)           │     │ establishment_id              │
+│ count (INT)              │     │ step_name                     │
+│ reset_time (TIMESTAMPTZ) │     │ status                        │
+└──────────────────────────┘     └───────────────────────────────┘
+```
+
+---
+
+## Schema-Based Multi-Tenancy
+
+This is an advanced concept, but important to understand. Each establishment (bar/restaurant) gets its own **PostgreSQL schema** — a namespace for tables. Think of it like folders on a computer:
+
+```
+Database: mosehxl_development
+├── public schema (shared tables)
+│   ├── users
+│   ├── establishments
+│   ├── permissions
+│   ├── user_permissions
+│   ├── legal_journal
+│   └── rate_limit_store
+│
+├── establishment_abc123 schema (MuseBar's tables)
+│   ├── categories
+│   ├── products
+│   ├── orders
+│   └── business_settings
+│
+└── establishment_def456 schema (another bar's tables)
+    ├── categories
+    ├── products
+    ├── orders
+    └── business_settings
+```
+
+This isolation means that Bar A's products and orders are completely separate from Bar B's. It's the database-level equivalent of having separate databases, but within one PostgreSQL instance (easier to manage). The `SchemaManager` service creates these schemas automatically when a new establishment is set up.
+
+---
+
 ## Summary
 
 | Concept | What it does | Where in the project |
@@ -327,3 +409,5 @@ When `pool.query(...)` is called, it grabs an available connection, runs the que
 | Migration | Schema change without data loss | `src/migrations/files/` |
 | Connection pool | Reuses DB connections for performance | `new Pool({...})` in `app.ts` |
 | Parameterized query | Prevents SQL injection | `$1`, `$2` in every `pool.query()` |
+| DECIMAL(12,4) | Exact monetary arithmetic (no floating point drift) | All monetary columns |
+| Schema-based multi-tenancy | Each establishment gets its own table namespace | `SchemaManager.ts`, `establishment.ts` |

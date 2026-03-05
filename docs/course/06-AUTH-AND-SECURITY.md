@@ -209,6 +209,16 @@ rateLimitMaxRequests: 100,
 
 If someone tries to brute-force the login (guessing passwords), they get blocked after 100 attempts in 15 minutes with a `429 Too Many Requests` response.
 
+### How counters are stored
+
+Rate limit counters need to be stored somewhere. There are two approaches:
+
+- **In-memory** (a JavaScript object in the Node.js process): Simple, but counters reset when the server restarts, and if you run multiple server processes (common in production), each process has its own counter — so a user could exceed the limit by spreading requests across processes.
+
+- **PostgreSQL-backed** (a `rate_limit_store` table in the database): Counters are shared across all server processes and survive restarts. This is what our system uses in production.
+
+The system uses the **adapter pattern** — an interface (`IRateLimitStoreAdapter`) that both `InMemoryRateLimitStore` and `PostgresRateLimitStore` implement. When the app starts and a database pool is available, it automatically uses PostgreSQL. This means the same code works in development (in-memory, simpler) and production (PostgreSQL, more robust) without changing the middleware logic.
+
 ---
 
 ## Input Sanitization — Preventing Injection
@@ -217,14 +227,21 @@ User input can contain malicious content. The security middleware sanitizes it:
 
 ```typescript
 // middleware/security/InputSanitization.ts strips:
-// - HTML tags (prevents XSS — cross-site scripting)
-// - SQL injection patterns
-// - Excessive whitespace
+// - <script> and <iframe> tags (prevents XSS — cross-site scripting)
+// - javascript: and vbscript: URLs
+// - Event handler attributes (onload=, onerror=, onclick=)
+// - Strings longer than 10,000 characters
 ```
 
-**XSS example**: If a user sets their name to `<script>alert('hacked')</script>` and we display it raw, the script runs in everyone's browser. Sanitization strips the HTML tags.
+**XSS example**: If a user sets their name to `<script>alert('hacked')</script>` and we display it raw, the script runs in everyone's browser. Sanitization strips the dangerous HTML tags.
 
-This is a **defense-in-depth** measure — even if our code has a bug, the sanitization layer provides protection.
+### What about SQL injection?
+
+An earlier version of the sanitization code also tried to strip SQL keywords like `SELECT`, `DROP`, `DELETE` from user input. This was actually **harmful** — it would corrupt legitimate data. For example, if a product was named "Selection du Chef", stripping "SELECT" from it would mangle the name.
+
+SQL injection is prevented **only** by using parameterized queries (`$1`, `$2`, etc.) in every database call. This is a fundamental security principle: sanitize for the **output context** (HTML for XSS), but use proper escaping/parameterization for the **data context** (SQL queries). The SQL keyword stripping was removed entirely (see [patch note #16](../patch-notes/16-SECURITY-SQL-KEYWORD-STRIPPING-FIX.md)).
+
+This is a **defense-in-depth** measure — even if our code has a bug, the sanitization layer provides protection against XSS attacks.
 
 ---
 
@@ -234,10 +251,15 @@ This is a **defense-in-depth** measure — even if our code has a bug, the sanit
 
 | Header | What it does |
 |--------|-------------|
-| `X-Content-Type-Options: nosniff` | Prevents the browser from guessing content types |
-| `X-Frame-Options: DENY` | Prevents our page from being embedded in an iframe (clickjacking) |
-| `X-XSS-Protection: 1; mode=block` | Enables browser's built-in XSS filter |
-| `Strict-Transport-Security` | Forces HTTPS (in production) |
+| `X-Content-Type-Options: nosniff` | Prevents the browser from guessing content types (MIME sniffing) |
+| `X-Frame-Options: DENY` | Prevents our page from being embedded in an iframe (protects against clickjacking attacks) |
+| `X-XSS-Protection: 1; mode=block` | Enables the browser's built-in XSS filter |
+| `Strict-Transport-Security` | Forces HTTPS connections (in production only) |
+| `Content-Security-Policy` | Controls which resources the browser is allowed to load |
+| `Referrer-Policy: strict-origin-when-cross-origin` | Limits what URL info is sent when navigating to other sites |
+| `Permissions-Policy` | Restricts access to browser features like camera, microphone, geolocation |
+
+The `X-Powered-By` header (which Express adds by default, revealing "Express" to anyone) is explicitly removed to prevent server fingerprinting — you don't want attackers knowing exactly what software you're running.
 
 ---
 

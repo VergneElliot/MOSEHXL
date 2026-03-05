@@ -2,7 +2,7 @@
 
 **Purpose:** Single source of truth for what the application expects from the database, and how it aligns with the reference schemas and migrations.
 
-**Last updated:** February 2026
+**Last updated:** March 2026 (includes rate_limit_store migration and post-audit alignment)
 
 ---
 
@@ -26,9 +26,10 @@ The app uses **only** migrations in `MuseBar/backend/src/migrations/files/` that
 | `2026_02_25_01_00_00_convert_timestamps_to_timestamptz.sql` | Converts timestamp columns to TIMESTAMPTZ (Europe/Paris) for legal journal and closure correctness. |
 | `2026_02_26_01_00_00_accounting_decimal_precision.sql` | Accounting decimal precision. |
 | `2026_02_26_02_00_00_add_establishment_id_to_closure_bulletins.sql` | Adds establishment scoping to closure bulletins. |
+| `2026_03_05_12_00_00_rate_limit_store.sql` | Creates `rate_limit_store` table for PostgreSQL-backed rate limiting (shared across processes, survives restart). |
 
 **Not run by the CLI:**  
-The reference schemas in `models/*.sql` are **not** run by `npm run migration:migrate`; they are for documentation and manual bootstrap. All schema changes applied by the app are in `migrations/files/` (timestamped migrations). Orphan root-level SQL files were removed; establishment fields and email-constraint changes are in the chain (see [24-MIGRATION-CHAIN-FRESH-DB-FIX.md](./24-MIGRATION-CHAIN-FRESH-DB-FIX.md), [51-ORPHAN-MIGRATION-SQL-FILES-AUDIT-44-FIX.md](./51-ORPHAN-MIGRATION-SQL-FILES-AUDIT-44-FIX.md)).
+The reference schemas in `models/*.sql` are **not** run by `npm run migration:migrate`; they are for documentation and manual bootstrap. All schema changes applied by the app are in `migrations/files/` (timestamped migrations). Orphan root-level SQL files were removed; establishment fields and email-constraint changes are in the chain (see [24-MIGRATION-CHAIN-FRESH-DB-FIX.md](../patch-notes/24-MIGRATION-CHAIN-FRESH-DB-FIX.md), [51-ORPHAN-MIGRATION-SQL-FILES-AUDIT-44-FIX.md](../patch-notes/51-ORPHAN-MIGRATION-SQL-FILES-AUDIT-44-FIX.md)).
 
 ### 1.2 Reference schemas (documentation / manual setup)
 

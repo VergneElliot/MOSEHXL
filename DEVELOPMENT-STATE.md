@@ -1,7 +1,9 @@
 # Development Branch — Current State
 
-This document captures the state of the `development` branch as of February 2026.
+This document captures the state of the `development` branch as of March 2026.
 It is the working reference for what is complete, what is broken, and what needs to be fixed before V2 can replace V1 in production.
+
+> **Post-audit update (March 2026):** A comprehensive code audit identified 48 issues across security, architecture, performance, type safety, and code quality. **45 fixes have been applied** (patches 11–55, documented in [docs/patch-notes/](docs/patch-notes/)). The 7 critical functional fixes listed below remain the priority for V2 completion.
 
 ---
 
@@ -16,8 +18,11 @@ It is the working reference for what is complete, what is broken, and what needs
 - Structured logging system (`utils/logger/`)
 - Security middleware stack: rate limiting, CORS, input sanitization, security headers (`middleware/security/`)
 - Environment validation on startup (`config/environment.ts`)
-- Error handling with proper Express error boundaries (`middleware/errorHandler.ts`, `middleware/errorHandling.ts`)
-- Migration CLI system (`src/migrations/cli.ts`, `npm run migration:*`)
+- Unified error handling with AppError hierarchy (`middleware/errorHandler.ts`) — consolidated from three separate systems
+- Migration CLI system (`src/migrations/cli.ts`, `npm run migration:*`) with correct filename generation
+- PostgreSQL-backed rate limiting (shared across processes, survives restarts)
+- No hardcoded secrets — all secrets from validated environment variables
+- No debug console.logs — structured logging throughout
 
 ### POS
 - Product grid with category filter and accent-normalized search
@@ -197,14 +202,16 @@ These do not prevent the POS from working but should be addressed before a stabl
 
 | # | Issue | File | Notes |
 |---|-------|------|-------|
-| 8 | `orderService.ts` is dead code | `services/orderService.ts` | `OrderService.createOrder()` has stub comments for legal journal and audit trail. `orderCRUD.ts` ignores it and goes to models directly. Either wire it in or delete it. |
 | 9 | `orderAudit.ts` stubs return empty arrays | `routes/orders/orderAudit.ts` | GET audit trail endpoints return `{ audit_entries: [], note: 'to be implemented' }`. Wire to actual `audit_trail` table queries. |
 | 10 | Audit trail not written on order creation | `routes/orders/orderCRUD.ts` | `POST /api/orders` does not call `AuditTrailModel.logAction`. V1 did. Add after the legal journal call in Fix 1. |
 | 11 | CORS missing explicit `mosehxl.com` | `app.ts` | The `CORS_ORIGIN` env var covers it in production if set correctly, but it's not explicit in code. Add `'https://mosehxl.com'` and `'https://www.mosehxl.com'` to the whitelist. |
-| 12 | Debug logging in `useAuth.ts` | `hooks/useAuth.ts` | Many `console.log('🔍 useAuth: ...')` statements left from debugging the `/me` hang. Remove before production. |
 | 13 | `usePOSAPI.processChange` description mismatch | `hooks/usePOSAPI.ts` | Notes string says `Changement de caisse: ${amount}€` but the `Faire de la Monnaie` note was used in V1 to detect the operation type. Align with how the backend detects change operations. |
 | 14 | Settings printer tab not connected | `components/Settings/Settings/PrinterSettings.tsx` | UI exists but is not wired to the new `services/printing/` backend services. |
 | 15 | History dialogs for order details and receipts missing | `components/History/HistoryContainer.tsx` | `{/* Future: Add Order Details Dialog */}` and `{/* Future: Add Receipt Dialog Component */}`. View and print receipt flows exist in V1 but not yet ported. |
+
+> **Resolved by audit patches (no longer blocking):**
+> - ~~#8: `orderService.ts` dead code~~ → Removed (patch #32)
+> - ~~#12: Debug logging in `useAuth.ts`~~ → Replaced with structured logger (patch #33)
 
 ---
 

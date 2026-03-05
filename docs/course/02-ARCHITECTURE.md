@@ -47,14 +47,13 @@ MOSEHXL/
 │   │   │   │
 │   │   │   ├── config/
 │   │   │   │   ├── environment.ts     ← Reads .env, validates, creates typed config
-│   │   │   │   └── database/          ← DB connection pool management (unused — pool is in app.ts)
+│   │   │   │   └── timezone.ts        ← DEFAULT_APP_TIMEZONE = 'Europe/Paris'
 │   │   │   │
 │   │   │   ├── middleware/
 │   │   │   │   ├── auth.ts            ← JWT verification — "is this request from a logged-in user?"
 │   │   │   │   ├── validation.ts      ← Request body/param validation rules
-│   │   │   │   ├── errorHandler.ts    ← Catches errors and sends clean JSON responses
-│   │   │   │   ├── errorHandling.ts   ← Enhanced error handler with logging
-│   │   │   │   └── security/          ← Rate limiting, CORS, input sanitization, security headers
+│   │   │   │   ├── errorHandler.ts    ← Unified error types (AppError hierarchy) and global error handler
+│   │   │   │   └── security/          ← Rate limiting (PostgreSQL-backed), CORS, input sanitization, security headers
 │   │   │   │
 │   │   │   ├── routes/                ← API endpoints — the "doors" the frontend knocks on
 │   │   │   │   ├── auth.ts            ← /api/auth/* (login, register, /me)
@@ -134,7 +133,9 @@ MOSEHXL/
 │
 ├── scripts/                           ← Shell scripts for setup and deployment
 ├── backups/                           ← Database backup files
-├── docs/                              ← This learning guide
+├── docs/                              ← Documentation hub
+│   ├── course/                        ← Learning guide (chapters 01-10)
+│   └── patch-notes/                   ← Fix documentation (45 patches from code audit)
 ├── README.md                          ← Project overview
 └── DEVELOPMENT-STATE.md               ← Current state and fix list
 ```
