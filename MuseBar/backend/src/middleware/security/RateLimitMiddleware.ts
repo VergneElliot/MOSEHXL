@@ -40,6 +40,11 @@ export class RateLimitMiddleware {
   }
 
   private async run(req: Request, res: Response, next: NextFunction): Promise<void> {
+    // Skip rate limiting for health checks so probes do not consume the budget (fixes 429 on login)
+    if (req.method === 'GET' && req.originalUrl === '/api/health') {
+      return next();
+    }
+
     const key = this.getKey(req);
     const windowMs = this.config.security.rateLimitWindowMs;
     const maxRequests = this.config.security.rateLimitMaxRequests;

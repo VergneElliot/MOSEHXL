@@ -3,6 +3,8 @@
 
 class ApiConfig {
   private static instance: ApiConfig;
+  /** Single shared init promise so concurrent callers await the same run (avoids 429 from health-check burst) */
+  private static initPromise: Promise<void> | null = null;
   private baseURL: string;
   private isInitialized: boolean = false;
 
@@ -19,39 +21,43 @@ class ApiConfig {
 
   /**
    * Initialize API configuration
-   * Attempts to detect the best backend URL to use
+   * Attempts to detect the best backend URL to use.
+   * Concurrent callers await the same run so only one health-probe loop executes.
    */
   public async initialize(): Promise<void> {
     if (this.isInitialized) return;
+    if (ApiConfig.initPromise) {
+      await ApiConfig.initPromise;
+      return;
+    }
+    ApiConfig.initPromise = this.runInitialize();
+    await ApiConfig.initPromise;
+  }
 
-    // Get the current host (works for both localhost and network IPs)
+  /**
+   * Performs the actual health probes and sets baseURL.
+   * Called at most once per app load via shared initPromise.
+   */
+  private async runInitialize(): Promise<void> {
     const currentHost = window.location.hostname;
-
-    // Define possible backend URLs to test
     const possibleUrls = [
-      `http://${currentHost}:3001`, // Same host as frontend
-      'http://localhost:3001', // Local fallback
-      'http://127.0.0.1:3001', // IP fallback
+      `http://${currentHost}:3001`,
+      'http://localhost:3001',
+      'http://127.0.0.1:3001',
     ];
-
-    // Add custom backend URL from environment if available
     if (process.env.REACT_APP_API_URL) {
       possibleUrls.unshift(process.env.REACT_APP_API_URL);
     }
 
     for (const url of possibleUrls) {
       try {
-        // Create AbortController for timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3000);
-
         const response = await fetch(`${url}/api/health`, {
           method: 'GET',
           signal: controller.signal,
         });
-
         clearTimeout(timeoutId);
-
         if (response.ok) {
           const data = await response.json();
           if (data.status === 'OK') {
@@ -64,8 +70,6 @@ class ApiConfig {
         continue;
       }
     }
-
-    // If no backend is reachable, use localhost as fallback
     this.baseURL = 'http://localhost:3001';
     this.isInitialized = true;
   }
