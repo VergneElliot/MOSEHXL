@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Card,
   CardContent,
@@ -12,6 +12,11 @@ import {
   Chip,
   useTheme,
   useMediaQuery,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -21,6 +26,7 @@ import {
   CreditCard as CreditCardIcon,
   LocalAtm as CashIcon,
   Settings as OptionsIcon,
+  SwapHoriz as ChangeIcon,
 } from '@mui/icons-material';
 import { OrderItem } from '../../types';
 
@@ -38,6 +44,8 @@ interface OrderSummaryProps {
   onQuickCard?: () => void;
   /** Quick payment: full order by cash */
   onQuickCash?: () => void;
+  /** Faire de la monnaie: customer pays amount by card, receives same amount in cash */
+  onFaireDeLaMonnaie?: (amount: number) => Promise<void>;
   onUpdateQuantity: (index: number, newQuantity: number) => void;
   formatCurrency: (amount: number) => string;
 }
@@ -53,11 +61,35 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
   onCheckout,
   onQuickCard,
   onQuickCash,
+  onFaireDeLaMonnaie,
   onUpdateQuantity,
   formatCurrency,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const [changeDialogOpen, setChangeDialogOpen] = useState(false);
+  const [changeAmount, setChangeAmount] = useState('');
+  const [changeSubmitting, setChangeSubmitting] = useState(false);
+
+  const handleOpenChangeDialog = () => setChangeDialogOpen(true);
+  const handleCloseChangeDialog = () => {
+    if (!changeSubmitting) {
+      setChangeDialogOpen(false);
+      setChangeAmount('');
+    }
+  };
+  const handleConfirmChange = async () => {
+    const parsed = parseFloat(changeAmount.replace(',', '.'));
+    if (!Number.isFinite(parsed) || parsed <= 0) return;
+    if (!onFaireDeLaMonnaie) return;
+    setChangeSubmitting(true);
+    try {
+      await onFaireDeLaMonnaie(parsed);
+      handleCloseChangeDialog();
+    } finally {
+      setChangeSubmitting(false);
+    }
+  };
 
   const handleQuantityChange = (index: number, change: number) => {
     const item = currentOrder[index];
@@ -80,16 +112,39 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
         </Box>
 
         {currentOrder.length === 0 ? (
-          <Box
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            flexGrow={1}
-            textAlign="center"
-            py={4}
-          >
-            <Typography color="textSecondary">Aucun article sélectionné</Typography>
-          </Box>
+          <>
+            <Box
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              flexGrow={1}
+              textAlign="center"
+              py={4}
+            >
+              <Typography color="textSecondary">Aucun article sélectionné</Typography>
+            </Box>
+            {onFaireDeLaMonnaie && (
+              <Box sx={{ flexShrink: 0, pt: 1 }}>
+                <Button
+                  variant="outlined"
+                  fullWidth
+                  size="large"
+                  onClick={handleOpenChangeDialog}
+                  startIcon={<ChangeIcon />}
+                  sx={{
+                    py: isMobile ? 1.25 : 1.5,
+                    fontSize: isMobile ? '0.95rem' : '1rem',
+                    fontWeight: 'bold',
+                    borderColor: 'error.light',
+                    color: 'error.dark',
+                    '&:hover': { borderColor: 'error.main', bgcolor: 'error.light' },
+                  }}
+                >
+                  Faire de la monnaie
+                </Button>
+              </Box>
+            )}
+          </>
         ) : (
           <>
             <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
@@ -242,11 +297,67 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
                 >
                   Options de paiement
                 </Button>
+                {onFaireDeLaMonnaie && (
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    size="large"
+                    onClick={handleOpenChangeDialog}
+                    startIcon={<ChangeIcon />}
+                    sx={{
+                      py: isMobile ? 1.25 : 1.5,
+                      fontSize: isMobile ? '0.95rem' : '1rem',
+                      fontWeight: 'bold',
+                      borderColor: 'error.light',
+                      color: 'error.dark',
+                      '&:hover': { borderColor: 'error.main', bgcolor: 'error.light' },
+                    }}
+                  >
+                    Faire de la monnaie
+                  </Button>
+                )}
               </Box>
             </Box>
           </>
         )}
       </CardContent>
+
+      <Dialog open={changeDialogOpen} onClose={handleCloseChangeDialog} maxWidth="xs" fullWidth>
+        <DialogTitle>Faire de la monnaie</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+            Le client paie par carte et reçoit le même montant en espèces.
+          </Typography>
+          <TextField
+            autoFocus
+            label="Montant (€)"
+            type="number"
+            inputProps={{ min: 0, step: 0.01 }}
+            value={changeAmount}
+            onChange={(e) => setChangeAmount(e.target.value)}
+            fullWidth
+            error={changeAmount !== '' && (parseFloat(changeAmount.replace(',', '.')) <= 0 || !Number.isFinite(parseFloat(changeAmount.replace(',', '.'))))}
+            helperText={changeAmount !== '' && parseFloat(changeAmount.replace(',', '.')) <= 0 ? 'Le montant doit être strictement positif' : undefined}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseChangeDialog} disabled={changeSubmitting}>
+            Annuler
+          </Button>
+          <Button
+            onClick={handleConfirmChange}
+            variant="contained"
+            disabled={
+              changeSubmitting ||
+              !changeAmount ||
+              !Number.isFinite(parseFloat(changeAmount.replace(',', '.'))) ||
+              parseFloat(changeAmount.replace(',', '.')) <= 0
+            }
+          >
+            {changeSubmitting ? 'Enregistrement…' : 'Valider'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Card>
   );
 };

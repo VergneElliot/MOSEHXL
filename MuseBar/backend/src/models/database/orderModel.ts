@@ -32,8 +32,8 @@ export const OrderModel = {
   async create(order: Omit<Order, 'id' | 'created_at' | 'updated_at'>, establishmentId: string): Promise<Order> {
     const result = await pool.query(
       `INSERT INTO orders (
-         total_amount, total_tax, payment_method, status, notes, tips, change, establishment_id
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         total_amount, total_tax, payment_method, status, notes, tips, change, establishment_id, operation_type, change_amount
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         order.total_amount,
@@ -44,6 +44,8 @@ export const OrderModel = {
         order.tips || 0,
         order.change || 0,
         establishmentId,
+        order.operation_type ?? 'sale',
+        order.change_amount ?? null,
       ]
     );
     return result.rows[0];

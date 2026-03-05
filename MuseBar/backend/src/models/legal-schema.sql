@@ -6,7 +6,7 @@
 CREATE TABLE IF NOT EXISTS legal_journal (
     id SERIAL PRIMARY KEY,
     sequence_number INTEGER NOT NULL UNIQUE, -- Sequential numbering for legal compliance
-    transaction_type VARCHAR(20) NOT NULL CHECK (transaction_type IN ('SALE', 'REFUND', 'CORRECTION', 'CLOSURE', 'ARCHIVE')),
+    transaction_type VARCHAR(20) NOT NULL CHECK (transaction_type IN ('SALE', 'REFUND', 'CORRECTION', 'CLOSURE', 'ARCHIVE', 'CHANGE')),
     order_id INTEGER REFERENCES orders(id), -- Link to business transaction
     amount DECIMAL(12,4) NOT NULL, -- Transaction amount (exact precision for legal)
     vat_amount DECIMAL(12,4) NOT NULL, -- VAT amount

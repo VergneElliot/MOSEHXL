@@ -42,7 +42,14 @@ const POSContainer: React.FC<POSContainerProps> = ({
   const handlePaymentError = (message: string) => {
     actions.setSnackbar({ open: true, message, severity: 'error' });
   };
-  const { createOrder } = usePOSAPI(handlePaymentComplete, handlePaymentError, onDataUpdate);
+  const { createOrder, processChange } = usePOSAPI(handlePaymentComplete, handlePaymentError, onDataUpdate);
+
+  const handleFaireDeLaMonnaie = useCallback(
+    async (amount: number) => {
+      await processChange({ amount, direction: 'card-to-cash' });
+    },
+    [processChange]
+  );
 
   // Event handlers
   const handleAddToOrder = (item: OrderItem) => {
@@ -140,6 +147,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
       onCheckout={handleCheckout}
       onQuickCard={() => handleQuickPayment('card')}
       onQuickCash={() => handleQuickPayment('cash')}
+      onFaireDeLaMonnaie={handleFaireDeLaMonnaie}
       onUpdateQuantity={handleUpdateQuantity}
       formatCurrency={logic.formatCurrency}
     />

@@ -14,6 +14,10 @@ export interface Order {
   notes?: string;
   tips?: number;
   change?: number;
+  /** 'sale' = normal order; 'change' = faire de la monnaie (card→cash only) */
+  operation_type?: 'sale' | 'change';
+  /** Amount in € for change operations; null for sales */
+  change_amount?: number | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -91,7 +95,7 @@ export type { UserRow, AuthenticatedUser } from '../user';
 export interface JournalEntry {
   id: number;
   sequence_number: number;
-  transaction_type: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE';
+  transaction_type: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE' | 'CHANGE';
   order_id?: number;
   amount: number;
   vat_amount: number;

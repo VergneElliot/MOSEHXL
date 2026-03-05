@@ -82,7 +82,8 @@ router.get('/report', requireAdmin, async (req, res) => {
         sales: entries.filter(e => e.transaction_type === 'SALE').length,
         refunds: entries.filter(e => e.transaction_type === 'REFUND').length,
         corrections: entries.filter(e => e.transaction_type === 'CORRECTION').length,
-        closures: entries.filter(e => e.transaction_type === 'CLOSURE').length
+        closures: entries.filter(e => e.transaction_type === 'CLOSURE').length,
+        change_operations: entries.filter(e => e.transaction_type === 'CHANGE').length
       },
       closures: {
         total: periodClosures.length,

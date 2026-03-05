@@ -6,7 +6,7 @@
 export interface JournalEntry {
   id: number;
   sequence_number: number;
-  transaction_type: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE';
+  transaction_type: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE' | 'CHANGE';
   order_id?: number;
   amount: number;
   vat_amount: number;

@@ -314,54 +314,57 @@ router.post(
  * POST cash register change operation ("Faire de la Monnaie")
  * POST /api/orders/payment/change
  *
- * Records a zero-total order that tracks a cash↔card exchange in the register.
+ * Customer pays amount by card and receives the same amount in cash (e.g. coins for darts).
+ * Always card → cash: +X to card operations of the day, -X to cash. Zero sum; recorded for
+ * legal journal, closures, and order history.
  */
 router.post(
   '/change',
   requireAuth,
-  validateBody([
-    { field: 'amount', required: true },
-    { field: 'direction', required: true },
-  ]),
+  validateBody([{ field: 'amount', required: true }]),
   async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
     const { amount, direction } = req.body as {
       amount: number;
-      direction: 'card-to-cash' | 'cash-to-card';
+      direction?: 'card-to-cash' | 'cash-to-card';
     };
 
-    if (!['card-to-cash', 'cash-to-card'].includes(direction)) {
-      return res.status(400).json({ error: 'Direction must be "card-to-cash" or "cash-to-card"' });
-    }
     if (typeof amount !== 'number' || amount <= 0 || !Number.isFinite(amount)) {
       return res.status(400).json({ error: 'Amount must be a positive number' });
     }
-
-    const label = direction === 'card-to-cash'
-      ? `Faire de la Monnaie: ${amount}€ - Carte vers Espèces`
-      : `Faire de la Monnaie: ${amount}€ - Espèces vers Carte`;
+    // Only card→cash is supported in practice
+    if (direction != null && direction !== 'card-to-cash') {
+      return res.status(400).json({ error: 'Only direction "card-to-cash" is supported (customer pays by card, receives cash)' });
+    }
 
     const order = await OrderModel.create({
       total_amount: 0,
       total_tax: 0,
-      payment_method: 'cash',
+      payment_method: 'card',
       status: 'completed',
-      notes: label,
-      establishment_id: establishmentId,
+      notes: `Faire de la Monnaie: ${amount}€ - Carte vers Espèces`,
       tips: 0,
       change: amount,
+      operation_type: 'change',
+      change_amount: amount,
     }, establishmentId);
 
-    // Audit trail
     const userId = req.user ? String(req.user.id) : undefined;
+
+    try {
+      await LegalJournalModel.logChange(order.id, amount, userId);
+    } catch (journalError: unknown) {
+      logger.error(`Legal journal error (change) for order ${order.id}`, journalError instanceof Error ? journalError : new Error(String(journalError)), 'LEGAL_JOURNAL');
+    }
+
     AuditTrailModel.logAction({
       user_id: userId,
       action_type: 'CASH_REGISTER_CHANGE',
       resource_type: 'ORDER',
       resource_id: String(order.id),
-      action_details: { amount, direction },
+      action_details: { amount, direction: 'card-to-cash' },
       ip_address: req.ip,
       user_agent: req.headers['user-agent'],
     }).catch((err: unknown) => {

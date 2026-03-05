@@ -51,8 +51,14 @@ export class ClosureOperations {
       const orderVat = parseFloat(String(order.total_tax ?? order.taxAmount ?? 0));
       totalAmount += orderAmount;
       totalVat += orderVat;
-      const paymentMethod = order.payment_method || 'cash';
-      paymentBreakdown[paymentMethod] = (paymentBreakdown[paymentMethod] || 0) + orderAmount;
+      if (order.operation_type === 'change' && order.change_amount != null) {
+        const x = parseFloat(String(order.change_amount));
+        paymentBreakdown['card'] = (paymentBreakdown['card'] || 0) + x;
+        paymentBreakdown['cash'] = (paymentBreakdown['cash'] || 0) - x;
+      } else {
+        const paymentMethod = order.payment_method || 'cash';
+        paymentBreakdown[paymentMethod] = (paymentBreakdown[paymentMethod] || 0) + orderAmount;
+      }
     }
 
     // VAT breakdown from order_items (exact sums for accounting; round only when displaying/printing)
@@ -169,9 +175,15 @@ export class ClosureOperations {
     const orderIds = orders.map((o: { id: number }) => o.id);
     const paymentBreakdown: PaymentBreakdown = {};
     for (const order of orders) {
-      const paymentMethod = order.payment_method || 'cash';
-      const orderAmount = parseFloat(String(order.total_amount ?? 0));
-      paymentBreakdown[paymentMethod] = (paymentBreakdown[paymentMethod] || 0) + orderAmount;
+      if (order.operation_type === 'change' && order.change_amount != null) {
+        const x = parseFloat(String(order.change_amount));
+        paymentBreakdown['card'] = (paymentBreakdown['card'] || 0) + x;
+        paymentBreakdown['cash'] = (paymentBreakdown['cash'] || 0) - x;
+      } else {
+        const paymentMethod = order.payment_method || 'cash';
+        const orderAmount = parseFloat(String(order.total_amount ?? 0));
+        paymentBreakdown[paymentMethod] = (paymentBreakdown[paymentMethod] || 0) + orderAmount;
+      }
     }
 
     // Exact VAT breakdown from order_items (no rounding for storage)

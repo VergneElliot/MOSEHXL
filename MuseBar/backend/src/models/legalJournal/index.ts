@@ -27,7 +27,7 @@ export type {
 export class LegalJournalModel {
   // Journal operations
   static async addEntry(
-    transactionType: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE',
+    transactionType: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE' | 'CHANGE',
     orderId: number | null,
     amount: number,
     vatAmount: number,
@@ -61,6 +61,10 @@ export class LegalJournalModel {
     return await JournalOperations.logTransaction(order, userId);
   }
 
+  static async logChange(orderId: number, amount: number, userId?: string) {
+    return await JournalOperations.logChange(orderId, amount, userId);
+  }
+
   // Integrity verification
   static async verifyJournalIntegrity() {
     return await JournalSigning.verifyJournalIntegrity();
@@ -76,7 +80,7 @@ export class LegalJournalModel {
   }
 
   static async getEntriesByType(
-    transactionType: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE',
+    transactionType: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE' | 'CHANGE',
     limit?: number
   ) {
     return await JournalQueries.getEntriesByType(transactionType, limit);
