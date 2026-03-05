@@ -44,7 +44,7 @@ jobs:
       run: npm run test:ci
 
     - name: Upload frontend test coverage
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         file: MuseBar/coverage/lcov.info
         flags: frontend
@@ -122,7 +122,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
+      uses: aquasecurity/trivy-action@v1
       with:
         scan-type: 'fs'
         scan-ref: '.'
@@ -130,7 +130,7 @@ jobs:
         output: 'trivy-results.sarif'
 
     - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       if: always()
       with:
         sarif_file: 'trivy-results.sarif'
@@ -182,28 +182,37 @@ jobs:
         tar -czf musebar-deployment.tar.gz deployment/
 
     - name: Upload deployment artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: musebar-deployment
         path: musebar-deployment.tar.gz
 
-    - name: Deploy to production
+    - name: Record deployment artifact (deploy configured elsewhere)
       if: github.ref == 'refs/heads/main'
       run: |
-        echo "🚀 Deploying to production..."
-        # Add your deployment logic here
-        # Examples:
-        # - Deploy to AWS, Google Cloud, or Azure
-        # - Deploy to Docker containers
-        # - Deploy to Kubernetes cluster
-        # - Deploy to VPS via SSH
+        echo "Deployment artifact 'musebar-deployment' has been uploaded."
+        echo "Configure your deployment (e.g. download this artifact and deploy to your host, or use a separate deploy job with needs: build-and-deploy and actions/download-artifact) to complete production deploy."
 
-  # Performance Testing
+  # Performance Testing (frontend Lighthouse; backend needs DB)
   performance-test:
     name: Performance Test
     runs-on: ubuntu-latest
     needs: [frontend-test, backend-test]
-    
+
+    services:
+      postgres:
+        image: postgres:${{ env.POSTGRES_VERSION }}
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mosehxl_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -213,17 +222,53 @@ jobs:
       with:
         node-version: ${{ env.NODE_VERSION }}
 
-    - name: Install dependencies
-      run: |
-        cd MuseBar && npm ci
-        cd ../backend && npm ci
+    - name: Install frontend dependencies
+      working-directory: MuseBar
+      run: npm ci
+
+    - name: Install backend dependencies
+      working-directory: MuseBar/backend
+      run: npm ci
+
+    - name: Build frontend
+      working-directory: MuseBar
+      run: npm run build
+
+    - name: Build backend
+      working-directory: MuseBar/backend
+      run: npm run build
+
+    - name: Run database migrations
+      working-directory: MuseBar/backend
+      env:
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_USER: postgres
+        DB_PASSWORD: postgres
+        DB_NAME: mosehxl_test
+        JWT_SECRET: test-jwt-secret-for-ci
+        NODE_ENV: test
+      run: npm run migration:migrate
 
     - name: Start backend server
       working-directory: MuseBar/backend
+      env:
+        PORT: "3001"
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_USER: postgres
+        DB_PASSWORD: postgres
+        DB_NAME: mosehxl_test
+        JWT_SECRET: test-jwt-secret-for-ci
+        NODE_ENV: test
       run: |
-        npm run build
         npm start &
-        sleep 10
+        sleep 15
+
+    - name: Serve frontend for Lighthouse
+      run: |
+        npx --yes serve -s MuseBar/build -l 3000 &
+        sleep 5
 
     - name: Run Lighthouse CI
       uses: treosh/lighthouse-ci-action@v10
@@ -258,7 +303,7 @@ jobs:
         echo "📚 API documentation generated"
 
     - name: Upload documentation
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: api-documentation
         path: MuseBar/backend/src/docs/
