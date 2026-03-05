@@ -54,17 +54,17 @@ const ClosureContainer: React.FC = () => {
     actions.closeSnackbar();
   };
 
-  const handleViewDetails = (bulletin: any) => {
+  const handleViewDetails = (bulletin: Parameters<typeof actions.setSelectedBulletin>[0]) => {
     actions.setSelectedBulletin(bulletin);
     actions.setShowDetailsDialog(true);
   };
 
-  const handlePrint = (bulletin: any) => {
+  const handlePrint = (bulletin: Parameters<typeof actions.setPrintBulletin>[0]) => {
     actions.setPrintBulletin(bulletin);
     actions.setPrintDialogOpen(true);
   };
 
-  const handleDownload = (bulletin: any) => {
+  const handleDownload = (_bulletin: Parameters<typeof actions.setPrintBulletin>[0]) => {
     // Future: Implement download functionality
   };
 
@@ -109,8 +109,8 @@ const ClosureContainer: React.FC = () => {
 
       {/* Status Cards */}
       <ClosureStatusCards
-        todayStatus={state.todayStatus as any}
-        monthlyStats={state.monthlyStats as any}
+        todayStatus={state.todayStatus}
+        monthlyStats={state.monthlyStats}
         monthlyStatsError={state.monthlyStatsError}
         loading={state.loading}
         formatCurrency={formatCurrency}

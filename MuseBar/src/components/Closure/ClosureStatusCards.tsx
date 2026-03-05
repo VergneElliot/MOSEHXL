@@ -11,22 +11,11 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { Receipt, Schedule, TrendingUp, Assignment, Security, Lock } from '@mui/icons-material';
+import type { ClosureTodayStatus, LiveMonthlyStats } from '../../types';
 
 interface ClosureStatusCardsProps {
-  todayStatus: {
-    has_daily_closure?: boolean;
-    closure_date?: string;
-    total_transactions?: number;
-    total_amount?: number;
-    transactions_today?: number;
-  } | null;
-  monthlyStats: {
-    total_amount?: number;
-    total_transactions?: number;
-    avg_daily_amount?: number;
-    avg_daily_transactions?: number;
-    closure_count?: number;
-  } | null;
+  todayStatus: ClosureTodayStatus | null;
+  monthlyStats: LiveMonthlyStats | null;
   monthlyStatsError: string | null;
   loading: boolean;
   formatCurrency: (amount: number) => string;
@@ -63,25 +52,24 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
       {/* Today Status Alert */}
       {todayStatus && (
         <Alert
-          severity={todayStatus.has_daily_closure ? 'success' : 'warning'}
+          severity={todayStatus.has_closure ? 'success' : 'warning'}
           sx={{ mb: 2 }}
-          icon={todayStatus.has_daily_closure ? <Lock /> : <Schedule />}
+          icon={todayStatus.has_closure ? <Lock /> : <Schedule />}
         >
           <AlertTitle>
-            {todayStatus.has_daily_closure
+            {todayStatus.has_closure
               ? 'Clôture journalière effectuée'
               : 'Clôture journalière en attente'}
           </AlertTitle>
-          {todayStatus.has_daily_closure ? (
+          {todayStatus.has_closure && todayStatus.bulletin ? (
             <Typography variant="body2">
-              Clôture effectuée le {todayStatus.closure_date ? new Date(todayStatus.closure_date).toLocaleDateString('fr-FR') : 'N/A'}-{' '}
-              {todayStatus.total_transactions} transactions pour{' '}
-              {formatCurrency(todayStatus.total_amount || 0)}
+              Clôture effectuée le {todayStatus.bulletin.period_end ? new Date(todayStatus.bulletin.period_end).toLocaleDateString('fr-FR') : 'N/A'} —{' '}
+              {todayStatus.bulletin.total_transactions} transactions pour{' '}
+              {formatCurrency(todayStatus.bulletin.total_amount || 0)}
             </Typography>
           ) : (
             <Typography variant="body2">
-              La clôture journalière n'a pas encore été effectuée pour aujourd'hui. Période
-              d'activité en cours : {todayStatus.transactions_today} transactions.
+              La clôture journalière n'a pas encore été effectuée pour aujourd'hui.
             </Typography>
           )}
         </Alert>
@@ -111,7 +99,7 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
                   </Typography>
                 </Box>
                 <Typography variant="h6" fontWeight="bold">
-                  {todayStatus.transactions_today || 0}
+                  {todayStatus.bulletin?.total_transactions ?? 0}
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
                   Transactions

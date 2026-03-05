@@ -136,13 +136,13 @@ export interface ClosureBulletin {
   change_total?: number;
 }
 
-// Closure today status
+// Closure today status (matches GET /api/legal/closure/today-status)
 export interface ClosureTodayStatus {
-  is_closed: boolean;
-  closure_bulletin: ClosureBulletin | null;
-  auto_closure_enabled: boolean;
-  next_auto_closure: string;
-  closure_settings: Record<string, string>;
+  date: string;
+  has_closure: boolean;
+  closure_status: string;
+  bulletin: ClosureBulletin | null;
+  compliance_note?: string;
 }
 
 // Closure settings map (settings endpoint returns key-value object)
@@ -153,13 +153,16 @@ export type ClosureSettings = Record<string, {
   updated_at?: string;
 }> | Record<string, string>;
 
-// Live monthly stats
+// Live monthly stats (API may include optional display fields)
 export interface LiveMonthlyStats {
   total_transactions: number;
   total_amount: number;
   total_vat: number;
-  tips_total: number;
-  change_total: number;
+  tips_total?: number;
+  change_total?: number;
+  avg_daily_amount?: number;
+  avg_daily_transactions?: number;
+  closure_count?: number;
 }
 
 // Business info (minimal)

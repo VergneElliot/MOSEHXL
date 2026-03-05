@@ -60,10 +60,11 @@ export const usePOSAPI = (
         });
         onSuccess('Commande créée avec succès');
         onDataUpdate();
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as { response?: { data?: { error?: string } }; message?: string };
         const errorMessage =
-          error.response?.data?.error ||
-          error.message ||
+          err.response?.data?.error ||
+          err.message ||
           'Erreur lors de la création de la commande';
         onError(errorMessage);
         throw error;
@@ -94,9 +95,10 @@ export const usePOSAPI = (
         onSuccess('Retour traité avec succès');
         onDataUpdate();
         return response.data;
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as { response?: { data?: { error?: string } }; message?: string };
         const errorMessage =
-          error.response?.data?.error || error.message || 'Erreur lors du traitement du retour';
+          err.response?.data?.error || err.message || 'Erreur lors du traitement du retour';
         onError(errorMessage);
         throw error;
       }
@@ -127,9 +129,10 @@ export const usePOSAPI = (
         onSuccess('Changement de caisse effectué');
         onDataUpdate();
         return response.data;
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as { response?: { data?: { error?: string } }; message?: string };
         const errorMessage =
-          error.response?.data?.error || error.message || 'Erreur lors du changement de caisse';
+          err.response?.data?.error || err.message || 'Erreur lors du changement de caisse';
         onError(errorMessage);
         throw error;
       }

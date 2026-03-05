@@ -131,9 +131,10 @@ export const useHistoryAPI = (
           loadOrders();
           loadStats();
         }, 1500);
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as { response?: { data?: { error?: string } }; message?: string };
         const errorMessage =
-          error.response?.data?.error || error.message || 'Erreur lors du traitement du retour';
+          err.response?.data?.error || err.message || 'Erreur lors du traitement du retour';
         setReturnError(errorMessage);
       } finally {
         setReturnLoading(false);

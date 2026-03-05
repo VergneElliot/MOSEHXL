@@ -15,8 +15,8 @@ export const useEstablishments = () => {
       ensureAuthentication();
       const response = await EstablishmentService.getEstablishments();
       setEstablishments(response.establishments);
-    } catch (err: any) {
-      const errorMessage = err.message || 'Erreur lors du chargement des établissements';
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors du chargement des établissements';
       setError(errorMessage);
     } finally {
       setLoading(false);

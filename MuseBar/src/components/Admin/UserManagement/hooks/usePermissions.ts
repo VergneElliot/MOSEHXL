@@ -31,7 +31,7 @@ export const usePermissions = () => {
     setPermError(null);
     
     try {
-      const response = await apiService.get<any>(`/auth/users/${user.id}/permissions`);
+      const response = await apiService.get<{ permissions: string[] }>(`/auth/users/${user.id}/permissions`);
       const data = response.data;
       const state: { [key: string]: boolean } = {};
       
