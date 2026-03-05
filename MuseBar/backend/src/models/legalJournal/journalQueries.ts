@@ -78,7 +78,7 @@ export class JournalQueries {
    * @returns Array of journal entries
    */
   static async getEntriesByType(
-    transactionType: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE',
+    transactionType: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE' | 'CHANGE',
     limit?: number
   ): Promise<JournalEntry[]> {
     let query = 'SELECT * FROM legal_journal WHERE transaction_type = $1 ORDER BY sequence_number DESC';
@@ -115,7 +115,7 @@ export class JournalQueries {
    */
   static async insertEntry(
     sequenceNumber: number,
-    transactionType: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE',
+    transactionType: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE' | 'CHANGE',
     orderId: number | null,
     amount: number,
     vatAmount: number,

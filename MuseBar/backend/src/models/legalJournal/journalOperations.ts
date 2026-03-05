@@ -13,7 +13,7 @@ export class JournalOperations {
    * This is the core function for maintaining the legal journal chain
    */
   static async addEntry(
-    transactionType: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE',
+    transactionType: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE' | 'CHANGE',
     orderId: number | null,
     amount: number,
     vatAmount: number,
@@ -157,6 +157,31 @@ export class JournalOperations {
   }
 
   /**
+   * Log a change operation (faire de la monnaie: card → cash).
+   * +X to card, -X to cash; one entry per operation, linked to the change order.
+   */
+  static async logChange(
+    orderId: number,
+    amount: number,
+    userId?: string
+  ): Promise<JournalEntry> {
+    return await this.addEntry(
+      'CHANGE',
+      orderId,
+      amount,
+      0,
+      'change',
+      {
+        card: amount,
+        cash: -amount,
+        operation: 'faire_de_la_monnaie',
+        register_id: JournalSigning.getRegisterKey(),
+      },
+      userId
+    );
+  }
+
+  /**
    * Log an archive entry
    */
   static async logArchive(
@@ -195,7 +220,7 @@ export class JournalOperations {
    * Get entries by transaction type
    */
   static async getEntriesByType(
-    transactionType: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE',
+    transactionType: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE' | 'CHANGE',
     limit?: number
   ): Promise<JournalEntry[]> {
     return await JournalQueries.getEntriesByType(transactionType, limit);
