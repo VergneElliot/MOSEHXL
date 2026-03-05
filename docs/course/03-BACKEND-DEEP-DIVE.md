@@ -269,7 +269,7 @@ The validation runs before the handler. If validation fails, the handler never e
 
 ## Error Handling
 
-In Express, errors flow to **error-handling middleware** — a special middleware with four arguments:
+In Express, errors flow to **error-handling middleware** — a special middleware with four arguments (yes, four — the extra `err` argument is how Express distinguishes error middleware from regular middleware):
 
 ```typescript
 app.use((err, req, res, next) => {
@@ -278,14 +278,44 @@ app.use((err, req, res, next) => {
 });
 ```
 
-In our project, this is in `middleware/errorHandler.ts`. The `AppError` class lets us throw errors with specific status codes:
+In our project, the unified error system lives in `middleware/errorHandler.ts`. It provides:
+
+1. **An error class hierarchy** — different error types for different situations:
 
 ```typescript
-throw new AppError('Order not found', 404);
-// The error handler catches this and sends: { "error": "Order not found" } with 404
+throw new ValidationError('Invalid email');     // → 400 Bad Request
+throw new AuthenticationError('Token expired');  // → 401 Unauthorized
+throw new AuthorizationError('No permission');   // → 403 Forbidden
+throw new NotFoundError('Order not found');      // → 404 Not Found
+throw new ConflictError('Email already exists'); // → 409 Conflict
+throw new RateLimitError('Too many requests');   // → 429 Too Many Requests
+throw new BusinessLogicError('Cannot refund');   // → 422 Unprocessable Entity
 ```
 
-The `notFound` middleware runs after all routes — if no route matched the URL, it sends a 404:
+All of these extend `AppError`, which has a `statusCode` and `isOperational` flag. The global error handler knows how to format them into clean JSON responses.
+
+2. **Error normalization** — the handler automatically converts common errors:
+   - PostgreSQL error code `23505` → `ConflictError` (duplicate key violation)
+   - JWT `TokenExpiredError` → `AuthenticationError` with "Token expired"
+   - Network `ECONNREFUSED` → "Database connection failed"
+
+3. **The `asyncHandler` wrapper** — because Express doesn't catch errors from `async` functions by default:
+
+```typescript
+// Without asyncHandler — errors in async code crash the server:
+router.get('/', async (req, res) => {
+  const orders = await OrderModel.getAll(); // if this throws, Express doesn't catch it
+  res.json(orders);
+});
+
+// With asyncHandler — errors are properly caught:
+router.get('/', asyncHandler(async (req, res) => {
+  const orders = await OrderModel.getAll(); // if this throws, error handler catches it
+  res.json(orders);
+}));
+```
+
+4. **The `notFound` middleware** — runs after all routes. If no route matched the URL, it sends a 404:
 
 ```typescript
 export const notFound = (req, res, next) => {
@@ -370,6 +400,21 @@ If the `await` fails (DB error, network error), it throws an exception, which is
 
 ---
 
+---
+
+## Structured Logging
+
+Instead of using `console.log` (which produces unstructured output that's hard to search and filter), the backend uses a **structured logging system** in `utils/logger/`. This system:
+
+- Categorizes log messages (AUTH, DATABASE, SECURITY, LEGAL, etc.)
+- Includes timestamps, severity levels (DEBUG, INFO, WARN, ERROR)
+- Logs request details (method, URL, duration, status code) via request logger middleware
+- In production, omits debug-level messages for performance
+
+Every debug `console.log` statement was replaced with the structured logger during the audit (see [patch note #33](../patch-notes/33-DEBUG-CONSOLE-LOG-AUDIT-25-FIX.md)). If you need to add logging, use the logger, not `console.log`.
+
+---
+
 ## Summary
 
 | Concept | What it does | Our code |
@@ -377,8 +422,11 @@ If the `await` fails (DB error, network error), it throws an exception, which is
 | Express | Web framework — handles HTTP | `app.ts` creates the app |
 | Middleware | Functions that run before route handlers | `auth.ts`, `validation.ts`, `security/` |
 | Routes | Map URLs to handler functions | `routes/orders/`, `routes/legal/` |
-| Models | Wrap SQL queries in TypeScript | `models/index.ts`, `models/user.ts` |
+| Models | Wrap SQL queries in TypeScript | `models/database/`, `models/user.ts` |
 | Services | Complex multi-step business logic | `services/email/`, `services/setup/` |
 | Pool | Reusable database connections | `pool` in `app.ts` |
 | Parameterized queries | Prevent SQL injection | `$1`, `$2` in every query |
 | async/await | Clean asynchronous code | Every route handler and model function |
+| AppError hierarchy | Typed errors with proper HTTP status codes | `middleware/errorHandler.ts` |
+| asyncHandler | Catches errors from async route handlers | Wraps every async route handler |
+| Structured logger | Categorized, timestamped logging (no console.log) | `utils/logger/` |

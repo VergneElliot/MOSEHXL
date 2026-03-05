@@ -1,65 +1,130 @@
-# MOSEHXL — Learning Guide
+# MOSEHXL — Documentation Hub
 
-This is your personal reference for understanding every piece of this project.
-Each chapter is self-contained. Read them in order, or jump to whatever you need.
+Welcome to the MOSEHXL project documentation. This is your central reference for understanding every piece of this project, from the fundamentals of the technologies used to the detailed patch notes of every fix applied.
 
-## Chapters
+The documentation is organized into two sections:
+
+- **Course** — A progressive learning guide that teaches you every aspect of the project, from basic concepts to advanced legal compliance. Start here if you are new.
+- **Patch Notes** — A chronological log of every fix and improvement made to the codebase after the initial audit. Each entry explains what was wrong, why it mattered, and exactly what was changed.
+
+---
+
+## Course — Learning Guide
+
+These chapters are designed to be read in order. Each one builds on the previous, taking you from "what is JavaScript?" all the way to "how does French legal compliance work in this specific codebase?"
 
 | # | File | What You'll Learn |
 |---|------|-------------------|
-| 01 | [Fundamentals](./01-FUNDAMENTALS.md) | TypeScript, Node.js, npm — the building blocks |
-| 02 | [Architecture Overview](./02-ARCHITECTURE.md) | Why the project is structured the way it is, what each folder does, how data flows from click to database and back |
-| 03 | [Backend Deep Dive](./03-BACKEND-DEEP-DIVE.md) | Express.js, middleware, routes, models, services — how the API works |
-| 04 | [Frontend Deep Dive](./04-FRONTEND-DEEP-DIVE.md) | React, components, hooks, state management, Material-UI — how the UI works |
-| 05 | [Database](./05-DATABASE.md) | PostgreSQL, tables, SQL, indexes, migrations — how data is stored |
-| 06 | [Auth and Security](./06-AUTH-AND-SECURITY.md) | JWT, bcrypt, CORS, rate limiting — how users are authenticated and protected |
-| 07 | [Legal Compliance](./07-LEGAL-COMPLIANCE.md) | Hash chains, ISCA pillars, French law — how the legal system works technically |
-| 08 | [Audit & Full Course](./08-AUDIT-AND-FULL-COURSE.md) | Code audit, redundant code, architecture assessment, and complete file-by-file course for developers |
-| 09 | [Database Architecture Compatibility](./09-DATABASE-ARCHITECTURE-COMPATIBILITY.md) | What the DB must have for current code; migration CLI vs reference schemas; verification queries |
-| 10 | [Multi-tenant and Muse POS access](./10-MULTI-TENANT-AND-MUSE-POS-ACCESS.md) | How user–establishment links work; how to log in to Muse POS; script to fix lost links |
-| 11 | [Security: Hardcoded secrets fix](./11-SECURITY-HARDCODED-SECRETS-FIX.md) | Why hardcoded JWT/DB/archive secrets are dangerous and how they were removed |
-| 12 | [Security: Invitation token leak fix](./12-SECURITY-INVITATION-TOKEN-LEAK-FIX.md) | Why invitation tokens must not be returned in API responses and how it was fixed |
-| 13 | [Security: Env files not tracked](./13-SECURITY-ENV-FILES-NOT-TRACKED.md) | Why .env.development/.production must not be in Git and how they were untracked |
-| 14 | [Security: SQL injection fix](./14-SECURITY-SQL-INJECTION-FIX.md) | Why schema/column interpolation is dangerous and how we validate or whitelist |
-| 15 | [Schema creation divergence fix](./15-SCHEMA-CREATION-DIVERGENCE-FIX.md) | Why two schema creators broke the POS and how we unified on SchemaManager |
-| 16 | [Security: SQL keyword stripping fix](./16-SECURITY-SQL-KEYWORD-STRIPPING-FIX.md) | Why stripping SQL keywords corrupts data and doesn’t protect; rely on parameterized queries |
-| 17 | [Legal journal multi-tenancy fix](./17-LEGAL-JOURNAL-MULTI-TENANCY-FIX.md) | Why closure bulletins must be per-establishment and how scheduler, archive, and routes were updated |
-| 18 | [Printing and products schema fix](./18-PRINTING-PRODUCTS-SCHEMA-FIX.md) | Why printing/products must query the establishment schema and how routes and models were updated |
-| 19 | [Security: Unauthenticated endpoints fix](./19-SECURITY-UNAUTHENTICATED-ENDPOINTS-FIX.md) | Why every sensitive endpoint must use auth middleware and how email-test and admin-dashboard routes were secured |
-| 20 | [Dual database pool removal](./20-DUAL-DATABASE-POOL-REMOVAL.md) | Why we removed the unused config/database module and keep a single pool in app.ts |
-| 21 | [Triple error handling consolidation](./21-TRIPLE-ERROR-HANDLING-CONSOLIDATION.md) | Why we merged to one error hierarchy, one asyncHandler, and one global handler |
-| 22 | [Establishment/setup flows and invitation consolidation](./22-ESTABLISHMENT-SETUP-FLOWS-AND-INVITATION-CONSOLIDATION.md) | Five overlapping flows (#12), single invitation query (#13), and how to evolve |
-| 23 | [Password validation single rule set](./23-PASSWORD-VALIDATION-SINGLE-RULE-SET.md) | Why one password policy everywhere and how we consolidated to utils/passwordValidation |
-| 24 | [Migration chain broken on fresh DB](./24-MIGRATION-CHAIN-FRESH-DB-FIX.md) | Why migrate failed on fresh DB and how we moved setup/status-transitions into the timestamped chain |
-| 25 | [package-lock and email templates](./25-PACKAGE-LOCK-AND-EMAIL-TEMPLATES-FIX.md) | Why lockfile must be committed (CI/reproducible builds) and why missing invitation templates threw at runtime |
-| 26 | [Product isActive hardcoded](./26-PRODUCT-ISACTIVE-HARDCODED-FIX.md) | Why products API hardcoded isActive: true and how we use the real DB value and persist it on update |
-| 27 | [Double API call on mount (legal compliance)](./27-DOUBLE-API-CALL-LEGAL-COMPLIANCE-FIX.md) | Why two identical useEffects caused double fetches and how we keep a single load-on-mount effect |
-| 28 | [Debug info leaked on login](./28-DEBUG-INFO-LEAKED-LOGIN-FIX.md) | Why backend URL/host/init status must not be shown to all users and how we removed the debug Alert |
-| 29 | [Redundant standalone vs directory files](./29-REDUNDANT-STANDALONE-FILES-FIX.md) | Why shim files and duplicate route files were removed and how we consolidated establishments |
-| 30 | [Redundant frontend files (standalone vs directory)](./30-REDUNDANT-FRONTEND-FILES-FIX.md) | Why 14 frontend shim files were removed and how resolution uses directory index |
-| 31 | [Dead frontend modules and middleware](./31-DEAD-FRONTEND-MODULES-AND-MIDDLEWARE-FIX.md) | Why skeletons/ and loadingStates/ were removed and validateBusinessInfo was added to the route chain |
-| 32 | [Dead code within files](./32-DEAD-CODE-WITHIN-FILES-FIX.md) | Why we removed Mongoose handling, localStorage methods, fake PDF, unused methods/variables (audit #24) |
-| 33 | [Debug console.log everywhere](./33-DEBUG-CONSOLE-LOG-AUDIT-25-FIX.md) | Why we replaced console with structured logger (backend) and removed debug/auth logs (frontend, audit #25) |
-| 34 | [Self-HTTP proxy in printing compat](./34-SELF-HTTP-PROXY-PRINTING-COMPAT-FIX.md) | Why printingCompat used in-process calls instead of axios to self (audit #26) |
-| 35 | [Currency format deduplication](./35-CURRENCY-FORMAT-DEDUPLICATION-AUDIT-27.md) | Single formatCurrency util for Euro (fr-FR) instead of 11 duplicated formatters (audit #27) |
-| 36 | [Snackbar pattern deduplication](./36-SNACKBAR-PATTERN-DEDUPLICATION-AUDIT-28.md) | Shared useSnackbar hook instead of duplicated showSuccess/showError/closeSnackbar in 3 hooks (audit #28) |
-| 37 | [ClosureBulletin type unification](./37-CLOSURE-BULLETIN-TYPE-UNIFICATION-AUDIT-29.md) | Single ClosureBulletin type in types/api.ts instead of 3+ definitions with different shapes (audit #29) |
-| 38 | [Case sensitivity: Auth vs auth](./38-CASE-SENSITIVITY-AUTH-DIRECTORY-FIX.md) | Single lowercase auth/ directory so imports work on macOS and Windows (case-insensitive FS) |
-| 39 | [React Router types mismatch](./39-REACT-ROUTER-TYPES-AUDIT-32-FIX.md) | Removed @types/react-router-dom (v5) — v6 ships its own types (audit #32) |
-| 40 | [moment-timezone version and timezone strategy](./40-MOMENT-TIMEZONE-AND-TIMEZONE-STRATEGY-AUDIT-33.md) | Valid moment-timezone 0.5.x; single DEFAULT_APP_TIMEZONE; configurable closures (audit #33) |
-| 41 | [Reduce any types](./41-ANY-TYPES-REDUCTION-AUDIT-34-FIX.md) | Proper types in closure, auth, API, history, POS; unknown in catch (audit #34) |
-| 42 | [N+1 in setUserPermissions](./42-N-PLUS-ONE-SET-USER-PERMISSIONS-AUDIT-35-FIX.md) | Single INSERT...SELECT + transaction instead of 2N+1 queries (audit #35) |
-| 43 | [Per-request service instantiation](./43-PER-REQUEST-SERVICE-INSTANTIATION-AUDIT-36-FIX.md) | Module-level singletons for DashboardDataService, EstablishmentService, Orchestrator (audit #36) |
-| 44 | [Empty catch blocks in auth](./44-EMPTY-CATCH-BLOCKS-AUDIT-37-FIX.md) | Capture and log errors in create-user catch blocks (audit #37) |
-| 45 | [Math.random for request IDs](./45-MATH-RANDOM-REQUEST-IDS-AUDIT-38-FIX.md) | Use crypto.randomUUID() for request IDs in request logger (audit #38) |
-| 46 | [X-Powered-By removal](./46-X-POWERED-BY-REMOVAL-AUDIT-39-FIX.md) | Remove X-Powered-By from security headers to avoid fingerprinting (audit #39) |
-| 47 | [In-memory rate limiting](./47-IN-MEMORY-RATE-LIMITING-AUDIT-40-FIX.md) | PostgreSQL-backed rate limit store so limits work across processes and survive restart (audit #40) |
-| 48 | [Circular logger re-export](./48-CIRCULAR-LOGGER-RE-EXPORT-AUDIT-41-FIX.md) | Remove Logger re-export from utils/logger/index.ts to break index → parent → children cycle (audit #41) |
-| 49 | [Schema SQL files outdated](./49-SCHEMA-SQL-FILES-OUTDATED-AUDIT-42-FIX.md) | Align schema.sql, legal-schema.sql, multi-tenant-schema.sql with post-migration types and precision (audit #42) |
-| 50 | [CI/CD pipeline issues](./50-CICD-PIPELINE-ISSUES-AUDIT-43-FIX.md) | Deploy step explicit; performance job paths+DB; .lighthouserc.json; actions v4/v3 (audit #43) |
-| 51 | [Orphan root migration SQL files](./51-ORPHAN-MIGRATION-SQL-FILES-AUDIT-44-FIX.md) | Establishment fields in chain; remove add-establishment-fields.sql and remove-email-unique-constraints.sql (audit #44) |
-| 52 | [Migration CLI filename format](./52-MIGRATION-CLI-FILENAME-FORMAT-AUDIT-45-FIX.md) | createMigration() generates YYYY_MM_DD_HH_MM_SS so created files are parsed (audit #45) |
-| 53 | [Infinite re-render loops](./53-INFINITE-RERENDER-LOOPS-AUDIT-46-FIX.md) | Memoize api return in useClosureAPI, useHistoryAPI, useMenuAPI so useEffect([api]) is stable (audit #46) |
-| 54 | [establishmentAccountApi bypass](./54-ESTABLISHMENT-ACCOUNT-API-BYPASS-AUDIT-47-FIX.md) | Use api/core request() for auth, timeout, 401; centralize base URL (audit #47) |
-| 55 | [useAuth 100ms sleep hack](./55-USE-AUTH-100MS-SLEEP-AUDIT-48-FIX.md) | Remove sleep; gate on apiConfig.isReady() / initialize() only (audit #48) |
-| — | [Session summary: POS tax, payment, cleanup](./SESSION-SUMMARY-POS-TAX-PAYMENT-AND-CLEANUP.md) | Handoff: TTC tax fix, exact tax storage, cash/card only, three payment buttons, migrations, code cleanup |
+| 01 | [Fundamentals](./course/01-FUNDAMENTALS.md) | TypeScript, Node.js, npm — the building blocks of modern web development |
+| 02 | [Architecture Overview](./course/02-ARCHITECTURE.md) | Why the project is structured the way it is, what each folder does, how data flows from a user's click to the database and back |
+| 03 | [Backend Deep Dive](./course/03-BACKEND-DEEP-DIVE.md) | Express.js, middleware, routes, models, services — how the API works |
+| 04 | [Frontend Deep Dive](./course/04-FRONTEND-DEEP-DIVE.md) | React, components, hooks, state management, Material-UI — how the UI works |
+| 05 | [Database](./course/05-DATABASE.md) | PostgreSQL, tables, SQL, indexes, migrations — how data is stored and evolved |
+| 06 | [Auth and Security](./course/06-AUTH-AND-SECURITY.md) | JWT, bcrypt, CORS, rate limiting — how users are authenticated and the system is protected |
+| 07 | [Legal Compliance](./course/07-LEGAL-COMPLIANCE.md) | Hash chains, ISCA pillars, French law — how the legal system works technically |
+| 08 | [Audit & Full Course](./course/08-AUDIT-AND-FULL-COURSE.md) | Code audit results, architecture assessment, and a complete file-by-file walkthrough |
+| 09 | [Database Architecture Compatibility](./course/09-DATABASE-ARCHITECTURE-COMPATIBILITY.md) | What the database must contain for the code to work; migration CLI vs reference schemas; verification queries |
+| 10 | [Multi-Tenant and Muse POS Access](./course/10-MULTI-TENANT-AND-MUSE-POS-ACCESS.md) | How user–establishment links work; how to log in to Muse POS; script to fix lost links |
+
+---
+
+## Patch Notes — Fixes & Improvements
+
+These are organized chronologically. Each entry corresponds to one specific issue found during the code audit, explains the problem in depth, and documents the fix. They are grouped by category below for easier navigation, but numbered in the order they were applied.
+
+### Security Fixes
+
+| # | File | Summary |
+|---|------|---------|
+| 11 | [Hardcoded Secrets](./patch-notes/11-SECURITY-HARDCODED-SECRETS-FIX.md) | Removed hardcoded JWT, database, and archive secrets — app now fails fast if secrets are missing from environment |
+| 12 | [Invitation Token Leak](./patch-notes/12-SECURITY-INVITATION-TOKEN-LEAK-FIX.md) | Stopped returning raw invitation tokens in API responses |
+| 13 | [Env Files in Git](./patch-notes/13-SECURITY-ENV-FILES-NOT-TRACKED.md) | Removed .env files from version control and added them to .gitignore |
+| 14 | [SQL Injection](./patch-notes/14-SECURITY-SQL-INJECTION-FIX.md) | Fixed unsafe schema/column name interpolation with whitelist validation |
+| 16 | [SQL Keyword Stripping](./patch-notes/16-SECURITY-SQL-KEYWORD-STRIPPING-FIX.md) | Removed harmful SQL keyword stripping that corrupted data — parameterized queries are the real defense |
+| 19 | [Unauthenticated Endpoints](./patch-notes/19-SECURITY-UNAUTHENTICATED-ENDPOINTS-FIX.md) | Added auth middleware to email-test and admin-dashboard routes |
+| 28 | [Debug Info Leaked on Login](./patch-notes/28-DEBUG-INFO-LEAKED-LOGIN-FIX.md) | Removed debug Alert showing backend URL and init status to all users |
+| 38 | [Case Sensitivity Auth Directory](./patch-notes/38-CASE-SENSITIVITY-AUTH-DIRECTORY-FIX.md) | Unified to lowercase `auth/` directory for cross-platform compatibility |
+| 45 | [Math.random Request IDs](./patch-notes/45-MATH-RANDOM-REQUEST-IDS-AUDIT-38-FIX.md) | Replaced predictable Math.random() with crypto.randomUUID() for request IDs |
+| 46 | [X-Powered-By Removal](./patch-notes/46-X-POWERED-BY-REMOVAL-AUDIT-39-FIX.md) | Removed X-Powered-By header to prevent server fingerprinting |
+| 54 | [Establishment Account API Bypass](./patch-notes/54-ESTABLISHMENT-ACCOUNT-API-BYPASS-AUDIT-47-FIX.md) | Routed establishment account API through the centralized HTTP client for auth and timeout handling |
+
+### Architecture & Code Quality Fixes
+
+| # | File | Summary |
+|---|------|---------|
+| 15 | [Schema Creation Divergence](./patch-notes/15-SCHEMA-CREATION-DIVERGENCE-FIX.md) | Unified two schema creation paths into a single SchemaManager |
+| 20 | [Dual Database Pool](./patch-notes/20-DUAL-DATABASE-POOL-REMOVAL.md) | Removed unused config/database module — single pool in app.ts |
+| 21 | [Triple Error Handling](./patch-notes/21-TRIPLE-ERROR-HANDLING-CONSOLIDATION.md) | Merged three error handling systems into one unified AppError hierarchy |
+| 22 | [Setup Flow Consolidation](./patch-notes/22-ESTABLISHMENT-SETUP-FLOWS-AND-INVITATION-CONSOLIDATION.md) | Documented the five overlapping setup/invitation flows and consolidated the invitation query |
+| 23 | [Password Validation](./patch-notes/23-PASSWORD-VALIDATION-SINGLE-RULE-SET.md) | Consolidated password rules into a single shared utility |
+| 29 | [Redundant Standalone Files](./patch-notes/29-REDUNDANT-STANDALONE-FILES-FIX.md) | Removed shim files and duplicate route files; consolidated on directory-based modules |
+| 30 | [Redundant Frontend Files](./patch-notes/30-REDUNDANT-FRONTEND-FILES-FIX.md) | Removed 14 frontend shim/barrel files that duplicated directory index exports |
+| 31 | [Dead Frontend Modules](./patch-notes/31-DEAD-FRONTEND-MODULES-AND-MIDDLEWARE-FIX.md) | Removed unused skeletons/ and loadingStates/ modules; wired missing middleware |
+| 32 | [Dead Code Within Files](./patch-notes/32-DEAD-CODE-WITHIN-FILES-FIX.md) | Removed Mongoose handling, fake PDF generator, unused localStorage methods, dead variables |
+| 33 | [Debug Console.log Cleanup](./patch-notes/33-DEBUG-CONSOLE-LOG-AUDIT-25-FIX.md) | Replaced console.log with structured logger (backend) and removed debug logs (frontend) |
+| 34 | [Self-HTTP Proxy Fix](./patch-notes/34-SELF-HTTP-PROXY-PRINTING-COMPAT-FIX.md) | Replaced axios-to-self calls in printing compat with direct in-process function calls |
+| 48 | [Circular Logger Re-export](./patch-notes/48-CIRCULAR-LOGGER-RE-EXPORT-AUDIT-41-FIX.md) | Broke circular import cycle in logger module by removing re-export from index |
+| 43 | [Per-Request Service Instantiation](./patch-notes/43-PER-REQUEST-SERVICE-INSTANTIATION-AUDIT-36-FIX.md) | Changed services from per-request `new` to module-level singletons |
+
+### Code Deduplication & Type Safety
+
+| # | File | Summary |
+|---|------|---------|
+| 35 | [Currency Format Deduplication](./patch-notes/35-CURRENCY-FORMAT-DEDUPLICATION-AUDIT-27.md) | Single formatCurrency utility replacing 11 duplicated Euro formatters |
+| 36 | [Snackbar Pattern Deduplication](./patch-notes/36-SNACKBAR-PATTERN-DEDUPLICATION-AUDIT-28.md) | Shared useSnackbar hook replacing duplicated success/error/close pattern in 3 hooks |
+| 37 | [ClosureBulletin Type Unification](./patch-notes/37-CLOSURE-BULLETIN-TYPE-UNIFICATION-AUDIT-29.md) | Single ClosureBulletin type in types/api.ts replacing 3+ divergent definitions |
+| 39 | [React Router Types Fix](./patch-notes/39-REACT-ROUTER-TYPES-AUDIT-32-FIX.md) | Removed stale @types/react-router-dom (v5 types) since v6 ships its own |
+| 41 | [Any Types Reduction](./patch-notes/41-ANY-TYPES-REDUCTION-AUDIT-34-FIX.md) | Replaced `any` with proper types in closure, auth, API, history, and POS code |
+| 44 | [Empty Catch Blocks](./patch-notes/44-EMPTY-CATCH-BLOCKS-AUDIT-37-FIX.md) | Added error logging to previously silent catch blocks in auth user creation |
+
+### Performance Fixes
+
+| # | File | Summary |
+|---|------|---------|
+| 42 | [N+1 in setUserPermissions](./patch-notes/42-N-PLUS-ONE-SET-USER-PERMISSIONS-AUDIT-35-FIX.md) | Replaced 2N+1 queries with a single INSERT...SELECT in a transaction |
+| 47 | [In-Memory Rate Limiting](./patch-notes/47-IN-MEMORY-RATE-LIMITING-AUDIT-40-FIX.md) | PostgreSQL-backed rate limit store so limits survive restarts and work across processes |
+| 53 | [Infinite Rerender Loops](./patch-notes/53-INFINITE-RERENDER-LOOPS-AUDIT-46-FIX.md) | Memoized API hook return values to stabilize useEffect dependency arrays |
+| 55 | [useAuth 100ms Sleep Hack](./patch-notes/55-USE-AUTH-100MS-SLEEP-AUDIT-48-FIX.md) | Removed arbitrary sleep; gate on apiConfig.isReady() instead |
+
+### Legal Compliance & Multi-Tenancy Fixes
+
+| # | File | Summary |
+|---|------|---------|
+| 17 | [Legal Journal Multi-Tenancy](./patch-notes/17-LEGAL-JOURNAL-MULTI-TENANCY-FIX.md) | Closure bulletins now scoped per-establishment; scheduler, archive, and routes updated |
+| 18 | [Printing and Products Schema](./patch-notes/18-PRINTING-PRODUCTS-SCHEMA-FIX.md) | Printing and product queries now use the establishment's schema |
+| 26 | [Product isActive Hardcoded](./patch-notes/26-PRODUCT-ISACTIVE-HARDCODED-FIX.md) | Products API now uses the real database is_active value instead of hardcoding true |
+| 27 | [Double API Call on Mount](./patch-notes/27-DOUBLE-API-CALL-LEGAL-COMPLIANCE-FIX.md) | Fixed duplicate useEffect causing two identical API calls on component mount |
+| 40 | [Moment Timezone Strategy](./patch-notes/40-MOMENT-TIMEZONE-AND-TIMEZONE-STRATEGY-AUDIT-33.md) | Single DEFAULT_APP_TIMEZONE constant; configurable closure timezone |
+
+### Database & Migration Fixes
+
+| # | File | Summary |
+|---|------|---------|
+| 24 | [Migration Chain Fresh DB](./patch-notes/24-MIGRATION-CHAIN-FRESH-DB-FIX.md) | Fixed migrate failing on fresh database by adding setup/status-transitions tables to the migration chain |
+| 25 | [Package Lock & Email Templates](./patch-notes/25-PACKAGE-LOCK-AND-EMAIL-TEMPLATES-FIX.md) | Committed lockfile for reproducible builds; added missing invitation email templates |
+| 49 | [Schema SQL Files Outdated](./patch-notes/49-SCHEMA-SQL-FILES-OUTDATED-AUDIT-42-FIX.md) | Aligned reference schema.sql files with actual post-migration database state |
+| 51 | [Orphan Migration SQL Files](./patch-notes/51-ORPHAN-MIGRATION-SQL-FILES-AUDIT-44-FIX.md) | Moved orphan SQL files into the timestamped migration chain |
+| 52 | [Migration CLI Filename Format](./patch-notes/52-MIGRATION-CLI-FILENAME-FORMAT-AUDIT-45-FIX.md) | Fixed createMigration() to generate correct YYYY_MM_DD_HH_MM_SS filenames |
+
+### CI/CD & DevOps
+
+| # | File | Summary |
+|---|------|---------|
+| 50 | [CI/CD Pipeline Issues](./patch-notes/50-CICD-PIPELINE-ISSUES-AUDIT-43-FIX.md) | Fixed deploy step, performance job paths, Lighthouse config, and GitHub Actions versions |
+
+### Session Summaries
+
+| File | Summary |
+|------|---------|
+| [Session Summary for Successor](./patch-notes/SESSION-SUMMARY-FOR-SUCCESSOR.md) | Handoff document covering the initial audit, all fixes applied, and remaining work |
+| [Session Summary: POS Tax, Payment & Cleanup](./patch-notes/SESSION-SUMMARY-POS-TAX-PAYMENT-AND-CLEANUP.md) | TTC tax model fix, exact tax storage, cash/card only payment, three payment buttons, migrations, code cleanup |
+
+---
+
+## Where to Start
+
+- **Complete beginner?** Start with [Chapter 01 — Fundamentals](./course/01-FUNDAMENTALS.md) and work through in order.
+- **Want the big picture?** Read [Chapter 02 — Architecture Overview](./course/02-ARCHITECTURE.md).
+- **Need to understand a specific fix?** Use the categorized patch notes list above.
+- **Setting up the project?** See the [root README](../README.md) for quick start instructions.
+- **Checking development status?** See [DEVELOPMENT-STATE.md](../DEVELOPMENT-STATE.md) for what's complete and what still needs work.
