@@ -383,14 +383,11 @@ export class EstablishmentModel {
         throw new Error('Establishment not found');
       }
 
-      assertValidSchemaName(establishment.schema_name);
-
-      // Get orders count and revenue from establishment schema (schema_name validated above)
       const ordersResult = await pool.query(`
         SELECT COUNT(*) as total_orders, COALESCE(SUM(total_amount), 0) as total_revenue
-        FROM "${establishment.schema_name}".orders
-        WHERE status = 'completed'
-      `);
+        FROM orders
+        WHERE establishment_id = $1 AND status = 'completed'
+      `, [id]);
 
       // Get active users count
       const usersResult = await pool.query(`

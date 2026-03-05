@@ -2,7 +2,6 @@ import { Router, Request, Response } from 'express';
 import { PrintingServiceFactory, IPrintingService, PrintingConfig } from '../services/printing';
 import { pool } from '../app';
 import { authenticateToken } from '../middleware/auth';
-import { EstablishmentModel } from '../models/establishment';
 import { getLogger } from '../utils/logger';
 
 const router = Router();
@@ -146,7 +145,6 @@ export async function printReceiptResponse(
   type: string = 'detailed'
 ): Promise<{ result: any; receiptData: any }> {
   const establishmentId = user.establishment_id;
-  const schemaName = await EstablishmentModel.getSchemaNameForEstablishment(String(establishmentId));
   const receiptResult = await pool.query(
     `SELECT 
       o.id as order_id,
@@ -173,11 +171,11 @@ export async function printReceiptResponse(
       e.email as business_email,
       e.siret,
       e.tax_identification
-    FROM "${schemaName}".orders o
-    JOIN public.establishments e ON e.id = $2
-    LEFT JOIN "${schemaName}".order_items oi ON o.id = oi.order_id
-    LEFT JOIN "${schemaName}".products p ON oi.product_id = p.id
-    WHERE o.id = $1
+    FROM orders o
+    JOIN establishments e ON e.id = $2
+    LEFT JOIN order_items oi ON o.id = oi.order_id
+    LEFT JOIN products p ON oi.product_id = p.id
+    WHERE o.id = $1 AND o.establishment_id = $2
     GROUP BY o.id, e.id`,
     [orderId, establishmentId]
   );
