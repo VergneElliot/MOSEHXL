@@ -50,4 +50,5 @@ Each chapter is self-contained. Read them in order, or jump to whatever you need
 | 41 | [Reduce any types](./41-ANY-TYPES-REDUCTION-AUDIT-34-FIX.md) | Proper types in closure, auth, API, history, POS; unknown in catch (audit #34) |
 | 42 | [N+1 in setUserPermissions](./42-N-PLUS-ONE-SET-USER-PERMISSIONS-AUDIT-35-FIX.md) | Single INSERT...SELECT + transaction instead of 2N+1 queries (audit #35) |
 | 43 | [Per-request service instantiation](./43-PER-REQUEST-SERVICE-INSTANTIATION-AUDIT-36-FIX.md) | Module-level singletons for DashboardDataService, EstablishmentService, Orchestrator (audit #36) |
+| 44 | [Empty catch blocks in auth](./44-EMPTY-CATCH-BLOCKS-AUDIT-37-FIX.md) | Capture and log errors in create-user catch blocks (audit #37) |
 | — | [Session summary: POS tax, payment, cleanup](./SESSION-SUMMARY-POS-TAX-PAYMENT-AND-CLEANUP.md) | Handoff: TTC tax fix, exact tax storage, cash/card only, three payment buttons, migrations, code cleanup |

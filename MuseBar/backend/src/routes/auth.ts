@@ -227,7 +227,13 @@ router.post('/register', requireAuth, requireAdmin, async (req, res) => {
       user_agent: userAgent,
     }).catch(() => {});
     return res.status(201).json({ id: user.id, email: user.email, is_admin: user.is_admin });
-  } catch {
+  } catch (err) {
+    const logger = Logger.getInstance();
+    logger.error(
+      'Create user failed',
+      { error: err instanceof Error ? err : new Error(String(err)), email },
+      'AUTH_ROUTE'
+    );
     await AuditTrailModel.logAction({
       user_id: String(req.user!.id),
       action_type: 'CREATE_USER_FAILED',
@@ -372,7 +378,13 @@ router.post('/users', requireAuth, requireEstablishmentAdmin, async (req, res) =
       user_agent: req.headers['user-agent'],
     }).catch(() => {});
     return res.status(201).json({ id: user.id, email: user.email, role, establishment_id: establishmentId });
-  } catch {
+  } catch (err) {
+    const logger = Logger.getInstance();
+    logger.error(
+      'Create establishment user failed',
+      { error: err instanceof Error ? err : new Error(String(err)), email, establishmentId },
+      'AUTH_ROUTE'
+    );
     return res.status(400).json({ error: 'User already exists or invalid data' });
   }
 });
