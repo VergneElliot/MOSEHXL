@@ -3,6 +3,7 @@
  * Express middleware and request logging functionality
  */
 
+import { randomUUID } from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 
 /**
@@ -88,10 +89,10 @@ export class RequestLogger {
   }
 
   /**
-   * Generate unique request ID
+   * Generate unique request ID (crypto-based for uniqueness and predictability)
    */
   private static generateRequestId(): string {
-    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    return randomUUID();
   }
 
   /**
