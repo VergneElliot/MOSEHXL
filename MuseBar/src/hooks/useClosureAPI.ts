@@ -146,13 +146,24 @@ export const useClosureAPI = (
     ]);
   }, [loadBulletins, loadTodayStatus, loadClosureSettings, loadMonthlyStats]);
 
-  return {
-    loadBulletins,
-    loadTodayStatus,
-    loadClosureSettings,
-    loadMonthlyStats,
-    createClosure,
-    updateClosureSettings,
-    refreshAllData,
-  };
+  return useMemo(
+    () => ({
+      loadBulletins,
+      loadTodayStatus,
+      loadClosureSettings,
+      loadMonthlyStats,
+      createClosure,
+      updateClosureSettings,
+      refreshAllData,
+    }),
+    [
+      loadBulletins,
+      loadTodayStatus,
+      loadClosureSettings,
+      loadMonthlyStats,
+      createClosure,
+      updateClosureSettings,
+      refreshAllData,
+    ]
+  );
 };
