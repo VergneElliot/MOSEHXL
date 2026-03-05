@@ -8,19 +8,18 @@ import { ClosureBulletin, VATBreakdown, PaymentBreakdown, ClosureType } from './
 import { JournalQueries } from './journalQueries';
 import { JournalSigning } from './journalSigning';
 import { pool } from '../../app';
+import { DEFAULT_APP_TIMEZONE } from '../../config/timezone';
 
 export class ClosureOperations {
   /**
    * Create daily closure bulletin for one establishment (multi-tenant: only that establishment's orders).
    * @param date - The date to create closure for
    * @param establishmentId - UUID of the establishment (required for data isolation)
+   * @param timezone - IANA timezone (e.g. Europe/Paris). Defaults to DEFAULT_APP_TIMEZONE.
    * @returns The created closure bulletin
    */
-  static async createDailyClosure(date: Date, establishmentId: string): Promise<ClosureBulletin> {
-    // Set timezone for French business operations
-    const timezone = 'Europe/Paris';
-    
-    // Get business day period (from 02:00 current day to 01:59:59 next day)
+  static async createDailyClosure(date: Date, establishmentId: string, timezone: string = DEFAULT_APP_TIMEZONE): Promise<ClosureBulletin> {
+    // Business day period uses configurable timezone (Paris for France)
     const { start, end } = getBusinessDayPeriod(date, '02:00', timezone);
 
     // Check if closure already exists for this establishment

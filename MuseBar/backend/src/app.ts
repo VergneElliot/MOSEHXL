@@ -5,6 +5,7 @@ import { Pool } from 'pg';
 import { ClosureScheduler } from './utils/closureScheduler';
 import { Logger, requestLoggerMiddleware } from './utils/logger';
 import { EnvironmentConfig, initializeEnvironment } from './config/environment';
+import { DEFAULT_APP_TIMEZONE } from './config/timezone';
 import { createSecurityMiddleware } from './middleware/security';
 
 // Load environment variables
@@ -48,8 +49,8 @@ app.use(requestLoggerMiddleware(logger));
 app.use(createSecurityMiddleware(config, logger));
 
 // Database connection from validated config (no fallback passwords).
-// options: '--timezone=Europe/Paris' ensures every session uses Paris time so that
-// NOW() / CURRENT_TIMESTAMP return Paris time and TIMESTAMPTZ values display correctly.
+// options: timezone ensures every session uses the app default so that
+// NOW() / CURRENT_TIMESTAMP and TIMESTAMPTZ display align with Paris.
 export const pool = new Pool({
   user: config.database.user,
   host: config.database.host,
@@ -59,7 +60,7 @@ export const pool = new Pool({
   ssl: config.database.ssl ? { rejectUnauthorized: true } : false,
   max: config.database.maxConnections,
   idleTimeoutMillis: config.database.idleTimeoutMillis,
-  options: '--timezone=Europe/Paris',
+  options: `--timezone=${DEFAULT_APP_TIMEZONE}`,
 });
 
 // Health check route

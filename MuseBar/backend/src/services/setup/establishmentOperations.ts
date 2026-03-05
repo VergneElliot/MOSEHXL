@@ -9,6 +9,7 @@ import {
   SetupProgress
 } from './types';
 import { Logger } from '../../utils/logger';
+import { DEFAULT_APP_TIMEZONE } from '../../config/timezone';
 import { EstablishmentQueries } from '../../utils/database';
 import { initializeEstablishmentSchema } from './db';
 import { logSetupProgress as logProgress } from './db';
@@ -48,7 +49,7 @@ export class EstablishmentOperations {
         setupData.contact_email,
         setupData.siret_number,
         setupData.tva_number,
-        'Europe/Paris', // Default timezone
+        DEFAULT_APP_TIMEZONE,
         'EUR', // Default currency
         establishmentId
       ]);
