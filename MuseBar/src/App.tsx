@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { Container } from '@mui/material';
+import { Box, Container } from '@mui/material';
 import { apiConfig } from './config/api';
 import { useAuth } from './hooks/useAuth';
 import { useHappyHour } from './hooks/useHappyHour';
@@ -106,15 +106,24 @@ function App() {
             // System Admin Interface - Full screen, no container
             <SystemAdminRouter user={user!} />
           ) : (
-            // Business Interface - Traditional layout
-            <>
+            // Business Interface - viewport-height chain so tab content can use flex/scroll
+            <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
               <AppHeader
                 isHappyHourActive={isHappyHourActive}
                 timeUntilHappyHour={timeUntilHappyHour}
                 onLogout={handleLogout}
                 user={user!}
               />
-              <Container maxWidth="xl" sx={{ mt: 2 }}>
+              <Container
+                maxWidth="xl"
+                sx={{
+                  flex: 1,
+                  minHeight: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  mt: 2,
+                }}
+              >
                 <AppRouter
                   user={user!}
                   token={token!}
@@ -126,7 +135,7 @@ function App() {
                   onHappyHourStatusUpdate={updateHappyHourStatus}
                 />
               </Container>
-            </>
+            </Box>
           )}
         </>
       } />

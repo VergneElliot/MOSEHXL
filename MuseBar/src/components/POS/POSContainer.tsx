@@ -114,7 +114,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
         onCategorySelect={actions.setSelectedCategory}
         onSearchChange={actions.setSearchQuery}
       />
-      <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+      <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         <ProductGrid
           products={logic.filteredProducts}
           isHappyHourActive={isHappyHourActive}
