@@ -15,6 +15,7 @@ import {
   useTheme,
   useMediaQuery,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import {
   Add as AddIcon,
   Edit as EditIcon,
@@ -87,12 +88,17 @@ const CategorySection: React.FC<CategorySectionProps> = ({
           </Box>
         ) : (
           <Grid container spacing={2}>
-            {activeCategories.map(category => (
+            {activeCategories.map(category => {
+              const resolvedColor = category.color || theme.palette.primary.main;
+              const bgColor = alpha(resolvedColor, 0.2);
+              const borderColor = alpha(resolvedColor, 0.8);
+              return (
               <Grid item xs={12} sm={6} md={4} key={category.id}>
                 <Card
                   sx={{
                     height: '100%',
-                    borderLeft: `4px solid ${category.color || theme.palette.primary.main}`,
+                    border: `1px solid ${borderColor}`,
+                    backgroundColor: bgColor,
                     '&:hover': { boxShadow: 3 },
                   }}
                 >
@@ -138,26 +144,10 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                         {category.description}
                       </Typography>
                     )}
-
-                    <Box display="flex" justifyContent="space-between" alignItems="center">
-                      <Chip
-                        size="small"
-                        label={category.color || '#1976d2'}
-                        sx={{
-                          backgroundColor: category.color || theme.palette.primary.main,
-                          color: theme.palette.getContrastText(
-                            category.color || theme.palette.primary.main
-                          ),
-                        }}
-                      />
-                      <Typography variant="caption" color="textSecondary">
-                        ID: {category.id.substring(0, 8)}...
-                      </Typography>
-                    </Box>
                   </CardContent>
                 </Card>
               </Grid>
-            ))}
+            );})}
           </Grid>
         )}
 
@@ -169,13 +159,18 @@ const CategorySection: React.FC<CategorySectionProps> = ({
               📁 Catégories Archivées ({archivedCategories.length})
             </Typography>
             <Grid container spacing={2}>
-              {archivedCategories.map(category => (
+              {archivedCategories.map(category => {
+                const resolvedColor = category.color || theme.palette.grey[400];
+                const bgColor = alpha(resolvedColor, 0.15);
+                const borderColor = alpha(resolvedColor, 0.5);
+                return (
                 <Grid item xs={12} sm={6} md={4} key={category.id}>
                   <Card
                     sx={{
                       height: '100%',
-                      opacity: 0.7,
-                      borderLeft: `4px solid ${category.color || theme.palette.grey[400]}`,
+                      opacity: 0.85,
+                      border: `1px solid ${borderColor}`,
+                      backgroundColor: bgColor,
                     }}
                   >
                     <CardContent>
@@ -218,7 +213,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                     </CardContent>
                   </Card>
                 </Grid>
-              ))}
+              );})}
             </Grid>
           </>
         )}

@@ -116,10 +116,10 @@ export class DataService {
     return product;
   }
 
-  public async deleteProduct(id: string): Promise<boolean> {
-    await this.apiService.deleteProduct(id);
+  public async deleteProduct(id: string): Promise<{ message?: string; action?: string }> {
+    const result = await this.apiService.deleteProduct(id);
     await this.getProducts();
-    return true;
+    return result;
   }
 
   public async restoreProduct(id: string): Promise<boolean> {

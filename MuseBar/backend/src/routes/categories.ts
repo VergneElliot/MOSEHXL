@@ -86,15 +86,22 @@ router.put('/:id', validateParams([paramValidations.id]), async (req, res) => {
   if (!establishmentId) return;
   try {
     const id = parseInt(req.params.id);
-    const { name, default_tax_rate, color } = req.body;
-    const category = await CategoryModel.update(id, name, default_tax_rate, color || '#1976d2', establishmentId);
+    const { name, default_tax_rate, color, is_active } = req.body;
+    const category = await CategoryModel.update(
+      id,
+      name,
+      default_tax_rate != null ? default_tax_rate : undefined,
+      color ?? undefined,
+      establishmentId,
+      is_active
+    );
     if (!category) return res.status(404).json({ error: 'Category not found' });
     await AuditTrailModel.logAction({
       user_id: String(req.user!.id),
       action_type: 'UPDATE_CATEGORY',
       resource_type: 'CATEGORY',
       resource_id: String(id),
-      action_details: { name, default_tax_rate, color },
+      action_details: { name, default_tax_rate, color, is_active },
       ip_address: req.ip,
       user_agent: req.headers['user-agent'],
     }).catch(() => {});
