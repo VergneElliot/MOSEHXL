@@ -9,6 +9,7 @@ import {
   useMediaQuery,
   Box,
   IconButton,
+  TextField,
 } from '@mui/material';
 import { Add as AddIcon, Remove as RemoveIcon } from '@mui/icons-material';
 import { alpha } from '@mui/material/styles';
@@ -105,6 +106,20 @@ const ProductCard: React.FC<ProductCardProps> = ({
   const currentPrice = calculateProductPrice(product, isHappyHourActive);
   const isDiscounted =
     isHappyHourActive && product.isHappyHourEligible && currentPrice < product.price;
+
+  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    if (raw === '') {
+      setQuantity(1);
+      return;
+    }
+    const v = parseInt(raw, 10);
+    if (!Number.isNaN(v)) setQuantity(Math.min(999, Math.max(1, v)));
+  };
+
+  const handleQuantityBlur = () => {
+    if (quantity < 1) setQuantity(1);
+  };
 
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -239,12 +254,34 @@ const ProductCard: React.FC<ProductCardProps> = ({
             >
               <RemoveIcon fontSize="small" />
             </IconButton>
-            <Typography
-              variant="body2"
-              sx={{ minWidth: 22, textAlign: 'center', fontWeight: 'bold' }}
-            >
-              {quantity}
-            </Typography>
+            <TextField
+              type="number"
+              variant="standard"
+              value={quantity}
+              onChange={handleQuantityChange}
+              onBlur={handleQuantityBlur}
+              onClick={e => e.stopPropagation()}
+              inputProps={{
+                min: 1,
+                max: 999,
+                onFocus: (e: React.FocusEvent<HTMLInputElement>) => e.target.select(),
+              }}
+              sx={{
+                width: 44,
+                '& .MuiInputBase-root': { fontSize: '0.875rem' },
+                '& .MuiInputBase-input': {
+                  textAlign: 'center',
+                  py: 0,
+                  fontWeight: 'bold',
+                  MozAppearance: 'textfield',
+                  '&::-webkit-outer-spin-button, &::-webkit-inner-spin-button': {
+                    WebkitAppearance: 'none',
+                    margin: 0,
+                  },
+                },
+              }}
+              size="small"
+            />
             <IconButton
               size="small"
               onClick={e => {
