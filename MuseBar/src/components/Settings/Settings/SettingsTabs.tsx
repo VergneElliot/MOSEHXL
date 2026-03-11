@@ -11,6 +11,7 @@ import {
   Payment as PaymentIcon,
   Schedule as ScheduleIcon,
   Print as PrintIcon,
+  LocalBar as HappyHourIcon,
 } from '@mui/icons-material';
 import { SettingsTab } from './types';
 import { GeneralSettings } from './GeneralSettings';
@@ -18,9 +19,13 @@ import { BusinessSettings } from './BusinessSettings';
 import { PaymentSettings } from './PaymentSettings';
 import { ClosureSettings } from './ClosureSettings';
 import { PrinterSettings } from './PrinterSettings';
+import { HappyHourControl } from '../../HappyHour';
 
 interface SettingsTabsProps {
   settingsHook: any; // UseSettingsReturn type
+  isHappyHourActive?: boolean;
+  timeUntilHappyHour?: string;
+  onHappyHourStatusUpdate?: () => void;
 }
 
 /**
@@ -55,7 +60,12 @@ function TabPanel(props: TabPanelProps) {
 /**
  * Settings Tabs Component
  */
-export const SettingsTabs: React.FC<SettingsTabsProps> = ({ settingsHook }) => {
+export const SettingsTabs: React.FC<SettingsTabsProps> = ({
+  settingsHook,
+  isHappyHourActive = false,
+  timeUntilHappyHour = '',
+  onHappyHourStatusUpdate = () => {},
+}) => {
   const [currentTab, setCurrentTab] = useState(0);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -87,6 +97,18 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({ settingsHook }) => {
           onSave={settingsHook.saveBusinessInfo}
           loading={settingsHook.infoSaving}
           message={settingsHook.infoMessage}
+        />
+      ),
+    },
+    {
+      id: 'happy_hour',
+      label: 'Happy Hour',
+      icon: <HappyHourIcon />,
+      component: (
+        <HappyHourControl
+          isActive={isHappyHourActive}
+          timeUntil={timeUntilHappyHour}
+          onStatusUpdate={onHappyHourStatusUpdate}
         />
       ),
     },

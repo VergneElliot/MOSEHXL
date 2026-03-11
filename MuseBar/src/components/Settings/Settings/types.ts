@@ -66,7 +66,9 @@ export interface SettingsState {
 }
 
 export interface SettingsProps {
-  // Add any props if needed
+  isHappyHourActive?: boolean;
+  timeUntilHappyHour?: string;
+  onHappyHourStatusUpdate?: () => void;
 }
 
 export interface GeneralSettingsProps {

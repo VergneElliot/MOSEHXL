@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { DataService } from '../services/dataService';
 import { Category, Product } from '../types';
 
@@ -21,6 +21,7 @@ export const useDataManagement = (enabled: boolean = true): DataState & DataActi
   const [error, setError] = useState<string | null>(null);
 
   const dataService = DataService.getInstance();
+  const hasLoadedOnce = useRef(false);
 
   const updateData = useCallback(async () => {
     if (!enabled) {
@@ -29,7 +30,12 @@ export const useDataManagement = (enabled: boolean = true): DataState & DataActi
       return;
     }
 
-    setIsLoading(true);
+    // Only show full-screen loading on initial load. Refreshes after e.g. creating an order
+    // run without loading so the app stays mounted and snackbars (success/error) stay visible.
+    const isInitialLoad = !hasLoadedOnce.current;
+    if (isInitialLoad) {
+      setIsLoading(true);
+    }
     setError(null);
 
     try {
@@ -40,10 +46,13 @@ export const useDataManagement = (enabled: boolean = true): DataState & DataActi
 
       setCategories(categoriesData);
       setProducts(productsData);
+      hasLoadedOnce.current = true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
     } finally {
-      setIsLoading(false);
+      if (isInitialLoad) {
+        setIsLoading(false);
+      }
     }
   }, [dataService, enabled]);
 
@@ -55,6 +64,8 @@ export const useDataManagement = (enabled: boolean = true): DataState & DataActi
   useEffect(() => {
     if (enabled) {
       updateData();
+    } else {
+      hasLoadedOnce.current = false;
     }
   }, [updateData, enabled]);
 

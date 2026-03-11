@@ -12,7 +12,11 @@ import { SettingsProps } from './types';
 /**
  * Settings Container Component
  */
-export const SettingsContainer: React.FC<SettingsProps> = () => {
+export const SettingsContainer: React.FC<SettingsProps> = ({
+  isHappyHourActive = false,
+  timeUntilHappyHour = '',
+  onHappyHourStatusUpdate = () => {},
+}) => {
   const settingsHook = useSettings();
 
   // Loading state
@@ -36,7 +40,12 @@ export const SettingsContainer: React.FC<SettingsProps> = () => {
 
   return (
     <Box sx={{ width: '100%', maxWidth: 1200, mx: 'auto', p: 3 }}>
-      <SettingsTabs settingsHook={settingsHook} />
+      <SettingsTabs
+        settingsHook={settingsHook}
+        isHappyHourActive={isHappyHourActive}
+        timeUntilHappyHour={timeUntilHappyHour}
+        onHappyHourStatusUpdate={onHappyHourStatusUpdate}
+      />
     </Box>
   );
 };
