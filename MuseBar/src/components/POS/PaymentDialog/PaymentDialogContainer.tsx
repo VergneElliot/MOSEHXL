@@ -198,6 +198,7 @@ export const PaymentDialogContainer: React.FC<PaymentDialogProps> = ({
             onSplitTypeChange={paymentLogic.setSplitType}
             onSplitCountChange={paymentLogic.setSplitCount}
             onSubBillsChange={paymentLogic.setSubBills}
+            onSubBillPaymentMethodChange={paymentLogic.updateSubBillPaymentMethod}
             onInitialize={paymentLogic.initializeSplitBills}
             loading={paymentLogic.state.loading}
             onConfirm={paymentLogic.handleSplitPayment}

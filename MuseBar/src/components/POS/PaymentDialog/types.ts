@@ -60,6 +60,7 @@ export interface SplitPaymentProps {
   onSplitTypeChange: (type: SplitType) => void;
   onSplitCountChange: (count: number) => void;
   onSubBillsChange: (bills: LocalSubBill[]) => void;
+  onSubBillPaymentMethodChange?: (billId: string, method: 'cash' | 'card') => void;
   onInitialize: () => void;
   loading: boolean;
   onConfirm: () => void;
@@ -89,6 +90,7 @@ export interface UsePaymentLogicReturn {
   setSplitType: (type: SplitType) => void;
   setSplitCount: (count: number) => void;
   setSubBills: (bills: LocalSubBill[]) => void;
+  updateSubBillPaymentMethod: (billId: string, method: 'cash' | 'card') => void;
   initializeSplitBills: () => void;
   handleSplitPayment: () => Promise<void>;
   // Tab management
