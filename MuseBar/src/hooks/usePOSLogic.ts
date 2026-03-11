@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { OrderItem, Product, Category } from '../types';
 import { formatCurrency } from '../utils/formatCurrency';
+import { HappyHourService } from '../services/happyHourService';
 
 // Function to normalize accents for search
 const normalizeAccents = (str: string): string => {
@@ -56,18 +57,46 @@ export const usePOSLogic = (
     return filtered;
   }, [products, selectedCategory, searchQuery]);
 
-  // Calculate product price with happy hour discounts
+  // Calculate product price with happy hour discounts.
+  // If the product has an individual discount (value > 0), use it; otherwise use the base discount from Parameters.
   const calculateProductPrice = (product: Product, isHappyHour: boolean): number => {
     if (!isHappyHour || !product.isHappyHourEligible) {
       return product.price;
     }
 
-    // Apply happy hour discount based on product settings
-    if (product.happyHourDiscountType === 'percentage') {
-      return product.price * (1 - product.happyHourDiscountValue);
+    const baseSettings = HappyHourService.getInstance().getSettings();
+    const productVal = product.happyHourDiscountValue;
+    const productValNum =
+      typeof productVal === 'number'
+        ? productVal
+        : (Number.isNaN(Number(productVal)) ? 0 : Number(productVal));
+    const hasIndividualDiscount = productValNum > 0;
+    const type: 'percentage' | 'fixed' = hasIndividualDiscount
+      ? (product.happyHourDiscountType ?? 'percentage')
+      : (baseSettings.discountType ?? 'percentage');
+    // Coerce to number: form/store may have saved discountValue as string (e.g. "1" for 1€)
+    let value: number;
+    if (hasIndividualDiscount) {
+      value = productValNum;
     } else {
-      return Math.max(0, product.price - product.happyHourDiscountValue);
+      const raw = baseSettings.discountValue;
+      if (typeof raw === 'number' && !Number.isNaN(raw)) {
+        value = raw;
+      } else {
+        const n = Number(raw);
+        value = Number.isNaN(n) ? 0 : n;
+      }
     }
+
+    // Base percentage may be stored as 20 (form) or 0.2 (decimal)
+    if (type === 'percentage' && value > 1) {
+      value = value / 100;
+    }
+
+    if (type === 'percentage') {
+      return product.price * (1 - value);
+    }
+    return Math.max(0, product.price - value);
   };
 
   // Calculate item total (price * quantity)
