@@ -48,7 +48,11 @@ export const usePaymentLogic = (
     totalWithTips: calculationsHook.totalWithTips,
     cashChange: calculationsHook.cashChange,
     onLoading: stateHook.setLoading,
-    onSuccess: () => onOrderComplete('Payment processed successfully'),
+    onSuccess: () => {
+      onOrderComplete('Payment processed successfully');
+      onClose();
+      onClearOrder();
+    },
     onError: onOrderError,
     onReset: stateHook.resetForm,
   });
