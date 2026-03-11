@@ -39,6 +39,7 @@ export interface POSActions {
   setCurrentOrder: (order: OrderItem[]) => void;
   addToOrder: (item: OrderItem) => void;
   removeFromOrder: (index: number) => void;
+  updateLineAt: (index: number, updates: Partial<OrderItem>) => void;
   clearOrder: () => void;
 
   // Payment dialog
@@ -103,6 +104,12 @@ export const usePOSState = (): [POSState, POSActions] => {
     setCurrentOrder(prev => prev.filter((_, i) => i !== index));
   };
 
+  const updateLineAt = (index: number, updates: Partial<OrderItem>) => {
+    setCurrentOrder(prev =>
+      prev.map((line, i) => (i === index ? { ...line, ...updates } : line))
+    );
+  };
+
   const clearOrder = () => {
     setCurrentOrder([]);
   };
@@ -130,6 +137,7 @@ export const usePOSState = (): [POSState, POSActions] => {
     setCurrentOrder,
     addToOrder,
     removeFromOrder,
+    updateLineAt,
     clearOrder,
     setPaymentDialogOpen,
     setMobileView,

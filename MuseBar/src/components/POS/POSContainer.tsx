@@ -4,6 +4,7 @@ import { Category, Product, OrderItem } from '../../types';
 import { usePOSState } from '../../hooks/usePOSState';
 import { usePOSLogic } from '../../hooks/usePOSLogic';
 import { usePOSAPI } from '../../hooks/usePOSAPI';
+import { HappyHourService } from '../../services/happyHourService';
 import CategoryFilter from './CategoryFilter';
 import ProductGrid from './ProductGrid';
 import OrderSummary from './OrderSummary';
@@ -51,34 +52,80 @@ const POSContainer: React.FC<POSContainerProps> = ({
     [processChange]
   );
 
-  // Event handlers
-  const handleAddToOrder = (item: OrderItem) => {
-    // Check if item already exists in order
-    const existingIndex = state.currentOrder.findIndex(
-      orderItem =>
-        orderItem.productId === item.productId &&
-        orderItem.isHappyHourApplied === item.isHappyHourApplied
-    );
+  // Add N copies as individual cart lines (each quantity 1). No grouping.
+  const handleAddToOrder = useCallback(
+    (item: OrderItem, quantity: number = 1) => {
+      const base = { ...item, quantity: 1 };
+      for (let i = 0; i < quantity; i++) {
+        actions.addToOrder({
+          ...base,
+          id: `${base.id}-${Date.now()}-${i}`,
+          totalPrice: base.unitPrice,
+          taxAmount: base.unitPrice * (base.taxRate / (1 + base.taxRate)),
+        });
+      }
+    },
+    [actions]
+  );
 
-    if (existingIndex >= 0) {
-      // Update quantity of existing item
-      handleUpdateQuantity(existingIndex, state.currentOrder[existingIndex].quantity + 1);
-    } else {
-      // Add new item
-      actions.addToOrder(item);
-    }
-  };
+  const happyHourService = HappyHourService.getInstance();
 
-  const handleUpdateQuantity = (index: number, newQuantity: number) => {
-    const updatedOrder = [...state.currentOrder];
-    const item = updatedOrder[index];
+  const handleApplyHappyHour = useCallback(
+    (index: number) => {
+      const line = state.currentOrder[index];
+      if (!line) return;
+      const settings = happyHourService.getSettings();
+      const basePrice = line.originalPrice ?? line.unitPrice;
+      let discountedPrice: number;
+      if (settings.discountType === 'percentage') {
+        discountedPrice = basePrice * (1 - (settings.discountValue ?? 0));
+      } else {
+        discountedPrice = Math.max(0, basePrice - (settings.discountValue ?? 0));
+      }
+      const taxAmount = discountedPrice * (line.taxRate / (1 + line.taxRate));
+      actions.updateLineAt(index, {
+        isHappyHourApplied: true,
+        isManualHappyHour: true,
+        originalPrice: basePrice,
+        unitPrice: discountedPrice,
+        totalPrice: discountedPrice,
+        taxAmount,
+      });
+    },
+    [state.currentOrder, actions, happyHourService]
+  );
 
-    item.quantity = newQuantity;
-    item.totalPrice = item.unitPrice * newQuantity;
-    item.taxAmount = item.totalPrice * (item.taxRate / (1 + item.taxRate));
+  const handleApplyOffert = useCallback(
+    (index: number) => {
+      const line = state.currentOrder[index];
+      const desc = line?.description?.trim() ? `${line.description.trim()} [Offert]` : '[Offert]';
+      actions.updateLineAt(index, {
+        isOffert: true,
+        isPerso: false,
+        unitPrice: 0,
+        totalPrice: 0,
+        taxAmount: 0,
+        description: desc,
+      });
+    },
+    [state.currentOrder, actions]
+  );
 
-    actions.setCurrentOrder(updatedOrder);
-  };
+  const handleApplyPerso = useCallback(
+    (index: number) => {
+      const line = state.currentOrder[index];
+      const desc = line?.description?.trim() ? `${line.description.trim()} [Perso]` : '[Perso]';
+      actions.updateLineAt(index, {
+        isPerso: true,
+        isOffert: false,
+        unitPrice: 0,
+        totalPrice: 0,
+        taxAmount: 0,
+        description: desc,
+      });
+    },
+    [state.currentOrder, actions]
+  );
 
   const handleCheckout = () => {
     actions.setPaymentDialogOpen(true);
@@ -127,7 +174,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
         <ProductGrid
           products={logic.filteredProducts}
           isHappyHourActive={isHappyHourActive}
-          onAddToOrder={handleAddToOrder}
+          onAddToOrder={(item, qty) => handleAddToOrder(item, qty ?? 1)}
           calculateProductPrice={logic.calculateProductPrice}
           formatCurrency={logic.formatCurrency}
         />
@@ -148,7 +195,9 @@ const POSContainer: React.FC<POSContainerProps> = ({
       onQuickCard={() => handleQuickPayment('card')}
       onQuickCash={() => handleQuickPayment('cash')}
       onFaireDeLaMonnaie={handleFaireDeLaMonnaie}
-      onUpdateQuantity={handleUpdateQuantity}
+      onApplyHappyHour={handleApplyHappyHour}
+      onApplyOffert={handleApplyOffert}
+      onApplyPerso={handleApplyPerso}
       formatCurrency={logic.formatCurrency}
     />
   );

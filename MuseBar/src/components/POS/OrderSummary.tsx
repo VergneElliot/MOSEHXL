@@ -20,13 +20,13 @@ import {
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
-  Add as AddIcon,
-  Remove as RemoveIcon,
   Clear as ClearIcon,
   CreditCard as CreditCardIcon,
   LocalAtm as CashIcon,
   Settings as OptionsIcon,
   SwapHoriz as ChangeIcon,
+  LocalOffer as OffertIcon,
+  Person as PersoIcon,
 } from '@mui/icons-material';
 import { OrderItem } from '../../types';
 
@@ -46,7 +46,12 @@ interface OrderSummaryProps {
   onQuickCash?: () => void;
   /** Faire de la monnaie: customer pays amount by card, receives same amount in cash */
   onFaireDeLaMonnaie?: (amount: number) => Promise<void>;
-  onUpdateQuantity: (index: number, newQuantity: number) => void;
+  /** Apply default Happy Hour discount to this line (manual) */
+  onApplyHappyHour?: (index: number) => void;
+  /** Set line to 0€ — offered to customer (traceability: [Offert]) */
+  onApplyOffert?: (index: number) => void;
+  /** Set line to 0€ — consumed by staff (traceability: [Perso]) */
+  onApplyPerso?: (index: number) => void;
   formatCurrency: (amount: number) => string;
 }
 
@@ -62,7 +67,9 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
   onQuickCard,
   onQuickCash,
   onFaireDeLaMonnaie,
-  onUpdateQuantity,
+  onApplyHappyHour,
+  onApplyOffert,
+  onApplyPerso,
   formatCurrency,
 }) => {
   const theme = useTheme();
@@ -89,12 +96,6 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
     } finally {
       setChangeSubmitting(false);
     }
-  };
-
-  const handleQuantityChange = (index: number, change: number) => {
-    const item = currentOrder[index];
-    const newQuantity = Math.max(1, item.quantity + change);
-    onUpdateQuantity(index, newQuantity);
   };
 
   return (
@@ -157,7 +158,7 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
                         display="flex"
                         justifyContent="space-between"
                         alignItems="flex-start"
-                        mb={1}
+                        mb={0.5}
                       >
                         <Typography variant="body2" sx={{ fontWeight: 'medium', flexGrow: 1 }}>
                           {item.productName}
@@ -166,54 +167,71 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
                           onClick={() => onRemoveItem(index)}
                           size="small"
                           color="error"
-                          sx={{ ml: 1 }}
+                          sx={{ ml: 0.5 }}
+                          aria-label="Supprimer"
                         >
                           <DeleteIcon fontSize="small" />
                         </IconButton>
                       </Box>
 
-                      <Box display="flex" justifyContent="space-between" alignItems="center">
-                        <Box display="flex" alignItems="center" gap={1}>
-                          <IconButton
-                            onClick={() => handleQuantityChange(index, -1)}
-                            size="small"
-                            disabled={item.quantity <= 1}
-                          >
-                            <RemoveIcon fontSize="small" />
-                          </IconButton>
-
-                          <Typography
-                            variant="body2"
-                            sx={{ minWidth: '20px', textAlign: 'center' }}
-                          >
-                            {item.quantity}
-                          </Typography>
-
-                          <IconButton onClick={() => handleQuantityChange(index, 1)} size="small">
-                            <AddIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-
-                        <Box textAlign="right">
+                      <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
+                        <Box textAlign="left">
                           <Typography variant="body2" color="primary" fontWeight="bold">
                             {formatCurrency(item.totalPrice)}
-                          </Typography>
-                          <Typography variant="caption" color="textSecondary">
-                            {formatCurrency(item.unitPrice)}/unité
                           </Typography>
                         </Box>
                       </Box>
 
-                      {item.isHappyHourApplied && (
-                        <Chip label="Happy Hour" size="small" color="secondary" sx={{ mt: 0.5 }} />
-                      )}
+                      <Box display="flex" flexWrap="wrap" gap={0.5} sx={{ mt: 0.5 }}>
+                        {onApplyHappyHour && (
+                          <Button
+                            size="small"
+                            variant={item.isHappyHourApplied ? 'contained' : 'outlined'}
+                            color="secondary"
+                            onClick={() => onApplyHappyHour(index)}
+                            sx={{ minWidth: 'auto', px: 1, py: 0.25, fontSize: '0.7rem' }}
+                          >
+                            Happy Hour
+                          </Button>
+                        )}
+                        {onApplyOffert && (
+                          <Button
+                            size="small"
+                            variant={item.isOffert ? 'contained' : 'outlined'}
+                            color="success"
+                            onClick={() => onApplyOffert(index)}
+                            startIcon={<OffertIcon sx={{ fontSize: 14 }} />}
+                            sx={{ minWidth: 'auto', px: 1, py: 0.25, fontSize: '0.7rem' }}
+                          >
+                            Offert
+                          </Button>
+                        )}
+                        {onApplyPerso && (
+                          <Button
+                            size="small"
+                            variant={item.isPerso ? 'contained' : 'outlined'}
+                            color="info"
+                            onClick={() => onApplyPerso(index)}
+                            startIcon={<PersoIcon sx={{ fontSize: 14 }} />}
+                            sx={{ minWidth: 'auto', px: 1, py: 0.25, fontSize: '0.7rem' }}
+                          >
+                            Perso
+                          </Button>
+                        )}
+                      </Box>
 
-                      {item.isOffert && (
-                        <Chip label="Offert" size="small" color="success" sx={{ mt: 0.5 }} />
-                      )}
-
-                      {item.isPerso && (
-                        <Chip label="Personnel" size="small" color="info" sx={{ mt: 0.5 }} />
+                      {(item.isHappyHourApplied || item.isOffert || item.isPerso) && (
+                        <Box sx={{ mt: 0.5 }} display="flex" gap={0.5} flexWrap="wrap">
+                          {item.isHappyHourApplied && (
+                            <Chip label="Happy Hour" size="small" color="secondary" />
+                          )}
+                          {item.isOffert && (
+                            <Chip label="Offert" size="small" color="success" />
+                          )}
+                          {item.isPerso && (
+                            <Chip label="Personnel" size="small" color="info" />
+                          )}
+                        </Box>
                       )}
                     </Box>
                   </ListItem>
