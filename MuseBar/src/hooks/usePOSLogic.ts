@@ -91,8 +91,9 @@ export const usePOSLogic = (
   }, [orderSubtotal]);
 
   // Validation logic
+  // Allow processing orders even when total is 0 (e.g. Offert/Perso or full discounts)
   const canProcessPayment = useMemo(() => {
-    return currentOrder.length > 0 && orderTotal > 0;
+    return currentOrder.length > 0 && orderTotal >= 0;
   }, [currentOrder.length, orderTotal]);
 
   return {
