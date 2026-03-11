@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  Grid,
   Card,
   CardContent,
   Typography,
@@ -12,10 +11,12 @@ import {
   IconButton,
 } from '@mui/material';
 import { Add as AddIcon, Remove as RemoveIcon } from '@mui/icons-material';
-import { Product, OrderItem } from '../../types';
+import { alpha } from '@mui/material/styles';
+import { Product, OrderItem, Category } from '../../types';
 
 interface ProductGridProps {
   products: Product[];
+  categories: Category[];
   isHappyHourActive: boolean;
   onAddToOrder: (item: OrderItem, quantity: number) => void;
   calculateProductPrice: (product: Product, isHappyHour: boolean) => number;
@@ -24,6 +25,7 @@ interface ProductGridProps {
 
 const ProductGrid: React.FC<ProductGridProps> = ({
   products,
+  categories,
   isHappyHourActive,
   onAddToOrder,
   calculateProductPrice,
@@ -31,6 +33,14 @@ const ProductGrid: React.FC<ProductGridProps> = ({
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+  const categoryColorMap = useMemo(() => {
+    const map: Record<string, string | undefined> = {};
+    categories.forEach(category => {
+      map[category.id] = category.color;
+    });
+    return map;
+  }, [categories]);
 
   if (products.length === 0) {
     return (
@@ -41,11 +51,24 @@ const ProductGrid: React.FC<ProductGridProps> = ({
   }
 
   return (
-    <Grid container spacing={2}>
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: {
+          xs: 'repeat(auto-fill, minmax(190px, 1fr))',
+          sm: 'repeat(auto-fill, minmax(210px, 1fr))',
+          md: 'repeat(auto-fill, minmax(220px, 1fr))',
+          lg: 'repeat(auto-fill, minmax(230px, 1fr))',
+        },
+        gap: 2,
+        alignItems: 'stretch',
+      }}
+    >
       {products.map(product => (
         <ProductCard
           key={product.id}
           product={product}
+          categoryColor={categoryColorMap[product.categoryId]}
           isHappyHourActive={isHappyHourActive}
           onAddToOrder={onAddToOrder}
           calculateProductPrice={calculateProductPrice}
@@ -53,12 +76,13 @@ const ProductGrid: React.FC<ProductGridProps> = ({
           isMobile={isMobile}
         />
       ))}
-    </Grid>
+    </Box>
   );
 };
 
 interface ProductCardProps {
   product: Product;
+  categoryColor?: string;
   isHappyHourActive: boolean;
   onAddToOrder: (item: OrderItem, quantity: number) => void;
   calculateProductPrice: (product: Product, isHappyHour: boolean) => number;
@@ -68,12 +92,14 @@ interface ProductCardProps {
 
 const ProductCard: React.FC<ProductCardProps> = ({
   product,
+  categoryColor,
   isHappyHourActive,
   onAddToOrder,
   calculateProductPrice,
   formatCurrency,
   isMobile,
 }) => {
+  const theme = useTheme();
   const [quantity, setQuantity] = useState(1);
 
   const currentPrice = calculateProductPrice(product, isHappyHourActive);
@@ -101,117 +127,151 @@ const ProductCard: React.FC<ProductCardProps> = ({
     setQuantity(1);
   };
 
+  const resolvedBackground = categoryColor
+    ? alpha(categoryColor, 0.12)
+    : theme.palette.background.paper;
+
+  const resolvedBorder = categoryColor
+    ? alpha(categoryColor, 0.6)
+    : theme.palette.divider;
+
   return (
-    <Grid item xs={6} sm={4} md={3} lg={2}>
-      <Card
+    <Card
+      sx={{
+        height: '100%',
+        minHeight: isMobile ? 160 : 200,
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        border: `1px solid ${resolvedBorder}`,
+        backgroundColor: resolvedBackground,
+        transition: 'box-shadow 0.15s ease, transform 0.15s ease',
+        '&:hover': {
+          boxShadow: 3,
+          transform: 'translateY(-2px)',
+        },
+      }}
+    >
+      {isDiscounted && (
+        <Chip
+          label="Happy Hour"
+          color="secondary"
+          size="small"
+          sx={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            zIndex: 1,
+          }}
+        />
+      )}
+
+      <CardContent
         sx={{
+          p: isMobile ? 1 : 2,
+          display: 'flex',
+          flexDirection: 'column',
           height: '100%',
-          '&:hover': { boxShadow: 3 },
-          position: 'relative',
         }}
       >
-        {isDiscounted && (
-          <Chip
-            label="Happy Hour"
-            color="secondary"
-            size="small"
-            sx={{
-              position: 'absolute',
-              top: 8,
-              right: 8,
-              zIndex: 1,
-            }}
-          />
-        )}
+        <Typography
+          variant={isMobile ? 'body2' : 'h6'}
+          component="h3"
+          sx={{
+            fontWeight: 'bold',
+            mb: 1,
+            fontSize: isMobile ? '0.875rem' : '1.1rem',
+            lineHeight: 1.2,
+            height: isMobile ? '2.4em' : 'auto',
+            overflow: 'hidden',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+          }}
+        >
+          {product.name}
+        </Typography>
 
-        <CardContent sx={{ p: isMobile ? 1 : 2 }}>
-          <Typography
-            variant={isMobile ? 'body2' : 'h6'}
-            component="h3"
-            sx={{
-              fontWeight: 'bold',
-              mb: 1,
-              fontSize: isMobile ? '0.875rem' : '1.1rem',
-              lineHeight: 1.2,
-              height: isMobile ? '2.4em' : 'auto',
-              overflow: 'hidden',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-            }}
-          >
-            {product.name}
-          </Typography>
-
-          <Box display="flex" flexDirection="column" alignItems="center" gap={1}>
-            {isDiscounted && (
-              <Typography
-                variant="body2"
-                sx={{
-                  textDecoration: 'line-through',
-                  color: 'text.secondary',
-                  fontSize: '0.75rem',
-                }}
-              >
-                {formatCurrency(product.price)}
-              </Typography>
-            )}
-
+        <Box
+          display="flex"
+          flexDirection="column"
+          alignItems="stretch"
+          gap={1}
+          sx={{ flex: 1, justifyContent: 'space-between' }}
+        >
+          {isDiscounted && (
             <Typography
-              variant={isMobile ? 'h6' : 'h5'}
-              color={isDiscounted ? 'secondary' : 'primary'}
+              variant="body2"
               sx={{
-                fontWeight: 'bold',
-                fontSize: isMobile ? '1rem' : '1.2rem',
+                textDecoration: 'line-through',
+                color: 'text.secondary',
+                fontSize: '0.75rem',
               }}
             >
-              {formatCurrency(currentPrice)}
+              {formatCurrency(product.price)}
             </Typography>
+          )}
 
-            <Box display="flex" alignItems="center" gap={0.5} sx={{ width: '100%', mt: 1 }}>
-              <IconButton
-                size="small"
-                onClick={e => {
-                  e.stopPropagation();
-                  setQuantity(q => Math.max(1, q - 1));
-                }}
-                aria-label="Diminuer la quantité"
-              >
-                <RemoveIcon fontSize="small" />
-              </IconButton>
-              <Typography
-                variant="body2"
-                sx={{ minWidth: 24, textAlign: 'center', fontWeight: 'bold' }}
-              >
-                {quantity}
-              </Typography>
-              <IconButton
-                size="small"
-                onClick={e => {
-                  e.stopPropagation();
-                  setQuantity(q => q + 1);
-                }}
-                aria-label="Augmenter la quantité"
-              >
-                <AddIcon fontSize="small" />
-              </IconButton>
-              <Button
-                variant="contained"
-                size={isMobile ? 'small' : 'medium'}
-                fullWidth
-                onClick={handleAdd}
-                sx={{
-                  minHeight: isMobile ? 32 : 36,
-                  fontSize: isMobile ? '0.75rem' : '0.875rem',
-                }}
-              >
-                Ajouter
-              </Button>
-            </Box>
+          <Typography
+            variant={isMobile ? 'h6' : 'h5'}
+            color={isDiscounted ? 'secondary' : 'primary'}
+            sx={{
+              fontWeight: 'bold',
+              fontSize: isMobile ? '1rem' : '1.2rem',
+            }}
+          >
+            {formatCurrency(currentPrice)}
+          </Typography>
+
+          <Box
+            display="flex"
+            alignItems="center"
+            gap={0.5}
+            sx={{ width: '100%', mt: 0.5 }}
+          >
+            <IconButton
+              size="small"
+              onClick={e => {
+                e.stopPropagation();
+                setQuantity(q => Math.max(1, q - 1));
+              }}
+              aria-label="Diminuer la quantité"
+            >
+              <RemoveIcon fontSize="small" />
+            </IconButton>
+            <Typography
+              variant="body2"
+              sx={{ minWidth: 22, textAlign: 'center', fontWeight: 'bold' }}
+            >
+              {quantity}
+            </Typography>
+            <IconButton
+              size="small"
+              onClick={e => {
+                e.stopPropagation();
+                setQuantity(q => q + 1);
+              }}
+              aria-label="Augmenter la quantité"
+            >
+              <AddIcon fontSize="small" />
+            </IconButton>
+            <Button
+              variant="contained"
+              size="small"
+              fullWidth
+              onClick={handleAdd}
+              sx={{
+                minHeight: isMobile ? 30 : 32,
+                py: isMobile ? 0.5 : 0.75,
+                fontSize: isMobile ? '0.7rem' : '0.8rem',
+              }}
+            >
+              Ajouter
+            </Button>
           </Box>
-        </CardContent>
-      </Card>
-    </Grid>
+        </Box>
+      </CardContent>
+    </Card>
   );
 };
 

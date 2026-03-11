@@ -173,6 +173,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
       <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         <ProductGrid
           products={logic.filteredProducts}
+          categories={categories}
           isHappyHourActive={isHappyHourActive}
           onAddToOrder={(item, qty) => handleAddToOrder(item, qty ?? 1)}
           calculateProductPrice={logic.calculateProductPrice}

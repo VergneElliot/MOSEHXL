@@ -349,6 +349,7 @@ router.post(
       change: amount,
       operation_type: 'change',
       change_amount: amount,
+      establishment_id: establishmentId,
     }, establishmentId);
 
     const userId = req.user ? String(req.user.id) : undefined;
