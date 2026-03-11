@@ -22,7 +22,6 @@ import {
   Delete as DeleteIcon,
   ExpandMore as ExpandMoreIcon,
   LocalBar as ProductIcon,
-  Archive as ArchiveIcon,
   Restore as RestoreIcon,
   EuroSymbol,
   LocalOffer as DiscountIcon,
@@ -38,7 +37,6 @@ interface ProductSectionProps {
   onCreateProduct: () => void;
   onEditProduct: (product: Product) => void;
   onDeleteProduct: (id: string) => void;
-  onArchiveProduct: (id: string) => void;
   onRestoreProduct: (id: string) => void;
   formatCurrency: (amount: number) => string;
 }
@@ -52,7 +50,6 @@ const ProductSection: React.FC<ProductSectionProps> = ({
   onCreateProduct,
   onEditProduct,
   onDeleteProduct,
-  onArchiveProduct,
   onRestoreProduct,
   formatCurrency,
 }) => {
@@ -149,16 +146,8 @@ const ProductSection: React.FC<ProductSectionProps> = ({
                         </IconButton>
                         <IconButton
                           size="small"
-                          onClick={() => onArchiveProduct(product.id)}
-                          title="Archiver"
-                          color="warning"
-                        >
-                          <ArchiveIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          size="small"
                           onClick={() => onDeleteProduct(product.id)}
-                          title="Supprimer"
+                          title="Supprimer (ou archiver si utilisé)"
                           color="error"
                         >
                           <DeleteIcon fontSize="small" />
