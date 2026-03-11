@@ -128,11 +128,11 @@ const ProductCard: React.FC<ProductCardProps> = ({
   };
 
   const resolvedBackground = categoryColor
-    ? alpha(categoryColor, 0.12)
+    ? alpha(categoryColor, 0.2)
     : theme.palette.background.paper;
 
   const resolvedBorder = categoryColor
-    ? alpha(categoryColor, 0.6)
+    ? alpha(categoryColor, 0.8)
     : theme.palette.divider;
 
   return (
