@@ -117,7 +117,9 @@ export async function updateProduct(id: string, product: Partial<Product>): Prom
   };
 }
 
-export async function deleteProduct(id: string): Promise<void> { await request(`/products/${id}`, { method: 'DELETE' }); }
+export async function deleteProduct(id: string): Promise<{ message?: string; action?: string }> {
+  return request(`/products/${id}`, { method: 'DELETE' });
+}
 export async function restoreProduct(id: string): Promise<void> { await request(`/products/${id}/restore`, { method: 'PUT' }); }
 
 

@@ -31,6 +31,26 @@ export const useMenuAPI = (
 ): MenuAPIActions => {
   const dataService = DataService.getInstance();
 
+  const loadArchivedProducts = useCallback(async () => {
+    try {
+      const archived = await dataService.getArchivedProducts();
+      setArchivedProducts(archived);
+    } catch (error) {
+      console.error('Error loading archived products:', error);
+      showError('Erreur lors du chargement des produits archivés');
+    }
+  }, [dataService, setArchivedProducts, showError]);
+
+  const loadArchivedCategories = useCallback(async () => {
+    try {
+      const archived = await dataService.getArchivedCategories();
+      setArchivedCategories(archived);
+    } catch (error) {
+      console.error('Error loading archived categories:', error);
+      showError('Erreur lors du chargement des catégories archivées');
+    }
+  }, [dataService, setArchivedCategories, showError]);
+
   const createCategory = useCallback(
     async (categoryData: CategoryFormData) => {
       try {
@@ -68,45 +88,47 @@ export const useMenuAPI = (
   const deleteCategory = useCallback(
     async (id: string) => {
       try {
-        await dataService.deleteCategory(id);
-        showSuccess('Catégorie supprimée avec succès');
+        const result = await dataService.deleteCategory(id);
+        showSuccess(result.message || 'Catégorie supprimée avec succès');
         await onDataUpdate();
+        loadArchivedCategories();
+        loadArchivedProducts();
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Erreur inconnue';
         showError(`Erreur: ${message}`);
       }
     },
-    [dataService, showSuccess, showError, onDataUpdate]
+    [dataService, showSuccess, showError, onDataUpdate, loadArchivedCategories, loadArchivedProducts]
   );
 
   const archiveCategory = useCallback(
     async (id: string) => {
       try {
-        // Use soft delete instead of archive if no archive method exists
         await dataService.updateCategory(id, { isActive: false });
         showSuccess('Catégorie archivée avec succès');
         await onDataUpdate();
+        loadArchivedCategories();
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Erreur inconnue';
         showError(`Erreur: ${message}`);
       }
     },
-    [dataService, showSuccess, showError, onDataUpdate]
+    [dataService, showSuccess, showError, onDataUpdate, loadArchivedCategories]
   );
 
   const restoreCategory = useCallback(
     async (id: string) => {
       try {
-        // Use soft restore instead of restore if no restore method exists
-        await dataService.updateCategory(id, { isActive: true });
+        await dataService.restoreCategory(id);
         showSuccess('Catégorie restaurée avec succès');
         await onDataUpdate();
+        loadArchivedCategories();
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Erreur inconnue';
         showError(`Erreur: ${message}`);
       }
     },
-    [dataService, showSuccess, showError, onDataUpdate]
+    [dataService, showSuccess, showError, onDataUpdate, loadArchivedCategories]
   );
 
   const createProduct = useCallback(
@@ -154,66 +176,48 @@ export const useMenuAPI = (
   const deleteProduct = useCallback(
     async (id: string) => {
       try {
-        await dataService.deleteProduct(id);
-        showSuccess('Produit supprimé avec succès');
+        const result = await dataService.deleteProduct(id);
+        const message = result?.message ?? 'Produit supprimé avec succès';
+        showSuccess(message);
         await onDataUpdate();
+        loadArchivedProducts();
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Erreur inconnue';
         showError(`Erreur: ${message}`);
       }
     },
-    [dataService, showSuccess, showError, onDataUpdate]
+    [dataService, showSuccess, showError, onDataUpdate, loadArchivedProducts]
   );
 
   const archiveProduct = useCallback(
     async (id: string) => {
       try {
-        // Use soft delete instead of archive if no archive method exists
         await dataService.updateProduct(id, { isActive: false });
         showSuccess('Produit archivé avec succès');
         await onDataUpdate();
+        loadArchivedProducts();
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Erreur inconnue';
         showError(`Erreur: ${message}`);
       }
     },
-    [dataService, showSuccess, showError, onDataUpdate]
+    [dataService, showSuccess, showError, onDataUpdate, loadArchivedProducts]
   );
 
   const restoreProduct = useCallback(
     async (id: string) => {
       try {
-        // Use soft restore instead of restore if no restore method exists
-        await dataService.updateProduct(id, { isActive: true });
+        await dataService.restoreProduct(id);
         showSuccess('Produit restauré avec succès');
         await onDataUpdate();
+        loadArchivedProducts();
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Erreur inconnue';
         showError(`Erreur: ${message}`);
       }
     },
-    [dataService, showSuccess, showError, onDataUpdate]
+    [dataService, showSuccess, showError, onDataUpdate, loadArchivedProducts]
   );
-
-  const loadArchivedProducts = useCallback(async () => {
-    try {
-      const archived = await dataService.getArchivedProducts();
-      setArchivedProducts(archived);
-    } catch (error) {
-      console.error('Error loading archived products:', error);
-      showError('Erreur lors du chargement des produits archivés');
-    }
-  }, [dataService, setArchivedProducts, showError]);
-
-  const loadArchivedCategories = useCallback(async () => {
-    try {
-      const archived = await dataService.getArchivedCategories();
-      setArchivedCategories(archived);
-    } catch (error) {
-      console.error('Error loading archived categories:', error);
-      showError('Erreur lors du chargement des catégories archivées');
-    }
-  }, [dataService, setArchivedCategories, showError]);
 
   return useMemo(
     () => ({

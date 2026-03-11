@@ -2,8 +2,7 @@ import express from 'express';
 import { ProductModel } from '../models';
 import { AuditTrailModel } from '../models/auditTrail';
 import { getEstablishmentId, requireAuth } from './auth';
-import { validateBody, validateParams, commonValidations, paramValidations } from '../middleware/validation';
-import { pool } from '../app';
+import { validateParams, paramValidations } from '../middleware/validation';
 
 const router = express.Router();
 
@@ -144,28 +143,21 @@ router.delete('/:id', validateParams([paramValidations.id]), async (req, res) =>
   if (!establishmentId) return;
   try {
     const id = parseInt(req.params.id);
-    const orderItemsResult = await pool.query(
-      `SELECT COUNT(*) FROM order_items oi
-       JOIN orders o ON o.id = oi.order_id
-       WHERE oi.product_id = $1 AND o.establishment_id = $2`,
-      [id, establishmentId]
-    );
-    const hasOrderItems = parseInt(orderItemsResult.rows[0].count, 10) > 0;
-    const deleted = await ProductModel.delete(id, establishmentId);
-    if (!deleted) return res.status(404).json({ error: 'Product not found or could not be deleted.' });
+    const result = await ProductModel.delete(id, establishmentId);
+    if (!result.deleted) return res.status(404).json({ error: 'Product not found or could not be deleted.' });
     await AuditTrailModel.logAction({
       user_id: String(req.user!.id),
-      action_type: hasOrderItems ? 'ARCHIVE_PRODUCT' : 'DELETE_PRODUCT',
+      action_type: result.action === 'hard' ? 'DELETE_PRODUCT' : 'ARCHIVE_PRODUCT',
       resource_type: 'PRODUCT',
       resource_id: String(id),
-      action_details: { deletion_type: hasOrderItems ? 'soft_delete' : 'hard_delete' },
+      action_details: { deletion_type: result.action },
       ip_address: req.ip,
       user_agent: req.headers['user-agent'],
     }).catch(() => {});
-    const message = hasOrderItems
+    const message = result.action === 'soft'
       ? 'Produit archivé avec succès (utilisé dans des commandes précédentes)'
       : 'Produit supprimé définitivement avec succès (jamais utilisé)';
-    res.json({ message, action: hasOrderItems ? 'soft' : 'hard' });
+    res.json({ message, action: result.action });
   } catch (error: any) {
     const message = error?.code === '23503'
       ? 'Impossible de supprimer le produit : il est référencé dans des commandes existantes.'

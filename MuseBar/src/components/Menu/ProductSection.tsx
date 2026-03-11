@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Grid,
   Card,
@@ -15,6 +15,7 @@ import {
   useTheme,
   useMediaQuery,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import {
   Add as AddIcon,
   Edit as EditIcon,
@@ -32,6 +33,7 @@ interface ProductSectionProps {
   products: Product[];
   categories: Category[];
   archivedProducts: Product[];
+  archivedCategories: Category[];
   showArchived: boolean;
   onCreateProduct: () => void;
   onEditProduct: (product: Product) => void;
@@ -45,6 +47,7 @@ const ProductSection: React.FC<ProductSectionProps> = ({
   products,
   categories,
   archivedProducts,
+  archivedCategories,
   showArchived,
   onCreateProduct,
   onEditProduct,
@@ -58,13 +61,18 @@ const ProductSection: React.FC<ProductSectionProps> = ({
 
   const activeProducts = products.filter(prod => prod.isActive);
 
+  const allCategoriesForColor = useMemo(
+    () => [...categories, ...archivedCategories],
+    [categories, archivedCategories]
+  );
+
   const getCategoryName = (categoryId: string): string => {
-    const category = categories.find(cat => cat.id === categoryId);
+    const category = allCategoriesForColor.find(cat => cat.id === categoryId);
     return category ? category.name : 'Sans catégorie';
   };
 
   const getCategoryColor = (categoryId: string): string => {
-    const category = categories.find(cat => cat.id === categoryId);
+    const category = allCategoriesForColor.find(cat => cat.id === categoryId);
     return category?.color || theme.palette.grey[400];
   };
 
@@ -103,12 +111,17 @@ const ProductSection: React.FC<ProductSectionProps> = ({
           </Box>
         ) : (
           <Grid container spacing={2}>
-            {activeProducts.map(product => (
+            {activeProducts.map(product => {
+              const color = getCategoryColor(product.categoryId);
+              const bgColor = alpha(color, 0.2);
+              const borderColor = alpha(color, 0.8);
+              return (
               <Grid item xs={12} sm={6} md={4} lg={3} key={product.id}>
                 <Card
                   sx={{
                     height: '100%',
-                    borderLeft: `4px solid ${getCategoryColor(product.categoryId)}`,
+                    border: `1px solid ${borderColor}`,
+                    backgroundColor: bgColor,
                     '&:hover': { boxShadow: 3 },
                   }}
                 >
@@ -203,7 +216,7 @@ const ProductSection: React.FC<ProductSectionProps> = ({
                   </CardContent>
                 </Card>
               </Grid>
-            ))}
+            );})}
           </Grid>
         )}
 
@@ -215,15 +228,20 @@ const ProductSection: React.FC<ProductSectionProps> = ({
               📁 Produits Archivés ({archivedProducts.length})
             </Typography>
             <Grid container spacing={2}>
-              {archivedProducts.map(product => (
-                <Grid item xs={12} sm={6} md={4} lg={3} key={product.id}>
-                  <Card
-                    sx={{
-                      height: '100%',
-                      opacity: 0.7,
-                      borderLeft: `4px solid ${theme.palette.grey[400]}`,
-                    }}
-                  >
+            {archivedProducts.map(product => {
+              const color = getCategoryColor(product.categoryId);
+              const bgColor = alpha(color, 0.15);
+              const borderColor = alpha(color, 0.5);
+              return (
+              <Grid item xs={12} sm={6} md={4} lg={3} key={product.id}>
+                <Card
+                  sx={{
+                    height: '100%',
+                    opacity: 0.85,
+                    border: `1px solid ${borderColor}`,
+                    backgroundColor: bgColor,
+                  }}
+                >
                     <CardContent>
                       <Box
                         display="flex"
@@ -266,7 +284,7 @@ const ProductSection: React.FC<ProductSectionProps> = ({
                     </CardContent>
                   </Card>
                 </Grid>
-              ))}
+              );})}
             </Grid>
           </>
         )}

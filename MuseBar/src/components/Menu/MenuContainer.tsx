@@ -130,6 +130,7 @@ const MenuContainer: React.FC<MenuContainerProps> = ({ categories, products, onD
             products={products}
             categories={categories}
             archivedProducts={state.archivedProducts}
+            archivedCategories={state.archivedCategories}
             showArchived={state.showArchived}
             onCreateProduct={handleCreateProduct}
             onEditProduct={handleEditProduct}

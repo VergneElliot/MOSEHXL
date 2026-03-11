@@ -50,7 +50,7 @@ export class ApiService {
 
   async updateProduct(id: string, product: Partial<Product>): Promise<Product> { return productsApi.updateProduct(id, product); }
 
-  async deleteProduct(id: string): Promise<void> { return productsApi.deleteProduct(id); }
+  async deleteProduct(id: string): Promise<{ message?: string; action?: string }> { return productsApi.deleteProduct(id); }
 
   async restoreProduct(id: string): Promise<void> { return productsApi.restoreProduct(id); }
 
