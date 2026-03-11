@@ -42,13 +42,19 @@ const MenuContainer: React.FC<MenuContainerProps> = ({ categories, products, onD
     onDataUpdate
   );
 
-  // Load archived data when showArchived changes
+  // Load archived data only when showArchived turns true (avoid re-running when api reference changes → 429 cascade)
+  const showArchivedRef = React.useRef(state.showArchived);
+  const loadArchivedRef = React.useRef(api);
+  loadArchivedRef.current = api;
   useEffect(() => {
-    if (state.showArchived) {
-      api.loadArchivedProducts();
-      api.loadArchivedCategories();
+    if (state.showArchived && !showArchivedRef.current) {
+      showArchivedRef.current = true;
+      loadArchivedRef.current.loadArchivedProducts();
+      loadArchivedRef.current.loadArchivedCategories();
     }
-  }, [state.showArchived, api]);
+    if (!state.showArchived) showArchivedRef.current = false;
+    // Intentionally omit api from deps to prevent request cascade (parent re-render → new api → effect re-run → 429)
+  }, [state.showArchived]);
 
   // Event handlers
   const handleCreateCategory = () => {
@@ -120,7 +126,6 @@ const MenuContainer: React.FC<MenuContainerProps> = ({ categories, products, onD
           onCreateCategory={handleCreateCategory}
           onEditCategory={handleEditCategory}
           onDeleteCategory={api.deleteCategory}
-          onArchiveCategory={api.archiveCategory}
           onRestoreCategory={api.restoreCategory}
         />
 
@@ -135,7 +140,6 @@ const MenuContainer: React.FC<MenuContainerProps> = ({ categories, products, onD
             onCreateProduct={handleCreateProduct}
             onEditProduct={handleEditProduct}
             onDeleteProduct={api.deleteProduct}
-            onArchiveProduct={api.archiveProduct}
             onRestoreProduct={api.restoreProduct}
             formatCurrency={formatCurrency}
           />

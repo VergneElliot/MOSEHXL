@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Box, Snackbar, Alert } from '@mui/material';
 import { Category, Product, OrderItem } from '../../types';
 import { usePOSState } from '../../hooks/usePOSState';
@@ -10,6 +10,7 @@ import ProductGrid from './ProductGrid';
 import OrderSummary from './OrderSummary';
 import POSLayout from './POSLayout';
 import PaymentDialog from './PaymentDialog';
+import { DiversDialog, DiversFormData } from './DiversDialog';
 
 interface POSContainerProps {
   categories: Category[];
@@ -26,6 +27,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
 }) => {
   // Custom hooks for state management
   const [state, actions] = usePOSState();
+  const [diversDialogOpen, setDiversDialogOpen] = useState(false);
 
   // Custom hook for business logic
   const logic = usePOSLogic(
@@ -226,6 +228,30 @@ const POSContainer: React.FC<POSContainerProps> = ({
     actions.setPaymentDialogOpen(false);
   };
 
+  const handleDiversSubmit = useCallback(
+    (data: DiversFormData) => {
+      const price = parseFloat(data.price.replace(',', '.'));
+      if (Number.isNaN(price) || price < 0) return;
+      const taxAmount = price * (data.taxRate / (1 + data.taxRate));
+      const item: OrderItem = {
+        id: `divers-${Date.now()}`,
+        productId: null,
+        productName: data.description.trim(),
+        quantity: 1,
+        unitPrice: price,
+        totalPrice: price,
+        taxRate: data.taxRate,
+        taxAmount,
+        isHappyHourApplied: false,
+        isOffert: false,
+        isPerso: false,
+        description: data.description.trim(),
+      };
+      handleAddToOrder(item, 1);
+    },
+    [handleAddToOrder]
+  );
+
   const menuContent = (
     <>
       <Box sx={{ flexShrink: 0 }}>
@@ -245,6 +271,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
           onAddToOrder={(item, qty) => handleAddToOrder(item, qty ?? 1)}
           calculateProductPrice={logic.calculateProductPrice}
           formatCurrency={logic.formatCurrency}
+          onDiversClick={() => setDiversDialogOpen(true)}
         />
       </Box>
     </>
@@ -309,6 +336,13 @@ const POSContainer: React.FC<POSContainerProps> = ({
         onOrderError={handlePaymentError}
         onDataUpdate={onDataUpdate}
         onClearOrder={actions.clearOrder}
+      />
+
+      <DiversDialog
+        open={diversDialogOpen}
+        onClose={() => setDiversDialogOpen(false)}
+        onSubmit={handleDiversSubmit}
+        formatCurrency={logic.formatCurrency}
       />
 
       {/* Future: Add other dialog components (retour, change, etc.) */}

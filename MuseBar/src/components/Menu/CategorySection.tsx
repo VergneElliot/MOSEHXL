@@ -22,7 +22,6 @@ import {
   Delete as DeleteIcon,
   ExpandMore as ExpandMoreIcon,
   Category as CategoryIcon,
-  Archive as ArchiveIcon,
   Restore as RestoreIcon,
 } from '@mui/icons-material';
 import { Category } from '../../types';
@@ -34,7 +33,6 @@ interface CategorySectionProps {
   onCreateCategory: () => void;
   onEditCategory: (category: Category) => void;
   onDeleteCategory: (id: string) => void;
-  onArchiveCategory: (id: string) => void;
   onRestoreCategory: (id: string) => void;
 }
 
@@ -45,7 +43,6 @@ const CategorySection: React.FC<CategorySectionProps> = ({
   onCreateCategory,
   onEditCategory,
   onDeleteCategory,
-  onArchiveCategory,
   onRestoreCategory,
 }) => {
   const theme = useTheme();
@@ -122,16 +119,8 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                         </IconButton>
                         <IconButton
                           size="small"
-                          onClick={() => onArchiveCategory(category.id)}
-                          title="Archiver"
-                          color="warning"
-                        >
-                          <ArchiveIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          size="small"
                           onClick={() => onDeleteCategory(category.id)}
-                          title="Supprimer"
+                          title="Supprimer (ou archiver si utilisé)"
                           color="error"
                         >
                           <DeleteIcon fontSize="small" />
