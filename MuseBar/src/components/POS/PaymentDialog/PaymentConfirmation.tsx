@@ -120,7 +120,9 @@ export const PaymentConfirmation: React.FC<PaymentConfirmationProps> = ({
                     Montant reçu:
                   </Typography>
                   <Typography variant="h6">
-                    {formatCurrency(parseFloat(cashReceived) || 0)}
+                    {cashReceived && cashReceived.trim() !== ''
+                      ? formatCurrency(parseFloat(cashReceived) || 0)
+                      : '—'}
                   </Typography>
                 </Grid>
                 

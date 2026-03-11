@@ -20,9 +20,11 @@ export const usePaymentValidation = ({
 
   /**
    * Validate simple payment form
+   * For cash: Montant reçu is optional; if provided it must be >= total.
    */
   const isSimplePaymentValid = useMemo(() => {
     if (state.simplePaymentMethod === 'cash') {
+      if (!state.cashReceived || state.cashReceived.trim() === '') return true;
       const received = parseFloat(state.cashReceived) || 0;
       return received >= totalWithTips;
     }
@@ -47,9 +49,10 @@ export const usePaymentValidation = ({
 
   /**
    * Get validation error message for simple payment
+   * Only show when cash and user entered an insufficient amount.
    */
   const simplePaymentError = useMemo(() => {
-    if (state.simplePaymentMethod === 'cash') {
+    if (state.simplePaymentMethod === 'cash' && state.cashReceived && state.cashReceived.trim() !== '') {
       const received = parseFloat(state.cashReceived) || 0;
       if (received < totalWithTips) {
         const shortfall = totalWithTips - received;
@@ -89,11 +92,12 @@ export const usePaymentValidation = ({
   }, [state.tips]);
 
   /**
-   * Validate cash received amount
+   * Validate cash received amount (when provided)
+   * Empty is allowed for fast cash payment without change calculation.
    */
   const isCashReceivedValid = useMemo(() => {
     if (state.simplePaymentMethod !== 'cash') return true;
-    if (!state.cashReceived) return false;
+    if (!state.cashReceived || state.cashReceived.trim() === '') return true;
     const received = parseFloat(state.cashReceived);
     return !isNaN(received) && received >= 0;
   }, [state.simplePaymentMethod, state.cashReceived]);

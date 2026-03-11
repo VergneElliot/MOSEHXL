@@ -98,7 +98,7 @@ export const PaymentCalculator: React.FC<PaymentCalculatorProps> = ({
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Montant reçu"
+                label="Montant reçu (optionnel)"
                 value={cashReceived}
                 onChange={(e) => onCashReceivedChange(e.target.value)}
                 type="number"
@@ -115,7 +115,7 @@ export const PaymentCalculator: React.FC<PaymentCalculatorProps> = ({
                 helperText={
                   !isValid && cashReceived !== ''
                     ? 'Montant insuffisant'
-                    : `Minimum requis: ${formatCurrency(totalWithTips)}`
+                    : `Optionnel. Si renseigné, minimum: ${formatCurrency(totalWithTips)}`
                 }
               />
             </Grid>

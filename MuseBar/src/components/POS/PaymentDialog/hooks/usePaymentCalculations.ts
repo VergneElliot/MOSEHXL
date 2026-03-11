@@ -42,10 +42,11 @@ export const usePaymentCalculations = ({
   }, [totalAmount, tipsAmount]);
 
   /**
-   * Calculate cash change
+   * Calculate cash change (only when Montant reçu is filled)
    */
   const cashChange = useMemo(() => {
     if (state.simplePaymentMethod !== 'cash') return 0;
+    if (!state.cashReceived || state.cashReceived.trim() === '') return 0;
     const received = parseFloat(state.cashReceived) || 0;
     return Math.max(0, received - totalWithTips);
   }, [state.simplePaymentMethod, state.cashReceived, totalWithTips]);
