@@ -134,7 +134,8 @@ export const usePaymentProcessing = ({
    */
   const executePayment = useCallback(async () => {
     // Basic validation before processing
-    if (totalWithTips <= 0) {
+    // Allow 0€ totals (e.g. fully discounted or complimentary orders), but prevent negative amounts
+    if (totalWithTips < 0) {
       onError('Invalid payment amount');
       return;
     }
