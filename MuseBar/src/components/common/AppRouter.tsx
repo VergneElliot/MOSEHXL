@@ -3,16 +3,14 @@ import { Box, Tabs, Tab, Paper } from '@mui/material';
 import {
   RestaurantMenu as MenuIcon,
   PointOfSale as POSIcon,
-  Schedule as ScheduleIcon,
-  Settings as SettingsIcon,
   History as HistoryIcon,
+  Settings as SettingsIcon,
   Gavel as GavelIcon,
 } from '@mui/icons-material';
 
 // Component imports
 import { MenuContainer } from '../Menu';
 import POSContainer from '../POS/POSContainer';
-import { HappyHourControl } from '../HappyHour';
 import { HistoryContainer } from '../History';
 import Settings from '../Settings';
 import { LegalComplianceDashboard } from '../Legal';
@@ -97,12 +95,6 @@ const AppRouter: React.FC<AppRouterProps> = ({
   const TABS: TabConfig[] = [
     { label: 'Caisse', icon: <POSIcon />, value: 'pos', permission: 'access_pos' },
     { label: 'Menu', icon: <MenuIcon />, value: 'menu', permission: 'access_menu' },
-    {
-      label: 'Happy Hour',
-      icon: <ScheduleIcon />,
-      value: 'happy_hour',
-      permission: 'access_happy_hour',
-    },
     { label: 'Historique', icon: <HistoryIcon />, value: 'history', permission: 'access_history' },
     {
       label: 'Paramètres',
@@ -201,15 +193,14 @@ const AppRouter: React.FC<AppRouterProps> = ({
               onDataUpdate={onDataUpdate}
             />
           )}
-          {tab.value === 'happy_hour' && (
-            <HappyHourControl
-              isActive={isHappyHourActive}
-              timeUntil={timeUntilHappyHour}
-              onStatusUpdate={onHappyHourStatusUpdate}
+          {tab.value === 'history' && <HistoryContainer />}
+          {tab.value === 'settings' && (
+            <Settings
+              isHappyHourActive={isHappyHourActive}
+              timeUntilHappyHour={timeUntilHappyHour}
+              onHappyHourStatusUpdate={onHappyHourStatusUpdate}
             />
           )}
-          {tab.value === 'history' && <HistoryContainer />}
-          {tab.value === 'settings' && <Settings />}
           {tab.value === 'compliance' && <LegalComplianceDashboard />}
           {tab.value === 'closures' && <ClosureContainer />}
           {tab.value === 'user_management' && user?.role === 'establishment_admin' && <UserManagement token={token} />}

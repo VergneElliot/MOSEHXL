@@ -8,6 +8,7 @@
 
 import { useEffect, useCallback } from 'react';
 import { UseHappyHourReturn, EditForm } from './types';
+import { HappyHourService } from '../../../services/happyHourService';
 import { useHappyHourState, useHappyHourSettings, useHappyHourProducts } from './hooks';
 
 export const useHappyHour = (
@@ -98,22 +99,24 @@ export const useHappyHour = (
   return {
     // State
     state,
-    
+
     // Settings management
     updateSettings: settingsHook.updateSettings,
     saveSettings: async () => {
-      // Implementation would go here
+      HappyHourService.getInstance().updateSettings(state.settings);
+      onStatusUpdate();
     },
-    
+
     // Product management
     startEditingProduct,
     updateEditForm,
     saveProductDiscount,
     cancelEditing,
-    
-    // Manual control
+
+    // Manual control: persist in service and notify App to refresh status
     toggleManualActive: async () => {
-      // Implementation would go here
+      HappyHourService.getInstance().toggleManualActivation();
+      onStatusUpdate();
     },
     
     // Utility functions

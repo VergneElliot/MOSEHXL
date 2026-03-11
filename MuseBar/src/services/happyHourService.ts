@@ -82,6 +82,11 @@ export class HappyHourService {
 
   public toggleManualActivation(): void {
     this.settings.isManuallyActivated = !this.settings.isManuallyActivated;
+    try {
+      localStorage.setItem('musebar-happyhour-settings', JSON.stringify(this.settings));
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde de l\'activation manuelle Happy Hour:', error);
+    }
   }
 
   public getDiscountPercentage(): number {
