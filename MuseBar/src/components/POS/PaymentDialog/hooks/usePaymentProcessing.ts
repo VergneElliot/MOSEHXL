@@ -37,7 +37,9 @@ export const usePaymentProcessing = ({
   );
 
   /**
-   * Handle simple payment processing
+   * Handle simple payment processing.
+   * For cash: when "Montant reçu" is empty we send totalAmount = order total and change = 0,
+   * so the backend records one cash transaction for the full order amount (daily cash total is correct).
    */
   const handleSimplePayment = useCallback(async () => {
     onLoading(true);
@@ -49,7 +51,10 @@ export const usePaymentProcessing = ({
         paymentMethod: state.simplePaymentMethod,
         items: orderItems,
         tips: parseFloat(state.tips) || 0,
-        cashReceived: state.simplePaymentMethod === 'cash' ? parseFloat(state.cashReceived) : undefined,
+        // API stores order total and payment_method; when cash + empty montant reçu we send total so cash = order total
+        cashReceived: state.simplePaymentMethod === 'cash'
+          ? (parseFloat(state.cashReceived) || totalWithTips)
+          : undefined,
         change: state.simplePaymentMethod === 'cash' ? cashChange : 0,
       };
 
@@ -141,8 +146,8 @@ export const usePaymentProcessing = ({
     }
 
     if (state.tabValue === 0) {
-      // Simple payment validation
-      if (state.simplePaymentMethod === 'cash') {
+      // Simple payment validation (cash: Montant reçu is optional)
+      if (state.simplePaymentMethod === 'cash' && state.cashReceived && state.cashReceived.trim() !== '') {
         const received = parseFloat(state.cashReceived) || 0;
         if (received < totalWithTips) {
           onError('Insufficient cash amount');

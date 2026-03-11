@@ -58,6 +58,7 @@ export class ClosureOperations {
       } else if (order.payment_method === 'split') {
         // Split order: attribution done from sub_bills below
       } else {
+        // Cash or card: full order total is attributed to that method (even if "montant reçu" was left empty in POS)
         const paymentMethod = order.payment_method || 'cash';
         paymentBreakdown[paymentMethod] = (paymentBreakdown[paymentMethod] || 0) + orderAmount;
       }
