@@ -3,7 +3,7 @@
  * Handles split payment functionality for multiple payers
  */
 
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -20,6 +20,11 @@ import {
   Grid,
   ToggleButtonGroup,
   ToggleButton,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  IconButton,
 } from '@mui/material';
 import {
   Group as GroupIcon,
@@ -27,9 +32,12 @@ import {
   Refresh as RefreshIcon,
   CreditCard as CardIcon,
   LocalAtm as CashIcon,
+  Add as AddIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { SplitPaymentProps } from './types';
 import { formatCurrency } from '../../../utils/formatCurrency';
+import type { OrderItem } from '../../../types';
 
 /**
  * Split Payment Component
@@ -48,8 +56,100 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
   loading,
   onConfirm,
 }) => {
+  const [customSubMode, setCustomSubMode] = useState<'amount' | 'items'>('amount');
+  const [addToBillIndex, setAddToBillIndex] = useState<Record<string, number>>({});
   const totalSplit = subBills.reduce((sum, bill) => sum + bill.total, 0);
   const isValidSplit = Math.round(totalSplit * 100) === Math.round(orderTotal * 100);
+
+  const assignedItemIds = new Set(
+    subBills.flatMap(b => b.items.map(i => i.id))
+  );
+  const unassignedItems = currentOrder.filter(item => !assignedItemIds.has(item.id));
+  const allItemsAssigned = currentOrder.length > 0 && unassignedItems.length === 0;
+  const isValidByItems = allItemsAssigned && isValidSplit;
+
+  const assignItemToBill = useCallback(
+    (billIndex: number, item: OrderItem) => {
+      const updated = subBills.map((bill, i) => {
+        if (i !== billIndex) {
+          const items = bill.items.filter(x => x.id !== item.id);
+          const total = items.reduce((s, x) => s + x.totalPrice, 0);
+          return {
+            ...bill,
+            items,
+            total,
+            payments:
+              bill.payments.length > 0
+                ? [{ ...bill.payments[0], amount: total }]
+                : [{ amount: total, method: 'card' as const }],
+          };
+        }
+        const items = [...bill.items, item];
+        const total = items.reduce((s, x) => s + x.totalPrice, 0);
+        return {
+          ...bill,
+          items,
+          total,
+          payments:
+            bill.payments.length > 0
+              ? [{ ...bill.payments[0], amount: total }]
+              : [{ amount: total, method: 'card' as const }],
+        };
+      });
+      onSubBillsChange(updated);
+    },
+    [subBills, onSubBillsChange]
+  );
+
+  const removeItemFromBill = useCallback(
+    (billIndex: number, itemId: string) => {
+      const updated = subBills.map((bill, i) => {
+        if (i !== billIndex) return bill;
+        const items = bill.items.filter(x => x.id !== itemId);
+        const total = items.reduce((s, x) => s + x.totalPrice, 0);
+        return {
+          ...bill,
+          items,
+          total,
+          payments:
+            bill.payments.length > 0
+              ? [{ ...bill.payments[0], amount: total }]
+              : [{ amount: total, method: 'card' as const }],
+        };
+      });
+      onSubBillsChange(updated);
+    },
+    [subBills, onSubBillsChange]
+  );
+
+  const handleSwitchToByItems = useCallback(() => {
+    setCustomSubMode('items');
+    onSubBillsChange(
+      subBills.map(b => ({
+        ...b,
+        items: [],
+        total: 0,
+        payments: [{ amount: 0, method: 'card' as const }],
+      }))
+    );
+  }, [subBills, onSubBillsChange]);
+
+  const handleSwitchToByAmount = useCallback(() => {
+    setCustomSubMode('amount');
+    onSubBillsChange(
+      subBills.map(b => {
+        const total = b.items.reduce((s, x) => s + x.totalPrice, 0);
+        return {
+          ...b,
+          total,
+          payments:
+            b.payments.length > 0
+              ? [{ ...b.payments[0], amount: total }]
+              : [{ amount: total, method: 'card' as const }],
+        };
+      })
+    );
+  }, [subBills, onSubBillsChange]);
 
   const handleCustomAmountChange = (index: number, raw: string) => {
     const value = parseFloat(raw.replace(',', '.'));
@@ -139,7 +239,7 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
           type="number"
           value={splitCount}
           onChange={(e) => onSplitCountChange(parseInt(e.target.value) || 2)}
-          inputProps={{ min: 2, max: 10 }}
+          inputProps={{ min: 2, max: 10, onFocus: (e: React.FocusEvent<HTMLInputElement>) => e.target.select() }}
           sx={{ maxWidth: 200 }}
           helperText="Entre 2 et 10 paiements"
         />
@@ -153,6 +253,90 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
           Initialiser
         </Button>
       </Box>
+
+      {/* Custom split: by amount vs by items */}
+      {splitType === 'custom' && subBills.length > 0 && (
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            Répartition
+          </Typography>
+          <ToggleButtonGroup
+            value={customSubMode}
+            exclusive
+            onChange={(_, v) => {
+              if (v === 'items') handleSwitchToByItems();
+              else if (v === 'amount') handleSwitchToByAmount();
+            }}
+            size="small"
+          >
+            <ToggleButton value="amount">Par montant</ToggleButton>
+            <ToggleButton value="items">Par articles</ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+      )}
+
+      {/* Item assignment list for custom split by items (unassigned only) */}
+      {splitType === 'custom' && customSubMode === 'items' && currentOrder.length > 0 && subBills.length > 0 && (
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="subtitle1" gutterBottom>
+            Articles à assigner
+          </Typography>
+          {unassignedItems.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', py: 1 }}>
+              Tous les articles sont assignés.
+            </Typography>
+          ) : (
+            <List dense>
+              {unassignedItems.map(item => {
+                const selectedIndex = addToBillIndex[item.id] ?? 0;
+                return (
+                  <ListItem
+                    key={item.id}
+                    sx={{
+                      bgcolor: 'grey.50',
+                      mb: 0.5,
+                      borderRadius: 1,
+                      border: '1px solid',
+                      borderColor: 'grey.300',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 2,
+                    }}
+                  >
+                    <ListItemText
+                      primary={item.productName}
+                      secondary={`x${item.quantity} — ${formatCurrency(item.totalPrice)}`}
+                    />
+                    <FormControl size="small" sx={{ minWidth: 180 }}>
+                      <InputLabel>Paiement</InputLabel>
+                      <Select
+                        label="Paiement"
+                        value={String(selectedIndex)}
+                        onChange={e => setAddToBillIndex(prev => ({ ...prev, [item.id]: parseInt(e.target.value, 10) }))}
+                      >
+                        {subBills.map((_, index) => (
+                          <MenuItem key={subBills[index].id} value={String(index)}>
+                            {`Paiement ${index + 1}`}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    <IconButton
+                      color="primary"
+                      size="small"
+                      onClick={() => assignItemToBill(selectedIndex, item)}
+                      aria-label="Ajouter à ce paiement"
+                      title="Ajouter à ce paiement"
+                    >
+                      <AddIcon fontSize="small" />
+                    </IconButton>
+                  </ListItem>
+                );
+              })}
+            </List>
+          )}
+        </Box>
+      )}
 
       {/* Split Summary */}
       {subBills.length > 0 && (
@@ -175,45 +359,85 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
                     border: '1px solid',
                     borderColor: 'grey.300',
                     flexWrap: 'wrap',
+                    display: 'block',
                   }}
                 >
-                  <ListItemText
-                    primary={`Paiement ${index + 1}`}
-                    secondary={
-                      <Box>
-                        {splitType === 'custom' ? (
-                          <TextField
-                            label="Montant"
-                            type="number"
-                            size="small"
-                            value={index === subBills.length - 1 ? bill.total.toFixed(2) : bill.total || ''}
-                            onChange={e => {
-                              if (index !== subBills.length - 1) {
-                                handleCustomAmountChange(index, e.target.value);
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1 }}>
+                    <ListItemText
+                      primary={`Paiement ${index + 1}`}
+                      secondary={
+                        <Box sx={{ mt: 0.5 }}>
+                          {splitType === 'custom' && customSubMode === 'items' ? (
+                            <Box>
+                              <Typography variant="caption" color="text.secondary">
+                                Articles dans ce paiement:
+                              </Typography>
+                              {bill.items.length === 0 ? (
+                                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                  Aucun article
+                                </Typography>
+                              ) : (
+                                <List dense disablePadding>
+                                  {bill.items.map(item => (
+                                    <ListItem
+                                      key={item.id}
+                                      disablePadding
+                                      secondaryAction={
+                                        <IconButton
+                                          edge="end"
+                                          size="small"
+                                          onClick={() => removeItemFromBill(index, item.id)}
+                                          aria-label="Retirer du paiement"
+                                        >
+                                          <DeleteIcon fontSize="small" />
+                                        </IconButton>
+                                      }
+                                    >
+                                      <ListItemText
+                                        primary={`${item.productName} — ${formatCurrency(item.totalPrice)}`}
+                                        primaryTypographyProps={{ variant: 'body2' }}
+                                      />
+                                    </ListItem>
+                                  ))}
+                                </List>
+                              )}
+                              <Typography variant="body2" fontWeight="bold" sx={{ mt: 0.5 }}>
+                                Sous-total: {formatCurrency(bill.total)}
+                              </Typography>
+                            </Box>
+                          ) : splitType === 'custom' ? (
+                            <TextField
+                              label="Montant"
+                              type="number"
+                              size="small"
+                              value={index === subBills.length - 1 ? bill.total.toFixed(2) : bill.total || ''}
+                              onChange={e => {
+                                if (index !== subBills.length - 1) {
+                                  handleCustomAmountChange(index, e.target.value);
+                                }
+                              }}
+                              inputProps={{ min: 0, step: 0.01 }}
+                              sx={{ maxWidth: 140, mb: 1 }}
+                              helperText={
+                                index === subBills.length - 1
+                                  ? 'Calculé automatiquement'
+                                  : 'Saisir le montant pour ce payeur'
                               }
-                            }}
-                            inputProps={{ min: 0, step: 0.01 }}
-                            sx={{ maxWidth: 140, mb: 1 }}
-                            helperText={
-                              index === subBills.length - 1
-                                ? 'Calculé automatiquement'
-                                : 'Saisir le montant pour ce payeur'
-                            }
-                            disabled={splitType !== 'custom' || (index === subBills.length - 1)}
-                          />
-                        ) : (
-                          <Typography variant="body2">
-                            Montant: {formatCurrency(bill.total)}
-                          </Typography>
-                        )}
-                        {splitType === 'equal' && (
-                          <Typography variant="body2" color="textSecondary">
-                            Articles: {bill.items.length}
-                          </Typography>
-                        )}
-                      </Box>
-                    }
-                  />
+                              disabled={splitType !== 'custom' || (index === subBills.length - 1)}
+                            />
+                          ) : (
+                            <Typography variant="body2">
+                              Montant: {formatCurrency(bill.total)}
+                            </Typography>
+                          )}
+                          {splitType === 'equal' && (
+                            <Typography variant="body2" color="textSecondary">
+                              Articles: {bill.items.length}
+                            </Typography>
+                          )}
+                        </Box>
+                      }
+                    />
                   {onSubBillPaymentMethodChange && (
                     <ToggleButtonGroup
                       value={method}
@@ -239,6 +463,7 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
                     size="small"
                     sx={{ ml: 1 }}
                   />
+                  </Box>
                 </ListItem>
               );
             })}
@@ -291,7 +516,16 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
         </Alert>
       )}
 
-      {subBills.length > 0 && isValidSplit && (
+      {splitType === 'custom' && customSubMode === 'items' && subBills.length > 0 && !allItemsAssigned && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          <Typography variant="body2">
+            <strong>Articles non assignés:</strong> Assignez tous les articles ({unassignedItems.length} restant
+            {unassignedItems.length > 1 ? 's' : ''}) à un paiement pour valider.
+          </Typography>
+        </Alert>
+      )}
+
+      {subBills.length > 0 && (isValidSplit || isValidByItems) && (
         <Alert severity="success" sx={{ mb: 2 }}>
           <Typography variant="body2">
             <strong>Partage validé:</strong> Les paiements sont correctement configurés.
@@ -307,7 +541,7 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
           <Button
             variant="contained"
             onClick={onConfirm}
-            disabled={!isValidSplit || loading}
+            disabled={(splitType === 'custom' && customSubMode === 'items' ? !isValidByItems : !isValidSplit) || loading}
             size="large"
           >
             {loading ? 'Traitement...' : 'Confirmer le paiement partagé'}
