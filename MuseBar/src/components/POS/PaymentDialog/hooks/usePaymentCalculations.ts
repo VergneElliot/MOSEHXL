@@ -52,20 +52,29 @@ export const usePaymentCalculations = ({
 
   /**
    * Initialize split bills based on type
+   * Equal split: distribute total in whole cents so the sum matches exactly (no rounding drift in closures).
    */
   const initializeSplitBills = useCallback(() => {
     if (state.splitType === 'equal') {
-      const amountPerBill = totalWithTips / state.splitCount;
-      const bills: LocalSubBill[] = Array.from({ length: state.splitCount }, (_, index) => ({
-        id: `split-${index + 1}`,
-        total: amountPerBill,
-        payments: [],
-        items: orderItems.map(item => ({
-          ...item,
-          quantity: item.quantity / state.splitCount,
-        })),
-        tip: (tipsAmount / state.splitCount).toFixed(2),
-      }));
+      const total = totalWithTips;
+      const n = state.splitCount;
+      const totalCents = Math.round(total * 100);
+      const baseCents = Math.floor(totalCents / n);
+      const remainder = totalCents - baseCents * n;
+      const bills: LocalSubBill[] = Array.from({ length: n }, (_, index) => {
+        const partCents = baseCents + (index < remainder ? 1 : 0);
+        const partAmount = partCents / 100;
+        return {
+          id: `split-${index + 1}`,
+          total: partAmount,
+          payments: [{ amount: partAmount, method: 'card' as const }],
+          items: orderItems.map(item => ({
+            ...item,
+            quantity: item.quantity / n,
+          })),
+          tip: (tipsAmount / n).toFixed(2),
+        };
+      });
       onSubBillsUpdate(bills);
     } else {
       // Custom split - create empty bills for manual assignment
@@ -91,10 +100,9 @@ export const usePaymentCalculations = ({
   }, [state.subBills, onSubBillsUpdate]);
 
   /**
-   * Update sub-bill payment method  
+   * Update sub-bill payment method (card or cash) for closure attribution
    */
   const updateSubBillPaymentMethod = useCallback((billId: string, paymentMethod: 'cash' | 'card') => {
-    // Note: LocalSubBill doesn't have paymentMethod, this might need adjustment based on actual usage
     const updatedBills = state.subBills.map(bill =>
       bill.id === billId ? { ...bill, payments: [{ amount: bill.total, method: paymentMethod }] } : bill
     );
@@ -109,12 +117,13 @@ export const usePaymentCalculations = ({
   }, [state.subBills]);
 
   /**
-   * Check if split amounts are valid
+   * Check if split amounts are valid (sum equals order total; use cents to avoid float drift)
    */
   const isSplitAmountValid = useMemo(() => {
     if (state.subBills.length === 0) return false;
-    const tolerance = 0.01; // Allow 1 cent difference due to rounding
-    return Math.abs(subBillsTotal - totalWithTips) <= tolerance;
+    const sumCents = Math.round(subBillsTotal * 100);
+    const totalCents = Math.round(totalWithTips * 100);
+    return sumCents === totalCents;
   }, [subBillsTotal, totalWithTips, state.subBills.length]);
 
   return {

@@ -52,6 +52,9 @@ export async function createOrder(order: {
   change?: number;
   sub_bills?: Array<{ payment_method: 'cash' | 'card'; amount: number }>;
 }): Promise<Order> {
+  // Accounting: send exact amounts for storage (no rounding). Taxes are derived from
+  // prices (taxAmount = totalPrice * taxRate / (1+taxRate)) and may be non-terminating;
+  // rounding is for display only to avoid cumulative drift in closures/audits.
   const result = await request<any>('/orders', {
     method: 'POST',
     body: JSON.stringify({
@@ -69,7 +72,7 @@ export async function createOrder(order: {
         unit_price: item.unitPrice,
         total_price: item.totalPrice,
         tax_rate: item.taxRate,
-        tax_amount: item.taxAmount || (item.totalPrice * item.taxRate) / (1 + item.taxRate),
+        tax_amount: item.taxAmount ?? (item.totalPrice * item.taxRate) / (1 + item.taxRate),
         happy_hour_applied: item.isHappyHourApplied,
         happy_hour_discount_amount: item.isHappyHourApplied ? (item.originalPrice ? (item.originalPrice - item.unitPrice) * item.quantity : 0) : 0,
         description: item.description || null,

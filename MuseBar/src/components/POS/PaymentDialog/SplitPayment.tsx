@@ -18,11 +18,15 @@ import {
   Chip,
   Alert,
   Grid,
+  ToggleButtonGroup,
+  ToggleButton,
 } from '@mui/material';
 import {
   Group as GroupIcon,
   Calculate as CalculateIcon,
   Refresh as RefreshIcon,
+  CreditCard as CardIcon,
+  LocalAtm as CashIcon,
 } from '@mui/icons-material';
 import { SplitPaymentProps } from './types';
 import { formatCurrency } from '../../../utils/formatCurrency';
@@ -39,12 +43,13 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
   onSplitTypeChange,
   onSplitCountChange,
   onSubBillsChange,
+  onSubBillPaymentMethodChange,
   onInitialize,
   loading,
   onConfirm,
 }) => {
   const totalSplit = subBills.reduce((sum, bill) => sum + bill.total, 0);
-  const isValidSplit = Math.abs(totalSplit - orderTotal) < 0.01;
+  const isValidSplit = Math.round(totalSplit * 100) === Math.round(orderTotal * 100);
 
   return (
     <Box sx={{ mt: 2 }}>
@@ -121,42 +126,63 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
           </Typography>
           
           <List>
-            {subBills.map((bill, index) => (
-              <ListItem 
-                key={bill.id} 
-                sx={{ 
-                  bgcolor: 'grey.50', 
-                  mb: 1, 
-                  borderRadius: 1,
-                  border: '1px solid',
-                  borderColor: 'grey.300',
-                }}
-              >
-                <ListItemText
-                  primary={`Paiement ${index + 1}`}
-                  secondary={
-                    <Box>
-                      <Typography variant="body2">
-                        Montant: {formatCurrency(bill.total)}
-                      </Typography>
-                      <Typography variant="body2" color="textSecondary">
-                        Mode: {bill.payments[0]?.method === 'card' ? 'Carte' : 'Espèces'}
-                      </Typography>
-                      {splitType === 'equal' && (
-                        <Typography variant="body2" color="textSecondary">
-                          Articles: {bill.items.length}
+            {subBills.map((bill, index) => {
+              const method = bill.payments[0]?.method ?? 'card';
+              return (
+                <ListItem
+                  key={bill.id}
+                  sx={{
+                    bgcolor: 'grey.50',
+                    mb: 1,
+                    borderRadius: 1,
+                    border: '1px solid',
+                    borderColor: 'grey.300',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <ListItemText
+                    primary={`Paiement ${index + 1}`}
+                    secondary={
+                      <Box>
+                        <Typography variant="body2">
+                          Montant: {formatCurrency(bill.total)}
                         </Typography>
-                      )}
-                    </Box>
-                  }
-                />
-                <Chip 
-                  label={bill.payments.length > 0 ? 'Configuré' : 'En attente'} 
-                  color={bill.payments.length > 0 ? 'success' : 'default'}
-                  size="small"
-                />
-              </ListItem>
-            ))}
+                        {splitType === 'equal' && (
+                          <Typography variant="body2" color="textSecondary">
+                            Articles: {bill.items.length}
+                          </Typography>
+                        )}
+                      </Box>
+                    }
+                  />
+                  {onSubBillPaymentMethodChange && (
+                    <ToggleButtonGroup
+                      value={method}
+                      exclusive
+                      onChange={(_, value) => value != null && onSubBillPaymentMethodChange(bill.id, value)}
+                      size="small"
+                      sx={{ ml: 1 }}
+                      aria-label={`Mode de paiement pour paiement ${index + 1}`}
+                    >
+                      <ToggleButton value="cash" aria-label="Espèces">
+                        <CashIcon sx={{ mr: 0.5 }} fontSize="small" />
+                        Espèces
+                      </ToggleButton>
+                      <ToggleButton value="card" aria-label="Carte">
+                        <CardIcon sx={{ mr: 0.5 }} fontSize="small" />
+                        Carte
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+                  )}
+                  <Chip
+                    label={bill.payments.length > 0 ? 'Configuré' : 'En attente'}
+                    color={bill.payments.length > 0 ? 'success' : 'default'}
+                    size="small"
+                    sx={{ ml: 1 }}
+                  />
+                </ListItem>
+              );
+            })}
           </List>
 
           {/* Split Validation */}

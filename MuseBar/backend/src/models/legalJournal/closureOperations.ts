@@ -55,9 +55,25 @@ export class ClosureOperations {
         const x = parseFloat(String(order.change_amount));
         paymentBreakdown['card'] = (paymentBreakdown['card'] || 0) + x;
         paymentBreakdown['cash'] = (paymentBreakdown['cash'] || 0) - x;
+      } else if (order.payment_method === 'split') {
+        // Split order: attribution done from sub_bills below
       } else {
         const paymentMethod = order.payment_method || 'cash';
         paymentBreakdown[paymentMethod] = (paymentBreakdown[paymentMethod] || 0) + orderAmount;
+      }
+    }
+
+    // Attribute split orders from sub_bills (each part can be card or cash)
+    const splitOrderIds = orders.filter((o: { payment_method: string }) => o.payment_method === 'split').map((o: { id: number }) => o.id);
+    if (splitOrderIds.length > 0) {
+      const subBillsResult = await pool.query(
+        'SELECT order_id, payment_method, amount FROM sub_bills WHERE order_id = ANY($1)',
+        [splitOrderIds]
+      );
+      for (const row of subBillsResult.rows as Array<{ order_id: number; payment_method: string; amount: string | number }>) {
+        const method = row.payment_method === 'card' ? 'card' : 'cash';
+        const amount = parseFloat(String(row.amount ?? 0));
+        paymentBreakdown[method] = (paymentBreakdown[method] || 0) + amount;
       }
     }
 
@@ -71,6 +87,14 @@ export class ClosureOperations {
     // Apply constraint requirement: use absolute values or set to 0 if negative
     const tipsTotal = Math.max(0, netTipsTotal);
     const changeTotal = Math.max(0, netChangeTotal);
+
+    // Business rule: tips are collected via electronic payment (e.g. card)
+    // and then withdrawn in cash for staff. Card totals already include tips
+    // via order.total_amount; we reflect the cash outflow by subtracting tips
+    // from the cash payment breakdown so closures show +X card, -X cash.
+    if (tipsTotal > 0) {
+      paymentBreakdown['cash'] = (paymentBreakdown['cash'] || 0) - tipsTotal;
+    }
 
     // Get legal journal entries for sequence calculation
     const entries = await JournalQueries.getEntriesForPeriod(start.toDate(), end.toDate());
@@ -179,10 +203,26 @@ export class ClosureOperations {
         const x = parseFloat(String(order.change_amount));
         paymentBreakdown['card'] = (paymentBreakdown['card'] || 0) + x;
         paymentBreakdown['cash'] = (paymentBreakdown['cash'] || 0) - x;
+      } else if (order.payment_method === 'split') {
+        // Attribution from sub_bills below
       } else {
         const paymentMethod = order.payment_method || 'cash';
         const orderAmount = parseFloat(String(order.total_amount ?? 0));
         paymentBreakdown[paymentMethod] = (paymentBreakdown[paymentMethod] || 0) + orderAmount;
+      }
+    }
+
+    // Attribute split orders from sub_bills
+    const splitOrderIds = orders.filter((o: { payment_method: string }) => o.payment_method === 'split').map((o: { id: number }) => o.id);
+    if (splitOrderIds.length > 0) {
+      const subBillsResult = await pool.query(
+        'SELECT order_id, payment_method, amount FROM sub_bills WHERE order_id = ANY($1)',
+        [splitOrderIds]
+      );
+      for (const row of subBillsResult.rows as Array<{ order_id: number; payment_method: string; amount: string | number }>) {
+        const method = row.payment_method === 'card' ? 'card' : 'cash';
+        const amount = parseFloat(String(row.amount ?? 0));
+        paymentBreakdown[method] = (paymentBreakdown[method] || 0) + amount;
       }
     }
 
@@ -192,6 +232,13 @@ export class ClosureOperations {
     // Calculate tips and change
     const tipsTotal = Math.max(0, orders.reduce((sum, order) => sum + parseFloat(order.tips || '0'), 0));
     const changeTotal = Math.max(0, orders.reduce((sum, order) => sum + parseFloat(order.change || '0'), 0));
+
+    // Business rule: tips in card are later taken out of the cash drawer
+    // for staff. Card totals already include tips through total_amount; we
+    // adjust cash totals so closures show +X card, -X cash for tips.
+    if (tipsTotal > 0) {
+      paymentBreakdown['cash'] = (paymentBreakdown['cash'] || 0) - tipsTotal;
+    }
 
     // Get journal sequence range
     const entries = await JournalQueries.getEntriesForPeriod(startDate, endDate);

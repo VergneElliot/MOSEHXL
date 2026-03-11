@@ -86,6 +86,7 @@ export const usePaymentLogic = (
     setSplitType: stateHook.setSplitType,
     setSplitCount: stateHook.setSplitCount,
     setSubBills: stateHook.setSubBills,
+    updateSubBillPaymentMethod: calculationsHook.updateSubBillPaymentMethod,
     initializeSplitBills: calculationsHook.initializeSplitBills,
     handleSplitPayment: processingHook.handleSplitPayment,
     

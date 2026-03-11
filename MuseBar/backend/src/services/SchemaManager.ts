@@ -59,13 +59,15 @@ export class SchemaManager {
 
   /**
    * Create orders table for establishment
+   * Accounting: total_amount and total_tax use DECIMAL(12,4) to store exact values;
+   * round only for display to avoid cumulative drift in closures/audits.
    */
   private static async createOrdersTable(client: PoolClient, schemaName: string): Promise<void> {
     await client.query(`
       CREATE TABLE IF NOT EXISTS "${schemaName}".orders (
         id SERIAL PRIMARY KEY,
-        total_amount DECIMAL(10,2) NOT NULL,
-        total_tax DECIMAL(10,2) NOT NULL,
+        total_amount DECIMAL(12,4) NOT NULL,
+        total_tax DECIMAL(12,4) NOT NULL,
         payment_method VARCHAR(50) NOT NULL,
         status VARCHAR(50) NOT NULL DEFAULT 'pending',
         notes TEXT,
@@ -79,6 +81,8 @@ export class SchemaManager {
 
   /**
    * Create order_items table for establishment
+   * Accounting: unit_price, total_price, tax_amount use DECIMAL(12,4) for exact storage;
+   * tax is derived from price (taxAmount = totalPrice * taxRate / (1+taxRate)) and may be non-terminating.
    */
   private static async createOrderItemsTable(client: PoolClient, schemaName: string): Promise<void> {
     await client.query(`
@@ -88,10 +92,10 @@ export class SchemaManager {
         product_id INTEGER NOT NULL,
         product_name VARCHAR(200) NOT NULL,
         quantity INTEGER NOT NULL,
-        unit_price DECIMAL(10,2) NOT NULL,
-        total_price DECIMAL(10,2) NOT NULL,
+        unit_price DECIMAL(12,4) NOT NULL,
+        total_price DECIMAL(12,4) NOT NULL,
         tax_rate DECIMAL(5,2) NOT NULL,
-        tax_amount DECIMAL(10,2) NOT NULL,
+        tax_amount DECIMAL(12,4) NOT NULL,
         happy_hour_applied BOOLEAN DEFAULT FALSE,
         happy_hour_discount_amount DECIMAL(10,2) DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -136,6 +140,7 @@ export class SchemaManager {
 
   /**
    * Create legal_journal table for establishment
+   * Fiscal records: amount and vat_amount DECIMAL(12,4) for exact audit/closure totals.
    */
   private static async createLegalJournalTable(client: PoolClient, schemaName: string): Promise<void> {
     await client.query(`
@@ -143,8 +148,8 @@ export class SchemaManager {
         id SERIAL PRIMARY KEY,
         order_id INTEGER REFERENCES "${schemaName}".orders(id),
         entry_type VARCHAR(50) NOT NULL,
-        amount DECIMAL(10,2) NOT NULL,
-        tax_amount DECIMAL(10,2) NOT NULL,
+        amount DECIMAL(12,4) NOT NULL,
+        vat_amount DECIMAL(12,4) NOT NULL,
         payment_method VARCHAR(50) NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )

@@ -48,9 +48,9 @@ export const usePOSAPI = (
           paymentMethod: orderData.paymentMethod,
           items: orderData.items,
           sub_bills: orderData.subBills?.map(bill => {
-            const method = bill.payments[0]?.method || 'cash';
+            const method = bill.payments[0]?.method || 'card';
             return {
-              payment_method: method === 'split' ? 'cash' : method,
+              payment_method: method === 'split' ? 'card' : method,
               amount: bill.total,
             };
           }),

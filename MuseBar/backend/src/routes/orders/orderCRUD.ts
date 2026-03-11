@@ -57,6 +57,8 @@ router.get('/:id', validateParams([paramValidations.id]), async (req, res) => {
 
 /**
  * POST /api/orders — create a new order (cashier action)
+ * Stores exact amounts (total_amount, total_tax, item total_price/tax_amount) for accounting;
+ * DB columns DECIMAL(12,4). Round only for display; do not round before persist.
  */
 router.post('/', validateBody(commonValidations.orderCreate), async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);

@@ -26,7 +26,13 @@ export const usePaymentState = () => {
    * Set simple payment method
    */
   const setSimplePaymentMethod = useCallback((method: SimplePaymentMethod) => {
-    setState(prev => ({ ...prev, simplePaymentMethod: method }));
+    setState(prev => ({
+      ...prev,
+      simplePaymentMethod: method,
+      // Tips are only relevant for card flows in our business rules.
+      // When switching to cash, clear tips so we don't treat them as cash tips.
+      ...(method === 'cash' ? { tips: '' } : {}),
+    }));
   }, []);
 
   /**
