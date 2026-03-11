@@ -66,6 +66,9 @@ const POSLayout: React.FC<POSLayoutProps> = ({
           flex: 1,
           minHeight: 0,
           width: '100%',
+          maxWidth: 1400,
+          mx: 'auto',
+          px: { xs: 0, lg: 1 },
           overflow: 'hidden',
           gap: 2,
         }}
