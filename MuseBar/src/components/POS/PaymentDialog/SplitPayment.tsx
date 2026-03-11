@@ -51,6 +51,43 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
   const totalSplit = subBills.reduce((sum, bill) => sum + bill.total, 0);
   const isValidSplit = Math.round(totalSplit * 100) === Math.round(orderTotal * 100);
 
+  const handleCustomAmountChange = (index: number, raw: string) => {
+    const value = parseFloat(raw.replace(',', '.'));
+    const safeAmount = Number.isFinite(value) && value > 0 ? value : 0;
+    const lastIndex = subBills.length - 1;
+
+    const updated = subBills.map((bill, i) =>
+      i === index
+            ? {
+                ...bill,
+                total: safeAmount,
+                payments:
+                  bill.payments.length > 0
+                    ? [{ ...bill.payments[0], amount: safeAmount }]
+                    : [{ amount: safeAmount, method: 'card' as const }],
+              }
+        : bill
+    );
+
+    // For custom splits we treat the last part as the residual amount.
+    if (index !== lastIndex) {
+      const othersTotal = updated
+        .slice(0, lastIndex)
+        .reduce((sum, bill) => sum + bill.total, 0);
+      const remaining = Math.max(0, orderTotal - othersTotal);
+      updated[lastIndex] = {
+          ...updated[lastIndex],
+          total: remaining,
+          payments:
+            updated[lastIndex].payments.length > 0
+              ? [{ ...updated[lastIndex].payments[0], amount: remaining }]
+              : [{ amount: remaining, method: 'card' as const }],
+        };
+    }
+
+    onSubBillsChange(updated);
+  };
+
   return (
     <Box sx={{ mt: 2 }}>
       <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -144,9 +181,31 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
                     primary={`Paiement ${index + 1}`}
                     secondary={
                       <Box>
-                        <Typography variant="body2">
-                          Montant: {formatCurrency(bill.total)}
-                        </Typography>
+                        {splitType === 'custom' ? (
+                          <TextField
+                            label="Montant"
+                            type="number"
+                            size="small"
+                            value={index === subBills.length - 1 ? bill.total.toFixed(2) : bill.total || ''}
+                            onChange={e => {
+                              if (index !== subBills.length - 1) {
+                                handleCustomAmountChange(index, e.target.value);
+                              }
+                            }}
+                            inputProps={{ min: 0, step: 0.01 }}
+                            sx={{ maxWidth: 140, mb: 1 }}
+                            helperText={
+                              index === subBills.length - 1
+                                ? 'Calculé automatiquement'
+                                : 'Saisir le montant pour ce payeur'
+                            }
+                            disabled={splitType !== 'custom' || (index === subBills.length - 1)}
+                          />
+                        ) : (
+                          <Typography variant="body2">
+                            Montant: {formatCurrency(bill.total)}
+                          </Typography>
+                        )}
                         {splitType === 'equal' && (
                           <Typography variant="body2" color="textSecondary">
                             Articles: {bill.items.length}
