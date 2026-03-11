@@ -32,28 +32,45 @@ export class HappyHourService {
 
   public getSettings(): HappyHourSettings {
     // Rétrocompatibilité : si discountType absent, utiliser discountPercentage
-    if (!this.settings.discountType) {
-      return {
-        ...this.settings,
-        discountType: 'percentage',
-        discountValue:
-          typeof this.settings.discountPercentage === 'number'
-            ? this.settings.discountPercentage
-            : 0.2,
-      };
-    }
-    return { ...this.settings };
+    const base = !this.settings.discountType
+      ? {
+          ...this.settings,
+          discountType: 'percentage' as const,
+          discountValue:
+            typeof this.settings.discountPercentage === 'number'
+              ? this.settings.discountPercentage
+              : 0.2,
+        }
+      : { ...this.settings };
+    // Ensure discountValue is always a number (localStorage/form may have stored string)
+    const raw = base.discountValue;
+    const discountValue =
+      typeof raw === 'number' && !Number.isNaN(raw)
+        ? raw
+        : (() => {
+            const n = Number(raw);
+            return Number.isNaN(n) ? 0 : n;
+          })();
+    return { ...base, discountValue };
   }
 
   public updateSettings(settings: Partial<HappyHourSettings>): void {
     // Rétrocompatibilité : si discountType absent, utiliser discountPercentage
-    if (settings.discountType && typeof settings.discountValue === 'number') {
+    if (settings.discountType != null && settings.discountValue !== undefined) {
+      const numVal = typeof settings.discountValue === 'number'
+        ? settings.discountValue
+        : Number(settings.discountValue);
       this.settings.discountType = settings.discountType;
-      this.settings.discountValue = settings.discountValue;
+      this.settings.discountValue = Number.isNaN(numVal) ? 0 : numVal;
       this.settings.discountPercentage =
-        settings.discountType === 'percentage' ? settings.discountValue : undefined;
+        settings.discountType === 'percentage' ? this.settings.discountValue : undefined;
     }
     this.settings = { ...this.settings, ...settings };
+    // Normalize discountValue to number (form may send string)
+    if (this.settings.discountValue !== undefined) {
+      const n = Number(this.settings.discountValue);
+      this.settings.discountValue = Number.isNaN(n) ? 0 : n;
+    }
     // Sauvegarde dans localStorage
     try {
       localStorage.setItem('musebar-happyhour-settings', JSON.stringify(this.settings));
