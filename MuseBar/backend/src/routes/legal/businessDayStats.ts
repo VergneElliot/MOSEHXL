@@ -53,7 +53,19 @@ router.get('/business-day-stats', async (req, res) => {
       subBills = subBillsResult.rows;
     }
 
-    const { totalAmount, paymentBreakdown } = computePaymentBreakdownFromOrders(orders, subBills);
+    const { paymentBreakdown } = computePaymentBreakdownFromOrders(orders, subBills);
+
+    const cardTotal = paymentBreakdown['card'] ?? 0;
+    const cashTotal = paymentBreakdown['cash'] ?? 0;
+    // CA du jour calculé depuis les commandes lues, en ignorant toute valeur NaN
+    // potentiellement présente dans d'anciennes données.
+    const totalTTC = orders.reduce(
+      (sum: number, o: { total_amount?: string | number | null }) => {
+        const v = parseFloat(String(o.total_amount ?? 0));
+        return Number.isFinite(v) ? sum + v : sum;
+      },
+      0
+    );
 
     const orderIds = orders.map((o: { id: number }) => o.id);
     let topProducts: Array<{ name: string; qty: number }> = [];
@@ -70,12 +82,22 @@ router.get('/business-day-stats', async (req, res) => {
       topProducts = topResult.rows;
     }
 
+    console.log('BUSINESS_DAY_STATS', {
+      totalTTC,
+      cardTotal,
+      cashTotal,
+      ordersCount: orders.length,
+      start: start.toISOString(),
+      end: end.toISOString(),
+      establishmentId,
+    });
+
     res.json({
       stats: {
-        total_ttc: Math.round(totalAmount * 100) / 100,
+        total_ttc: totalTTC,
         total_sales: orders.length,
-        card_total: Math.round((paymentBreakdown['card'] ?? 0) * 100) / 100,
-        cash_total: Math.round((paymentBreakdown['cash'] ?? 0) * 100) / 100,
+        card_total: cardTotal,
+        cash_total: cashTotal,
         top_products: topProducts,
       },
       business_day_period: {

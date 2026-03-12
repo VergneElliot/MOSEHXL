@@ -33,11 +33,24 @@ export function computePaymentBreakdownFromOrders(
   const paymentBreakdown: PaymentBreakdown = {};
 
   for (const order of orders) {
-    const orderAmount = parseFloat(String(order.total_amount ?? 0));
+    const orderAmount = typeof order.total_amount === 'number'
+      ? order.total_amount
+      : parseFloat(String(order.total_amount ?? 0));
+
+    // Skip any orders with non-finite totals to avoid propagating NaN into stats.
+    if (!Number.isFinite(orderAmount)) {
+      continue;
+    }
+
     totalAmount += orderAmount;
 
     if (order.operation_type === 'change' && order.change_amount != null) {
-      const x = parseFloat(String(order.change_amount));
+      const x = typeof order.change_amount === 'number'
+        ? order.change_amount
+        : parseFloat(String(order.change_amount));
+      if (!Number.isFinite(x)) {
+        continue;
+      }
       paymentBreakdown['card'] = (paymentBreakdown['card'] || 0) + x;
       paymentBreakdown['cash'] = (paymentBreakdown['cash'] || 0) - x;
     } else if (order.payment_method === 'split') {
@@ -52,13 +65,26 @@ export function computePaymentBreakdownFromOrders(
   for (const row of subBills) {
     if (!splitOrderIds.includes(row.order_id)) continue;
     const method = (row.payment_method === 'card' ? 'card' : 'cash') as keyof PaymentBreakdown;
-    const amount = parseFloat(String(row.amount ?? 0));
+    const amount = typeof row.amount === 'number'
+      ? row.amount
+      : parseFloat(String(row.amount ?? 0));
+    if (!Number.isFinite(amount)) {
+      continue;
+    }
     paymentBreakdown[method] = (paymentBreakdown[method] || 0) + amount;
   }
 
   const tipsTotal = Math.max(
     0,
-    orders.reduce((sum, o) => sum + parseFloat(String(o.tips || '0')), 0)
+    orders.reduce((sum, o) => {
+      const tip = typeof o.tips === 'number'
+        ? o.tips
+        : parseFloat(String(o.tips || '0'));
+      if (!Number.isFinite(tip) || tip < 0) {
+        return sum;
+      }
+      return sum + tip;
+    }, 0)
   );
   if (tipsTotal > 0) {
     paymentBreakdown['cash'] = (paymentBreakdown['cash'] || 0) - tipsTotal;

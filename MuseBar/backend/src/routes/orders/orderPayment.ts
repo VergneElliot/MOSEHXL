@@ -42,13 +42,30 @@ router.post(
       paymentMethod?: 'cash' | 'card';
     };
     
+    // Strong validation to prevent NaN amounts being stored in the database
+    const rawTotalPrice = item?.totalPrice;
+    const rawTaxRate = item?.taxRate;
+    const rawUnitPrice = item?.unitPrice;
+
+    const totalPrice = Number(rawTotalPrice);
+    const taxRate = Number(rawTaxRate);
+    const unitPrice = Number(rawUnitPrice);
+
+    if (
+      !Number.isFinite(totalPrice) ||
+      !Number.isFinite(taxRate) ||
+      !Number.isFinite(unitPrice)
+    ) {
+      return res.status(400).json({
+        error: 'Invalid price or tax rate for retour item',
+      });
+    }
+    
     if (!['cash', 'card'].includes(paymentMethod)) {
       return res.status(400).json({ error: 'Payment method must be either "cash" or "card"' });
     }
     
     // Calculate negative amounts
-    const totalPrice = Number(item.totalPrice);
-    const taxRate = Number(item.taxRate);
     const itemTaxAmount = totalPrice * taxRate / (1 + taxRate);
     const netAmount = totalPrice - itemTaxAmount;
     
@@ -68,7 +85,7 @@ router.post(
       product_id: item.productId,
       product_name: `[RETOUR] ${item.productName}`,
       quantity: -Math.abs(item.quantity || 1),
-      unit_price: item.unitPrice,
+      unit_price: unitPrice,
       total_price: -totalPrice,
       tax_rate: taxRate, // keep decimal for storage consistency
       tax_amount: -itemTaxAmount,
@@ -103,10 +120,10 @@ router.post(
     // Log audit trail
     const ip = req.ip;
     const userAgent = req.headers['user-agent'];
-    const userId = req.user ? String(req.user.id) : undefined;
+    const retourUserId = req.user ? String(req.user.id) : undefined;
     try {
       await AuditTrailModel.logAction({
-        user_id: userId,
+        user_id: retourUserId,
         action_type: 'RETOUR_ITEM',
         resource_type: 'ORDER',
         resource_id: String(order.id),
@@ -279,7 +296,20 @@ router.post(
     // Include tip amount in the cancelled TTC if requested. The card/cash rebalancing
     // (+X cash, -X card) is handled by a dedicated tip-reversal change order below.
     if (includeTipReversal && originalOrder.tips && originalOrder.tips > 0) {
-      cancellationAmount += originalOrder.tips;
+      const tipValue = Number(originalOrder.tips);
+      if (!Number.isFinite(tipValue)) {
+        return res.status(400).json({
+          error: 'Invalid tip amount on original order; cannot process cancellation safely',
+        });
+      }
+      cancellationAmount += tipValue;
+    }
+
+    // Final safety check: never create a cancellation order with NaN totals.
+    if (!Number.isFinite(cancellationAmount) || !Number.isFinite(cancellationTax)) {
+      return res.status(400).json({
+        error: 'Invalid cancellation totals computed from original order; data appears corrupted',
+      });
     }
     
     // Create cancellation order scoped to this establishment
@@ -368,10 +398,11 @@ router.post(
     // card/cash subtotals are rebalanced (-tip on card, +tip on cash) without
     // affecting the day's total TTC.
     let tipReversalOrder: Awaited<ReturnType<typeof OrderModel.create>> | null = null;
-    const tipAmountToReverse =
+    const rawTipAmount =
       includeTipReversal && originalOrder.tips && originalOrder.tips > 0
         ? Number(originalOrder.tips)
         : 0;
+    const tipAmountToReverse = Number.isFinite(rawTipAmount) ? rawTipAmount : 0;
     if (tipAmountToReverse > 0) {
       tipReversalOrder = await OrderModel.create(
         {
@@ -430,7 +461,6 @@ router.post(
     // Log audit trail
     const ip = req.ip;
     const userAgent = req.headers['user-agent'];
-    const userId = req.user ? String(req.user.id) : undefined;
     try {
       await AuditTrailModel.logAction({
         user_id: userId,
@@ -508,16 +538,16 @@ router.post(
       establishment_id: establishmentId,
     }, establishmentId);
 
-    const userId = req.user ? String(req.user.id) : undefined;
+    const changeUserId = req.user ? String(req.user.id) : undefined;
 
     try {
-      await LegalJournalModel.logChange(order.id, amount, userId);
+      await LegalJournalModel.logChange(order.id, amount, changeUserId);
     } catch (journalError: unknown) {
       logger.error(`Legal journal error (change) for order ${order.id}`, journalError instanceof Error ? journalError : new Error(String(journalError)), 'LEGAL_JOURNAL');
     }
 
     AuditTrailModel.logAction({
-      user_id: userId,
+      user_id: changeUserId,
       action_type: 'CASH_REGISTER_CHANGE',
       resource_type: 'ORDER',
       resource_id: String(order.id),
