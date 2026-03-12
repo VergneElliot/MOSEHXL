@@ -7,14 +7,12 @@ import React, { useState } from 'react';
 import { Box, Tabs, Tab, Typography } from '@mui/material';
 import {
   Business as BusinessIcon,
-  Payment as PaymentIcon,
   Schedule as ScheduleIcon,
   Print as PrintIcon,
   LocalBar as HappyHourIcon,
 } from '@mui/icons-material';
 import { SettingsTab } from './types';
 import { EstablishmentSettings } from './EstablishmentSettings';
-import { PaymentSettings } from './PaymentSettings';
 import { ClosureSettings } from './ClosureSettings';
 import { PrinterSettings } from './PrinterSettings';
 import { HappyHourControl } from '../../HappyHour';
@@ -107,19 +105,6 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
           timeUntil={timeUntilHappyHour}
           onStatusUpdate={onHappyHourStatusUpdate}
           products={products}
-        />
-      ),
-    },
-    {
-      id: 'payment',
-      label: 'Paiements',
-      icon: <PaymentIcon />,
-      component: (
-        <PaymentSettings
-          paymentSettings={settingsHook.state.paymentSettings}
-          onUpdate={settingsHook.updatePaymentSettings}
-          onSave={settingsHook.savePaymentSettings}
-          loading={settingsHook.saving}
         />
       ),
     },

@@ -42,15 +42,6 @@ export interface BusinessInfo {
   taxIdentification: string;
 }
 
-export interface PaymentSettings {
-  acceptCash: boolean;
-  acceptCard: boolean;
-  acceptChecks: boolean;
-  taxRate: number;
-  discountEnabled: boolean;
-  maxDiscountPercent: number;
-}
-
 export interface PrinterSettings {
   enabled: boolean;
   printerName: string;
@@ -62,7 +53,6 @@ export interface SettingsState {
   generalSettings: GeneralSettings;
   businessInfo: BusinessInfo;
   closureSettings: ClosureSettings;
-  paymentSettings: PaymentSettings;
   printerSettings: PrinterSettings;
   schedulerStatus: SchedulerStatus;
 }
@@ -89,13 +79,6 @@ export interface BusinessSettingsProps {
   message?: string | null;
 }
 
-export interface PaymentSettingsProps {
-  paymentSettings: PaymentSettings;
-  onUpdate: (settings: PaymentSettings) => void;
-  loading?: boolean;
-  onSave: () => Promise<void>;
-}
-
 export interface ClosureSettingsProps {
   closureSettings: ClosureSettings;
   schedulerStatus: SchedulerStatus;
@@ -114,11 +97,9 @@ export interface UseSettingsReturn {
   updateGeneralSettings: (settings: GeneralSettings) => void;
   updateBusinessInfo: (info: BusinessInfo) => void;
   updateClosureSettings: (settings: ClosureSettings) => void;
-  updatePaymentSettings: (settings: PaymentSettings) => void;
   saveGeneralSettings: () => Promise<void>;
   saveBusinessInfo: () => Promise<void>;
   saveClosureSettings: () => Promise<void>;
-  savePaymentSettings: () => Promise<void>;
   triggerManualCheck: () => Promise<void>;
   testPrinter: () => Promise<void>;
   checkPrinterStatus: () => Promise<void>;

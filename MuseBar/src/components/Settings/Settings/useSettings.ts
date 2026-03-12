@@ -8,7 +8,7 @@
 
 import { useState, useEffect } from 'react';
 import { SettingsState, UseSettingsReturn } from './types';
-import { useGeneralSettings, useBusinessInfo, useClosureSettings, usePaymentSettings } from './hooks';
+import { useGeneralSettings, useBusinessInfo, useClosureSettings } from './hooks';
 
 // Extended state for the hook with loading states
 interface ExtendedSettingsState extends SettingsState {
@@ -40,14 +40,6 @@ export const useSettings = (): UseSettingsReturn => {
       daily_closure_time: '02:00',
       timezone: 'Europe/Paris',
       grace_period_minutes: 30,
-    },
-    paymentSettings: {
-      acceptCash: true,
-      acceptCard: true,
-      acceptChecks: false,
-      taxRate: 20,
-      discountEnabled: true,
-      maxDiscountPercent: 15,
     },
     printerSettings: {
       enabled: false,
@@ -92,13 +84,6 @@ export const useSettings = (): UseSettingsReturn => {
     onSavingChange: (saving) => setState(prev => ({ ...prev, saving })),
   });
 
-  const paymentHook = usePaymentSettings({
-    paymentSettings: state.paymentSettings,
-    onUpdate: (settings) => setState(prev => ({ ...prev, paymentSettings: settings })),
-    onLoadingChange: (loading) => setState(prev => ({ ...prev, loading })),
-    onSavingChange: (saving) => setState(prev => ({ ...prev, saving })),
-  });
-
   /**
    * Load all settings on component mount
    */
@@ -116,7 +101,6 @@ export const useSettings = (): UseSettingsReturn => {
       await Promise.all([
         businessHook.loadBusinessInfo(),
         closureHook.loadClosureSettings(),
-        paymentHook.loadPaymentSettings(),
       ]);
     } catch (error) {
       // Error loading settings
@@ -145,7 +129,6 @@ export const useSettings = (): UseSettingsReturn => {
       generalSettings: state.generalSettings,
       businessInfo: state.businessInfo,
       closureSettings: state.closureSettings,
-      paymentSettings: state.paymentSettings,
       printerSettings: state.printerSettings,
       schedulerStatus: state.schedulerStatus,
     },
@@ -158,13 +141,11 @@ export const useSettings = (): UseSettingsReturn => {
     updateGeneralSettings: generalHook.updateGeneralSettings,
     updateBusinessInfo: businessHook.updateBusinessInfo,
     updateClosureSettings: closureHook.updateClosureSettings,
-    updatePaymentSettings: paymentHook.updatePaymentSettings,
     
     // Save functions
     saveGeneralSettings: generalHook.saveWithValidation,
     saveBusinessInfo: businessHook.saveBusinessInfo,
     saveClosureSettings: closureHook.saveClosureSettings,
-    savePaymentSettings: paymentHook.savePaymentSettings,
     
     // Special functions
     triggerManualCheck: closureHook.triggerManualCheck,
