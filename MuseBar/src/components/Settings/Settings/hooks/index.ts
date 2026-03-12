@@ -6,4 +6,3 @@
 export * from './useGeneralSettings';
 export * from './useBusinessInfo';
 export * from './useClosureSettings';
-export * from './usePaymentSettings';

@@ -5,7 +5,6 @@
 
 // Core components
 export { SettingsTabs } from './SettingsTabs';
-export { PaymentSettings } from './PaymentSettings';
 export { ClosureSettings } from './ClosureSettings';
 export { PrinterSettings } from './PrinterSettings';
 
@@ -19,13 +18,11 @@ export type {
   SchedulerStatusResponse,
   GeneralSettings as GeneralSettingsType,
   BusinessInfo,
-  PaymentSettings as PaymentSettingsType,
   PrinterSettings as PrinterSettingsType,
   SettingsState,
   SettingsProps,
   GeneralSettingsProps,
   BusinessSettingsProps,
-  PaymentSettingsProps,
   ClosureSettingsProps,
   UseSettingsReturn,
   SettingsTab,
