@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { ApiService } from '../services/apiService';
+import { getBusinessDayStats } from '../services/api/legal';
 import { Order } from '../types';
 import { HistoryStats } from './useHistoryState';
 
@@ -52,18 +53,7 @@ export const useHistoryAPI = (
 
   const loadStats = useCallback(async () => {
     try {
-      const businessDayResponse = await apiService.get<{
-        stats: {
-          total_ttc: number;
-          total_sales: number;
-          top_products: Array<{ name: string; qty: number }>;
-          card_total: number;
-          cash_total: number;
-        };
-        business_day_period: { start: string; end: string; closure_time: string; timezone: string } | null;
-      }>('/legal/business-day-stats');
-      const businessDayData = businessDayResponse.data;
-
+      const businessDayData = await getBusinessDayStats();
       setStats({
         caJour: businessDayData.stats.total_ttc || 0,
         ventesJour: businessDayData.stats.total_sales || 0,
@@ -72,11 +62,10 @@ export const useHistoryAPI = (
         cashTotal: businessDayData.stats.cash_total || 0,
         businessDayPeriod: businessDayData.business_day_period || null,
       });
-    } catch (error) {
-      // Failed to load business day stats
+    } catch {
       setReturnError('Erreur lors du chargement des statistiques');
     }
-  }, [apiService, setStats, setReturnError]);
+  }, [setStats, setReturnError]);
 
   const processReturn = useCallback(
     async (returnData: ProcessReturnData) => {

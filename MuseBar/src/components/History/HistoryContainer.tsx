@@ -29,10 +29,13 @@ const HistoryContainer: React.FC = () => {
     actions.closeReturnDialog
   );
 
-  // Load data on component mount using stable callback
+  // Load data once on mount. Do not depend on `api` — it is recreated every render
+  // because useHistoryState returns new action refs, which would cause an infinite
+  // refresh loop and 429s when the stats endpoint is hit repeatedly.
   useEffect(() => {
     api.refreshData();
-  }, [api]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Event handlers
   const handleViewOrder = (order: Order) => {
@@ -131,10 +134,6 @@ const HistoryContainer: React.FC = () => {
           {state.returnError}
         </Alert>
       </Snackbar>
-
-              {/* Future: Add Order Details Dialog */}
-        {/* Future: Add Return Dialog Component */}
-        {/* Future: Add Receipt Dialog Component */}
     </Box>
   );
 };
