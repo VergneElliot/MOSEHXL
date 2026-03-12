@@ -68,10 +68,6 @@ export function getSystemRoleById(roleId: string): Role | null {
   return DEFAULT_ROLES[roleId] || null;
 }
 
-export function isSystemRoleId(roleId: string): boolean {
-  return Boolean(DEFAULT_ROLES[roleId]);
-}
-
 export function getRolePermissionsForRoleId(roleId: string): RolePermissions | null {
   const role = getSystemRoleById(roleId);
   return role ? role.permissions : null;
