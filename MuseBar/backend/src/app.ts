@@ -84,6 +84,7 @@ import emailTestRouter from './routes/emailTest';
 import establishmentAccountCreationRouter from './routes/establishmentAccountCreation';
 import printingRouter from './routes/printing';
 import printingCompatRouter from './routes/printingCompat';
+import settingsRouter from './routes/settings';
 
 app.use('/api/categories', categoriesRouter);
 app.use('/api/products', productsRouter);
@@ -97,6 +98,7 @@ app.use('/api/establishment-search', establishmentSearchRouter);
 app.use('/api/setup', setupRouter);
 app.use('/api/establishment-account-creation', establishmentAccountCreationRouter);
 app.use('/api/printing', printingRouter);
+app.use('/api/settings', settingsRouter);
 app.use('/', printingCompatRouter);
 
 // Development-only email test routes
