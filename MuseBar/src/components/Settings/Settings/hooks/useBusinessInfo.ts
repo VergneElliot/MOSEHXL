@@ -47,8 +47,10 @@ export const useBusinessInfo = ({
         taxIdentification: data.tax_identification ?? '',
       });
     } catch (error) {
+      // Do NOT reset to defaults on failure (e.g. 429 or transient error):
+      // the form would lose data the user already entered or that was loaded
+      // on a previous successful call.  Keep current state; the user can retry.
       console.error('Error loading business info:', error);
-      onUpdate(defaultBusinessInfo);
     } finally {
       onLoadingChange(false);
     }

@@ -19,11 +19,14 @@ import { ClosureSettings } from './ClosureSettings';
 import { PrinterSettings } from './PrinterSettings';
 import { HappyHourControl } from '../../HappyHour';
 
+import { Product } from '../../../types';
+
 interface SettingsTabsProps {
   settingsHook: any; // UseSettingsReturn type
   isHappyHourActive?: boolean;
   timeUntilHappyHour?: string;
   onHappyHourStatusUpdate?: () => void;
+  products?: Product[];
 }
 
 /**
@@ -63,6 +66,7 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
   isHappyHourActive = false,
   timeUntilHappyHour = '',
   onHappyHourStatusUpdate = () => {},
+  products = [],
 }) => {
   const [currentTab, setCurrentTab] = useState(0);
 
@@ -102,6 +106,7 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
           isActive={isHappyHourActive}
           timeUntil={timeUntilHappyHour}
           onStatusUpdate={onHappyHourStatusUpdate}
+          products={products}
         />
       ),
     },

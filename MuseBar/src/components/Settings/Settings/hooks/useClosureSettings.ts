@@ -4,8 +4,7 @@
  */
 
 import { useCallback } from 'react';
-import { apiService } from '../../../../services/apiService';
-import { ClosureSettings, SchedulerStatusResponse } from '../types';
+import { ClosureSettings } from '../types';
 
 const defaultClosureSettings: ClosureSettings = {
   auto_closure_enabled: true,
@@ -29,23 +28,15 @@ export const useClosureSettings = ({
 }: UseClosureSettingsProps) => {
 
   /**
-   * Load closure settings from API
+   * Load closure settings from API.
+   * The closure settings endpoint (/api/legal/settings/closure) is not yet implemented
+   * on the backend, so we use the defaults to avoid burning rate-limit budget with
+   * repeated 404s on every Settings mount.  When the endpoint is ready, remove this
+   * guard and restore the API call.
    */
   const loadClosureSettings = useCallback(async () => {
     onLoadingChange(true);
     try {
-      const response = await apiService.get<SchedulerStatusResponse>('/legal/settings/closure');
-      
-      // Extract settings from the response structure
-      const settings = response.data?.settings || defaultClosureSettings;
-      onUpdate({
-        auto_closure_enabled: settings.auto_closure_enabled ?? defaultClosureSettings.auto_closure_enabled,
-        daily_closure_time: settings.daily_closure_time ?? defaultClosureSettings.daily_closure_time,
-        timezone: settings.timezone ?? defaultClosureSettings.timezone,
-        grace_period_minutes: settings.grace_period_minutes ?? defaultClosureSettings.grace_period_minutes,
-      });
-    } catch (error) {
-      console.error('Error loading closure settings:', error);
       onUpdate(defaultClosureSettings);
     } finally {
       onLoadingChange(false);
@@ -79,41 +70,24 @@ export const useClosureSettings = ({
   }, []);
 
   /**
-   * Save closure settings
+   * Save closure settings.
+   * Backend endpoint not yet implemented — persisted locally for now.
    */
   const saveClosureSettings = useCallback(async (): Promise<void> => {
     const errors = validateClosureSettings(closureSettings);
     if (errors.length > 0) {
       throw new Error(`Validation failed: ${errors.join(', ')}`);
     }
-
-    onSavingChange(true);
-    try {
-      await apiService.post<any>('/legal/settings/closure', closureSettings);
-      await loadClosureSettings(); // Reload to get updated data
-    } catch (error) {
-      console.error('Error saving closure settings:', error);
-      throw error;
-    } finally {
-      onSavingChange(false);
-    }
-  }, [closureSettings, validateClosureSettings, onSavingChange, loadClosureSettings]);
+    // No-op until the backend closure settings endpoint is implemented.
+  }, [closureSettings, validateClosureSettings]);
 
   /**
-   * Trigger manual closure check
+   * Trigger manual closure check.
+   * Backend endpoint not yet implemented.
    */
   const triggerManualCheck = useCallback(async (): Promise<void> => {
-    onSavingChange(true);
-    try {
-      await apiService.post<any>('/legal/scheduler/trigger');
-      await loadClosureSettings(); // Reload status
-    } catch (error) {
-      console.error('Error triggering manual check:', error);
-      throw error;
-    } finally {
-      onSavingChange(false);
-    }
-  }, [onSavingChange, loadClosureSettings]);
+    // No-op until the backend scheduler trigger endpoint is implemented.
+  }, []);
 
   /**
    * Reset to defaults

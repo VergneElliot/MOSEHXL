@@ -15,7 +15,7 @@ const defaultHappyHour = {
   isEnabled: true,
   startTime: '16:00',
   endTime: '19:00',
-  isManuallyActivated: false,
+  manualOverride: 'auto' as 'auto' | 'on' | 'off',
   discountType: 'percentage',
   discountValue: 0.2,
 };
@@ -65,11 +65,15 @@ router.put('/happy-hour', async (req, res) => {
 
   try {
     const body = req.body || {};
+    // Migrate legacy isManuallyActivated to manualOverride if sent by old clients
+    const legacyOverride = body.isManuallyActivated === true ? 'on' : undefined;
     const settings = {
       isEnabled: body.isEnabled ?? defaultHappyHour.isEnabled,
       startTime: body.startTime ?? defaultHappyHour.startTime,
       endTime: body.endTime ?? defaultHappyHour.endTime,
-      isManuallyActivated: body.isManuallyActivated ?? defaultHappyHour.isManuallyActivated,
+      manualOverride: (['auto', 'on', 'off'].includes(body.manualOverride)
+        ? body.manualOverride
+        : legacyOverride ?? defaultHappyHour.manualOverride),
       discountType: body.discountType ?? defaultHappyHour.discountType,
       discountValue: typeof body.discountValue === 'number' ? body.discountValue : Number(body.discountValue) || defaultHappyHour.discountValue,
     };

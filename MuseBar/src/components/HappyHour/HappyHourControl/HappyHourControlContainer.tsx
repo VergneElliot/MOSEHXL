@@ -32,8 +32,9 @@ export const HappyHourControlContainer: React.FC<HappyHourControlProps> = ({
   isActive,
   timeUntil,
   onStatusUpdate,
+  products = [],
 }) => {
-  const happyHour = useHappyHour(onStatusUpdate);
+  const happyHour = useHappyHour(onStatusUpdate, products);
 
   return (
     <Box>
