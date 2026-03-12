@@ -33,6 +33,10 @@ export interface Order {
   notes?: string;
   tips?: number;
   change?: number;
+  /** 'sale' = normal order; 'change' = faire de la monnaie */
+  operationType?: 'sale' | 'change';
+  /** Amount in € for change operations */
+  changeAmount?: number | null;
 }
 
 export interface Payment {

@@ -187,7 +187,71 @@ router.post(
       ? await SubBillModel.getByOrderId(orderId) 
       : [];
     
-    // Calculate cancellation amounts
+    // If this is a pure "faire de la monnaie" operation, cancellation is handled as
+    // an inverse change operation: -X card, +X cash, zero total amount.
+    const userId = req.user ? String(req.user.id) : undefined;
+    if (isChangeOperation) {
+      const amount =
+        (typeof originalOrder.change === 'number' && originalOrder.change !== 0
+          ? originalOrder.change
+          : originalOrder.change_amount) || 0;
+
+      if (amount <= 0) {
+        return res
+          .status(400)
+          .json({ error: 'Cannot cancel this change operation: invalid amount' });
+      }
+
+      const reversalOrder = await OrderModel.create(
+        {
+          total_amount: 0,
+          total_tax: 0,
+          payment_method: originalOrder.payment_method,
+          status: 'completed',
+          notes: `ANNULATION FAIRE DE LA MONNAIE - Raison: ${reason} - Order ID: ${orderId}`,
+          tips: 0,
+          change: -amount,
+          operation_type: 'change',
+          change_amount: -amount,
+          establishment_id: establishmentId,
+        },
+        establishmentId
+      );
+
+      try {
+        await LegalJournalModel.logChange(reversalOrder.id, -amount, userId);
+      } catch (journalError) {
+        logger.error(
+          `Legal journal error (change cancellation) for order ${reversalOrder.id}`,
+          journalError instanceof Error ? journalError : new Error(String(journalError)),
+          'LEGAL_JOURNAL'
+        );
+      }
+
+      AuditTrailModel.logAction({
+        user_id: userId,
+        action_type: 'CASH_REGISTER_CHANGE_CANCELLED',
+        resource_type: 'ORDER',
+        resource_id: String(reversalOrder.id),
+        action_details: { original_order_id: orderId, amount, reason },
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+      }).catch((auditError: unknown) => {
+        logger.error(
+          `Audit log error (change cancellation) for order ${reversalOrder.id}`,
+          auditError instanceof Error ? auditError : new Error(String(auditError)),
+          'AUDIT_TRAIL'
+        );
+      });
+
+      return res.status(201).json({
+        message: 'Opération \"faire de la monnaie\" annulée avec succès',
+        cancellation_order: reversalOrder,
+        cancelled_amount: -amount,
+      });
+    }
+
+    // Calculate cancellation amounts for normal sales
     let cancellationAmount = 0;
     let cancellationTax = 0;
     let cancelledItems: typeof originalItems = [];
@@ -212,20 +276,24 @@ router.post(
       }
     }
     
-    // Include tip reversal if requested
+    // Include tip amount in the cancelled TTC if requested. The card/cash rebalancing
+    // (+X cash, -X card) is handled by a dedicated tip-reversal change order below.
     if (includeTipReversal && originalOrder.tips && originalOrder.tips > 0) {
       cancellationAmount += originalOrder.tips;
     }
     
     // Create cancellation order scoped to this establishment
-    const cancellationOrder = await OrderModel.create({
-      total_amount: -cancellationAmount,
-      total_tax: -cancellationTax,
-      payment_method: originalOrder.payment_method,
-      status: 'completed',
-      notes: `ANNULATION - ${cancellationType.toUpperCase()} - Raison: ${reason} - Order ID: ${orderId}`,
-      establishment_id: establishmentId,
-    }, establishmentId);
+    const cancellationOrder = await OrderModel.create(
+      {
+        total_amount: -cancellationAmount,
+        total_tax: -cancellationTax,
+        payment_method: originalOrder.payment_method,
+        status: 'completed',
+        notes: `ANNULATION - ${cancellationType.toUpperCase()} - Raison: ${reason} - Order ID: ${orderId}`,
+        establishment_id: establishmentId,
+      },
+      establishmentId
+    );
     
     // Create cancellation items
     const cancellationOrderItems = await Promise.all(
@@ -244,7 +312,94 @@ router.post(
         });
       })
     );
+
+    // If the original payment was split, mirror the cancellation into sub_bills so that
+    // card/cash breakdowns remain accurate for closures and live stats.
+    let cancellationSubBills: Awaited<ReturnType<typeof SubBillModel.getByOrderId>> = [];
+    if (originalOrder.payment_method === 'split' && originalSubBills.length > 0) {
+      if (cancellationType === 'full') {
+        // Full cancellation: create exact negative copies of the original sub_bills.
+        cancellationSubBills = await Promise.all(
+          originalSubBills.map(async (sb) =>
+            SubBillModel.create({
+              order_id: cancellationOrder.id,
+              payment_method: sb.payment_method,
+              amount: -sb.amount,
+              status: sb.status,
+            })
+          )
+        );
+      } else if (cancellationAmount > 0) {
+        // Partial/items-only cancellation: distribute the cancelled amount proportionally
+        // across the original sub_bills (card/cash) so totals stay consistent.
+        const totalOriginalSplitAmount = originalSubBills.reduce(
+          (sum, sb) => sum + Number(sb.amount),
+          0
+        );
+
+        if (totalOriginalSplitAmount > 0) {
+          const ratio = cancellationAmount / totalOriginalSplitAmount;
+          let remaining = cancellationAmount;
+
+          cancellationSubBills = await Promise.all(
+            originalSubBills.map(async (sb, index) => {
+              let amountToCancel: number;
+              if (index === originalSubBills.length - 1) {
+                // Last sub-bill gets the remainder to avoid rounding drift.
+                amountToCancel = remaining;
+              } else {
+                amountToCancel = Number((Number(sb.amount) * ratio).toFixed(4));
+                remaining -= amountToCancel;
+              }
+
+              return SubBillModel.create({
+                order_id: cancellationOrder.id,
+                payment_method: sb.payment_method,
+                amount: -amountToCancel,
+                status: sb.status,
+              });
+            })
+          );
+        }
+      }
+    }
     
+    // If we reversed the tip, create a dedicated zero-total change order so that
+    // card/cash subtotals are rebalanced (-tip on card, +tip on cash) without
+    // affecting the day's total TTC.
+    let tipReversalOrder: Awaited<ReturnType<typeof OrderModel.create>> | null = null;
+    const tipAmountToReverse =
+      includeTipReversal && originalOrder.tips && originalOrder.tips > 0
+        ? Number(originalOrder.tips)
+        : 0;
+    if (tipAmountToReverse > 0) {
+      tipReversalOrder = await OrderModel.create(
+        {
+          total_amount: 0,
+          total_tax: 0,
+          payment_method: originalOrder.payment_method,
+          status: 'completed',
+          notes: `ANNULATION POURBOIRE - Raison: ${reason} - Order ID: ${orderId}`,
+          tips: 0,
+          change: -tipAmountToReverse,
+          operation_type: 'change',
+          change_amount: -tipAmountToReverse,
+          establishment_id: establishmentId,
+        },
+        establishmentId
+      );
+
+      try {
+        await LegalJournalModel.logChange(tipReversalOrder.id, -tipAmountToReverse, userId);
+      } catch (journalError) {
+        logger.error(
+          `Legal journal error (tip reversal) for order ${tipReversalOrder.id}`,
+          journalError instanceof Error ? journalError : new Error(String(journalError)),
+          'LEGAL_JOURNAL'
+        );
+      }
+    }
+
     // Log to legal journal
     try {
       await LegalJournalModel.addEntry(
@@ -266,7 +421,7 @@ router.post(
           total_cancelled: -cancellationAmount,
           tax_cancelled: -cancellationTax
         },
-        req.user ? String(req.user.id) : undefined
+        userId
       );
     } catch (journalError) {
       logger.error(`Legal journal error (cancellation) for order ${cancellationOrder.id}`, journalError instanceof Error ? journalError : new Error(String(journalError)), 'LEGAL_JOURNAL');
@@ -300,6 +455,7 @@ router.post(
       message: 'Annulation enregistrée avec succès',
       cancellation_order: cancellationOrder,
       cancellation_items: cancellationOrderItems,
+      cancellation_sub_bills: cancellationSubBills,
       cancelled_amount: -cancellationAmount
     });
   } catch (error: unknown) {

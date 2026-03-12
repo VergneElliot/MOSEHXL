@@ -94,7 +94,7 @@ export const useHistoryAPI = (
           // Use cancel-unified: it creates the cancellation order, writes the
           // legal journal REFUND entry, and logs the audit trail in one shot.
           await apiService.post('/orders/payment/cancel-unified', {
-            orderId: order.id,
+            orderId: Number(order.id),
             reason,
             cancellationType: 'partial',
             itemsToCancel: numericItemIds,
@@ -105,7 +105,7 @@ export const useHistoryAPI = (
         } else {
           // Full return — cancel-unified handles the entire order
           await apiService.post('/orders/payment/cancel-unified', {
-            orderId: order.id,
+            orderId: Number(order.id),
             reason,
             cancellationType: 'full',
             includeTipReversal: !!(order.tips && order.tips > 0),
