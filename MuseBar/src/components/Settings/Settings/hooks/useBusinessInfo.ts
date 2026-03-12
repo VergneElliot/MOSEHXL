@@ -36,8 +36,16 @@ export const useBusinessInfo = ({
   const loadBusinessInfo = useCallback(async () => {
     onLoadingChange(true);
     try {
-      const response = await apiService.get<BusinessInfo>('/settings/business');
-      onUpdate({ ...defaultBusinessInfo, ...response });
+      const data = await apiService.getBusinessInfo();
+      onUpdate({
+        ...defaultBusinessInfo,
+        name: data.name ?? '',
+        address: data.address ?? '',
+        phone: data.phone ?? '',
+        email: data.email ?? '',
+        siret: data.siret ?? '',
+        taxIdentification: data.tax_identification ?? '',
+      });
     } catch (error) {
       console.error('Error loading business info:', error);
       onUpdate(defaultBusinessInfo);
@@ -93,7 +101,14 @@ export const useBusinessInfo = ({
 
     onSavingChange(true);
     try {
-      await apiService.post<BusinessInfo>('/settings/business', businessInfo);
+      await apiService.updateBusinessInfo({
+        name: businessInfo.name,
+        address: businessInfo.address,
+        phone: businessInfo.phone,
+        email: businessInfo.email,
+        siret: businessInfo.siret,
+        tax_identification: businessInfo.taxIdentification,
+      });
       await loadBusinessInfo(); // Reload to get updated data
     } catch (error) {
       console.error('Error saving business info:', error);

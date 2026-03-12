@@ -8,6 +8,7 @@ import journalRouter from './journal';
 import closureRouter from './closure';
 import archiveRouter from './archive';
 import complianceRouter from './compliance';
+import businessInfoRouter from './businessInfo';
 
 const router = express.Router();
 
@@ -16,5 +17,6 @@ router.use('/journal', journalRouter);
 router.use('/closure', closureRouter);
 router.use('/archive', archiveRouter);
 router.use('/compliance', complianceRouter);
+router.use('/', businessInfoRouter);
 
 export default router; 
