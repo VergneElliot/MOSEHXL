@@ -31,7 +31,6 @@ export const CompletionStep: React.FC = () => {
   // Confetti effect or celebration animation could be added here
   useEffect(() => {
     // Optional: Add celebration effects
-  // console.info('Business setup completed successfully!');
   }, []);
 
   const handleLoginRedirect = () => {

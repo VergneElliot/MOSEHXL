@@ -43,7 +43,6 @@ export const CreateSystemUserDialog: React.FC<CreateSystemUserDialogProps> = ({
       setError(null);
       
       // Future: integrate with admin users API endpoint
-      // console.debug('Creating system user:', formData);
       
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));

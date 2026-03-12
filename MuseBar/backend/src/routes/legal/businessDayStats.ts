@@ -82,16 +82,6 @@ router.get('/business-day-stats', async (req, res) => {
       topProducts = topResult.rows;
     }
 
-    console.log('BUSINESS_DAY_STATS', {
-      totalTTC,
-      cardTotal,
-      cashTotal,
-      ordersCount: orders.length,
-      start: start.toISOString(),
-      end: end.toISOString(),
-      establishmentId,
-    });
-
     res.json({
       stats: {
         total_ttc: totalTTC,
