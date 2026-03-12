@@ -38,6 +38,8 @@ export async function getOrders(): Promise<Order[]> {
     notes: order.notes,
     tips: order.tips || 0,
     change: order.change || 0,
+    operationType: order.operation_type as 'sale' | 'change' | undefined,
+    changeAmount: order.change_amount != null ? parseFloat(String(order.change_amount)) : null,
   }));
 }
 

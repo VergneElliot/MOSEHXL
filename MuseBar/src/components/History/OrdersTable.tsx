@@ -218,7 +218,7 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
                       Reçu
                     </Button>
 
-                    {order.status === 'completed' && (
+                    {order.status === 'completed' && order.operationType !== 'change' && (
                       <Button
                         size="small"
                         variant="outlined"

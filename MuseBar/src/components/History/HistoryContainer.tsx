@@ -6,6 +6,8 @@ import { useHistoryLogic } from '../../hooks/useHistoryLogic';
 import StatsCards from './StatsCards';
 import SearchBar from './SearchBar';
 import OrdersTable from './OrdersTable';
+import OrderDetailsDialog from './OrderDetailsDialog';
+import ReturnDialog from './ReturnDialog';
 import { Order } from '../../types';
 
 const HistoryContainer: React.FC = () => {
@@ -52,6 +54,17 @@ const HistoryContainer: React.FC = () => {
 
   const handleCloseSnackbar = () => {
     actions.clearMessages();
+  };
+
+  const handleConfirmReturn = () => {
+    if (!state.orderToReturn) return;
+    api.processReturn({
+      order: state.orderToReturn,
+      reason: state.returnReason,
+      selectedItems: state.selectedItemsToReturn,
+      selectedTip: state.selectedTipToReturn,
+      isPartial: state.isPartialReturn,
+    });
   };
 
   return (
@@ -134,6 +147,33 @@ const HistoryContainer: React.FC = () => {
           {state.returnError}
         </Alert>
       </Snackbar>
+
+      {/* Order details dialog (view) */}
+      <OrderDetailsDialog
+        order={state.selectedOrder}
+        onClose={() => actions.setSelectedOrder(null)}
+        formatDateTime={logic.formatDateTime}
+        getPaymentMethodLabel={logic.getPaymentMethodLabel}
+      />
+
+      {/* Return / cancellation dialog */}
+      <ReturnDialog
+        open={state.returnDialogOpen}
+        order={state.orderToReturn}
+        reason={state.returnReason}
+        onReasonChange={actions.setReturnReason}
+        isPartial={state.isPartialReturn}
+        onPartialChange={actions.setIsPartialReturn}
+        selectedItemIds={state.selectedItemsToReturn}
+        onSelectedItemIdsChange={actions.setSelectedItemsToReturn}
+        selectedTip={state.selectedTipToReturn}
+        onSelectedTipChange={actions.setSelectedTipToReturn}
+        onConfirm={handleConfirmReturn}
+        onClose={actions.closeReturnDialog}
+        loading={state.returnLoading}
+        errorMessage={state.returnError}
+        formatDateTime={logic.formatDateTime}
+      />
     </Box>
   );
 };
