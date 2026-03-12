@@ -31,17 +31,20 @@ export const useHappyHour = (enabled: boolean = true): HappyHourState & HappyHou
     setTimeUntilHappyHour(timeUntil);
   }, [happyHourService, enabled]);
 
-  // Initialize and update happy hour status
+  // Initialize and update happy hour status (load from server so settings sync across devices)
   useEffect(() => {
     if (enabled) {
-      updateHappyHourStatus();
+      updateHappyHourStatus(); // show local state immediately
+      happyHourService.loadFromApi().then(() => {
+        updateHappyHourStatus(); // then refresh from server
+      });
 
       // Update every minute
       const intervalId = setInterval(updateHappyHourStatus, 60000);
 
       return () => clearInterval(intervalId);
     }
-  }, [updateHappyHourStatus, enabled]);
+  }, [updateHappyHourStatus, enabled, happyHourService]);
 
   return {
     isHappyHourActive,

@@ -1,4 +1,5 @@
 import { HappyHourSettings } from '../types';
+import * as settingsApi from './api/settings';
 
 export class HappyHourService {
   private static instance: HappyHourService;
@@ -28,6 +29,44 @@ export class HappyHourService {
       HappyHourService.instance = new HappyHourService();
     }
     return HappyHourService.instance;
+  }
+
+  /**
+   * Load Happy Hour settings from the server (establishment-scoped).
+   * Call when the user is authenticated so all devices see the same settings.
+   * On failure (e.g. not logged in), keeps current in-memory/localStorage state.
+   */
+  public async loadFromApi(): Promise<void> {
+    try {
+      const serverSettings = await settingsApi.getHappyHourSettings();
+      this.settings = {
+        ...this.settings,
+        ...serverSettings,
+        discountValue: typeof serverSettings.discountValue === 'number'
+          ? serverSettings.discountValue
+          : Number(serverSettings.discountValue) || 0.2,
+      };
+      try {
+        localStorage.setItem('musebar-happyhour-settings', JSON.stringify(this.settings));
+      } catch {
+        // ignore
+      }
+    } catch (error) {
+      // Not authenticated or network error: keep current state
+    }
+  }
+
+  /**
+   * Persist current settings to the server so they sync across devices.
+   * Call after updateSettings or toggleManualActivation when user is authenticated.
+   */
+  private async persistToApi(): Promise<void> {
+    try {
+      const serverSettings = await settingsApi.updateHappyHourSettings(this.settings);
+      this.settings = { ...this.settings, ...serverSettings };
+    } catch (error) {
+      // Keep local state; next loadFromApi will retry sync
+    }
   }
 
   public getSettings(): HappyHourSettings {
@@ -71,12 +110,12 @@ export class HappyHourService {
       const n = Number(this.settings.discountValue);
       this.settings.discountValue = Number.isNaN(n) ? 0 : n;
     }
-    // Sauvegarde dans localStorage
     try {
       localStorage.setItem('musebar-happyhour-settings', JSON.stringify(this.settings));
     } catch (error) {
       console.error('Erreur lors de la sauvegarde des paramètres Happy Hour:', error);
     }
+    void this.persistToApi();
   }
 
   public isHappyHourActive(): boolean {
@@ -104,6 +143,7 @@ export class HappyHourService {
     } catch (error) {
       console.error('Erreur lors de la sauvegarde de l\'activation manuelle Happy Hour:', error);
     }
+    void this.persistToApi();
   }
 
   public getDiscountPercentage(): number {
