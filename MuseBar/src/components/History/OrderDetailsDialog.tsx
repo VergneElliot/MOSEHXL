@@ -49,9 +49,14 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
 
   const getPaymentBreakdown = () => {
     if (isChange && changeAmount !== 0) {
+      const absAmount = Math.abs(changeAmount);
+      const isReversal = changeAmount < 0;
       return (
         <Typography variant="body2" color="textSecondary">
-          Faire de la monnaie : +{formatCurrency(changeAmount)} Carte, −{formatCurrency(changeAmount)} Espèces
+          {isReversal ? 'Annulation faire de la monnaie' : 'Faire de la monnaie'} :{' '}
+          {isReversal ? '-' : '+'}
+          {formatCurrency(absAmount)} Carte, {isReversal ? '+' : '−'}
+          {formatCurrency(absAmount)} Espèces
         </Typography>
       );
     }

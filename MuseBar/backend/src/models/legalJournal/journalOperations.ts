@@ -60,8 +60,16 @@ export class JournalOperations {
    * This is the main entry point for logging sales transactions
    */
   static async logTransaction(order: OrderForJournal, userId?: string): Promise<JournalEntry> {
-    const amount = parseFloat(String(order.total_amount ?? 0));
-    const vatAmount = parseFloat(String(order.total_tax ?? order.taxAmount ?? 0));
+    const rawAmount = typeof order.total_amount === 'number'
+      ? order.total_amount
+      : parseFloat(String(order.total_amount ?? 0));
+    const rawVatAmount = typeof order.total_tax === 'number'
+      ? order.total_tax
+      : parseFloat(String(order.total_tax ?? order.taxAmount ?? 0));
+
+    // Defensive guard: never write NaN into the legal journal.
+    const amount = Number.isFinite(rawAmount) ? rawAmount : 0;
+    const vatAmount = Number.isFinite(rawVatAmount) ? rawVatAmount : 0;
     
     return await this.addEntry(
       'SALE',
