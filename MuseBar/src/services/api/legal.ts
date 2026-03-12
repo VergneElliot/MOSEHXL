@@ -16,5 +16,20 @@ export async function getLiveMonthlyStats() {
   return request('/legal/stats/monthly-live');
 }
 
+/** Live business-day stats for the History tab (closure-aligned totals). */
+export interface BusinessDayStatsResponse {
+  stats: {
+    total_ttc: number;
+    total_sales: number;
+    top_products: Array<{ name: string; qty: number }>;
+    card_total: number;
+    cash_total: number;
+  };
+  business_day_period: { start: string; end: string; closure_time: string; timezone: string } | null;
+}
+
+export async function getBusinessDayStats() {
+  return request<BusinessDayStatsResponse>('/legal/business-day-stats');
+}
 
 

@@ -3,12 +3,13 @@
  * Daily, weekly, monthly, and annual closure bulletin generation
  */
 
-import moment from 'moment-timezone';
-import { ClosureBulletin, VATBreakdown, PaymentBreakdown, ClosureType } from './types';
+import { ClosureBulletin, VATBreakdown, ClosureType } from './types';
 import { JournalQueries } from './journalQueries';
 import { JournalSigning } from './journalSigning';
 import { pool } from '../../app';
 import { DEFAULT_APP_TIMEZONE } from '../../config/timezone';
+import { getBusinessDayPeriod } from './businessDayPeriod';
+import { computePaymentBreakdownFromOrders } from './paymentBreakdown';
 
 export class ClosureOperations {
   /**
@@ -40,62 +41,29 @@ export class ClosureOperations {
     const orders = ordersResult.rows;
     const orderIds = orders.map((o: { id: number }) => o.id);
 
-    // Totals from orders (exact — no rounding; used for storage and hash)
-    const totalTransactions = orders.length;
-    let totalAmount = 0;
-    let totalVat = 0;
-    const paymentBreakdown: PaymentBreakdown = {};
-
-    for (const order of orders) {
-      const orderAmount = parseFloat(String(order.total_amount ?? 0));
-      const orderVat = parseFloat(String(order.total_tax ?? order.taxAmount ?? 0));
-      totalAmount += orderAmount;
-      totalVat += orderVat;
-      if (order.operation_type === 'change' && order.change_amount != null) {
-        const x = parseFloat(String(order.change_amount));
-        paymentBreakdown['card'] = (paymentBreakdown['card'] || 0) + x;
-        paymentBreakdown['cash'] = (paymentBreakdown['cash'] || 0) - x;
-      } else if (order.payment_method === 'split') {
-        // Split order: attribution done from sub_bills below
-      } else {
-        // Cash or card: full order total is attributed to that method (even if "montant reçu" was left empty in POS)
-        const paymentMethod = order.payment_method || 'cash';
-        paymentBreakdown[paymentMethod] = (paymentBreakdown[paymentMethod] || 0) + orderAmount;
-      }
-    }
-
-    // Attribute split orders from sub_bills (each part can be card or cash)
     const splitOrderIds = orders.filter((o: { payment_method: string }) => o.payment_method === 'split').map((o: { id: number }) => o.id);
+    let subBills: Array<{ order_id: number; payment_method: string; amount: string | number }> = [];
     if (splitOrderIds.length > 0) {
       const subBillsResult = await pool.query(
         'SELECT order_id, payment_method, amount FROM sub_bills WHERE order_id = ANY($1)',
         [splitOrderIds]
       );
-      for (const row of subBillsResult.rows as Array<{ order_id: number; payment_method: string; amount: string | number }>) {
-        const method = row.payment_method === 'card' ? 'card' : 'cash';
-        const amount = parseFloat(String(row.amount ?? 0));
-        paymentBreakdown[method] = (paymentBreakdown[method] || 0) + amount;
-      }
+      subBills = subBillsResult.rows;
     }
 
-    // VAT breakdown from order_items (exact sums for accounting; round only when displaying/printing)
-    const vatBreakdown = await getExactVatBreakdownFromOrderItems(pool, orderIds);
+    const { totalAmount, paymentBreakdown } = computePaymentBreakdownFromOrders(orders, subBills);
+    const totalTransactions = orders.length;
+    const totalVat = orders.reduce(
+      (sum: number, order: { total_tax?: string | number; taxAmount?: string | number }) =>
+        sum + parseFloat(String(order.total_tax ?? order.taxAmount ?? 0)),
+      0
+    );
 
-    // Calculate tips and change totals
-    const netTipsTotal = orders.reduce((sum, order) => sum + parseFloat(order.tips || '0'), 0);
-    const netChangeTotal = orders.reduce((sum, order) => sum + parseFloat(order.change || '0'), 0);
-    
-    // Apply constraint requirement: use absolute values or set to 0 if negative
+    const netTipsTotal = orders.reduce((sum: number, order: { tips?: string | number }) => sum + parseFloat(String(order.tips || '0')), 0);
+    const netChangeTotal = orders.reduce((sum: number, order: { change?: string | number }) => sum + parseFloat(String(order.change || '0')), 0);
     const tipsTotal = Math.max(0, netTipsTotal);
     const changeTotal = Math.max(0, netChangeTotal);
-
-    // Business rule: tips are collected via electronic payment (e.g. card)
-    // and then withdrawn in cash for staff. Card totals already include tips
-    // via order.total_amount; we reflect the cash outflow by subtracting tips
-    // from the cash payment breakdown so closures show +X card, -X cash.
-    if (tipsTotal > 0) {
-      paymentBreakdown['cash'] = (paymentBreakdown['cash'] || 0) - tipsTotal;
-    }
+    const vatBreakdown = await getExactVatBreakdownFromOrderItems(pool, orderIds);
 
     // Get legal journal entries for sequence calculation
     const entries = await JournalQueries.getEntriesForPeriod(start.toDate(), end.toDate());
@@ -191,55 +159,30 @@ export class ClosureOperations {
     `;
     const ordersResult = await pool.query(ordersQuery, [startDate, endDate, establishmentId]);
     const orders = ordersResult.rows;
-
-    // Calculate aggregated totals
-    const totalTransactions = orders.length;
-    const totalAmount = orders.reduce((sum, order) => sum + parseFloat(order.total_amount || '0'), 0);
-    const totalVat = orders.reduce((sum, order) => sum + parseFloat(order.total_tax || order.taxAmount || '0'), 0);
-
     const orderIds = orders.map((o: { id: number }) => o.id);
-    const paymentBreakdown: PaymentBreakdown = {};
-    for (const order of orders) {
-      if (order.operation_type === 'change' && order.change_amount != null) {
-        const x = parseFloat(String(order.change_amount));
-        paymentBreakdown['card'] = (paymentBreakdown['card'] || 0) + x;
-        paymentBreakdown['cash'] = (paymentBreakdown['cash'] || 0) - x;
-      } else if (order.payment_method === 'split') {
-        // Attribution from sub_bills below
-      } else {
-        const paymentMethod = order.payment_method || 'cash';
-        const orderAmount = parseFloat(String(order.total_amount ?? 0));
-        paymentBreakdown[paymentMethod] = (paymentBreakdown[paymentMethod] || 0) + orderAmount;
-      }
-    }
 
-    // Attribute split orders from sub_bills
     const splitOrderIds = orders.filter((o: { payment_method: string }) => o.payment_method === 'split').map((o: { id: number }) => o.id);
+    let subBills: Array<{ order_id: number; payment_method: string; amount: string | number }> = [];
     if (splitOrderIds.length > 0) {
       const subBillsResult = await pool.query(
         'SELECT order_id, payment_method, amount FROM sub_bills WHERE order_id = ANY($1)',
         [splitOrderIds]
       );
-      for (const row of subBillsResult.rows as Array<{ order_id: number; payment_method: string; amount: string | number }>) {
-        const method = row.payment_method === 'card' ? 'card' : 'cash';
-        const amount = parseFloat(String(row.amount ?? 0));
-        paymentBreakdown[method] = (paymentBreakdown[method] || 0) + amount;
-      }
+      subBills = subBillsResult.rows;
     }
+
+    const { totalAmount, paymentBreakdown } = computePaymentBreakdownFromOrders(orders, subBills);
+    const totalTransactions = orders.length;
+    const totalVat = orders.reduce(
+      (sum: number, order: { total_tax?: string | number; taxAmount?: string | number }) =>
+        sum + parseFloat(String(order.total_tax ?? order.taxAmount ?? '0')),
+      0
+    );
+    const tipsTotal = Math.max(0, orders.reduce((sum: number, order: { tips?: string | number }) => sum + parseFloat(String(order.tips || '0')), 0));
+    const changeTotal = Math.max(0, orders.reduce((sum: number, order: { change?: string | number }) => sum + parseFloat(String(order.change || '0')), 0));
 
     // Exact VAT breakdown from order_items (no rounding for storage)
     const vatBreakdown = await getExactVatBreakdownFromOrderItems(pool, orderIds);
-
-    // Calculate tips and change
-    const tipsTotal = Math.max(0, orders.reduce((sum, order) => sum + parseFloat(order.tips || '0'), 0));
-    const changeTotal = Math.max(0, orders.reduce((sum, order) => sum + parseFloat(order.change || '0'), 0));
-
-    // Business rule: tips in card are later taken out of the cash drawer
-    // for staff. Card totals already include tips through total_amount; we
-    // adjust cash totals so closures show +X card, -X cash for tips.
-    if (tipsTotal > 0) {
-      paymentBreakdown['cash'] = (paymentBreakdown['cash'] || 0) - tipsTotal;
-    }
 
     // Get journal sequence range
     const entries = await JournalQueries.getEntriesForPeriod(startDate, endDate);
@@ -317,21 +260,5 @@ async function getExactVatBreakdownFromOrderItems(
     }
   }
   return vatBreakdown;
-}
-
-/**
- * Utility to calculate business day period
- */
-function getBusinessDayPeriod(date: Date, closureTime: string, timezone: string) {
-  // date: the business day to close (e.g., 2025-07-11)
-  // closureTime: e.g., '02:00'
-  // timezone: e.g., 'Europe/Paris'
-  const [hours, minutes] = closureTime.split(':').map(Number);
-  // The period starts at the closure time of the given day
-  const start = moment.tz(date, timezone).set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
-  // The period ends at closure time the next day, minus 1ms
-  const end = start.clone().add(1, 'day').subtract(1, 'ms');
-  
-  return { start, end };
 }
 
