@@ -37,6 +37,16 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
   const isChange = order.operationType === 'change';
   const changeAmount = order.changeAmount ?? 0;
 
+  const safeNumber = (value: number): number =>
+    Number.isFinite(value) ? value : 0;
+
+  const itemsTotal = safeNumber(order.items.reduce((s, i) => s + i.totalPrice, 0));
+  const vatTotal =
+    order.items.length > 0 && !Number.isFinite(order.taxAmount)
+      ? safeNumber(order.items.reduce((s, i) => s + i.taxAmount, 0))
+      : safeNumber(order.taxAmount);
+  const totalTTC = safeNumber(order.totalAmount);
+
   const getPaymentBreakdown = () => {
     if (isChange && changeAmount !== 0) {
       return (
@@ -46,11 +56,15 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
       );
     }
     if (order.paymentMethod === 'split' && order.subBills && order.subBills.length > 0) {
-      const card = order.subBills.filter(s => s.paymentMethod === 'card').reduce((sum, s) => sum + s.amount, 0);
-      const cash = order.subBills.filter(s => s.paymentMethod === 'cash').reduce((sum, s) => sum + s.amount, 0);
+      const card = order.subBills
+        .filter(s => s.paymentMethod === 'card')
+        .reduce((sum, s) => sum + s.amount, 0);
+      const cash = order.subBills
+        .filter(s => s.paymentMethod === 'cash')
+        .reduce((sum, s) => sum + s.amount, 0);
       const parts: string[] = [];
-      if (card > 0) parts.push(`${formatCurrency(card)} Carte`);
-      if (cash > 0) parts.push(`${formatCurrency(cash)} Espèces`);
+      if (card !== 0) parts.push(`${formatCurrency(card)} Carte`);
+      if (cash !== 0) parts.push(`${formatCurrency(cash)} Espèces`);
       return (
         <Typography variant="body2" color="textSecondary">
           Mixte : {parts.join(', ')}
@@ -59,7 +73,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     }
     return (
       <Typography variant="body2" color="textSecondary">
-        {getPaymentMethodLabel(order.paymentMethod)} : {formatCurrency(order.totalAmount)}
+        {getPaymentMethodLabel(order.paymentMethod)} : {formatCurrency(totalTTC)}
       </Typography>
     );
   };
@@ -117,19 +131,17 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
               <>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                   <Typography variant="body2">Sous-total TTC (articles)</Typography>
-                  <Typography variant="body2">
-                    {formatCurrency(order.items.reduce((s, i) => s + i.totalPrice, 0))}
-                  </Typography>
+                  <Typography variant="body2">{formatCurrency(itemsTotal)}</Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                   <Typography variant="body2">TVA totale</Typography>
-                  <Typography variant="body2">{formatCurrency(order.taxAmount)}</Typography>
+                  <Typography variant="body2">{formatCurrency(vatTotal)}</Typography>
                 </Box>
               </>
             )}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', mt: 1 }}>
               <Typography>Total TTC</Typography>
-              <Typography>{formatCurrency(order.totalAmount)}</Typography>
+              <Typography>{formatCurrency(totalTTC)}</Typography>
             </Box>
             {order.tips != null && order.tips > 0 && (
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
