@@ -48,11 +48,7 @@ export const CreateEstablishmentDialog: React.FC<CreateEstablishmentDialogProps>
       
       ensureAuthentication(); // Ensure token is set
       
-    // console.debug('Creating establishment with data:', formData);
-      
       await createEstablishment(formData);
-      
-    // console.debug('Establishment created successfully:', response);
       
       setSuccess(`Établissement créé avec succès! Invitation envoyée à ${formData.owner_email}`);
       
