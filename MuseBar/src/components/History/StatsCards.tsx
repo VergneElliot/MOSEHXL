@@ -5,11 +5,10 @@ import {
   CardContent,
   Typography,
   Box,
-  Chip,
   useTheme,
   useMediaQuery,
 } from '@mui/material';
-import { BarChart, CreditCard, Money, TrendingUp } from '@mui/icons-material';
+import { CreditCard, Money, TrendingUp, LocalOffer } from '@mui/icons-material';
 import { HistoryStats } from '../../hooks/useHistoryState';
 
 interface StatsCardsProps {
@@ -21,6 +20,8 @@ interface StatsCardsProps {
 const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, formatCurrency }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const topN = isMobile ? 3 : 5;
+  const topProduits = stats.topProduits.slice(0, topN);
 
   const statsData = [
     {
@@ -29,13 +30,14 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, formatCurrency 
       icon: <TrendingUp />,
       color: theme.palette.success.main,
       description: "Chiffre d'affaires total",
+      isTopProducts: false,
     },
     {
-      title: 'Ventes du Jour',
-      value: stats.ventesJour.toString(),
-      icon: <BarChart />,
+      title: 'Top ventes du jour',
+      icon: <LocalOffer />,
       color: theme.palette.primary.main,
-      description: 'Nombre de transactions',
+      description: `Top ${topN} produits`,
+      isTopProducts: true,
     },
     {
       title: 'Paiements Carte',
@@ -43,6 +45,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, formatCurrency 
       icon: <CreditCard />,
       color: theme.palette.info.main,
       description: 'Total paiements par carte',
+      isTopProducts: false,
     },
     {
       title: 'Paiements Espèces',
@@ -50,6 +53,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, formatCurrency 
       icon: <Money />,
       color: theme.palette.warning.main,
       description: 'Total paiements en espèces',
+      isTopProducts: false,
     },
   ];
 
@@ -123,15 +127,36 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, formatCurrency 
                 </Box>
 
                 <Typography
-                  variant={isMobile ? 'h6' : 'h5'}
-                  component="p"
+                  variant={stat.isTopProducts ? undefined : (isMobile ? 'h6' : 'h5')}
+                  component={stat.isTopProducts ? 'div' : 'p'}
                   sx={{
                     fontWeight: 'bold',
                     color: stat.color,
                     mb: 0.5,
+                    ...(stat.isTopProducts && {
+                      fontWeight: 500,
+                      maxHeight: isMobile ? 72 : 100,
+                      overflow: 'auto',
+                    }),
                   }}
                 >
-                  {stat.value}
+                  {stat.isTopProducts ? (
+                    topProduits.length === 0 ? (
+                      '—'
+                    ) : (
+                      <Box component="ol" sx={{ m: 0, pl: 2, '& li': { py: 0.2 } }}>
+                        {topProduits.map((p, i) => (
+                          <li key={i}>
+                            <Typography component="span" variant="body2" noWrap sx={{ display: 'block' }}>
+                              {p.name} <Typography component="span" color="textSecondary">({p.qty})</Typography>
+                            </Typography>
+                          </li>
+                        ))}
+                      </Box>
+                    )
+                  ) : (
+                    stat.value
+                  )}
                 </Typography>
 
                 <Typography
@@ -146,31 +171,6 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, formatCurrency 
           </Grid>
         ))}
       </Grid>
-
-      {/* Top Products */}
-      {stats.topProduits.length > 0 && (
-        <Card>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              🏆 Produits les plus vendus
-            </Typography>
-            <Box display="flex" flexWrap="wrap" gap={1}>
-              {stats.topProduits.slice(0, isMobile ? 3 : 5).map((product, index) => (
-                <Chip
-                  key={index}
-                  label={`${product.name} (${product.qty})`}
-                  variant="outlined"
-                  size={isMobile ? 'small' : 'medium'}
-                  sx={{
-                    backgroundColor: index === 0 ? theme.palette.primary.light : 'transparent',
-                    color: index === 0 ? theme.palette.primary.contrastText : 'inherit',
-                  }}
-                />
-              ))}
-            </Box>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Business Day Period Info */}
       {stats.businessDayPeriod && (
