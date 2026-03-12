@@ -24,10 +24,12 @@ interface TabPanelProps {
   children?: React.ReactNode;
   index: number;
   value: number;
+  /** Controls whether the tab content can scroll the whole page or uses nested scroll containers */
+  scrollMode?: 'auto' | 'hidden';
 }
 
 function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
+  const { children, value, index, scrollMode = 'auto', ...other } = props;
   const isActive = value === index;
   return (
     <div
@@ -48,7 +50,8 @@ function TabPanel(props: TabPanelProps) {
           sx={{
             flex: 1,
             minHeight: 0,
-            overflow: 'hidden',
+            overflowX: 'hidden',
+            overflowY: scrollMode === 'auto' ? 'auto' : 'hidden',
             display: 'flex',
             flexDirection: 'column',
             p: 3,
@@ -177,7 +180,14 @@ const AppRouter: React.FC<AppRouterProps> = ({
       </Tabs>
 
       {filteredTabs.map((tab, i) => (
-        <TabPanel value={tabValue} index={i} key={tab.value}>
+        <TabPanel
+          value={tabValue}
+          index={i}
+          key={tab.value}
+          // POS (caisse) has its own nested scroll containers; keep outer panel non-scrollable
+          // All other tabs (menu, settings, history, etc.) should be able to scroll vertically
+          scrollMode={tab.value === 'pos' ? 'hidden' : 'auto'}
+        >
           {tab.value === 'pos' && (
             <POSContainer
               categories={categories}
