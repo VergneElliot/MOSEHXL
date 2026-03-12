@@ -5,8 +5,6 @@
 
 // Core components
 export { SettingsTabs } from './SettingsTabs';
-export { GeneralSettings } from './GeneralSettings';
-export { BusinessSettings } from './BusinessSettings';
 export { PaymentSettings } from './PaymentSettings';
 export { ClosureSettings } from './ClosureSettings';
 export { PrinterSettings } from './PrinterSettings';

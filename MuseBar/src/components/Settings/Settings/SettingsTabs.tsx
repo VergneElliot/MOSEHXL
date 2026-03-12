@@ -7,15 +7,13 @@ import React, { useState } from 'react';
 import { Box, Tabs, Tab, Typography } from '@mui/material';
 import {
   Business as BusinessIcon,
-  Settings as SettingsIcon,
   Payment as PaymentIcon,
   Schedule as ScheduleIcon,
   Print as PrintIcon,
   LocalBar as HappyHourIcon,
 } from '@mui/icons-material';
 import { SettingsTab } from './types';
-import { GeneralSettings } from './GeneralSettings';
-import { BusinessSettings } from './BusinessSettings';
+import { EstablishmentSettings } from './EstablishmentSettings';
 import { PaymentSettings } from './PaymentSettings';
 import { ClosureSettings } from './ClosureSettings';
 import { PrinterSettings } from './PrinterSettings';
@@ -74,29 +72,24 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
 
   const tabs: SettingsTab[] = [
     {
-      id: 'general',
-      label: 'Général',
-      icon: <SettingsIcon />,
-      component: (
-        <GeneralSettings
-          settings={settingsHook.state.generalSettings}
-          onUpdate={settingsHook.updateGeneralSettings}
-          onSave={settingsHook.saveGeneralSettings}
-          loading={settingsHook.saving}
-        />
-      ),
-    },
-    {
-      id: 'business',
-      label: 'Informations du Bar',
+      id: 'establishment',
+      label: "Établissement",
       icon: <BusinessIcon />,
       component: (
-        <BusinessSettings
-          businessInfo={settingsHook.state.businessInfo}
-          onUpdate={settingsHook.updateBusinessInfo}
-          onSave={settingsHook.saveBusinessInfo}
-          loading={settingsHook.infoSaving}
-          message={settingsHook.infoMessage}
+        <EstablishmentSettings
+          businessInfoProps={{
+            businessInfo: settingsHook.state.businessInfo,
+            onUpdate: settingsHook.updateBusinessInfo,
+            onSave: settingsHook.saveBusinessInfo,
+            loading: settingsHook.infoSaving,
+            message: settingsHook.infoMessage,
+          }}
+          generalSettingsProps={{
+            settings: settingsHook.state.generalSettings,
+            onUpdate: settingsHook.updateGeneralSettings,
+            onSave: settingsHook.saveGeneralSettings,
+            loading: settingsHook.saving,
+          }}
         />
       ),
     },
