@@ -127,7 +127,7 @@ const ReturnDialog: React.FC<ReturnDialogProps> = ({
             </Box>
           )}
 
-          {isPartial && hasTip && (
+          {hasTip && (
             <FormControlLabel
               control={
                 <Checkbox
