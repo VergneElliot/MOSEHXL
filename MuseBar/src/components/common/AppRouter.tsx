@@ -209,6 +209,7 @@ const AppRouter: React.FC<AppRouterProps> = ({
               isHappyHourActive={isHappyHourActive}
               timeUntilHappyHour={timeUntilHappyHour}
               onHappyHourStatusUpdate={onHappyHourStatusUpdate}
+              products={products}
             />
           )}
           {tab.value === 'compliance' && <LegalComplianceDashboard />}

@@ -3,6 +3,8 @@
  * Centralized type definitions for the settings system
  */
 
+import { Product } from '../../../types';
+
 export interface ClosureSettings {
   auto_closure_enabled: boolean;
   daily_closure_time: string;
@@ -69,6 +71,7 @@ export interface SettingsProps {
   isHappyHourActive?: boolean;
   timeUntilHappyHour?: string;
   onHappyHourStatusUpdate?: () => void;
+  products?: Product[];
 }
 
 export interface GeneralSettingsProps {

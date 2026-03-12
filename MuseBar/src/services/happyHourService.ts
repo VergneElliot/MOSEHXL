@@ -7,7 +7,7 @@ export class HappyHourService {
     isEnabled: true,
     startTime: '16:00',
     endTime: '19:00',
-    isManuallyActivated: false,
+    manualOverride: 'auto',
     discountType: 'percentage',
     discountValue: 0.2,
     discountPercentage: 0.2, // Pour rétrocompatibilité
@@ -39,9 +39,12 @@ export class HappyHourService {
   public async loadFromApi(): Promise<void> {
     try {
       const serverSettings = await settingsApi.getHappyHourSettings();
+      // Migrate legacy isManuallyActivated → manualOverride
+      const legacyOverride = serverSettings.isManuallyActivated === true ? 'on' : undefined;
       this.settings = {
         ...this.settings,
         ...serverSettings,
+        manualOverride: serverSettings.manualOverride ?? legacyOverride ?? 'auto',
         discountValue: typeof serverSettings.discountValue === 'number'
           ? serverSettings.discountValue
           : Number(serverSettings.discountValue) || 0.2,
@@ -119,25 +122,32 @@ export class HappyHourService {
   }
 
   public isHappyHourActive(): boolean {
-    // Si l'Happy Hour est désactivé globalement
-    if (!this.settings.isEnabled) {
-      return false;
-    }
+    // Resolve manual override (support legacy isManuallyActivated field)
+    const override = this.settings.manualOverride
+      ?? (this.settings.isManuallyActivated === true ? 'on' : 'auto');
 
-    // Si l'Happy Hour est activé manuellement
-    if (this.settings.isManuallyActivated) {
-      return true;
-    }
+    if (override === 'on') return true;   // forced ON
+    if (override === 'off') return false; // forced OFF
 
-    // Vérification automatique basée sur l'heure
+    // 'auto': follow the schedule only when enabled
+    if (!this.settings.isEnabled) return false;
     const now = new Date();
-    const currentTime = now.toTimeString().slice(0, 5); // Format "HH:mm"
-
+    const currentTime = now.toTimeString().slice(0, 5);
     return this.isTimeInRange(currentTime, this.settings.startTime, this.settings.endTime);
   }
 
+  /**
+   * Toggle the manual override based on the *current* active status.
+   * - If HH is currently active  → force OFF  ('off')
+   * - If HH is currently inactive → force ON   ('on')
+   * Pressing again when already in a forced state reverses the force,
+   * giving the user a clean way to override in either direction.
+   */
   public toggleManualActivation(): void {
-    this.settings.isManuallyActivated = !this.settings.isManuallyActivated;
+    const currentlyActive = this.isHappyHourActive();
+    this.settings.manualOverride = currentlyActive ? 'off' : 'on';
+    // Keep legacy field in sync for any old code that may still read it
+    this.settings.isManuallyActivated = this.settings.manualOverride === 'on';
     try {
       localStorage.setItem('musebar-happyhour-settings', JSON.stringify(this.settings));
     } catch (error) {

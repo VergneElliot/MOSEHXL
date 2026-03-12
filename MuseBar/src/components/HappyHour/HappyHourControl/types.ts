@@ -9,6 +9,7 @@ export interface HappyHourControlProps {
   isActive: boolean;
   timeUntil: string;
   onStatusUpdate: () => void;
+  products?: Product[];
 }
 
 export interface HappyHourSettings {

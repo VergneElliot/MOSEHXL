@@ -29,7 +29,18 @@ export interface HappyHourSettings {
   isEnabled: boolean;
   startTime: string; // Format "HH:mm"
   endTime: string; // Format "HH:mm"
-  isManuallyActivated: boolean; // Pour activation/désactivation manuelle
+  /**
+   * Manual override for the automatic schedule.
+   * 'on'   – force active regardless of schedule or isEnabled
+   * 'off'  – force inactive regardless of schedule or isEnabled
+   * 'auto' – follow the automatic schedule (default)
+   *
+   * Legacy field kept for backward-compat when reading old DB values:
+   * isManuallyActivated: true  →  treated as manualOverride: 'on'
+   */
+  manualOverride?: 'auto' | 'on' | 'off';
+  /** @deprecated use manualOverride instead */
+  isManuallyActivated?: boolean;
   discountPercentage?: number; // Ancien champ, pour rétrocompatibilité
   discountType: 'percentage' | 'fixed';
   discountValue: number;

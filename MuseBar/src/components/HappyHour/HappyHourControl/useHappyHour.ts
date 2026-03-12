@@ -11,10 +11,13 @@ import { UseHappyHourReturn, EditForm } from './types';
 import { HappyHourService } from '../../../services/happyHourService';
 import { useHappyHourState, useHappyHourSettings, useHappyHourProducts } from './hooks';
 
+import { Product } from '../../../types';
+
 export const useHappyHour = (
-  onStatusUpdate: () => void
+  onStatusUpdate: () => void,
+  products: Product[] = []
 ): UseHappyHourReturn => {
-  const { state, setState, loadData } = useHappyHourState();
+  const { state, setState, loadData } = useHappyHourState(products);
   
   const settingsHook = useHappyHourSettings({
     onSettingsUpdate: (settings) => {
@@ -100,10 +103,14 @@ export const useHappyHour = (
     // State
     state,
 
-    // Settings management
-    updateSettings: settingsHook.updateSettings,
+    // Update local form state only — no API call on every keystroke
+    updateSettings: async (settings) => {
+      setState(prev => ({ ...prev, settings }));
+    },
+
+    // Persist to API only when the user explicitly clicks Save
     saveSettings: async () => {
-      HappyHourService.getInstance().updateSettings(state.settings);
+      await settingsHook.updateSettings(state.settings);
       onStatusUpdate();
     },
 

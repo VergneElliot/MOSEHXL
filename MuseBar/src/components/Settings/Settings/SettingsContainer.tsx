@@ -16,6 +16,7 @@ export const SettingsContainer: React.FC<SettingsProps> = ({
   isHappyHourActive = false,
   timeUntilHappyHour = '',
   onHappyHourStatusUpdate = () => {},
+  products = [],
 }) => {
   const settingsHook = useSettings();
 
@@ -45,6 +46,7 @@ export const SettingsContainer: React.FC<SettingsProps> = ({
         isHappyHourActive={isHappyHourActive}
         timeUntilHappyHour={timeUntilHappyHour}
         onHappyHourStatusUpdate={onHappyHourStatusUpdate}
+        products={products}
       />
     </Box>
   );

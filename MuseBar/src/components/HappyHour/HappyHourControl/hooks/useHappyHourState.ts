@@ -5,7 +5,6 @@
 
 import { useState, useCallback } from 'react';
 import { HappyHourService } from '../../../../services/happyHourService';
-import { DataService } from '../../../../services/dataService';
 import { Product } from '../../../../types';
 import { HappyHourState, HappyHourSettings, EditForm } from '../types';
 
@@ -29,7 +28,7 @@ interface UseHappyHourStateReturn {
   resetState: () => void;
 }
 
-export const useHappyHourState = (): UseHappyHourStateReturn => {
+export const useHappyHourState = (products: Product[] = []): UseHappyHourStateReturn => {
   const [state, setState] = useState<HappyHourState>({
     settings: defaultSettings,
     eligibleProducts: [],
@@ -39,24 +38,18 @@ export const useHappyHourState = (): UseHappyHourStateReturn => {
   });
 
   const happyHourService = HappyHourService.getInstance();
-  const dataService = DataService.getInstance();
 
   /**
-   * Load settings and eligible products
+   * Load settings from the in-memory service (already synced from API at app startup).
+   * Products are filtered from the prop list so no extra API call is made here.
    */
   const loadData = useCallback(async () => {
     setState(prev => ({ ...prev, loading: true }));
-    
     try {
-      // Load settings
-      const settings = await happyHourService.getSettings();
-      
-      // Load eligible products
-      const allProducts = await dataService.getProducts();
-      const eligibleProducts = allProducts.filter(
+      const settings = happyHourService.getSettings();
+      const eligibleProducts = products.filter(
         (product: Product) => product.isHappyHourEligible && product.isActive
       );
-
       setState(prev => ({
         ...prev,
         settings: {
@@ -64,7 +57,7 @@ export const useHappyHourState = (): UseHappyHourStateReturn => {
           endTime: settings.endTime || defaultSettings.endTime,
           discountType: settings.discountType || defaultSettings.discountType,
           discountValue: settings.discountValue || defaultSettings.discountValue,
-          isEnabled: settings.isEnabled || defaultSettings.isEnabled,
+          isEnabled: settings.isEnabled ?? defaultSettings.isEnabled,
         },
         eligibleProducts,
         loading: false,
@@ -73,7 +66,7 @@ export const useHappyHourState = (): UseHappyHourStateReturn => {
       console.error('Failed to load happy hour data:', error);
       setState(prev => ({ ...prev, loading: false }));
     }
-  }, [happyHourService, dataService]);
+  }, [happyHourService, products]);
 
   /**
    * Reset state to defaults
