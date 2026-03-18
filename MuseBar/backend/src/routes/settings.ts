@@ -5,20 +5,10 @@
  */
 
 import express from 'express';
-import { pool } from '../app';
 import { requireAuth, getEstablishmentId } from './auth';
+import { HappyHourSettingsModel, defaultHappyHour } from '../models/happyHourSettings';
 
 const router = express.Router();
-const SETTING_KEY_HAPPY_HOUR = 'happy_hour';
-
-const defaultHappyHour = {
-  isEnabled: true,
-  startTime: '16:00',
-  endTime: '19:00',
-  manualOverride: 'auto' as 'auto' | 'on' | 'off',
-  discountType: 'percentage',
-  discountValue: 0.2,
-};
 
 router.use(requireAuth);
 
@@ -31,24 +21,8 @@ router.get('/happy-hour', async (req, res) => {
   if (!establishmentId) return;
 
   try {
-    const result = await pool.query(
-      `SELECT setting_value FROM establishment_settings
-       WHERE establishment_id = $1 AND setting_key = $2`,
-      [establishmentId, SETTING_KEY_HAPPY_HOUR]
-    );
-
-    if (result.rows.length === 0) {
-      return res.json(defaultHappyHour);
-    }
-
-    const row = result.rows[0];
-    let value = defaultHappyHour;
-    try {
-      value = { ...defaultHappyHour, ...JSON.parse(row.setting_value) };
-    } catch {
-      // invalid JSON, use defaults
-    }
-    res.json(value);
+    const value = await HappyHourSettingsModel.getHappyHourSettings(establishmentId);
+    return res.json(value);
   } catch (error) {
     console.error('Error fetching happy hour settings:', error);
     res.status(500).json({ error: 'Failed to fetch Happy Hour settings' });
@@ -78,13 +52,7 @@ router.put('/happy-hour', async (req, res) => {
       discountValue: typeof body.discountValue === 'number' ? body.discountValue : Number(body.discountValue) || defaultHappyHour.discountValue,
     };
 
-    await pool.query(
-      `INSERT INTO establishment_settings (establishment_id, setting_key, setting_value, updated_at)
-       VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-       ON CONFLICT (establishment_id, setting_key)
-       DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = CURRENT_TIMESTAMP`,
-      [establishmentId, SETTING_KEY_HAPPY_HOUR, JSON.stringify(settings)]
-    );
+    await HappyHourSettingsModel.upsertHappyHourSettings(establishmentId, settings);
 
     res.json(settings);
   } catch (error) {
