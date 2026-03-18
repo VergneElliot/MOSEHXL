@@ -4,7 +4,7 @@ import { Category, Product, OrderItem } from '../../types';
 import { usePOSState } from '../../hooks/usePOSState';
 import { usePOSLogic } from '../../hooks/usePOSLogic';
 import { usePOSAPI } from '../../hooks/usePOSAPI';
-import { HappyHourService } from '../../services/happyHourService';
+import { usePOSOrderAdjustments } from '../../hooks/usePOSOrderAdjustments';
 import CategoryFilter from './CategoryFilter';
 import ProductGrid from './ProductGrid';
 import OrderSummary from './OrderSummary';
@@ -70,131 +70,11 @@ const POSContainer: React.FC<POSContainerProps> = ({
     [actions]
   );
 
-  const happyHourService = HappyHourService.getInstance();
-
-  const handleApplyHappyHour = useCallback(
-    (index: number) => {
-      const line = state.currentOrder[index];
-      if (!line) return;
-
-      // Toggle off manual Happy Hour if already applied
-      if (line.isHappyHourApplied && line.isManualHappyHour) {
-        const basePrice = line.originalPrice ?? line.unitPrice;
-        const taxAmount = basePrice * (line.taxRate / (1 + line.taxRate));
-        actions.updateLineAt(index, {
-          isHappyHourApplied: false,
-          isManualHappyHour: false,
-          unitPrice: basePrice,
-          totalPrice: basePrice,
-          taxAmount,
-        });
-        return;
-      }
-
-      const settings = happyHourService.getSettings();
-      const basePrice = line.originalPrice ?? line.unitPrice;
-      let discountedPrice: number;
-      if (settings.discountType === 'percentage') {
-        discountedPrice = basePrice * (1 - (settings.discountValue ?? 0));
-      } else {
-        discountedPrice = Math.max(0, basePrice - (settings.discountValue ?? 0));
-      }
-      const taxAmount = discountedPrice * (line.taxRate / (1 + line.taxRate));
-      actions.updateLineAt(index, {
-        isHappyHourApplied: true,
-        isManualHappyHour: true,
-        originalPrice: basePrice,
-        unitPrice: discountedPrice,
-        totalPrice: discountedPrice,
-        taxAmount,
-      });
-    },
-    [state.currentOrder, actions, happyHourService]
-  );
-
-  const handleApplyOffert = useCallback(
-    (index: number) => {
-      const line = state.currentOrder[index];
-      if (!line) return;
-
-      const basePrice = line.originalPrice ?? line.unitPrice;
-
-      // Toggle off "Offert"
-      if (line.isOffert) {
-        const taxAmount = basePrice * (line.taxRate / (1 + line.taxRate));
-        const cleanedDescription =
-          line.description?.replace(/\s*\[Offert\]/g, '').trim() || undefined;
-
-        actions.updateLineAt(index, {
-          isOffert: false,
-          unitPrice: basePrice,
-          totalPrice: basePrice,
-          taxAmount,
-          description: cleanedDescription,
-        });
-        return;
-      }
-
-      const desc = line.description?.trim()
-        ? `${line.description.trim()} [Offert]`
-        : '[Offert]';
-
-      actions.updateLineAt(index, {
-        isOffert: true,
-        isPerso: false,
-        isHappyHourApplied: false,
-        isManualHappyHour: false,
-        originalPrice: basePrice,
-        unitPrice: 0,
-        totalPrice: 0,
-        taxAmount: 0,
-        description: desc,
-      });
-    },
-    [state.currentOrder, actions]
-  );
-
-  const handleApplyPerso = useCallback(
-    (index: number) => {
-      const line = state.currentOrder[index];
-      if (!line) return;
-
-      const basePrice = line.originalPrice ?? line.unitPrice;
-
-      // Toggle off "Perso"
-      if (line.isPerso) {
-        const taxAmount = basePrice * (line.taxRate / (1 + line.taxRate));
-        const cleanedDescription =
-          line.description?.replace(/\s*\[Perso\]/g, '').trim() || undefined;
-
-        actions.updateLineAt(index, {
-          isPerso: false,
-          unitPrice: basePrice,
-          totalPrice: basePrice,
-          taxAmount,
-          description: cleanedDescription,
-        });
-        return;
-      }
-
-      const desc = line.description?.trim()
-        ? `${line.description.trim()} [Perso]`
-        : '[Perso]';
-
-      actions.updateLineAt(index, {
-        isPerso: true,
-        isOffert: false,
-        isHappyHourApplied: false,
-        isManualHappyHour: false,
-        originalPrice: basePrice,
-        unitPrice: 0,
-        totalPrice: 0,
-        taxAmount: 0,
-        description: desc,
-      });
-    },
-    [state.currentOrder, actions]
-  );
+  const { handleApplyHappyHour, handleApplyOffert, handleApplyPerso } =
+    usePOSOrderAdjustments({
+      currentOrder: state.currentOrder,
+      updateLineAt: actions.updateLineAt,
+    });
 
   const handleCheckout = () => {
     actions.setPaymentDialogOpen(true);
