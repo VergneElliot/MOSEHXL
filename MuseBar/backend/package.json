@@ -6,6 +6,8 @@
   "author": "Elliot Vergne <elliot.vergne@gmail.com>",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint src --ext .ts,.tsx",
+    "type-check": "tsc --noEmit",
     "dev": "ts-node src/app.ts",
     "build": "tsc && mkdir -p dist/docs && cp src/docs/openapi.yaml dist/docs/",
     "start": "node dist/app.js",
@@ -48,6 +50,8 @@
     "@types/pg": "^8.15.4",
     "@types/qrcode": "^1.5.6",
     "@types/swagger-ui-express": "^4.1.8",
+    "@typescript-eslint/eslint-plugin": "^8.57.1",
+    "@typescript-eslint/parser": "^8.57.1",
     "eslint": "^9.32.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.3",
