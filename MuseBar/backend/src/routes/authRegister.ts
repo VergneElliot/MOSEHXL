@@ -1,6 +1,5 @@
 import express from 'express';
 import { UserModel } from '../models/user';
-import { pool } from '../app';
 import { AuditTrailModel } from '../models/auditTrail';
 import { Logger } from '../utils/logger';
 import {
@@ -66,12 +65,9 @@ router.post('/register', requireAuth, requireAdmin, async (req, res) => {
 // GET /api/auth/users — list users scoped to the requester's establishment
 // ---------------------------------------------------------------------------
 router.get('/users', requireAuth, requireEstablishmentAdmin, async (req, res) => {
-  const establishmentId = req.user!.establishment_id;
-  const result = await pool.query(
-    'SELECT id, email, is_admin, role, establishment_id, first_name, last_name, created_at FROM users WHERE establishment_id = $1 ORDER BY id',
-    [establishmentId]
-  );
-  return res.json(result.rows);
+  const establishmentId = req.user!.establishment_id!;
+  const rows = await UserModel.listUsersByEstablishment(establishmentId);
+  return res.json(rows);
 });
 
 // ---------------------------------------------------------------------------
@@ -79,13 +75,10 @@ router.get('/users', requireAuth, requireEstablishmentAdmin, async (req, res) =>
 // ---------------------------------------------------------------------------
 router.get('/users/:id/permissions', requireAuth, requireEstablishmentAdmin, async (req, res) => {
   const userId = parseInt(req.params.id);
-  const establishmentId = req.user!.establishment_id;
+  const establishmentId = req.user!.establishment_id!;
 
-  const ownership = await pool.query(
-    'SELECT id FROM users WHERE id = $1 AND establishment_id = $2',
-    [userId, establishmentId]
-  );
-  if (ownership.rows.length === 0) {
+  const owns = await UserModel.userBelongsToEstablishment(userId, establishmentId);
+  if (!owns) {
     return res.status(403).json({ error: 'User does not belong to your establishment' });
   }
 
@@ -98,7 +91,7 @@ router.get('/users/:id/permissions', requireAuth, requireEstablishmentAdmin, asy
 // ---------------------------------------------------------------------------
 router.post('/users/:id/permissions', requireAuth, requireEstablishmentAdmin, async (req, res) => {
   const userId = parseInt(req.params.id);
-  const establishmentId = req.user!.establishment_id;
+  const establishmentId = req.user!.establishment_id!;
   const { permissions } = req.body;
   const ip = req.ip;
   const userAgent = req.headers['user-agent'];
@@ -107,11 +100,8 @@ router.post('/users/:id/permissions', requireAuth, requireEstablishmentAdmin, as
     return res.status(400).json({ error: 'Permissions must be an array' });
   }
 
-  const ownership = await pool.query(
-    'SELECT id FROM users WHERE id = $1 AND establishment_id = $2',
-    [userId, establishmentId]
-  );
-  if (ownership.rows.length === 0) {
+  const owns = await UserModel.userBelongsToEstablishment(userId, establishmentId);
+  if (!owns) {
     return res.status(403).json({ error: 'User does not belong to your establishment' });
   }
 
@@ -134,18 +124,15 @@ router.post('/users/:id/permissions', requireAuth, requireEstablishmentAdmin, as
 // ---------------------------------------------------------------------------
 router.put('/users/:id/permissions', requireAuth, requireEstablishmentAdmin, async (req, res) => {
   const userId = parseInt(req.params.id);
-  const establishmentId = req.user!.establishment_id;
+  const establishmentId = req.user!.establishment_id!;
   const { permissions } = req.body;
 
   if (!Array.isArray(permissions)) {
     return res.status(400).json({ error: 'Permissions must be an array' });
   }
 
-  const ownership = await pool.query(
-    'SELECT id FROM users WHERE id = $1 AND establishment_id = $2',
-    [userId, establishmentId]
-  );
-  if (ownership.rows.length === 0) {
+  const owns = await UserModel.userBelongsToEstablishment(userId, establishmentId);
+  if (!owns) {
     return res.status(403).json({ error: 'User does not belong to your establishment' });
   }
 
@@ -211,21 +198,18 @@ router.post('/users', requireAuth, requireEstablishmentAdmin, async (req, res) =
 // ---------------------------------------------------------------------------
 router.delete('/users/:id', requireAuth, requireEstablishmentAdmin, async (req, res) => {
   const userId = parseInt(req.params.id);
-  const establishmentId = req.user!.establishment_id;
+  const establishmentId = req.user!.establishment_id!;
 
   if (userId === req.user!.id) {
     return res.status(400).json({ error: 'You cannot delete your own account' });
   }
 
-  const ownership = await pool.query(
-    'SELECT id FROM users WHERE id = $1 AND establishment_id = $2',
-    [userId, establishmentId]
-  );
-  if (ownership.rows.length === 0) {
+  const owns = await UserModel.userBelongsToEstablishment(userId, establishmentId);
+  if (!owns) {
     return res.status(403).json({ error: 'User does not belong to your establishment' });
   }
 
-  await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+  await UserModel.deleteUserById(userId);
   await AuditTrailModel.logAction({
     user_id: String(req.user!.id),
     action_type: 'DELETE_USER',
@@ -244,7 +228,7 @@ router.delete('/users/:id', requireAuth, requireEstablishmentAdmin, async (req, 
 // ---------------------------------------------------------------------------
 router.put('/users/:id/role', requireAuth, requireEstablishmentAdmin, async (req, res) => {
   const userId = parseInt(req.params.id);
-  const establishmentId = req.user!.establishment_id;
+  const establishmentId = req.user!.establishment_id!;
   const { role } = req.body;
 
   const allowedRoles = ['cashier', 'manager', 'establishment_admin'];
@@ -252,15 +236,12 @@ router.put('/users/:id/role', requireAuth, requireEstablishmentAdmin, async (req
     return res.status(400).json({ error: `Role must be one of: ${allowedRoles.join(', ')}` });
   }
 
-  const ownership = await pool.query(
-    'SELECT id FROM users WHERE id = $1 AND establishment_id = $2',
-    [userId, establishmentId]
-  );
-  if (ownership.rows.length === 0) {
+  const owns = await UserModel.userBelongsToEstablishment(userId, establishmentId);
+  if (!owns) {
     return res.status(403).json({ error: 'User does not belong to your establishment' });
   }
 
-  await pool.query('UPDATE users SET role = $1 WHERE id = $2', [role, userId]);
+  await UserModel.updateUserRoleById(userId, role);
   await AuditTrailModel.logAction({
     user_id: String(req.user!.id),
     action_type: 'UPDATE_USER_ROLE',
@@ -284,22 +265,17 @@ router.post('/setup', async (req, res) => {
       return res.status(400).json({ error: 'Email and password required' });
     }
 
-    const existingAdmin = await pool.query('SELECT COUNT(*) FROM users WHERE is_admin = true');
-    if (parseInt(existingAdmin.rows[0].count) > 0) {
-      return res.status(400).json({ error: 'Admin user already exists' });
-    }
-
-    const user = await UserModel.createUser(email, password, true);
-    await pool.query(
-      `UPDATE users SET first_name = 'System', last_name = 'Administrator', role = 'system_admin', email_verified = true WHERE id = $1`,
-      [user.id]
-    );
+    const user = await UserModel.bootstrapSystemAdmin(email, password);
 
     return res.status(201).json({
       message: 'Admin user created successfully',
       user: { id: user.id, email: user.email, is_admin: user.is_admin },
     });
   } catch (error) {
+    const e = error as any;
+    if (e?.statusCode === 400) {
+      return res.status(400).json({ error: e.message || 'Admin user already exists' });
+    }
     return res.status(500).json({ error: 'Failed to create admin user' });
   }
 });
