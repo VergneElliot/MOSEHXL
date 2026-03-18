@@ -6,7 +6,7 @@
 import express from 'express';
 import { LegalJournalModel } from '../../models/legalJournal';
 import { Logger } from '../../utils/logger';
-import { pool } from '../../app';
+import { JournalQueries } from '../../models/legalJournal';
 import { requireAuth, requireAdmin } from '../auth';
 
 const router = express.Router();
@@ -40,36 +40,23 @@ router.get('/verify', async (req, res) => {
 router.get('/entries', async (req, res) => {
   try {
     const { start_date, end_date, limit = 100, offset = 0 } = req.query;
-    
-    let query = 'SELECT * FROM legal_journal ORDER BY sequence_number DESC';
-    const values: (string | number)[] = [];
-    
-    if (start_date && end_date) {
-      query = `
-        SELECT * FROM legal_journal 
-        WHERE timestamp >= $1 AND timestamp <= $2 
-        ORDER BY sequence_number DESC
-      `;
-      values.push(start_date as string, end_date as string);
-    }
-    
-    query += ` LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
-    values.push(parseInt(limit as string), parseInt(offset as string));
-    
-    const result = await pool.query(query, values);
-    
-    const countQuery = start_date && end_date 
-      ? 'SELECT COUNT(*) FROM legal_journal WHERE timestamp >= $1 AND timestamp <= $2'
-      : 'SELECT COUNT(*) FROM legal_journal';
-    const countValues = start_date && end_date ? [start_date, end_date] : [];
-    const countResult = await pool.query(countQuery, countValues);
-    
+
+    const parsedLimit = parseInt(limit as string);
+    const parsedOffset = parseInt(offset as string);
+
+    const result = await JournalQueries.getEntriesWithCountForPeriod({
+      start_date: start_date as string | undefined,
+      end_date: end_date as string | undefined,
+      limit: parsedLimit,
+      offset: parsedOffset,
+    });
+
     res.json({
-      entries: result.rows,
-      total: parseInt(countResult.rows[0].count),
-      limit: parseInt(limit as string),
-      offset: parseInt(offset as string),
-      compliance_note: 'Journal entries are immutable per French fiscal law'
+      entries: result.entries,
+      total: result.total,
+      limit: result.limit,
+      offset: result.offset,
+      compliance_note: 'Journal entries are immutable per French fiscal law',
     });
   } catch (error: unknown) {
     logger.error('Error fetching journal entries', error instanceof Error ? error : new Error(String(error)), 'LEGAL_JOURNAL');
@@ -83,25 +70,8 @@ router.get('/entries', async (req, res) => {
  */
 router.get('/stats', requireAdmin, async (req, res) => {
   try {
-    const statsQuery = `
-      SELECT 
-        COUNT(*) as total_entries,
-        MIN(sequence_number) as first_sequence,
-        MAX(sequence_number) as last_sequence,
-        MIN(timestamp) as first_entry_date,
-        MAX(timestamp) as last_entry_date,
-        SUM(CASE WHEN transaction_type = 'SALE' THEN 1 ELSE 0 END) as sales_count,
-        SUM(CASE WHEN transaction_type = 'REFUND' THEN 1 ELSE 0 END) as refunds_count,
-        SUM(CASE WHEN transaction_type = 'CORRECTION' THEN 1 ELSE 0 END) as corrections_count,
-        SUM(CASE WHEN transaction_type = 'CLOSURE' THEN 1 ELSE 0 END) as closures_count,
-        SUM(CASE WHEN transaction_type = 'CHANGE' THEN 1 ELSE 0 END) as change_count
-      FROM legal_journal
-    `;
-    
-    const statsResult = await pool.query(statsQuery);
-    
     res.json({
-      statistics: statsResult.rows[0],
+      statistics: await JournalQueries.getJournalStatsSummary(),
       compliance_note: 'Journal statistics for regulatory reporting'
     });
   } catch (error: unknown) {
@@ -116,17 +86,16 @@ router.get('/stats', requireAdmin, async (req, res) => {
  */
 router.post('/reset', requireAdmin, async (req, res) => {
   try {
-    if (process.env.NODE_ENV === 'production') {
-      return res.status(403).json({ error: 'Journal reset not allowed in production' });
-    }
-    
-    await pool.query('DELETE FROM legal_journal');
-    await pool.query('ALTER SEQUENCE legal_journal_id_seq RESTART WITH 1');
+    await JournalQueries.resetJournalDevOnly();
     
     res.json({
       message: 'Journal reset successfully (development only)',
     });
   } catch (error: unknown) {
+    const maybeAny = error as any;
+    if (maybeAny?.statusCode === 403) {
+      return res.status(403).json({ error: maybeAny.message || 'Journal reset not allowed in production' });
+    }
     logger.error('Error resetting journal', error instanceof Error ? error : new Error(String(error)), 'LEGAL_JOURNAL');
     res.status(500).json({ error: 'Failed to reset journal' });
   }
