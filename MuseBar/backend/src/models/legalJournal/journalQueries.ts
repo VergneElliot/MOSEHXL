@@ -72,6 +72,95 @@ export class JournalQueries {
   }
 
   /**
+   * Entries retrieval with a total count for pagination UI.
+   * Mirrors the logic previously implemented directly in routes/legal/journal.ts.
+   */
+  static async getEntriesWithCountForPeriod(params: {
+    start_date?: string;
+    end_date?: string;
+    limit: number;
+    offset: number;
+  }): Promise<{
+    entries: JournalEntry[];
+    total: number;
+    limit: number;
+    offset: number;
+  }> {
+    const { start_date, end_date, limit, offset } = params;
+
+    let query = 'SELECT * FROM legal_journal ORDER BY sequence_number DESC';
+    const values: Array<string | number> = [];
+
+    if (start_date && end_date) {
+      query = `
+        SELECT * FROM legal_journal
+        WHERE timestamp >= $1 AND timestamp <= $2
+        ORDER BY sequence_number DESC
+      `;
+      values.push(start_date, end_date);
+    }
+
+    query += ` LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
+    values.push(limit, offset);
+
+    const result = await pool.query(query, values);
+
+    const countQuery =
+      start_date && end_date
+        ? 'SELECT COUNT(*) FROM legal_journal WHERE timestamp >= $1 AND timestamp <= $2'
+        : 'SELECT COUNT(*) FROM legal_journal';
+
+    const countValues = start_date && end_date ? [start_date, end_date] : [];
+    const countResult = await pool.query(countQuery, countValues);
+
+    return {
+      entries: result.rows,
+      total: parseInt(countResult.rows[0].count),
+      limit,
+      offset,
+    };
+  }
+
+  /**
+   * Summary stats for the legal journal.
+   * Mirrors the SQL previously implemented directly in routes/legal/journal.ts.
+   */
+  static async getJournalStatsSummary(): Promise<Record<string, unknown>> {
+    const statsQuery = `
+      SELECT
+        COUNT(*) as total_entries,
+        MIN(sequence_number) as first_sequence,
+        MAX(sequence_number) as last_sequence,
+        MIN(timestamp) as first_entry_date,
+        MAX(timestamp) as last_entry_date,
+        SUM(CASE WHEN transaction_type = 'SALE' THEN 1 ELSE 0 END) as sales_count,
+        SUM(CASE WHEN transaction_type = 'REFUND' THEN 1 ELSE 0 END) as refunds_count,
+        SUM(CASE WHEN transaction_type = 'CORRECTION' THEN 1 ELSE 0 END) as corrections_count,
+        SUM(CASE WHEN transaction_type = 'CLOSURE' THEN 1 ELSE 0 END) as closures_count,
+        SUM(CASE WHEN transaction_type = 'CHANGE' THEN 1 ELSE 0 END) as change_count
+      FROM legal_journal
+    `;
+
+    const statsResult = await pool.query(statsQuery);
+    return statsResult.rows[0] ?? {};
+  }
+
+  /**
+   * Development-only destructive reset.
+   * Mirrors the SQL previously implemented directly in routes/legal/journal.ts.
+   */
+  static async resetJournalDevOnly(): Promise<void> {
+    if (process.env.NODE_ENV === 'production') {
+      const err: any = new Error('Journal reset not allowed in production');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    await pool.query('DELETE FROM legal_journal');
+    await pool.query('ALTER SEQUENCE legal_journal_id_seq RESTART WITH 1');
+  }
+
+  /**
    * Get journal entries by transaction type
    * @param transactionType - The type of transaction
    * @param limit - Optional limit
