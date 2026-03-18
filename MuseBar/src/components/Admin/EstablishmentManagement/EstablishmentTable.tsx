@@ -22,6 +22,7 @@ import {
   Delete as DeleteIcon
 } from '@mui/icons-material';
 import { Establishment } from './types';
+import { formatDateOnly } from '../../../utils/formatDate';
 
 interface EstablishmentTableProps {
   establishments: Establishment[];
@@ -89,7 +90,7 @@ const EstablishmentTable: React.FC<EstablishmentTableProps> = ({
                 />
               </TableCell>
               <TableCell>
-                {new Date(establishment.created_at).toLocaleDateString()}
+                {formatDateOnly(establishment.created_at)}
               </TableCell>
               <TableCell>
                 {onView && (

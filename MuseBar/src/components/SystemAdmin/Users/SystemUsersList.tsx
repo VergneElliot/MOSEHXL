@@ -18,6 +18,7 @@ import {
   Security as SecurityIcon
 } from '@mui/icons-material';
 import { SystemUser } from '../../../types/system';
+import { formatDateOnly } from '../../../utils/formatDate';
 
 export const SystemUsersList: React.FC = () => {
   // TODO: Replace with actual data from hook
@@ -101,7 +102,7 @@ export const SystemUsersList: React.FC = () => {
                 />
               </TableCell>
               <TableCell>
-                {user.last_login ? new Date(user.last_login).toLocaleDateString('fr-FR') : 'Jamais'}
+                {user.last_login ? formatDateOnly(user.last_login) : 'Jamais'}
               </TableCell>
               <TableCell>
                 <IconButton size="small" title="Permissions">

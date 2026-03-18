@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import { Receipt, Schedule, TrendingUp, Assignment, Security, Lock } from '@mui/icons-material';
 import type { ClosureTodayStatus, LiveMonthlyStats } from '../../types';
+import { formatDateOnly } from '../../utils/formatDate';
 
 interface ClosureStatusCardsProps {
   todayStatus: ClosureTodayStatus | null;
@@ -63,8 +64,11 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
           </AlertTitle>
           {todayStatus.has_closure && todayStatus.bulletin ? (
             <Typography variant="body2">
-              Clôture effectuée le {todayStatus.bulletin.period_end ? new Date(todayStatus.bulletin.period_end).toLocaleDateString('fr-FR') : 'N/A'} —{' '}
-              {todayStatus.bulletin.total_transactions} transactions pour{' '}
+              Clôture effectuée le{' '}
+              {todayStatus.bulletin.period_end
+                ? formatDateOnly(todayStatus.bulletin.period_end)
+                : 'N/A'}{' '}
+              — {todayStatus.bulletin.total_transactions} transactions pour{' '}
               {formatCurrency(todayStatus.bulletin.total_amount || 0)}
             </Typography>
           ) : (

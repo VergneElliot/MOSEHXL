@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Order } from '../types';
 import { formatCurrency } from '../utils/formatCurrency';
+import { formatDateOnly, formatDate } from '../utils/formatDate';
 
 export interface HistoryLogic {
   filteredOrders: Order[];
@@ -28,8 +29,8 @@ export const useHistoryLogic = (orders: Order[], search: string): HistoryLogic =
         return true;
       }
 
-      // Search by date
-      const dateStr = new Date(order.createdAt).toLocaleDateString('fr-FR');
+      // Search by date (using shared French date formatting)
+      const dateStr = formatDateOnly(order.createdAt);
       if (dateStr.includes(searchLower)) {
         return true;
       }
@@ -58,14 +59,8 @@ export const useHistoryLogic = (orders: Order[], search: string): HistoryLogic =
   }, [orders, search]);
 
   const formatDateTime = (date: Date | string): string => {
-    const dateObj = typeof date === 'string' ? new Date(date) : date;
-    return dateObj.toLocaleString('fr-FR', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    // Use shared French date+time formatting helper
+    return formatDate(date);
   };
 
   const getPaymentMethodLabel = (method: string): string => {

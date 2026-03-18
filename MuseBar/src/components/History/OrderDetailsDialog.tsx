@@ -36,6 +36,8 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
 
   const isChange = order.operationType === 'change';
   const changeAmount = order.changeAmount ?? 0;
+  const notes = order.notes || '';
+  const isTipChange = notes.toLowerCase().includes('pourboire');
 
   const safeNumber = (value: number): number =>
     Number.isFinite(value) ? value : 0;
@@ -51,9 +53,11 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     if (isChange && changeAmount !== 0) {
       const absAmount = Math.abs(changeAmount);
       const isReversal = changeAmount < 0;
+      const baseLabel = isTipChange ? 'Pourboire' : 'Faire de la monnaie';
+      const reversalLabel = isTipChange ? 'Annulation pourboire' : 'Annulation faire de la monnaie';
       return (
         <Typography variant="body2" color="textSecondary">
-          {isReversal ? 'Annulation faire de la monnaie' : 'Faire de la monnaie'} :{' '}
+          {isReversal ? reversalLabel : baseLabel} :{' '}
           {isReversal ? '-' : '+'}
           {formatCurrency(absAmount)} Carte, {isReversal ? '+' : '−'}
           {formatCurrency(absAmount)} Espèces
@@ -127,7 +131,9 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
 
           {isChange && (
             <Typography variant="body2" color="textSecondary" fontStyle="italic">
-              Opération « faire de la monnaie » — pas d’articles.
+              {isTipChange
+                ? 'Opération de pourboire (ajustement de caisse) — pas d’articles.'
+                : 'Opération « faire de la monnaie » — pas d’articles.'}
             </Typography>
           )}
 

@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import { CheckCircle, Business, Schedule } from '@mui/icons-material';
 import { InvitationValidation } from '../../types/setup';
+import { formatDate } from '../../utils/formatDate';
 
 interface InvitationValidationStepProps {
   invitationData: InvitationValidation | null;
@@ -35,16 +36,8 @@ export const InvitationValidationStep: React.FC<InvitationValidationStepProps> =
 
   const formatExpirationDate = (dateString?: string) => {
     if (!dateString) return 'Unknown';
-    
-    const date = new Date(dateString);
-    return date.toLocaleDateString('fr-FR', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    // Reuse shared French date+time formatting; this keeps everything consistent
+    return formatDate(dateString);
   };
 
   return (
