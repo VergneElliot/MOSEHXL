@@ -15,9 +15,7 @@ import {
   List,
   ListItem,
   ListItemText,
-  Chip,
   Alert,
-  Grid,
   ToggleButtonGroup,
   ToggleButton,
   FormControl,
@@ -28,16 +26,13 @@ import {
 } from '@mui/material';
 import {
   Group as GroupIcon,
-  Calculate as CalculateIcon,
   Refresh as RefreshIcon,
-  CreditCard as CardIcon,
-  LocalAtm as CashIcon,
   Add as AddIcon,
-  Delete as DeleteIcon,
 } from '@mui/icons-material';
-import { SplitPaymentProps } from './types';
+import { SplitPaymentProps, SplitMode } from './types';
 import { formatCurrency } from '../../../utils/formatCurrency';
 import type { OrderItem } from '../../../types';
+import SplitSummary from './SplitSummary';
 
 /**
  * Split Payment Component
@@ -56,7 +51,7 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
   loading,
   onConfirm,
 }) => {
-  const [customSubMode, setCustomSubMode] = useState<'amount' | 'items'>('amount');
+  const [customSubMode, setCustomSubMode] = useState<SplitMode>('amount');
   const [addToBillIndex, setAddToBillIndex] = useState<Record<string, number>>({});
   const totalSplit = subBills.reduce((sum, bill) => sum + bill.total, 0);
   const isValidSplit = Math.round(totalSplit * 100) === Math.round(orderTotal * 100);
@@ -340,161 +335,16 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
 
       {/* Split Summary */}
       {subBills.length > 0 && (
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="subtitle1" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <CalculateIcon />
-            Détails des paiements
-          </Typography>
-          
-          <List>
-            {subBills.map((bill, index) => {
-              const method = bill.payments[0]?.method ?? 'card';
-              return (
-                <ListItem
-                  key={bill.id}
-                  sx={{
-                    bgcolor: 'grey.50',
-                    mb: 1,
-                    borderRadius: 1,
-                    border: '1px solid',
-                    borderColor: 'grey.300',
-                    flexWrap: 'wrap',
-                    display: 'block',
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1 }}>
-                    <ListItemText
-                      primary={`Paiement ${index + 1}`}
-                      secondary={
-                        <Box sx={{ mt: 0.5 }}>
-                          {splitType === 'custom' && customSubMode === 'items' ? (
-                            <Box>
-                              <Typography variant="caption" color="text.secondary">
-                                Articles dans ce paiement:
-                              </Typography>
-                              {bill.items.length === 0 ? (
-                                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                                  Aucun article
-                                </Typography>
-                              ) : (
-                                <List dense disablePadding>
-                                  {bill.items.map(item => (
-                                    <ListItem
-                                      key={item.id}
-                                      disablePadding
-                                      secondaryAction={
-                                        <IconButton
-                                          edge="end"
-                                          size="small"
-                                          onClick={() => removeItemFromBill(index, item.id)}
-                                          aria-label="Retirer du paiement"
-                                        >
-                                          <DeleteIcon fontSize="small" />
-                                        </IconButton>
-                                      }
-                                    >
-                                      <ListItemText
-                                        primary={`${item.productName} — ${formatCurrency(item.totalPrice)}`}
-                                        primaryTypographyProps={{ variant: 'body2' }}
-                                      />
-                                    </ListItem>
-                                  ))}
-                                </List>
-                              )}
-                              <Typography variant="body2" fontWeight="bold" sx={{ mt: 0.5 }}>
-                                Sous-total: {formatCurrency(bill.total)}
-                              </Typography>
-                            </Box>
-                          ) : splitType === 'custom' ? (
-                            <TextField
-                              label="Montant"
-                              type="number"
-                              size="small"
-                              value={index === subBills.length - 1 ? bill.total.toFixed(2) : bill.total || ''}
-                              onChange={e => {
-                                if (index !== subBills.length - 1) {
-                                  handleCustomAmountChange(index, e.target.value);
-                                }
-                              }}
-                              inputProps={{ min: 0, step: 0.01 }}
-                              sx={{ maxWidth: 140, mb: 1 }}
-                              helperText={
-                                index === subBills.length - 1
-                                  ? 'Calculé automatiquement'
-                                  : 'Saisir le montant pour ce payeur'
-                              }
-                              disabled={splitType !== 'custom' || (index === subBills.length - 1)}
-                            />
-                          ) : (
-                            <Typography variant="body2">
-                              Montant: {formatCurrency(bill.total)}
-                            </Typography>
-                          )}
-                          {splitType === 'equal' && (
-                            <Typography variant="body2" color="textSecondary">
-                              Articles: {bill.items.length}
-                            </Typography>
-                          )}
-                        </Box>
-                      }
-                    />
-                  {onSubBillPaymentMethodChange && (
-                    <ToggleButtonGroup
-                      value={method}
-                      exclusive
-                      onChange={(_, value) => value != null && onSubBillPaymentMethodChange(bill.id, value)}
-                      size="small"
-                      sx={{ ml: 1 }}
-                      aria-label={`Mode de paiement pour paiement ${index + 1}`}
-                    >
-                      <ToggleButton value="cash" aria-label="Espèces">
-                        <CashIcon sx={{ mr: 0.5 }} fontSize="small" />
-                        Espèces
-                      </ToggleButton>
-                      <ToggleButton value="card" aria-label="Carte">
-                        <CardIcon sx={{ mr: 0.5 }} fontSize="small" />
-                        Carte
-                      </ToggleButton>
-                    </ToggleButtonGroup>
-                  )}
-                  <Chip
-                    label={bill.payments.length > 0 ? 'Configuré' : 'En attente'}
-                    color={bill.payments.length > 0 ? 'success' : 'default'}
-                    size="small"
-                    sx={{ ml: 1 }}
-                  />
-                  </Box>
-                </ListItem>
-              );
-            })}
-          </List>
-
-          {/* Split Validation */}
-          <Box sx={{ mt: 2, p: 2, bgcolor: isValidSplit ? 'success.light' : 'error.light', borderRadius: 1 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={6}>
-                <Typography variant="body2">
-                  <strong>Total partagé:</strong> {formatCurrency(totalSplit)}
-                </Typography>
-              </Grid>
-              <Grid item xs={6}>
-                <Typography variant="body2">
-                  <strong>Montant commande:</strong> {formatCurrency(orderTotal)}
-                </Typography>
-              </Grid>
-              <Grid item xs={12}>
-                <Typography 
-                  variant="body2" 
-                  color={isValidSplit ? 'success.main' : 'error.main'}
-                  fontWeight="bold"
-                >
-                  <strong>Différence:</strong> {formatCurrency(Math.abs(totalSplit - orderTotal))}
-                  {isValidSplit ? ' ✓ Valide' : ' ✗ Invalide'}
-                </Typography>
-              </Grid>
-            </Grid>
-          </Box>
-        </Box>
+        <SplitSummary
+          splitType={splitType}
+          customSubMode={customSubMode}
+          subBills={subBills}
+          totalSplit={totalSplit}
+          orderTotal={orderTotal}
+          onSubBillPaymentMethodChange={onSubBillPaymentMethodChange}
+          handleCustomAmountChange={handleCustomAmountChange}
+          removeItemFromBill={removeItemFromBill}
+        />
       )}
 
       {/* Validation Messages */}
