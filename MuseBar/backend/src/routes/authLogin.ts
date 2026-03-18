@@ -1,6 +1,5 @@
 import express from 'express';
 import { UserModel } from '../models/user';
-import { pool } from '../app';
 import { AuditTrailModel } from '../models/auditTrail';
 import { Logger } from '../utils/logger';
 import {
@@ -49,16 +48,11 @@ router.post('/login', async (req, res) => {
     }
 
     // Fetch the full user record to build the JWT payload
-    const detailsResult = await pool.query(
-      `SELECT first_name, last_name, role, establishment_id, is_admin, email_verified
-       FROM users WHERE id = $1`,
-      [user.id]
-    );
-    const d = detailsResult.rows[0] || {};
+    const d = await UserModel.getAuthLoginDetails(user.id);
 
-    const is_admin: boolean = d.is_admin ?? user.is_admin;
-    const role: string = is_admin ? 'system_admin' : (d.role || 'establishment_admin');
-    const establishment_id: string | null = d.establishment_id || null;
+    const is_admin: boolean = d?.is_admin ?? user.is_admin;
+    const role: string = is_admin ? 'system_admin' : (d?.role || 'establishment_admin');
+    const establishment_id: string | null = d?.establishment_id || null;
 
     const token = generateToken(
       { id: user.id, email: user.email, is_admin, role, establishment_id },
@@ -80,8 +74,8 @@ router.post('/login', async (req, res) => {
         email: user.email,
         is_admin,
         role,
-        first_name: d.first_name || '',
-        last_name: d.last_name || '',
+        first_name: d?.first_name || '',
+        last_name: d?.last_name || '',
         establishment_id,
         permissions: [],
       },
@@ -102,14 +96,11 @@ router.get('/me', requireAuth, async (req, res) => {
     const userId = req.user!.id;
 
     const [userResult, permissions] = await Promise.all([
-      pool.query(
-        'SELECT first_name, last_name, email_verified FROM users WHERE id = $1',
-        [userId]
-      ),
+      UserModel.getAuthMeProfile(userId),
       UserModel.getUserPermissions(userId).catch(() => [] as string[]),
     ]);
 
-    const userRow = userResult.rows[0] || {};
+    const userRow = userResult;
 
     return res.json({
       id: userId,
@@ -117,9 +108,9 @@ router.get('/me', requireAuth, async (req, res) => {
       is_admin: req.user!.is_admin,
       role: req.user!.role,
       establishment_id: req.user!.establishment_id,
-      first_name: userRow.first_name || '',
-      last_name: userRow.last_name || '',
-      email_verified: userRow.email_verified ?? false,
+      first_name: userRow?.first_name || '',
+      last_name: userRow?.last_name || '',
+      email_verified: userRow?.email_verified ?? false,
       permissions,
     });
   } catch (error) {
@@ -136,14 +127,10 @@ router.post('/refresh', requireAuth, async (req, res) => {
     const userId = req.user!.id;
 
     // Re-fetch role and establishment_id in case they changed since last login
-    const result = await pool.query(
-      'SELECT role, establishment_id, is_admin FROM users WHERE id = $1',
-      [userId]
-    );
-    if (result.rows.length === 0) {
+    const d = await UserModel.getAuthRoleState(userId);
+    if (!d) {
       return res.status(404).json({ error: 'User not found' });
     }
-    const d = result.rows[0];
     const is_admin: boolean = d.is_admin;
     const role: string = is_admin ? 'system_admin' : (d.role || 'establishment_admin');
     const establishment_id: string | null = d.establishment_id || null;

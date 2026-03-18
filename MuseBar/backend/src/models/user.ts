@@ -146,4 +146,131 @@ export class UserModel {
       client.release();
     }
   }
+
+  /**
+   * Auth login details used by /api/auth/login and token refresh.
+   * Centralizes small read queries so route handlers stay orchestration-only.
+   */
+  static async getAuthLoginDetails(userId: number): Promise<{
+    first_name: string | null;
+    last_name: string | null;
+    role: string | null;
+    establishment_id: string | null;
+    is_admin: boolean;
+    email_verified: boolean;
+  } | null> {
+    const result = await pool.query(
+      `SELECT first_name, last_name, role, establishment_id, is_admin, email_verified
+       FROM users WHERE id = $1`,
+      [userId]
+    );
+    return result.rows[0] || null;
+  }
+
+  /**
+   * Minimal role/state used by /api/auth/refresh.
+   */
+  static async getAuthRoleState(userId: number): Promise<{
+    role: string | null;
+    establishment_id: string | null;
+    is_admin: boolean;
+  } | null> {
+    const result = await pool.query(
+      'SELECT role, establishment_id, is_admin FROM users WHERE id = $1',
+      [userId]
+    );
+    return result.rows[0] || null;
+  }
+
+  /**
+   * Lightweight profile fields used by /api/auth/me.
+   */
+  static async getAuthMeProfile(userId: number): Promise<{
+    first_name: string | null;
+    last_name: string | null;
+    email_verified: boolean;
+  } | null> {
+    const result = await pool.query(
+      'SELECT first_name, last_name, email_verified FROM users WHERE id = $1',
+      [userId]
+    );
+    return result.rows[0] || null;
+  }
+
+  /**
+   * List users for an establishment (establishment-scoped admin view).
+   */
+  static async listUsersByEstablishment(
+    establishmentId: string
+  ): Promise<
+    Array<{
+      id: number;
+      email: string;
+      is_admin: boolean;
+      role: string;
+      establishment_id: string | null;
+      first_name: string | null;
+      last_name: string | null;
+      created_at: Date;
+    }>
+  > {
+    const result = await pool.query(
+      'SELECT id, email, is_admin, role, establishment_id, first_name, last_name, created_at FROM users WHERE establishment_id = $1 ORDER BY id',
+      [establishmentId]
+    );
+    return result.rows;
+  }
+
+  /**
+   * Ownership check: does `userId` belong to `establishmentId`?
+   */
+  static async userBelongsToEstablishment(userId: number, establishmentId: string): Promise<boolean> {
+    const result = await pool.query(
+      'SELECT id FROM users WHERE id = $1 AND establishment_id = $2',
+      [userId, establishmentId]
+    );
+    return result.rows.length > 0;
+  }
+
+  /**
+   * Delete a user by id.
+   * Ownership checks should be performed by callers at the establishment level.
+   */
+  static async deleteUserById(userId: number): Promise<boolean> {
+    const result = await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  /**
+   * Update a user's role.
+   * Ownership checks should be performed by callers at the establishment level.
+   */
+  static async updateUserRoleById(userId: number, role: string): Promise<boolean> {
+    const result = await pool.query('UPDATE users SET role = $1 WHERE id = $2', [role, userId]);
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  /**
+   * One-time system bootstrap: create the first admin user and mark it as system admin.
+   * Throws with `statusCode = 400` when an admin already exists.
+   */
+  static async bootstrapSystemAdmin(
+    email: string,
+    password: string
+  ): Promise<{ id: number; email: string; is_admin: boolean }> {
+    const existingAdmin = await pool.query('SELECT COUNT(*) FROM users WHERE is_admin = true');
+    if (parseInt(existingAdmin.rows[0].count) > 0) {
+      const err: any = new Error('Admin user already exists');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const user = await UserModel.createUser(email, password, true);
+    await pool.query(
+      `UPDATE users SET first_name = 'System', last_name = 'Administrator', role = 'system_admin', email_verified = true WHERE id = $1`,
+      [user.id]
+    );
+
+    return { id: user.id, email: user.email, is_admin: user.is_admin };
+  }
 } 
