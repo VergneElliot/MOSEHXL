@@ -10,6 +10,7 @@ import {
 } from '@mui/material';
 import { CreditCard, Money, TrendingUp, LocalOffer } from '@mui/icons-material';
 import { HistoryStats } from '../../hooks/useHistoryState';
+import { formatDateOnly } from '../../utils/formatDate';
 
 interface StatsCardsProps {
   stats: HistoryStats;
@@ -177,8 +178,8 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, formatCurrency 
         <Box mt={2}>
           <Typography variant="body2" color="textSecondary" align="center">
             📅 Période d'activité:{' '}
-            {new Date(stats.businessDayPeriod.start).toLocaleDateString('fr-FR')} -{' '}
-            {new Date(stats.businessDayPeriod.end).toLocaleDateString('fr-FR')}
+            {formatDateOnly(stats.businessDayPeriod.start)} -{' '}
+            {formatDateOnly(stats.businessDayPeriod.end)}
           </Typography>
         </Box>
       )}

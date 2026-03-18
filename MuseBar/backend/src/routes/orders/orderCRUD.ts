@@ -57,14 +57,19 @@ router.get('/:id', validateParams([paramValidations.id]), async (req, res) => {
 
 /**
  * POST /api/orders — create a new order (cashier action)
- * Stores exact amounts (total_amount, total_tax, item total_price/tax_amount) for accounting;
- * DB columns DECIMAL(12,4). Round only for display; do not round before persist.
+ * total_amount and total_tax are always computed from items (base TTC). Tips are stored
+ * separately and are zero-sum for CA; they only affect card/cash breakdown via payment logic.
  */
 router.post('/', validateBody(commonValidations.orderCreate), async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const { total_amount, total_tax, payment_method, status, notes, items, sub_bills, tips, change } = req.body;
+    const { payment_method, status, notes, items, sub_bills, tips, change } = req.body;
+
+    // Base TTC from items only — never include tips in total_amount (zero-sum for CA).
+    const itemsList = items as Array<{ total_price: number; tax_amount: number }>;
+    const total_amount = itemsList.reduce((sum, i) => sum + Number(i.total_price), 0);
+    const total_tax = itemsList.reduce((sum, i) => sum + Number(i.tax_amount), 0);
 
     const order = await OrderModel.create(
       { total_amount, total_tax, payment_method, status, notes: notes || '', tips: tips || 0, change: change || 0, establishment_id: establishmentId },

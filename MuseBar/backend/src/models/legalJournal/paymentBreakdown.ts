@@ -74,6 +74,7 @@ export function computePaymentBreakdownFromOrders(
     paymentBreakdown[method] = (paymentBreakdown[method] || 0) + amount;
   }
 
+  // Tips: +card, -cash (customer leaves tip on card). Reversals use change_amount and are handled above.
   const tipsTotal = Math.max(
     0,
     orders.reduce((sum, o) => {
@@ -87,6 +88,7 @@ export function computePaymentBreakdownFromOrders(
     }, 0)
   );
   if (tipsTotal > 0) {
+    paymentBreakdown['card'] = (paymentBreakdown['card'] || 0) + tipsTotal;
     paymentBreakdown['cash'] = (paymentBreakdown['cash'] || 0) - tipsTotal;
   }
 

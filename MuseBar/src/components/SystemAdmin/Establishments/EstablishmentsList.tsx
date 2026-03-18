@@ -21,6 +21,7 @@ import {
 import { EstablishmentService } from '../../../services/establishmentService';
 import { SystemEstablishment } from '../../../types/system';
 import { ensureAuthentication } from '../../../services/authHelper';
+import { formatDateOnly } from '../../../utils/formatDate';
 
 export const EstablishmentsList: React.FC = () => {
   const [establishments, setEstablishments] = useState<SystemEstablishment[]>([]);
@@ -160,7 +161,7 @@ export const EstablishmentsList: React.FC = () => {
                 />
               </TableCell>
               <TableCell>{establishment.timezone}</TableCell>
-              <TableCell>{new Date(establishment.created_at).toLocaleDateString('fr-FR')}</TableCell>
+              <TableCell>{formatDateOnly(establishment.created_at)}</TableCell>
               <TableCell>
                 <IconButton size="small" title="Voir">
                   <ViewIcon />
