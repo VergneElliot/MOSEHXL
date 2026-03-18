@@ -17,7 +17,6 @@ import {
   TextField,
 } from '@mui/material';
 import {
-  Delete as DeleteIcon,
   Clear as ClearIcon,
   CreditCard as CreditCardIcon,
   LocalAtm as CashIcon,
