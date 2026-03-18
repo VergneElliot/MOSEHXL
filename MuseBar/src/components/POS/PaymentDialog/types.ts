@@ -20,6 +20,7 @@ export interface PaymentDialogProps {
 
 export type SimplePaymentMethod = 'card' | 'cash';
 export type SplitType = 'equal' | 'custom';
+export type SplitMode = 'amount' | 'items';
 
 export interface PaymentMethodSelectorProps {
   paymentMethod: SimplePaymentMethod;
