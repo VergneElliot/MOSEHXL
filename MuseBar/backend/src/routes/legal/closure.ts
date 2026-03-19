@@ -231,11 +231,17 @@ router.get('/today-status', async (req, res) => {
       return bulletinDate.toDateString() === today.toDateString();
     });
     
-    res.json({
+      // This endpoint is only meant to power UI status/alert; we intentionally omit total_transactions
+      // to remove the "transactions counter" feature from the UI.
+      const bulletinWithoutTotalTransactions = todayBulletin
+        ? (({ total_transactions: _ignored, ...rest }) => rest)(todayBulletin as any)
+        : null;
+
+      res.json({
       date: today.toISOString().split('T')[0],
       has_closure: !!todayBulletin,
       closure_status: todayBulletin ? 'COMPLETED' : 'PENDING',
-      bulletin: todayBulletin || null,
+      bulletin: bulletinWithoutTotalTransactions,
       compliance_note: 'Daily closure status for regulatory compliance'
     });
   } catch (error) {

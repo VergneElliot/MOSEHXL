@@ -136,12 +136,14 @@ export interface ClosureBulletin {
   change_total?: number;
 }
 
+export type ClosureTodayBulletin = Omit<ClosureBulletin, 'total_transactions'>;
+
 // Closure today status (matches GET /api/legal/closure/today-status)
 export interface ClosureTodayStatus {
   date: string;
   has_closure: boolean;
   closure_status: string;
-  bulletin: ClosureBulletin | null;
+  bulletin: ClosureTodayBulletin | null;
   compliance_note?: string;
 }
 
