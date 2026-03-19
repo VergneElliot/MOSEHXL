@@ -39,8 +39,11 @@ export const useClosureAPI = (
     try {
       setLoading(true);
       setError(null);
-      const { data } = await apiService.get<ClosureBulletin[]>('/legal/closure/bulletins');
-      setBulletins(data || []);
+      const { data } = await apiService.get<{ bulletins: ClosureBulletin[]; total?: number }>(
+        '/legal/closure/bulletins'
+      );
+      const bulletins = Array.isArray((data as any)?.bulletins) ? (data as any).bulletins : [];
+      setBulletins(bulletins);
     } catch (err) {
       const errorMessage = 'Erreur lors du chargement des bulletins de clôture';
       setError(errorMessage);

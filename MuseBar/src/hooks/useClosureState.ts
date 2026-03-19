@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useSnackbar } from './useSnackbar';
 import type { ClosureBulletin, ClosureTodayStatus, LiveMonthlyStats } from '../types';
 
@@ -108,35 +108,41 @@ export const useClosureState = (): [ClosureState, ClosureActions] => {
   >('DAILY');
 
   // Helper actions
-  const openBulletinDetails = (bulletin: ClosureBulletin) => {
-    setSelectedBulletin(bulletin);
-    setShowDetailsDialog(true);
-  };
+  const openBulletinDetails = useCallback(
+    (bulletin: ClosureBulletin) => {
+      setSelectedBulletin(bulletin);
+      setShowDetailsDialog(true);
+    },
+    [setSelectedBulletin, setShowDetailsDialog]
+  );
 
-  const closeBulletinDetails = () => {
+  const closeBulletinDetails = useCallback(() => {
     setShowDetailsDialog(false);
     setSelectedBulletin(null);
-  };
+  }, [setShowDetailsDialog, setSelectedBulletin]);
 
-  const openPrintDialog = (bulletin: ClosureBulletin) => {
-    setPrintBulletin(bulletin);
-    setPrintDialogOpen(true);
-  };
+  const openPrintDialog = useCallback(
+    (bulletin: ClosureBulletin) => {
+      setPrintBulletin(bulletin);
+      setPrintDialogOpen(true);
+    },
+    [setPrintBulletin, setPrintDialogOpen]
+  );
 
-  const closePrintDialog = () => {
+  const closePrintDialog = useCallback(() => {
     setPrintDialogOpen(false);
     setPrintBulletin(null);
-  };
+  }, [setPrintDialogOpen, setPrintBulletin]);
 
-  const addBulletin = (bulletin: ClosureBulletin) => {
+  const addBulletin = useCallback((bulletin: ClosureBulletin) => {
     setBulletins(prev => [bulletin, ...prev]);
-  };
+  }, [setBulletins]);
 
-  const clearMessages = () => {
+  const clearMessages = useCallback(() => {
     setError(null);
     setMonthlyStatsError(null);
     snackbarApi.closeSnackbar();
-  };
+  }, [snackbarApi.closeSnackbar]);
 
   const state: ClosureState = useMemo(
     () => ({

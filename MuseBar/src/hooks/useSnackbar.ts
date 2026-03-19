@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 export type SnackbarSeverity = 'success' | 'error' | 'info';
 
@@ -30,17 +30,23 @@ export interface UseSnackbarReturn {
 export function useSnackbar(): UseSnackbarReturn {
   const [snackbar, setSnackbar] = useState<SnackbarState>(initialSnackbar);
 
-  const showSuccess = (message: string) => {
-    setSnackbar({ open: true, message, severity: 'success' });
-  };
+  const showSuccess = useCallback(
+    (message: string) => {
+      setSnackbar({ open: true, message, severity: 'success' });
+    },
+    []
+  );
 
-  const showError = (message: string) => {
-    setSnackbar({ open: true, message, severity: 'error' });
-  };
+  const showError = useCallback(
+    (message: string) => {
+      setSnackbar({ open: true, message, severity: 'error' });
+    },
+    []
+  );
 
-  const closeSnackbar = () => {
+  const closeSnackbar = useCallback(() => {
     setSnackbar(prev => ({ ...prev, open: false }));
-  };
+  }, []);
 
   return {
     snackbar,
