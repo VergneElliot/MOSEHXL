@@ -10,7 +10,7 @@ import {
   useTheme,
   CircularProgress,
 } from '@mui/material';
-import { Receipt, Schedule, TrendingUp, Assignment, Security, Lock } from '@mui/icons-material';
+import { Schedule, TrendingUp, Assignment, Security, Lock } from '@mui/icons-material';
 import type { ClosureTodayStatus, LiveMonthlyStats } from '../../types';
 import { formatDateOnly } from '../../utils/formatDate';
 
@@ -68,8 +68,7 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
               {todayStatus.bulletin.period_end
                 ? formatDateOnly(todayStatus.bulletin.period_end)
                 : 'N/A'}{' '}
-              — {todayStatus.bulletin.total_transactions} transactions pour{' '}
-              {formatCurrency(todayStatus.bulletin.total_amount || 0)}
+              — {formatCurrency(todayStatus.bulletin.total_amount || 0)}
             </Typography>
           ) : (
             <Typography variant="body2">
@@ -81,38 +80,6 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
 
       {/* Statistics Cards */}
       <Grid container spacing={2}>
-        {/* Daily Stats */}
-        {todayStatus && (
-          <Grid item xs={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box display="flex" alignItems="center" mb={1}>
-                  <Box
-                    sx={{
-                      p: 1,
-                      borderRadius: 1,
-                      backgroundColor: `${theme.palette.primary.main}20`,
-                      color: theme.palette.primary.main,
-                      mr: 2,
-                    }}
-                  >
-                    <Receipt />
-                  </Box>
-                  <Typography variant="body2" color="textSecondary">
-                    Aujourd'hui
-                  </Typography>
-                </Box>
-                <Typography variant="h6" fontWeight="bold">
-                  {todayStatus.bulletin?.total_transactions ?? 0}
-                </Typography>
-                <Typography variant="caption" color="textSecondary">
-                  Transactions
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        )}
-
         {/* Monthly Stats */}
         {monthlyStats && !monthlyStatsError && (
           <>
