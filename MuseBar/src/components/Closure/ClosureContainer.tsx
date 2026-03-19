@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -42,8 +42,11 @@ const ClosureContainer: React.FC = () => {
   );
 
   // Load data on component mount
+  const didInitRef = useRef(false);
   useEffect(() => {
-    api.refreshAllData();
+    if (didInitRef.current) return;
+    didInitRef.current = true;
+    void api.refreshAllData();
   }, [api]);
 
   // Event handlers

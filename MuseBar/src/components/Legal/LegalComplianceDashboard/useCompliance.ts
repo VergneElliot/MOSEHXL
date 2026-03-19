@@ -72,8 +72,13 @@ export const useCompliance = (): UseComplianceReturn => {
 
   const loadClosureBulletins = useCallback(async () => {
     try {
-      const response = await apiService.get<ClosureBulletin[]>('/legal/closure/bulletins');
-      setState(prev => ({ ...prev, closureBulletins: response.data }));
+      const response = await apiService.get<{ bulletins: ClosureBulletin[]; total?: number }>(
+        '/legal/closure/bulletins'
+      );
+      const bulletins = Array.isArray((response.data as any)?.bulletins)
+        ? (response.data as any).bulletins
+        : [];
+      setState(prev => ({ ...prev, closureBulletins: bulletins }));
     } catch {
       // Closures are non-critical; swallow to avoid blocking UI
     }
