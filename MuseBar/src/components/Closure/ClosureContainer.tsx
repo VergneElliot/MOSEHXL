@@ -1,10 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import {
   Box,
+  Button,
   Typography,
   Alert,
   Snackbar,
-  Fab,
   Tooltip,
   useTheme,
   useMediaQuery,
@@ -14,6 +14,7 @@ import { useClosureState } from '../../hooks/useClosureState';
 import { useClosureAPI } from '../../hooks/useClosureAPI';
 import ClosureStatusCards from './ClosureStatusCards';
 import BulletinsTable from './BulletinsTable';
+import CreateClosureDialog, { ClosureType } from './CreateClosureDialog';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { formatDateOnly as formatDate } from '../../utils/formatDate';
 
@@ -87,16 +88,42 @@ const ClosureContainer: React.FC = () => {
     }
   };
 
+  const canCreateForToday = state.todayStatus ? !state.todayStatus.has_closure : true;
+
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        <Typography variant={isMobile ? 'h5' : 'h4'} component="h1" gutterBottom>
-          🔒 Bulletins de Clôture
-        </Typography>
-        <Typography variant="body2" color="textSecondary">
-          Gestion des clôtures légales et conformité fiscale française
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: isMobile ? 'flex-start' : 'center' }}>
+          <Box>
+            <Typography variant={isMobile ? 'h5' : 'h4'} component="h1" gutterBottom>
+              🔒 Bulletins de Clôture
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              Gestion des clôtures légales et conformité fiscale française
+            </Typography>
+          </Box>
+
+          <Tooltip
+            title={
+              canCreateForToday
+                ? 'Créer un bulletin manuellement (si aucune clôture planifiée pour aujourd’hui)'
+                : 'Une clôture journalière est déjà enregistrée pour aujourd’hui'
+            }
+          >
+            <span>
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<Add />}
+                onClick={handleCreateClosure}
+                disabled={state.loading || !canCreateForToday}
+              >
+                Créer une clôture
+              </Button>
+            </span>
+          </Tooltip>
+        </Box>
       </Box>
 
       {/* Error Alert */}
@@ -129,23 +156,6 @@ const ClosureContainer: React.FC = () => {
         />
       </Box>
 
-      {/* Floating Action Button */}
-      <Fab
-        color="primary"
-        aria-label="Créer une clôture"
-        onClick={handleCreateClosure}
-        sx={{
-          position: 'fixed',
-          bottom: 20,
-          right: 20,
-          zIndex: 1000,
-        }}
-      >
-        <Tooltip title="Créer un bulletin de clôture">
-          <Add />
-        </Tooltip>
-      </Fab>
-
       {/* Success/Error Messages */}
       <Snackbar
         open={state.snackbar.open}
@@ -163,7 +173,18 @@ const ClosureContainer: React.FC = () => {
         </Alert>
       </Snackbar>
 
-              {/* Future: Add Create Closure Dialog */}
+      <CreateClosureDialog
+        open={state.showCreateDialog}
+        onClose={() => actions.setShowCreateDialog(false)}
+        onCreate={async ({ date, type }: { date: string; type: ClosureType }) => api.createClosure({ date, type })}
+        creating={state.creating}
+        selectedDate={state.selectedDate}
+        selectedClosureType={state.selectedClosureType}
+        onDateChange={actions.setSelectedDate}
+        onClosureTypeChange={actions.setSelectedClosureType}
+      />
+
+      {/* Future: Add Bulletin Details Dialog */}
         {/* Future: Add Bulletin Details Dialog */}
         {/* Future: Add Print Dialog */}
         {/* Future: Add Settings Dialog */}
