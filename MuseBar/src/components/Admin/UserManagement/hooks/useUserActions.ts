@@ -3,7 +3,7 @@
  * Handles user CRUD operations and API interactions
  */
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { apiService } from '../../../../services/apiService';
 import { EstablishmentMember as User } from '../../../../types/auth';
 
@@ -117,10 +117,15 @@ export const useUserActions = ({
     }
   }, [onError]);
 
-  return {
-    fetchUsers,
-    createUser,
-    deleteUser,
-    updateUserRole,
-  };
+  // Memoize returned object so callers depending on it (e.g. effects)
+  // don't retrigger unnecessarily and spam the backend.
+  return useMemo(
+    () => ({
+      fetchUsers,
+      createUser,
+      deleteUser,
+      updateUserRole,
+    }),
+    [fetchUsers, createUser, deleteUser, updateUserRole]
+  );
 };
