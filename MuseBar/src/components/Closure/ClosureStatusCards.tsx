@@ -40,7 +40,7 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
   formatCurrency,
 }) => {
   const theme = useTheme();
-  const isShortScreen = useMediaQuery('(max-height: 900px)');
+  const isShortScreen = useMediaQuery('(max-height: 1080px)');
 
   if (loading) {
     return (

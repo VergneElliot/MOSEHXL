@@ -13,7 +13,7 @@ import { Order } from '../../types';
 const HistoryContainer: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const isShortScreen = useMediaQuery('(max-height: 900px)');
+  const isShortScreen = useMediaQuery('(max-height: 1080px)');
 
   // Custom hooks for state management
   const [state, actions] = useHistoryState();
@@ -99,7 +99,7 @@ const HistoryContainer: React.FC = () => {
       </Box>
 
       {/* Statistics Cards */}
-      <Box sx={{ maxHeight: isShortScreen ? '30vh' : 'none', overflowY: isShortScreen ? 'auto' : 'visible', pr: isShortScreen ? 0.5 : 0 }}>
+      <Box sx={{ maxHeight: isShortScreen ? '22vh' : 'none', overflowY: isShortScreen ? 'auto' : 'visible', pr: isShortScreen ? 0.5 : 0 }}>
         <StatsCards
           stats={state.stats}
           loading={state.loading}
