@@ -10,6 +10,7 @@ import archiveRouter from './archive';
 import complianceRouter from './compliance';
 import businessInfoRouter from './businessInfo';
 import businessDayStatsRouter from './businessDayStats';
+import statsRouter from './stats';
 
 const router = express.Router();
 
@@ -18,6 +19,7 @@ router.use('/journal', journalRouter);
 router.use('/closure', closureRouter);
 router.use('/archive', archiveRouter);
 router.use('/compliance', complianceRouter);
+router.use('/stats', statsRouter);
 router.use('/', businessInfoRouter);
 router.use('/', businessDayStatsRouter);
 
