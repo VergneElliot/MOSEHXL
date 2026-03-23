@@ -9,7 +9,6 @@ import {
   AlertTitle,
   useTheme,
   CircularProgress,
-  useMediaQuery,
 } from '@mui/material';
 import {
   Schedule,
@@ -40,7 +39,6 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
   formatCurrency,
 }) => {
   const theme = useTheme();
-  const isShortScreen = useMediaQuery('(max-height: 1080px)');
 
   if (loading) {
     return (
@@ -60,20 +58,12 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
   }
 
   return (
-    <Box
-      sx={{
-        mb: isShortScreen ? 1.5 : 3,
-        ...(isShortScreen && {
-          '& .MuiCardContent-root': { p: 1.25, '&:last-child': { pb: 1.25 } },
-          '& .MuiSvgIcon-root': { fontSize: 18 },
-        }),
-      }}
-    >
+    <Box sx={{ mb: 3 }}>
       {/* Today Status Alert */}
       {todayStatus && (
         <Alert
           severity={todayStatus.has_closure ? 'success' : 'warning'}
-          sx={{ mb: isShortScreen ? 1 : 2, py: isShortScreen ? 0.25 : 0.75 }}
+          sx={{ mb: 2 }}
           icon={todayStatus.has_closure ? <Lock /> : <Schedule />}
         >
           <AlertTitle>
@@ -98,7 +88,7 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
       )}
 
       {/* Statistics Cards */}
-      <Grid container spacing={isShortScreen ? 1 : 2}>
+      <Grid container spacing={2}>
         {/* Monthly Stats (ongoing month totals, based on orders) */}
         {monthlyStats && !monthlyStatsError && (
           <>
@@ -117,11 +107,11 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
                     >
                       <Receipt />
                     </Box>
-                    <Typography variant={isShortScreen ? 'caption' : 'body2'} color="textSecondary">
+                    <Typography variant="body2" color="textSecondary">
                       Transactions (mois en cours)
                     </Typography>
                   </Box>
-                  <Typography variant={isShortScreen ? 'body1' : 'h6'} fontWeight="bold">
+                  <Typography variant="h6" fontWeight="bold">
                     {monthlyStats.total_transactions || 0}
                   </Typography>
                 </CardContent>
@@ -143,11 +133,11 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
                     >
                       <TrendingUp />
                     </Box>
-                    <Typography variant={isShortScreen ? 'caption' : 'body2'} color="textSecondary">
+                    <Typography variant="body2" color="textSecondary">
                       Chiffre d&apos;affaires
                     </Typography>
                   </Box>
-                  <Typography variant={isShortScreen ? 'body1' : 'h6'} fontWeight="bold" color="success.main">
+                  <Typography variant="h6" fontWeight="bold" color="success.main">
                     {formatCurrency(monthlyStats.total_amount || 0)}
                   </Typography>
                 </CardContent>
@@ -169,11 +159,11 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
                     >
                       <Assignment />
                     </Box>
-                    <Typography variant={isShortScreen ? 'caption' : 'body2'} color="textSecondary">
+                    <Typography variant="body2" color="textSecondary">
                       TVA collectée
                     </Typography>
                   </Box>
-                  <Typography variant={isShortScreen ? 'body1' : 'h6'} fontWeight="bold" color="info.main">
+                  <Typography variant="h6" fontWeight="bold" color="info.main">
                     {formatCurrency(monthlyStats.total_vat || 0)}
                   </Typography>
                 </CardContent>
@@ -195,11 +185,11 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
                     >
                       <MonetizationOn />
                     </Box>
-                    <Typography variant={isShortScreen ? 'caption' : 'body2'} color="textSecondary">
+                    <Typography variant="body2" color="textSecondary">
                       Total pourboires
                     </Typography>
                   </Box>
-                  <Typography variant={isShortScreen ? 'body1' : 'h6'} fontWeight="bold">
+                  <Typography variant="h6" fontWeight="bold">
                     {formatCurrency(monthlyStats.tips_total || 0)}
                   </Typography>
                 </CardContent>
@@ -221,11 +211,11 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
                     >
                       <SwapHoriz />
                     </Box>
-                    <Typography variant={isShortScreen ? 'caption' : 'body2'} color="textSecondary">
+                    <Typography variant="body2" color="textSecondary">
                       Monnaie rendue
                     </Typography>
                   </Box>
-                  <Typography variant={isShortScreen ? 'body1' : 'h6'} fontWeight="bold" color="warning.main">
+                  <Typography variant="h6" fontWeight="bold" color="warning.main">
                     {formatCurrency(monthlyStats.change_total || 0)}
                   </Typography>
                 </CardContent>
@@ -247,11 +237,11 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
                     >
                       <Security />
                     </Box>
-                    <Typography variant={isShortScreen ? 'caption' : 'body2'} color="textSecondary">
+                    <Typography variant="body2" color="textSecondary">
                       Bulletins de clôture
                     </Typography>
                   </Box>
-                  <Typography variant={isShortScreen ? 'body1' : 'h6'} fontWeight="bold" color="success.main">
+                  <Typography variant="h6" fontWeight="bold" color="success.main">
                     {monthlyStats.closure_count || 0}
                   </Typography>
                 </CardContent>

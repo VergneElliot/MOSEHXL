@@ -22,7 +22,6 @@ import { formatDateOnly as formatDate } from '../../utils/formatDate';
 const ClosureContainer: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const isShortScreen = useMediaQuery('(max-height: 1080px)');
 
   // Custom hooks for state management
   const [state, actions] = useClosureState();
@@ -112,15 +111,15 @@ const ClosureContainer: React.FC = () => {
   const canCreateForToday = state.todayStatus ? !state.todayStatus.has_closure : true;
 
   return (
-    <Box sx={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+    <Box sx={{ position: 'relative' }}>
       {/* Header */}
-      <Box sx={{ mb: isShortScreen ? 1 : 2 }}>
+      <Box sx={{ mb: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: isMobile ? 'flex-start' : 'center' }}>
           <Box>
-            <Typography variant={isShortScreen ? 'h5' : (isMobile ? 'h5' : 'h4')} component="h1" gutterBottom>
+            <Typography variant={isMobile ? 'h5' : 'h4'} component="h1" gutterBottom>
               🔒 Bulletins de Clôture
             </Typography>
-            <Typography variant={isShortScreen ? 'caption' : 'body2'} color="textSecondary">
+            <Typography variant="body2" color="textSecondary">
               Gestion des clôtures légales et conformité fiscale française
             </Typography>
           </Box>
@@ -155,37 +154,33 @@ const ClosureContainer: React.FC = () => {
       )}
 
       {/* Status Cards */}
-      <Box sx={{ maxHeight: isShortScreen ? '22vh' : 'none', overflowY: isShortScreen ? 'auto' : 'visible', pr: isShortScreen ? 0.5 : 0 }}>
-        <ClosureStatusCards
-          todayStatus={state.todayStatus}
-          monthlyStats={state.monthlyStats}
-          monthlyStatsError={state.monthlyStatsError}
-          loading={state.loading}
-          formatCurrency={formatCurrency}
-        />
-      </Box>
+      <ClosureStatusCards
+        todayStatus={state.todayStatus}
+        monthlyStats={state.monthlyStats}
+        monthlyStatsError={state.monthlyStatsError}
+        loading={state.loading}
+        formatCurrency={formatCurrency}
+      />
 
       {/* Bulletins Table */}
-      <Box sx={{ flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
-        <BulletinsTable
-          bulletins={state.bulletins}
-          loading={state.loading}
-          page={bulletinsPage}
-          rowsPerPage={bulletinsRowsPerPage}
-          totalCount={totalBulletins}
-          onPageChange={setBulletinsPage}
-          onRowsPerPageChange={(newRowsPerPage) => {
-            setBulletinsRowsPerPage(newRowsPerPage);
-            setBulletinsPage(0);
-          }}
-          onViewDetails={handleViewDetails}
-          onPrint={handlePrint}
-          onDownload={handleDownload}
-          formatCurrency={formatCurrency}
-          formatDate={formatDate}
-          getClosureTypeLabel={getClosureTypeLabel}
-        />
-      </Box>
+      <BulletinsTable
+        bulletins={state.bulletins}
+        loading={state.loading}
+        page={bulletinsPage}
+        rowsPerPage={bulletinsRowsPerPage}
+        totalCount={totalBulletins}
+        onPageChange={setBulletinsPage}
+        onRowsPerPageChange={(newRowsPerPage) => {
+          setBulletinsRowsPerPage(newRowsPerPage);
+          setBulletinsPage(0);
+        }}
+        onViewDetails={handleViewDetails}
+        onPrint={handlePrint}
+        onDownload={handleDownload}
+        formatCurrency={formatCurrency}
+        formatDate={formatDate}
+        getClosureTypeLabel={getClosureTypeLabel}
+      />
 
       {/* Success/Error Messages */}
       <Snackbar

@@ -21,7 +21,6 @@ interface StatsCardsProps {
 const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, formatCurrency }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const isShortScreen = useMediaQuery('(max-height: 1080px)');
   const topN = isMobile ? 3 : 5;
   const topProduits = stats.topProduits.slice(0, topN);
 
@@ -61,7 +60,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, formatCurrency 
 
   if (loading) {
     return (
-      <Grid container spacing={isShortScreen ? 1 : 2} sx={{ mb: isShortScreen ? 1.5 : 3 }}>
+      <Grid container spacing={2} sx={{ mb: 3 }}>
         {statsData.map((_, index) => (
           <Grid item xs={6} md={3} key={index}>
             <Card>
@@ -85,17 +84,9 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, formatCurrency 
   }
 
   return (
-    <Box
-      sx={{
-        mb: isShortScreen ? 1.5 : 3,
-        ...(isShortScreen && {
-          '& .MuiCardContent-root': { p: 1.25, '&:last-child': { pb: 1.25 } },
-          '& .MuiSvgIcon-root': { fontSize: 18 },
-        }),
-      }}
-    >
+    <Box sx={{ mb: 3 }}>
       {/* Statistics Cards */}
-      <Grid container spacing={isShortScreen ? 1 : 2} sx={{ mb: isShortScreen ? 1 : 2 }}>
+      <Grid container spacing={2} sx={{ mb: 2 }}>
         {statsData.map((stat, index) => (
           <Grid item xs={6} md={3} key={index}>
             <Card
@@ -127,7 +118,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, formatCurrency 
 
                   <Box flexGrow={1}>
                     <Typography
-                      variant={isShortScreen ? 'caption' : 'body2'}
+                      variant="body2"
                       color="textSecondary"
                       sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}
                     >
@@ -137,7 +128,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, formatCurrency 
                 </Box>
 
                 <Typography
-                  variant={stat.isTopProducts ? undefined : (isShortScreen ? 'body1' : (isMobile ? 'h6' : 'h5'))}
+                  variant={stat.isTopProducts ? undefined : (isMobile ? 'h6' : 'h5')}
                   component={stat.isTopProducts ? 'div' : 'p'}
                   sx={{
                     fontWeight: 'bold',
@@ -145,7 +136,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, formatCurrency 
                     mb: 0.5,
                     ...(stat.isTopProducts && {
                       fontWeight: 500,
-                      maxHeight: isShortScreen ? 52 : (isMobile ? 72 : 100),
+                      maxHeight: isMobile ? 72 : 100,
                       overflow: 'auto',
                     }),
                   }}
@@ -170,7 +161,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, formatCurrency 
                 </Typography>
 
                 <Typography
-                  variant={isShortScreen ? 'caption' : 'caption'}
+                  variant="caption"
                   color="textSecondary"
                   sx={{ fontSize: isMobile ? '0.7rem' : '0.75rem' }}
                 >
@@ -184,8 +175,8 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, formatCurrency 
 
       {/* Business Day Period Info */}
       {stats.businessDayPeriod && (
-        <Box mt={isShortScreen ? 1 : 2}>
-          <Typography variant={isShortScreen ? 'caption' : 'body2'} color="textSecondary" align="center">
+        <Box mt={2}>
+          <Typography variant="body2" color="textSecondary" align="center">
             📅 Période d'activité:{' '}
             {formatDateOnly(stats.businessDayPeriod.start)} -{' '}
             {formatDateOnly(stats.businessDayPeriod.end)}

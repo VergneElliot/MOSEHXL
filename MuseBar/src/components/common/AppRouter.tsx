@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Tabs, Tab, Paper, useMediaQuery } from '@mui/material';
+import { Box, Tabs, Tab, Paper } from '@mui/material';
 import {
   RestaurantMenu as MenuIcon,
   PointOfSale as POSIcon,
@@ -31,7 +31,6 @@ interface TabPanelProps {
 function TabPanel(props: TabPanelProps) {
   const { children, value, index, scrollMode = 'auto', ...other } = props;
   const isActive = value === index;
-  const isShortScreen = useMediaQuery('(max-height: 900px)');
   return (
     <div
       role="tabpanel"
@@ -55,7 +54,7 @@ function TabPanel(props: TabPanelProps) {
             overflowY: scrollMode === 'auto' ? 'auto' : 'hidden',
             display: 'flex',
             flexDirection: 'column',
-            p: isShortScreen ? 1 : 3,
+            p: 3,
           }}
         >
           {children}
@@ -95,7 +94,6 @@ const AppRouter: React.FC<AppRouterProps> = ({
   onHappyHourStatusUpdate,
 }) => {
   const [tabValue, setTabValue] = useState(0);
-  const isShortScreen = useMediaQuery('(max-height: 900px)');
 
   const TABS: TabConfig[] = [
     { label: 'Caisse', icon: <POSIcon />, value: 'pos', permission: 'access_pos' },
@@ -153,19 +151,17 @@ const AppRouter: React.FC<AppRouterProps> = ({
         scrollButtons="auto"
         allowScrollButtonsMobile
         sx={{
-          minHeight: isShortScreen ? 40 : 48,
           '& .MuiTabs-scrollButtons': {
             color: 'primary.main',
           },
           '& .MuiTab-root': {
             minWidth: { xs: 'auto', sm: 90 },
-            fontSize: { xs: isShortScreen ? '0.68rem' : '0.75rem', sm: isShortScreen ? '0.78rem' : '0.875rem' },
+            fontSize: { xs: '0.75rem', sm: '0.875rem' },
             px: { xs: 1, sm: 2 },
-            py: { xs: isShortScreen ? 0.75 : 1.5, sm: isShortScreen ? 0.9 : 2 },
-            minHeight: isShortScreen ? 40 : 48,
+            py: { xs: 1.5, sm: 2 },
           },
           '& .MuiTab-iconWrapper': {
-            fontSize: { xs: isShortScreen ? 14 : 18, sm: isShortScreen ? 16 : 20 },
+            fontSize: { xs: 18, sm: 20 },
           },
         }}
       >

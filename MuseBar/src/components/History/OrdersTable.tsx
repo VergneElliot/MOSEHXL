@@ -65,7 +65,7 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
 
   if (loading) {
     return (
-      <Paper sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Paper>
         <Box p={3} textAlign="center">
           <Typography>Chargement des commandes...</Typography>
         </Box>
@@ -75,7 +75,7 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
 
   if (orders.length === 0) {
     return (
-      <Paper sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Paper>
         <Box p={3} textAlign="center">
           <Typography color="textSecondary">Aucune commande trouvée</Typography>
         </Box>
@@ -84,9 +84,8 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
   }
 
   return (
-    <Paper sx={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-      <TableContainer sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-        <Table size={isMobile ? 'small' : 'medium'} stickyHeader>
+    <TableContainer component={Paper}>
+      <Table size={isMobile ? 'small' : 'medium'}>
         <TableHead>
           <TableRow>
             <TableCell>ID</TableCell>
@@ -228,8 +227,7 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
             </TableRow>
           ))}
         </TableBody>
-        </Table>
-      </TableContainer>
+      </Table>
 
       {/* Pagination Controls */}
       <TablePagination
@@ -246,9 +244,8 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
         labelDisplayedRows={({ from, to, count }) =>
           `${from}-${to} sur ${count !== -1 ? count : `plus de ${to}`}`
         }
-        sx={{ flexShrink: 0, borderTop: `1px solid ${theme.palette.divider}` }}
       />
-    </Paper>
+    </TableContainer>
   );
 };
 
