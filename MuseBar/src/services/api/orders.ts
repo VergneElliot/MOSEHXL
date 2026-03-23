@@ -43,6 +43,61 @@ export async function getOrders(): Promise<Order[]> {
   }));
 }
 
+export async function getOrdersPaginated(params: {
+  limit?: number;
+  offset?: number;
+}): Promise<{ orders: Order[]; total: number }> {
+  const query = new URLSearchParams();
+  if (params.limit != null) query.set('limit', String(params.limit));
+  if (params.offset != null) query.set('offset', String(params.offset));
+
+  const response = await request<any>('/orders' + (query.toString() ? `?${query.toString()}` : ''));
+
+  // Backend supports both the legacy shape (array) and paginated shape ({orders,total}).
+  const rawOrders: any[] = Array.isArray(response) ? response : response?.orders ?? [];
+  const total: number = Array.isArray(response) ? rawOrders.length : response?.total ?? rawOrders.length;
+
+  const orders = rawOrders.map(order => ({
+    id: order.id.toString(),
+    items: (order.items || []).map((item: any) => ({
+      id: item.id ? item.id.toString() : `${order.id}-${item.product_id || 'unknown'}`,
+      productId: item.product_id ? item.product_id.toString() : 'unknown',
+      productName: item.product_name || 'Unknown Product',
+      quantity: item.quantity || 1,
+      unitPrice: parseFloat(item.unit_price || '0'),
+      totalPrice: parseFloat(item.total_price || '0'),
+      taxRate: parseFloat(item.tax_rate || '20') / 100,
+      taxAmount: parseFloat(item.tax_amount || '0'),
+      isHappyHourApplied: item.happy_hour_applied || false,
+      isManualHappyHour: item.happy_hour_applied || false,
+      isOffert: parseFloat(item.total_price || '0') === 0,
+      originalPrice: parseFloat(item.unit_price || '0'),
+    })),
+    totalAmount: parseFloat(order.total_amount),
+    taxAmount: parseFloat(order.total_tax),
+    discountAmount: 0,
+    finalAmount: parseFloat(order.total_amount),
+    createdAt: new Date(order.created_at),
+    status: order.status as 'pending' | 'completed' | 'cancelled',
+    paymentMethod: order.payment_method as PaymentMethod,
+    subBills: (order.sub_bills || []).map((subBill: any) => ({
+      id: subBill.id.toString(),
+      orderId: order.id.toString(),
+      paymentMethod: subBill.payment_method as 'cash' | 'card',
+      amount: parseFloat(subBill.amount),
+      status: subBill.status as 'pending' | 'paid',
+      createdAt: new Date(subBill.created_at),
+    })),
+    notes: order.notes,
+    tips: order.tips || 0,
+    change: order.change || 0,
+    operationType: order.operation_type as 'sale' | 'change' | undefined,
+    changeAmount: order.change_amount != null ? parseFloat(String(order.change_amount)) : null,
+  }));
+
+  return { orders, total };
+}
+
 export async function createOrder(order: {
   items: OrderItem[];
   totalAmount: number;

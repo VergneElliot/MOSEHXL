@@ -281,6 +281,68 @@ export class JournalQueries {
   }
 
   /**
+   * Get closure bulletins with pagination.
+   * Returns only the requested page plus the total matching count.
+   */
+  static async getClosureBulletinsPaginated(
+    type?: 'DAILY' | 'MONTHLY' | 'ANNUAL',
+    establishmentId?: string,
+    opts?: { limit?: number; offset?: number }
+  ): Promise<{ bulletins: ClosureBulletin[]; total: number }> {
+    const values: any[] = [];
+    const conditions: string[] = [];
+
+    if (type) {
+      conditions.push(`closure_type = $${values.length + 1}`);
+      values.push(type);
+    }
+
+    if (establishmentId !== undefined && establishmentId !== null) {
+      conditions.push(`(establishment_id IS NOT DISTINCT FROM $${values.length + 1})`);
+      values.push(establishmentId);
+    }
+
+    const whereClause = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
+
+    // Total matching count (no LIMIT/OFFSET)
+    const countResult = await pool.query(
+      `SELECT COUNT(*)::int AS total FROM closure_bulletins${whereClause}`,
+      values
+    );
+    const total = countResult.rows[0]?.total ?? 0;
+
+    // Page query (applies LIMIT/OFFSET after conditions)
+    const pageValues = [...values];
+    let pageQuery = `SELECT * FROM closure_bulletins${whereClause} ORDER BY period_start DESC`;
+
+    if (opts?.limit != null && Number.isFinite(opts.limit) && opts.limit > 0) {
+      pageValues.push(opts.limit);
+      pageQuery += ` LIMIT $${pageValues.length}`;
+    }
+
+    if (opts?.offset != null && Number.isFinite(opts.offset) && opts.offset >= 0) {
+      pageValues.push(opts.offset);
+      pageQuery += ` OFFSET $${pageValues.length}`;
+    }
+
+    const result = await pool.query(pageQuery, pageValues);
+
+    // Parse JSON fields and ensure tips_total/change_total are present
+    const bulletins = result.rows.map((row: any) => ({
+      ...row,
+      vat_breakdown: typeof row.vat_breakdown === 'string' ? JSON.parse(row.vat_breakdown) : row.vat_breakdown,
+      payment_methods_breakdown:
+        typeof row.payment_methods_breakdown === 'string'
+          ? JSON.parse(row.payment_methods_breakdown)
+          : row.payment_methods_breakdown,
+      tips_total: row.tips_total || 0,
+      change_total: row.change_total || 0,
+    }));
+
+    return { bulletins, total };
+  }
+
+  /**
    * Insert a closure bulletin (scoped to one establishment for multi-tenancy).
    * @param establishmentId - UUID of the establishment this bulletin belongs to
    */

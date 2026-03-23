@@ -5,7 +5,7 @@ import { Order } from '../types';
 import { HistoryStats } from './useHistoryState';
 
 export interface HistoryAPIActions {
-  loadOrders: () => Promise<void>;
+  loadOrders: (pagination?: { limit: number; offset: number }) => Promise<void>;
   loadStats: () => Promise<void>;
   processReturn: (returnData: ProcessReturnData) => Promise<void>;
   refreshData: () => Promise<void>;
@@ -21,35 +21,41 @@ export interface ProcessReturnData {
 
 export const useHistoryAPI = (
   setOrders: (orders: Order[]) => void,
+  setTotalOrders: (total: number) => void,
   setStats: (stats: HistoryStats) => void,
   setLoading: (loading: boolean) => void,
   setReturnLoading: (loading: boolean) => void,
   setReturnSuccess: (message: string) => void,
   setReturnError: (error: string) => void,
-  closeReturnDialog: () => void
+  closeReturnDialog: () => void,
+  getPagination?: () => { limit: number; offset: number }
 ): HistoryAPIActions => {
   const apiService = useMemo(() => ApiService.getInstance(), []);
 
-  const loadOrders = useCallback(async () => {
+  const loadOrders = useCallback(async (pagination?: { limit: number; offset: number }) => {
     try {
       setLoading(true);
-      const ordersData = await apiService.getOrders();
+      const effectivePagination = pagination ?? (getPagination ? getPagination() : undefined);
+      const ordersResult = effectivePagination
+        ? await apiService.getOrders({ limit: effectivePagination.limit, offset: effectivePagination.offset })
+        : await apiService.getOrders();
 
       // Map sub_bills to subBills for frontend compatibility
-      const mappedOrders = ordersData.map(order => ({
+      const mappedOrders = ordersResult.orders.map(order => ({
         ...order,
         // Normalize legacy backend field to frontend shape
         subBills: (order as unknown as { sub_bills?: Order['subBills'] })['sub_bills'] || order.subBills || [],
       }));
 
       setOrders(mappedOrders);
+      setTotalOrders(ordersResult.total);
     } catch (error) {
       // Failed to load orders
       setReturnError('Erreur lors du chargement des commandes');
     } finally {
       setLoading(false);
     }
-  }, [apiService, setOrders, setLoading, setReturnError]);
+  }, [apiService, setOrders, setTotalOrders, setLoading, setReturnError, getPagination]);
 
   const loadStats = useCallback(async () => {
     try {

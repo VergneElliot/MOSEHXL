@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Table,
   TableBody,
@@ -26,6 +26,11 @@ import { Order } from '../../types';
 interface OrdersTableProps {
   orders: Order[];
   loading: boolean;
+  page: number;
+  rowsPerPage: number;
+  totalCount: number;
+  onPageChange: (newPage: number) => void;
+  onRowsPerPageChange: (newRowsPerPage: number) => void;
   onViewOrder: (order: Order) => void;
   onPrintReceipt: (order: Order, type: 'detailed' | 'summary') => void;
   onReturnOrder: (order: Order) => void;
@@ -41,6 +46,11 @@ interface OrdersTableProps {
 const OrdersTable: React.FC<OrdersTableProps> = ({
   orders,
   loading,
+  page,
+  rowsPerPage,
+  totalCount,
+  onPageChange,
+  onRowsPerPageChange,
   onViewOrder,
   onPrintReceipt,
   onReturnOrder,
@@ -52,24 +62,6 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-
-  // Pagination state
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(25);
-
-  // Calculate pagination
-  const startIndex = page * rowsPerPage;
-  const endIndex = startIndex + rowsPerPage;
-  const paginatedOrders = orders.slice(startIndex, endIndex);
-
-  const handleChangePage = (_: unknown, newPage: number) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
 
   if (loading) {
     return (
@@ -106,7 +98,7 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
           </TableRow>
         </TableHead>
         <TableBody>
-          {paginatedOrders.map(order => (
+          {orders.map(order => (
             <TableRow
               key={order.id}
               sx={{
@@ -240,11 +232,13 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
       {/* Pagination Controls */}
       <TablePagination
         component="div"
-        count={orders.length}
+        count={totalCount}
         page={page}
-        onPageChange={handleChangePage}
+        onPageChange={(_, newPage) => onPageChange(newPage)}
         rowsPerPage={rowsPerPage}
-        onRowsPerPageChange={handleChangeRowsPerPage}
+        onRowsPerPageChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+          onRowsPerPageChange(parseInt(e.target.value, 10));
+        }}
         rowsPerPageOptions={[25, 50, 100, 200]}
         labelRowsPerPage="Commandes par page:"
         labelDisplayedRows={({ from, to, count }) =>

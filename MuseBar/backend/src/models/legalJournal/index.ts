@@ -110,6 +110,14 @@ export class LegalJournalModel {
   static async getClosureBulletins(type?: 'DAILY' | 'MONTHLY' | 'ANNUAL', establishmentId?: string) {
     return await ClosureOperations.getClosureBulletins(type, establishmentId);
   }
+
+  static async getClosureBulletinsPaginated(
+    type?: 'DAILY' | 'MONTHLY' | 'ANNUAL',
+    establishmentId?: string,
+    opts?: { limit?: number; offset?: number }
+  ) {
+    return await ClosureOperations.getClosureBulletinsPaginated(type, establishmentId, opts);
+  }
 }
 
 // Default export for backward compatibility

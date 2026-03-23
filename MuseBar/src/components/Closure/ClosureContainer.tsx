@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Box,
   Button,
@@ -26,9 +26,15 @@ const ClosureContainer: React.FC = () => {
   // Custom hooks for state management
   const [state, actions] = useClosureState();
 
+  // Server-side pagination for the bulletins list
+  const [bulletinsPage, setBulletinsPage] = useState(0);
+  const [bulletinsRowsPerPage, setBulletinsRowsPerPage] = useState(10);
+  const [totalBulletins, setTotalBulletins] = useState(0);
+
   // Custom hook for API calls
   const api = useClosureAPI(
     actions.setBulletins,
+    setTotalBulletins,
     actions.setLoading,
     actions.setError,
     actions.setCreating,
@@ -45,11 +51,24 @@ const ClosureContainer: React.FC = () => {
 
   // Load data on component mount
   const didInitRef = useRef(false);
+
+  // Avoid including `api` in effect deps (closure state recreates callbacks).
+  const apiRef = useRef(api);
+  apiRef.current = api;
+
   useEffect(() => {
     if (didInitRef.current) return;
     didInitRef.current = true;
     void api.refreshAllData();
   }, [api]);
+
+  // Load bulletins whenever pagination changes
+  useEffect(() => {
+    apiRef.current.loadBulletins({
+      limit: bulletinsRowsPerPage,
+      offset: bulletinsPage * bulletinsRowsPerPage,
+    });
+  }, [bulletinsPage, bulletinsRowsPerPage]);
 
   // Event handlers
   const handleCreateClosure = () => {
@@ -148,6 +167,14 @@ const ClosureContainer: React.FC = () => {
         <BulletinsTable
           bulletins={state.bulletins}
           loading={state.loading}
+          page={bulletinsPage}
+          rowsPerPage={bulletinsRowsPerPage}
+          totalCount={totalBulletins}
+          onPageChange={setBulletinsPage}
+          onRowsPerPageChange={(newRowsPerPage) => {
+            setBulletinsRowsPerPage(newRowsPerPage);
+            setBulletinsPage(0);
+          }}
           onViewDetails={handleViewDetails}
           onPrint={handlePrint}
           onDownload={handleDownload}

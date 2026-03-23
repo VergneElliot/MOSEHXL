@@ -220,6 +220,14 @@ export class ClosureOperations {
   ): Promise<ClosureBulletin[]> {
     return await JournalQueries.getClosureBulletins(type, establishmentId);
   }
+
+  static async getClosureBulletinsPaginated(
+    type?: 'DAILY' | 'MONTHLY' | 'ANNUAL',
+    establishmentId?: string,
+    opts?: { limit?: number; offset?: number }
+  ): Promise<{ bulletins: ClosureBulletin[]; total: number }> {
+    return await JournalQueries.getClosureBulletinsPaginated(type, establishmentId, opts);
+  }
 }
 
 /**

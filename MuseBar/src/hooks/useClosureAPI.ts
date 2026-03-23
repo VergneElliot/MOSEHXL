@@ -4,7 +4,7 @@ import { ClosureBulletin } from './useClosureState';
 import type { ClosureTodayStatus, LiveMonthlyStats } from '../types/api';
 
 export interface ClosureAPIActions {
-  loadBulletins: () => Promise<void>;
+  loadBulletins: (pagination?: { limit: number; offset: number }) => Promise<void>;
   loadTodayStatus: () => Promise<void>;
   loadClosureSettings: () => Promise<void>;
   loadMonthlyStats: () => Promise<void>;
@@ -20,6 +20,7 @@ export interface CreateClosureData {
 
 export const useClosureAPI = (
   setBulletins: (bulletins: ClosureBulletin[]) => void,
+  setTotalBulletins: (total: number) => void,
   setLoading: (loading: boolean) => void,
   setError: (error: string | null) => void,
   setCreating: (creating: boolean) => void,
@@ -35,15 +36,20 @@ export const useClosureAPI = (
 ): ClosureAPIActions => {
   const apiService = useMemo(() => ApiService.getInstance(), []);
 
-  const loadBulletins = useCallback(async () => {
+  const loadBulletins = useCallback(async (pagination?: { limit: number; offset: number }) => {
     try {
       setLoading(true);
       setError(null);
-      const { data } = await apiService.get<{ bulletins: ClosureBulletin[]; total?: number }>(
-        '/legal/closure/bulletins'
-      );
+      const query = new URLSearchParams();
+      if (pagination?.limit != null) query.set('limit', String(pagination.limit));
+      if (pagination?.offset != null) query.set('offset', String(pagination.offset));
+
+      const endpoint = `/legal/closure/bulletins${query.toString() ? `?${query.toString()}` : ''}`;
+
+      const { data } = await apiService.get<{ bulletins: ClosureBulletin[]; total?: number }>(endpoint);
       const bulletins = Array.isArray((data as any)?.bulletins) ? (data as any).bulletins : [];
       setBulletins(bulletins);
+      setTotalBulletins(typeof (data as any)?.total === 'number' ? (data as any).total : bulletins.length);
     } catch (err) {
       const errorMessage = 'Erreur lors du chargement des bulletins de clôture';
       setError(errorMessage);
@@ -51,7 +57,7 @@ export const useClosureAPI = (
     } finally {
       setLoading(false);
     }
-  }, [setBulletins, setLoading, setError, apiService]);
+  }, [setBulletins, setLoading, setError, setTotalBulletins, apiService]);
 
   const loadTodayStatus = useCallback(async () => {
     try {
@@ -142,12 +148,11 @@ export const useClosureAPI = (
 
   const refreshAllData = useCallback(async () => {
     await Promise.all([
-      loadBulletins(),
       loadTodayStatus(),
       loadClosureSettings(),
       loadMonthlyStats(),
     ]);
-  }, [loadBulletins, loadTodayStatus, loadClosureSettings, loadMonthlyStats]);
+  }, [loadTodayStatus, loadClosureSettings, loadMonthlyStats]);
 
   return useMemo(
     () => ({
