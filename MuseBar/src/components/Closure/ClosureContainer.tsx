@@ -111,9 +111,9 @@ const ClosureContainer: React.FC = () => {
   const canCreateForToday = state.todayStatus ? !state.todayStatus.has_closure : true;
 
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+    <Box sx={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
       {/* Header */}
-      <Box sx={{ mb: 3 }}>
+      <Box sx={{ mb: 2 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: isMobile ? 'flex-start' : 'center' }}>
           <Box>
             <Typography variant={isMobile ? 'h5' : 'h4'} component="h1" gutterBottom>
@@ -163,7 +163,7 @@ const ClosureContainer: React.FC = () => {
       />
 
       {/* Bulletins Table */}
-      <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+      <Box sx={{ flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
         <BulletinsTable
           bulletins={state.bulletins}
           loading={state.loading}

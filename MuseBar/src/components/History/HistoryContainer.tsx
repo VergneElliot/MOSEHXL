@@ -86,9 +86,9 @@ const HistoryContainer: React.FC = () => {
   };
 
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
-      <Box sx={{ mb: 3 }}>
+      <Box sx={{ mb: 2 }}>
         <Typography variant={isMobile ? 'h5' : 'h4'} component="h1" gutterBottom>
           📊 Historique des Ventes
         </Typography>
@@ -114,7 +114,7 @@ const HistoryContainer: React.FC = () => {
       />
 
       {/* Orders Table */}
-      <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+      <Box sx={{ flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
         <OrdersTable
           orders={logic.filteredOrders}
           loading={state.loading}

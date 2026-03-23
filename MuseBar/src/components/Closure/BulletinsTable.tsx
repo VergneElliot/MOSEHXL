@@ -50,7 +50,7 @@ const BulletinsTable: React.FC<BulletinsTableProps> = ({
 }) => {
   if (loading) {
     return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
+      <Box sx={{ p: 3, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
         <Typography>Chargement des bulletins...</Typography>
       </Box>
     );
@@ -58,15 +58,16 @@ const BulletinsTable: React.FC<BulletinsTableProps> = ({
 
   if (bulletins.length === 0) {
     return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
+      <Box sx={{ p: 3, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
         <Typography color="textSecondary">Aucun bulletin de clôture trouvé</Typography>
       </Box>
     );
   }
 
   return (
-    <TableContainer component={Paper} sx={{ mt: 2 }}>
-      <Table>
+    <Paper sx={{ mt: 2, height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      <TableContainer sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+        <Table stickyHeader>
         <TableHead>
           <TableRow>
             <TableCell>Type</TableCell>
@@ -129,7 +130,8 @@ const BulletinsTable: React.FC<BulletinsTableProps> = ({
             </TableRow>
           ))}
         </TableBody>
-      </Table>
+        </Table>
+      </TableContainer>
 
       <TablePagination
         component="div"
@@ -145,8 +147,9 @@ const BulletinsTable: React.FC<BulletinsTableProps> = ({
         labelDisplayedRows={({ from, to, count }) =>
           `${from}-${to} sur ${count !== -1 ? count : `plus de ${to}`}`
         }
+        sx={{ flexShrink: 0 }}
       />
-    </TableContainer>
+    </Paper>
   );
 };
 
