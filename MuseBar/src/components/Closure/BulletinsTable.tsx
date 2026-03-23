@@ -12,6 +12,7 @@ import {
   Tooltip,
   Box,
   Typography,
+  TablePagination,
 } from '@mui/material';
 import { Visibility, Print, Download } from '@mui/icons-material';
 import { ClosureBulletin } from '../../hooks/useClosureState';
@@ -19,6 +20,11 @@ import { ClosureBulletin } from '../../hooks/useClosureState';
 interface BulletinsTableProps {
   bulletins: ClosureBulletin[];
   loading: boolean;
+  page: number;
+  rowsPerPage: number;
+  totalCount: number;
+  onPageChange: (newPage: number) => void;
+  onRowsPerPageChange: (newRowsPerPage: number) => void;
   onViewDetails: (bulletin: ClosureBulletin) => void;
   onPrint: (bulletin: ClosureBulletin) => void;
   onDownload: (bulletin: ClosureBulletin) => void;
@@ -30,6 +36,11 @@ interface BulletinsTableProps {
 const BulletinsTable: React.FC<BulletinsTableProps> = ({
   bulletins,
   loading,
+  page,
+  rowsPerPage,
+  totalCount,
+  onPageChange,
+  onRowsPerPageChange,
   onViewDetails,
   onPrint,
   onDownload,
@@ -119,6 +130,22 @@ const BulletinsTable: React.FC<BulletinsTableProps> = ({
           ))}
         </TableBody>
       </Table>
+
+      <TablePagination
+        component="div"
+        count={totalCount}
+        page={page}
+        onPageChange={(_, newPage) => onPageChange(newPage)}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+          onRowsPerPageChange(parseInt(e.target.value, 10));
+        }}
+        rowsPerPageOptions={[10, 25, 50, 100]}
+        labelRowsPerPage="Bulletins par page:"
+        labelDisplayedRows={({ from, to, count }) =>
+          `${from}-${to} sur ${count !== -1 ? count : `plus de ${to}`}`
+        }
+      />
     </TableContainer>
   );
 };

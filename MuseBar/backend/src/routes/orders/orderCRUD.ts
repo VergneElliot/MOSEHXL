@@ -8,6 +8,7 @@ import { OrderModel, OrderItemModel, SubBillModel } from '../../models';
 import { LegalJournalModel } from '../../models/legalJournal';
 import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';
+import { pool } from '../../app';
 import { getEstablishmentId, requireAuth } from '../auth';
 import { validateBody, validateParams, commonValidations, paramValidations } from '../../middleware/validation';
 
@@ -23,7 +24,16 @@ router.get('/', async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const orders = await OrderModel.getAll(establishmentId);
+    const limitRaw = req.query.limit;
+    const offsetRaw = req.query.offset;
+    const limit = typeof limitRaw === 'string' ? parseInt(limitRaw, 10) : undefined;
+    const offset = typeof offsetRaw === 'string' ? parseInt(offsetRaw, 10) : undefined;
+
+    const shouldPaginate =
+      (limit != null && Number.isFinite(limit) && limit > 0) ||
+      (offset != null && Number.isFinite(offset) && offset >= 0);
+
+    const orders = await OrderModel.getAll(establishmentId, shouldPaginate ? { limit, offset } : undefined);
     const ordersWithDetails = await Promise.all(
       orders.map(async (order) => {
         const items = await OrderItemModel.getByOrderId(order.id);
@@ -31,7 +41,18 @@ router.get('/', async (req, res) => {
         return { ...order, items, sub_bills: subBills, tips: order.tips || 0, change: order.change || 0 };
       })
     );
-    res.json(ordersWithDetails);
+
+    if (!shouldPaginate) {
+      res.json(ordersWithDetails);
+      return;
+    }
+
+    const totalResult = await pool.query(
+      'SELECT COUNT(*)::int AS total FROM orders WHERE establishment_id = $1',
+      [establishmentId]
+    );
+
+    res.json({ orders: ordersWithDetails, total: totalResult.rows[0]?.total ?? 0 });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch orders' });
   }

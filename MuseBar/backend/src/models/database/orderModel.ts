@@ -13,11 +13,24 @@ const ALLOWED_ORDER_UPDATE_FIELDS = [
 ] as const;
 
 export const OrderModel = {
-  async getAll(establishmentId: string): Promise<Order[]> {
-    const result = await pool.query(
-      'SELECT * FROM orders WHERE establishment_id = $1 ORDER BY created_at DESC',
-      [establishmentId]
-    );
+  async getAll(
+    establishmentId: string,
+    opts?: { limit?: number; offset?: number }
+  ): Promise<Order[]> {
+    const values: any[] = [establishmentId];
+    let query = 'SELECT * FROM orders WHERE establishment_id = $1 ORDER BY created_at DESC';
+
+    if (opts?.limit != null && Number.isFinite(opts.limit) && opts.limit > 0) {
+      values.push(opts.limit);
+      query += ` LIMIT $${values.length}`;
+    }
+
+    if (opts?.offset != null && Number.isFinite(opts.offset) && opts.offset >= 0) {
+      values.push(opts.offset);
+      query += ` OFFSET $${values.length}`;
+    }
+
+    const result = await pool.query(query, values);
     return result.rows;
   },
 

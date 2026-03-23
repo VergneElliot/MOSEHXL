@@ -55,7 +55,13 @@ export class ApiService {
   async restoreProduct(id: string): Promise<void> { return productsApi.restoreProduct(id); }
 
   // Orders
-  async getOrders(): Promise<Order[]> { return ordersApi.getOrders(); }
+  async getOrders(params?: { limit?: number; offset?: number }): Promise<{ orders: Order[]; total: number }> {
+    if (params) {
+      return ordersApi.getOrdersPaginated(params);
+    }
+    const orders = await ordersApi.getOrders();
+    return { orders, total: orders.length };
+  }
 
   async createOrder(order: { items: OrderItem[]; totalAmount: number; taxAmount: number; paymentMethod: 'cash' | 'card' | 'split'; status?: string; notes?: string; tips?: number; change?: number; sub_bills?: Array<{ payment_method: 'cash' | 'card'; amount: number }>; }): Promise<Order> { return ordersApi.createOrder(order); }
 

@@ -200,15 +200,41 @@ router.get('/bulletins', async (req, res) => {
     const { type } = req.query;
     const establishmentId = req.user?.establishment_id ?? undefined;
 
+    const limitRaw = req.query.limit;
+    const offsetRaw = req.query.offset;
+    const limit = typeof limitRaw === 'string' ? parseInt(limitRaw, 10) : undefined;
+    const offset = typeof offsetRaw === 'string' ? parseInt(offsetRaw, 10) : undefined;
+
+    const shouldPaginate =
+      (limit != null && Number.isFinite(limit) && limit > 0) ||
+      (offset != null && Number.isFinite(offset) && offset >= 0);
+
+    const closureType = type as 'DAILY' | 'MONTHLY' | 'ANNUAL' | undefined;
+
+    if (shouldPaginate) {
+      const { bulletins, total } = await LegalJournalModel.getClosureBulletinsPaginated(
+        closureType,
+        establishmentId,
+        { limit, offset }
+      );
+
+      res.json({
+        bulletins,
+        total,
+        compliance_note: 'Closure bulletins for regulatory reporting',
+      });
+      return;
+    }
+
     const bulletins = await LegalJournalModel.getClosureBulletins(
-      type as 'DAILY' | 'MONTHLY' | 'ANNUAL' | undefined,
+      closureType,
       establishmentId
     );
-    
+
     res.json({
       bulletins,
       total: bulletins.length,
-      compliance_note: 'Closure bulletins for regulatory reporting'
+      compliance_note: 'Closure bulletins for regulatory reporting',
     });
   } catch (error) {
     console.error('Error fetching closure bulletins:', error);

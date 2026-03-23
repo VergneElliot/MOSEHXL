@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Box, Typography, Alert, Snackbar, useTheme, useMediaQuery } from '@mui/material';
 import { useHistoryState } from '../../hooks/useHistoryState';
 import { useHistoryAPI } from '../../hooks/useHistoryAPI';
@@ -17,27 +17,45 @@ const HistoryContainer: React.FC = () => {
   // Custom hooks for state management
   const [state, actions] = useHistoryState();
 
+  // Server-side pagination (Backend can paginate orders list)
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [totalOrders, setTotalOrders] = useState(0);
+
   // Custom hook for business logic
   const logic = useHistoryLogic(state.orders, state.search);
+
+  const getPagination = useCallback(() => {
+    return { limit: rowsPerPage, offset: page * rowsPerPage };
+  }, [page, rowsPerPage]);
 
   // Custom hook for API calls
   const api = useHistoryAPI(
     actions.setOrders,
+    setTotalOrders,
     actions.setStats,
     actions.setLoading,
     actions.setReturnLoading,
     actions.setReturnSuccess,
     actions.setReturnError,
-    actions.closeReturnDialog
+    actions.closeReturnDialog,
+    getPagination
   );
 
-  // Load data once on mount. Do not depend on `api` — it is recreated every render
-  // because useHistoryState returns new action refs, which would cause an infinite
-  // refresh loop and 429s when the stats endpoint is hit repeatedly.
+  // Avoid including `api` in effect deps (useHistoryState recreates some callbacks).
+  const apiRef = useRef(api);
+  apiRef.current = api;
+
+  // Load stats once on mount
   useEffect(() => {
-    api.refreshData();
+    apiRef.current.loadStats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Load orders whenever pagination changes
+  useEffect(() => {
+    apiRef.current.loadOrders({ limit: rowsPerPage, offset: page * rowsPerPage });
+  }, [page, rowsPerPage]);
 
   // Event handlers
   const handleViewOrder = (order: Order) => {
@@ -87,13 +105,27 @@ const HistoryContainer: React.FC = () => {
       />
 
       {/* Search Bar */}
-      <SearchBar search={state.search} onSearchChange={actions.setSearch} />
+      <SearchBar
+        search={state.search}
+        onSearchChange={(newSearch) => {
+          actions.setSearch(newSearch);
+          setPage(0);
+        }}
+      />
 
       {/* Orders Table */}
       <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
         <OrdersTable
           orders={logic.filteredOrders}
           loading={state.loading}
+          page={page}
+          rowsPerPage={rowsPerPage}
+          totalCount={state.search ? logic.filteredOrders.length : totalOrders}
+          onPageChange={setPage}
+          onRowsPerPageChange={(newRowsPerPage) => {
+            setRowsPerPage(newRowsPerPage);
+            setPage(0);
+          }}
           onViewOrder={handleViewOrder}
           onPrintReceipt={handlePrintReceipt}
           onReturnOrder={handleReturnOrder}
