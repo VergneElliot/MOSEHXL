@@ -21,7 +21,7 @@ interface StatsCardsProps {
 const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, formatCurrency }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const isShortScreen = useMediaQuery('(max-height: 900px)');
+  const isShortScreen = useMediaQuery('(max-height: 1080px)');
   const topN = isMobile ? 3 : 5;
   const topProduits = stats.topProduits.slice(0, topN);
 

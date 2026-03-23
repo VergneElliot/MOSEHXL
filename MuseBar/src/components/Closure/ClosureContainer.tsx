@@ -22,7 +22,7 @@ import { formatDateOnly as formatDate } from '../../utils/formatDate';
 const ClosureContainer: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const isShortScreen = useMediaQuery('(max-height: 900px)');
+  const isShortScreen = useMediaQuery('(max-height: 1080px)');
 
   // Custom hooks for state management
   const [state, actions] = useClosureState();
@@ -155,7 +155,7 @@ const ClosureContainer: React.FC = () => {
       )}
 
       {/* Status Cards */}
-      <Box sx={{ maxHeight: isShortScreen ? '30vh' : 'none', overflowY: isShortScreen ? 'auto' : 'visible', pr: isShortScreen ? 0.5 : 0 }}>
+      <Box sx={{ maxHeight: isShortScreen ? '22vh' : 'none', overflowY: isShortScreen ? 'auto' : 'visible', pr: isShortScreen ? 0.5 : 0 }}>
         <ClosureStatusCards
           todayStatus={state.todayStatus}
           monthlyStats={state.monthlyStats}
