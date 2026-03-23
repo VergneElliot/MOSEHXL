@@ -15,6 +15,7 @@ import { useClosureAPI } from '../../hooks/useClosureAPI';
 import ClosureStatusCards from './ClosureStatusCards';
 import BulletinsTable from './BulletinsTable';
 import CreateClosureDialog, { ClosureType } from './CreateClosureDialog';
+import BulletinDetailsDialog from './BulletinDetailsDialog';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { formatDateOnly as formatDate } from '../../utils/formatDate';
 
@@ -184,8 +185,14 @@ const ClosureContainer: React.FC = () => {
         onClosureTypeChange={actions.setSelectedClosureType}
       />
 
-      {/* Future: Add Bulletin Details Dialog */}
-        {/* Future: Add Bulletin Details Dialog */}
+      <BulletinDetailsDialog
+        open={state.showDetailsDialog}
+        bulletin={state.selectedBulletin}
+        onClose={actions.closeBulletinDetails}
+        formatCurrency={formatCurrency}
+        formatDate={formatDate}
+      />
+
         {/* Future: Add Print Dialog */}
         {/* Future: Add Settings Dialog */}
     </Box>
