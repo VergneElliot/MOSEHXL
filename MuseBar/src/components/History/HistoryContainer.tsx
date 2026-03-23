@@ -13,6 +13,7 @@ import { Order } from '../../types';
 const HistoryContainer: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isShortScreen = useMediaQuery('(max-height: 900px)');
 
   // Custom hooks for state management
   const [state, actions] = useHistoryState();
@@ -88,21 +89,23 @@ const HistoryContainer: React.FC = () => {
   return (
     <Box sx={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
-      <Box sx={{ mb: 2 }}>
-        <Typography variant={isMobile ? 'h5' : 'h4'} component="h1" gutterBottom>
+      <Box sx={{ mb: isShortScreen ? 1 : 2 }}>
+        <Typography variant={isShortScreen ? 'h5' : (isMobile ? 'h5' : 'h4')} component="h1" gutterBottom>
           📊 Historique des Ventes
         </Typography>
-        <Typography variant="body2" color="textSecondary">
+        <Typography variant={isShortScreen ? 'caption' : 'body2'} color="textSecondary">
           Consultez l'historique des commandes, les statistiques de vente et gérez les retours
         </Typography>
       </Box>
 
       {/* Statistics Cards */}
-      <StatsCards
-        stats={state.stats}
-        loading={state.loading}
-        formatCurrency={logic.formatCurrency}
-      />
+      <Box sx={{ maxHeight: isShortScreen ? '30vh' : 'none', overflowY: isShortScreen ? 'auto' : 'visible', pr: isShortScreen ? 0.5 : 0 }}>
+        <StatsCards
+          stats={state.stats}
+          loading={state.loading}
+          formatCurrency={logic.formatCurrency}
+        />
+      </Box>
 
       {/* Search Bar */}
       <SearchBar
