@@ -10,7 +10,16 @@ import {
   useTheme,
   CircularProgress,
 } from '@mui/material';
-import { Schedule, TrendingUp, Assignment, Security, Lock } from '@mui/icons-material';
+import {
+  Schedule,
+  TrendingUp,
+  Assignment,
+  Security,
+  Lock,
+  Receipt,
+  MonetizationOn,
+  SwapHoriz,
+} from '@mui/icons-material';
 import type { ClosureTodayStatus, LiveMonthlyStats } from '../../types';
 import { formatDateOnly } from '../../utils/formatDate';
 
@@ -80,10 +89,36 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
 
       {/* Statistics Cards */}
       <Grid container spacing={2}>
-        {/* Monthly Stats */}
+        {/* Monthly Stats (ongoing month totals, based on orders) */}
         {monthlyStats && !monthlyStatsError && (
           <>
-            <Grid item xs={6} md={3}>
+            <Grid item xs={6} md={4}>
+              <Card>
+                <CardContent>
+                  <Box display="flex" alignItems="center" mb={1}>
+                    <Box
+                      sx={{
+                        p: 1,
+                        borderRadius: 1,
+                        backgroundColor: `${theme.palette.primary.main}20`,
+                        color: theme.palette.primary.main,
+                        mr: 2,
+                      }}
+                    >
+                      <Receipt />
+                    </Box>
+                    <Typography variant="body2" color="textSecondary">
+                      Transactions (mois en cours)
+                    </Typography>
+                  </Box>
+                  <Typography variant="h6" fontWeight="bold">
+                    {monthlyStats.total_transactions || 0}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid item xs={6} md={4}>
               <Card>
                 <CardContent>
                   <Box display="flex" alignItems="center" mb={1}>
@@ -99,20 +134,17 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
                       <TrendingUp />
                     </Box>
                     <Typography variant="body2" color="textSecondary">
-                      CA Mensuel
+                      Chiffre d&apos;affaires
                     </Typography>
                   </Box>
                   <Typography variant="h6" fontWeight="bold" color="success.main">
                     {formatCurrency(monthlyStats.total_amount || 0)}
                   </Typography>
-                  <Typography variant="caption" color="textSecondary">
-                    {monthlyStats.total_transactions || 0} transactions
-                  </Typography>
                 </CardContent>
               </Card>
             </Grid>
 
-            <Grid item xs={6} md={3}>
+            <Grid item xs={6} md={4}>
               <Card>
                 <CardContent>
                   <Box display="flex" alignItems="center" mb={1}>
@@ -128,20 +160,43 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
                       <Assignment />
                     </Box>
                     <Typography variant="body2" color="textSecondary">
-                      Moyenne/Jour
+                      TVA collectée
                     </Typography>
                   </Box>
                   <Typography variant="h6" fontWeight="bold" color="info.main">
-                    {formatCurrency(monthlyStats.avg_daily_amount || 0)}
-                  </Typography>
-                  <Typography variant="caption" color="textSecondary">
-                    {Math.round(monthlyStats.avg_daily_transactions || 0)} transactions
+                    {formatCurrency(monthlyStats.total_vat || 0)}
                   </Typography>
                 </CardContent>
               </Card>
             </Grid>
 
-            <Grid item xs={6} md={3}>
+            <Grid item xs={6} md={4}>
+              <Card>
+                <CardContent>
+                  <Box display="flex" alignItems="center" mb={1}>
+                    <Box
+                      sx={{
+                        p: 1,
+                        borderRadius: 1,
+                        backgroundColor: `${theme.palette.secondary.main}20`,
+                        color: theme.palette.secondary.main,
+                        mr: 2,
+                      }}
+                    >
+                      <MonetizationOn />
+                    </Box>
+                    <Typography variant="body2" color="textSecondary">
+                      Total pourboires
+                    </Typography>
+                  </Box>
+                  <Typography variant="h6" fontWeight="bold">
+                    {formatCurrency(monthlyStats.tips_total || 0)}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid item xs={6} md={4}>
               <Card>
                 <CardContent>
                   <Box display="flex" alignItems="center" mb={1}>
@@ -154,17 +209,40 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
                         mr: 2,
                       }}
                     >
-                      <Security />
+                      <SwapHoriz />
                     </Box>
                     <Typography variant="body2" color="textSecondary">
-                      Clôtures
+                      Monnaie rendue
                     </Typography>
                   </Box>
                   <Typography variant="h6" fontWeight="bold" color="warning.main">
-                    {monthlyStats.closure_count || 0}
+                    {formatCurrency(monthlyStats.change_total || 0)}
                   </Typography>
-                  <Typography variant="caption" color="textSecondary">
-                    Ce mois
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid item xs={6} md={4}>
+              <Card>
+                <CardContent>
+                  <Box display="flex" alignItems="center" mb={1}>
+                    <Box
+                      sx={{
+                        p: 1,
+                        borderRadius: 1,
+                        backgroundColor: `${theme.palette.success.main}20`,
+                        color: theme.palette.success.main,
+                        mr: 2,
+                      }}
+                    >
+                      <Security />
+                    </Box>
+                    <Typography variant="body2" color="textSecondary">
+                      Bulletins de clôture
+                    </Typography>
+                  </Box>
+                  <Typography variant="h6" fontWeight="bold" color="success.main">
+                    {monthlyStats.closure_count || 0}
                   </Typography>
                 </CardContent>
               </Card>
