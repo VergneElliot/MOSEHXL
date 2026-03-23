@@ -6,6 +6,18 @@
 import { pool } from '../../app';
 import { JournalEntry, ClosureBulletin } from './types';
 
+function parseJsonField<T>(value: unknown, fallback: T): T {
+  if (value == null) return fallback;
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value) as T;
+    } catch {
+      return fallback;
+    }
+  }
+  return value as T;
+}
+
 export class JournalQueries {
   /**
    * Get the next sequence number for a new journal entry
@@ -273,8 +285,8 @@ export class JournalQueries {
     // Parse JSON fields and ensure tips_total/change_total are present
     return result.rows.map((row: any) => ({
       ...row,
-      vat_breakdown: typeof row.vat_breakdown === 'string' ? JSON.parse(row.vat_breakdown) : row.vat_breakdown,
-      payment_methods_breakdown: typeof row.payment_methods_breakdown === 'string' ? JSON.parse(row.payment_methods_breakdown) : row.payment_methods_breakdown,
+      vat_breakdown: parseJsonField(row.vat_breakdown, {}),
+      payment_methods_breakdown: parseJsonField(row.payment_methods_breakdown, {}),
       tips_total: row.tips_total || 0,
       change_total: row.change_total || 0
     }));
@@ -330,11 +342,8 @@ export class JournalQueries {
     // Parse JSON fields and ensure tips_total/change_total are present
     const bulletins = result.rows.map((row: any) => ({
       ...row,
-      vat_breakdown: typeof row.vat_breakdown === 'string' ? JSON.parse(row.vat_breakdown) : row.vat_breakdown,
-      payment_methods_breakdown:
-        typeof row.payment_methods_breakdown === 'string'
-          ? JSON.parse(row.payment_methods_breakdown)
-          : row.payment_methods_breakdown,
+      vat_breakdown: parseJsonField(row.vat_breakdown, {}),
+      payment_methods_breakdown: parseJsonField(row.payment_methods_breakdown, {}),
       tips_total: row.tips_total || 0,
       change_total: row.change_total || 0,
     }));
