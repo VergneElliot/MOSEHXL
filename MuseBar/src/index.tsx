@@ -17,6 +17,18 @@ const theme = createTheme({
   },
   typography: {
     fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+    // Reduce global UI scale for cashier screens with limited viewport.
+    // MUI rem-based typography/components follow this base.
+    htmlFontSize: 14,
+  },
+  components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        html: {
+          fontSize: '87.5%', // 14px base instead of 16px
+        },
+      },
+    },
   },
 });
 
