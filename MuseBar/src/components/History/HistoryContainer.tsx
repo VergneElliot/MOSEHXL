@@ -13,7 +13,6 @@ import { Order } from '../../types';
 const HistoryContainer: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const isShortScreen = useMediaQuery('(max-height: 1080px)');
 
   // Custom hooks for state management
   const [state, actions] = useHistoryState();
@@ -87,25 +86,23 @@ const HistoryContainer: React.FC = () => {
   };
 
   return (
-    <Box sx={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+    <Box>
       {/* Header */}
-      <Box sx={{ mb: isShortScreen ? 1 : 2 }}>
-        <Typography variant={isShortScreen ? 'h5' : (isMobile ? 'h5' : 'h4')} component="h1" gutterBottom>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant={isMobile ? 'h5' : 'h4'} component="h1" gutterBottom>
           📊 Historique des Ventes
         </Typography>
-        <Typography variant={isShortScreen ? 'caption' : 'body2'} color="textSecondary">
+        <Typography variant="body2" color="textSecondary">
           Consultez l'historique des commandes, les statistiques de vente et gérez les retours
         </Typography>
       </Box>
 
       {/* Statistics Cards */}
-      <Box sx={{ maxHeight: isShortScreen ? '22vh' : 'none', overflowY: isShortScreen ? 'auto' : 'visible', pr: isShortScreen ? 0.5 : 0 }}>
-        <StatsCards
-          stats={state.stats}
-          loading={state.loading}
-          formatCurrency={logic.formatCurrency}
-        />
-      </Box>
+      <StatsCards
+        stats={state.stats}
+        loading={state.loading}
+        formatCurrency={logic.formatCurrency}
+      />
 
       {/* Search Bar */}
       <SearchBar
@@ -117,28 +114,26 @@ const HistoryContainer: React.FC = () => {
       />
 
       {/* Orders Table */}
-      <Box sx={{ flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
-        <OrdersTable
-          orders={logic.filteredOrders}
-          loading={state.loading}
-          page={page}
-          rowsPerPage={rowsPerPage}
-          totalCount={state.search ? logic.filteredOrders.length : totalOrders}
-          onPageChange={setPage}
-          onRowsPerPageChange={(newRowsPerPage) => {
-            setRowsPerPage(newRowsPerPage);
-            setPage(0);
-          }}
-          onViewOrder={handleViewOrder}
-          onPrintReceipt={handlePrintReceipt}
-          onReturnOrder={handleReturnOrder}
-          formatCurrency={logic.formatCurrency}
-          formatDateTime={logic.formatDateTime}
-          getPaymentMethodLabel={logic.getPaymentMethodLabel}
-          getStatusColor={logic.getStatusColor}
-          getOrderSummary={logic.getOrderSummary}
-        />
-      </Box>
+      <OrdersTable
+        orders={logic.filteredOrders}
+        loading={state.loading}
+        page={page}
+        rowsPerPage={rowsPerPage}
+        totalCount={state.search ? logic.filteredOrders.length : totalOrders}
+        onPageChange={setPage}
+        onRowsPerPageChange={(newRowsPerPage) => {
+          setRowsPerPage(newRowsPerPage);
+          setPage(0);
+        }}
+        onViewOrder={handleViewOrder}
+        onPrintReceipt={handlePrintReceipt}
+        onReturnOrder={handleReturnOrder}
+        formatCurrency={logic.formatCurrency}
+        formatDateTime={logic.formatDateTime}
+        getPaymentMethodLabel={logic.getPaymentMethodLabel}
+        getStatusColor={logic.getStatusColor}
+        getOrderSummary={logic.getOrderSummary}
+      />
 
       {/* Results Summary */}
       {state.search && !state.loading && (
