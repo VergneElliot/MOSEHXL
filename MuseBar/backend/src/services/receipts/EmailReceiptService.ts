@@ -402,13 +402,21 @@ export class EmailReceiptService {
             <table>
               ${data.vat_breakdown.vat_10 ? `
                 <tr>
-                  <td>TVA 10%:</td>
+                  <td>Total soumis à TVA 10%:</td>
+                  <td class="value">${data.vat_breakdown.vat_10.amount.toFixed(2)} EUR</td>
+                </tr>
+                <tr>
+                  <td>Montant TVA 10%:</td>
                   <td class="value">${data.vat_breakdown.vat_10.vat.toFixed(2)} EUR</td>
                 </tr>
               ` : ''}
               ${data.vat_breakdown.vat_20 ? `
                 <tr>
-                  <td>TVA 20%:</td>
+                  <td>Total soumis à TVA 20%:</td>
+                  <td class="value">${data.vat_breakdown.vat_20.amount.toFixed(2)} EUR</td>
+                </tr>
+                <tr>
+                  <td>Montant TVA 20%:</td>
                   <td class="value">${data.vat_breakdown.vat_20.vat.toFixed(2)} EUR</td>
                 </tr>
               ` : ''}

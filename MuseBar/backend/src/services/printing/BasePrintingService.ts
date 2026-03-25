@@ -212,16 +212,18 @@ export abstract class BasePrintingService implements IPrintingService {
     content += '--------------------------------\n';
     content += this.padLine('Transactions:', `${data.total_transactions}`, 32) + '\n';
     content += this.padLine('Total TTC:', `${data.total_amount.toFixed(2)} EUR`, 32) + '\n';
-    content += this.padLine('TVA collectee:', `${data.total_vat.toFixed(2)} EUR`, 32) + '\n';
+    content += this.padLine('Montant total TVA:', `${data.total_vat.toFixed(2)} EUR`, 32) + '\n';
     
     // VAT Breakdown
     content += '--------------------------------\n';
     content += ESC_POS.BOLD_ON + 'DETAIL TVA:\n' + ESC_POS.BOLD_OFF;
     if (data.vat_breakdown.vat_10) {
-      content += this.padLine('TVA 10%:', `${data.vat_breakdown.vat_10.vat.toFixed(2)} EUR`, 32) + '\n';
+      content += this.padLine('Soumis TVA 10%:', `${data.vat_breakdown.vat_10.amount.toFixed(2)} EUR`, 32) + '\n';
+      content += this.padLine('Montant TVA 10%:', `${data.vat_breakdown.vat_10.vat.toFixed(2)} EUR`, 32) + '\n';
     }
     if (data.vat_breakdown.vat_20) {
-      content += this.padLine('TVA 20%:', `${data.vat_breakdown.vat_20.vat.toFixed(2)} EUR`, 32) + '\n';
+      content += this.padLine('Soumis TVA 20%:', `${data.vat_breakdown.vat_20.amount.toFixed(2)} EUR`, 32) + '\n';
+      content += this.padLine('Montant TVA 20%:', `${data.vat_breakdown.vat_20.vat.toFixed(2)} EUR`, 32) + '\n';
     }
     
     // Payment Methods Breakdown
