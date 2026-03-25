@@ -39,7 +39,7 @@ const BulletinDetailsDialog: React.FC<BulletinDetailsDialogProps> = ({
 
   const totalTtc = toFiniteNumber(bulletin.total_amount);
   const totalVat = toFiniteNumber(bulletin.total_vat);
-  const totalHt = totalTtc - totalVat;
+  // Total HT is derived from TTC - TVA (display only)
 
   const cardTotal = toFiniteNumber(bulletin.payment_methods_breakdown?.card);
   const cashTotal = toFiniteNumber(bulletin.payment_methods_breakdown?.cash);

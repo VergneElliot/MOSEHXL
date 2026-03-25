@@ -142,7 +142,7 @@ export const useClosureState = (): [ClosureState, ClosureActions] => {
     setError(null);
     setMonthlyStatsError(null);
     snackbarApi.closeSnackbar();
-  }, [snackbarApi.closeSnackbar]);
+  }, [snackbarApi]);
 
   const state: ClosureState = useMemo(
     () => ({
