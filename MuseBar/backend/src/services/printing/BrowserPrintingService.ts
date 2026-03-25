@@ -200,6 +200,11 @@ export class BrowserPrintingService extends BasePrintingService {
   private generateClosureBulletinHTML(data: ClosureBulletinData): string {
     const styles = this.getBulletinStyles();
     
+    const vat10Shown = Math.round((data.vat_breakdown.vat_10?.vat ?? 0) * 100) / 100;
+    const vat20Shown = Math.round((data.vat_breakdown.vat_20?.vat ?? 0) * 100) / 100;
+    const vatTotalShown = vat10Shown + vat20Shown;
+    const htTotalShown = Math.round((data.total_amount - vatTotalShown) * 100) / 100;
+
     return `
       <!DOCTYPE html>
       <html>
@@ -242,8 +247,12 @@ export class BrowserPrintingService extends BasePrintingService {
                 <td class="value">${data.total_amount.toFixed(2)} EUR</td>
               </tr>
               <tr>
-                <td>TVA collectée:</td>
-                <td class="value">${data.total_vat.toFixed(2)} EUR</td>
+                <td>Total HT:</td>
+                <td class="value">${htTotalShown.toFixed(2)} EUR</td>
+              </tr>
+              <tr>
+                <td>Montant total TVA:</td>
+                <td class="value">${vatTotalShown.toFixed(2)} EUR</td>
               </tr>
             </table>
           </div>
@@ -258,7 +267,7 @@ export class BrowserPrintingService extends BasePrintingService {
                 </tr>
                 <tr>
                   <td>Montant TVA 10%:</td>
-                  <td class="value">${data.vat_breakdown.vat_10.vat.toFixed(2)} EUR</td>
+                  <td class="value">${vat10Shown.toFixed(2)} EUR</td>
                 </tr>
               ` : ''}
               ${data.vat_breakdown.vat_20 ? `
@@ -268,7 +277,7 @@ export class BrowserPrintingService extends BasePrintingService {
                 </tr>
                 <tr>
                   <td>Montant TVA 20%:</td>
-                  <td class="value">${data.vat_breakdown.vat_20.vat.toFixed(2)} EUR</td>
+                  <td class="value">${vat20Shown.toFixed(2)} EUR</td>
                 </tr>
               ` : ''}
             </table>

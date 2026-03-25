@@ -212,7 +212,13 @@ export abstract class BasePrintingService implements IPrintingService {
     content += '--------------------------------\n';
     content += this.padLine('Transactions:', `${data.total_transactions}`, 32) + '\n';
     content += this.padLine('Total TTC:', `${data.total_amount.toFixed(2)} EUR`, 32) + '\n';
-    content += this.padLine('Montant total TVA:', `${data.total_vat.toFixed(2)} EUR`, 32) + '\n';
+    // Tie-out display: total VAT shown equals sum of displayed buckets.
+    const vat10Shown = Math.round((data.vat_breakdown.vat_10?.vat ?? 0) * 100) / 100;
+    const vat20Shown = Math.round((data.vat_breakdown.vat_20?.vat ?? 0) * 100) / 100;
+    const vatTotalShown = vat10Shown + vat20Shown;
+    const htTotalShown = Math.round((data.total_amount - vatTotalShown) * 100) / 100;
+    content += this.padLine('Total HT:', `${htTotalShown.toFixed(2)} EUR`, 32) + '\n';
+    content += this.padLine('Montant total TVA:', `${vatTotalShown.toFixed(2)} EUR`, 32) + '\n';
     
     // VAT Breakdown
     content += '--------------------------------\n';
@@ -221,13 +227,13 @@ export abstract class BasePrintingService implements IPrintingService {
       const ttc10 =
         (data.vat_breakdown.vat_10 as any).ttc ?? (data.vat_breakdown.vat_10.amount + data.vat_breakdown.vat_10.vat);
       content += this.padLine('Soumis TVA 10%:', `${ttc10.toFixed(2)} EUR`, 32) + '\n';
-      content += this.padLine('Montant TVA 10%:', `${data.vat_breakdown.vat_10.vat.toFixed(2)} EUR`, 32) + '\n';
+      content += this.padLine('Montant TVA 10%:', `${vat10Shown.toFixed(2)} EUR`, 32) + '\n';
     }
     if (data.vat_breakdown.vat_20) {
       const ttc20 =
         (data.vat_breakdown.vat_20 as any).ttc ?? (data.vat_breakdown.vat_20.amount + data.vat_breakdown.vat_20.vat);
       content += this.padLine('Soumis TVA 20%:', `${ttc20.toFixed(2)} EUR`, 32) + '\n';
-      content += this.padLine('Montant TVA 20%:', `${data.vat_breakdown.vat_20.vat.toFixed(2)} EUR`, 32) + '\n';
+      content += this.padLine('Montant TVA 20%:', `${vat20Shown.toFixed(2)} EUR`, 32) + '\n';
     }
     
     // Payment Methods Breakdown

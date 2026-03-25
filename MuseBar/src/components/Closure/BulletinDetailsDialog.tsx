@@ -38,7 +38,8 @@ const BulletinDetailsDialog: React.FC<BulletinDetailsDialogProps> = ({
   if (!bulletin) return null;
 
   const totalTtc = toFiniteNumber(bulletin.total_amount);
-  const totalVat = toFiniteNumber(bulletin.total_vat);
+  // total_vat is available on the bulletin, but for display we intentionally use
+  // the sum of displayed VAT buckets so that numbers tie out to the cent.
   // Total HT is derived from TTC - TVA (display only)
 
   const cardTotal = toFiniteNumber(bulletin.payment_methods_breakdown?.card);
@@ -60,11 +61,14 @@ const BulletinDetailsDialog: React.FC<BulletinDetailsDialogProps> = ({
   // Round only for display, never "rebalance" buckets (accounting wants the bucket sums themselves).
   const vat10TtcDisplay = roundToCents(vat10TtcExact) / 100;
   const vat20TtcDisplay = roundToCents(vat20TtcExact) / 100;
-  const vat10AmountDisplay = roundToCents(vat10Amount) / 100;
-  const vat20AmountDisplay = roundToCents(vat20Amount) / 100;
+  const vat10AmountCents = roundToCents(vat10Amount);
+  const vat20AmountCents = roundToCents(vat20Amount);
+  const vat10AmountDisplay = vat10AmountCents / 100;
+  const vat20AmountDisplay = vat20AmountCents / 100;
 
   const ttcTotalCents = roundToCents(totalTtc);
-  const vatTotalCents = roundToCents(totalVat);
+  // Display rule: make totals tie out visually (sum of displayed buckets).
+  const vatTotalCents = vat10AmountCents + vat20AmountCents;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -106,7 +110,7 @@ const BulletinDetailsDialog: React.FC<BulletinDetailsDialogProps> = ({
                 Montant total TVA
               </Typography>
               <Typography variant="h6" fontWeight="bold">
-                {formatCurrency(totalVat)}
+                {formatCurrency(vatTotalCents / 100)}
               </Typography>
             </Grid>
 
