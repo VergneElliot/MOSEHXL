@@ -42,6 +42,12 @@ const BulletinDetailsDialog: React.FC<BulletinDetailsDialogProps> = ({
   const tipsTotal = toFiniteNumber(bulletin.tips_total);
   const changeTotal = toFiniteNumber(bulletin.change_total);
 
+  const vat10Base = toFiniteNumber(bulletin.vat_breakdown?.vat_10?.amount);
+  const vat20Base = toFiniteNumber(bulletin.vat_breakdown?.vat_20?.amount);
+  const vat10Amount = toFiniteNumber(bulletin.vat_breakdown?.vat_10?.vat);
+  const vat20Amount = toFiniteNumber(bulletin.vat_breakdown?.vat_20?.vat);
+  const totalSoumisTVA = vat10Base + vat20Base;
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>Détails du bulletin</DialogTitle>
@@ -70,19 +76,62 @@ const BulletinDetailsDialog: React.FC<BulletinDetailsDialogProps> = ({
 
             <Grid item xs={6} md={4}>
               <Typography variant="caption" color="textSecondary">
-                Total HT
+                Total soumis à TVA (HT)
               </Typography>
               <Typography variant="h6" fontWeight="bold">
-                {formatCurrency(totalHt)}
+                {formatCurrency(Number.isFinite(totalSoumisTVA) && totalSoumisTVA > 0 ? totalSoumisTVA : totalHt)}
               </Typography>
             </Grid>
 
             <Grid item xs={6} md={4}>
               <Typography variant="caption" color="textSecondary">
-                Total taxes (TVA)
+                Montant total TVA
               </Typography>
               <Typography variant="h6" fontWeight="bold">
                 {formatCurrency(totalVat)}
+              </Typography>
+            </Grid>
+
+            <Grid item xs={12}>
+              <Divider sx={{ my: 1 }} />
+              <Typography variant="subtitle2" color="textSecondary">
+                Détail TVA (France)
+              </Typography>
+            </Grid>
+
+            <Grid item xs={6} md={3}>
+              <Typography variant="caption" color="textSecondary">
+                Total soumis à TVA 10%
+              </Typography>
+              <Typography variant="body1" fontWeight="bold">
+                {formatCurrency(vat10Base)}
+              </Typography>
+            </Grid>
+
+            <Grid item xs={6} md={3}>
+              <Typography variant="caption" color="textSecondary">
+                Total soumis à TVA 20%
+              </Typography>
+              <Typography variant="body1" fontWeight="bold">
+                {formatCurrency(vat20Base)}
+              </Typography>
+            </Grid>
+
+            <Grid item xs={6} md={3}>
+              <Typography variant="caption" color="textSecondary">
+                Montant TVA 10%
+              </Typography>
+              <Typography variant="body1" fontWeight="bold">
+                {formatCurrency(vat10Amount)}
+              </Typography>
+            </Grid>
+
+            <Grid item xs={6} md={3}>
+              <Typography variant="caption" color="textSecondary">
+                Montant TVA 20%
+              </Typography>
+              <Typography variant="body1" fontWeight="bold">
+                {formatCurrency(vat20Amount)}
               </Typography>
             </Grid>
 
