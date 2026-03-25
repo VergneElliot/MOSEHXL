@@ -5,7 +5,7 @@
 
 import express from 'express';
 import { OrderModel, OrderItemModel, SubBillModel } from '../../models';
-import { LegalJournalModel } from '../../models/legalJournal';
+import LegalJournalModel from '../../models/legalJournal';
 import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';
 import { pool } from '../../app';

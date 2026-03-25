@@ -4,7 +4,7 @@
  */
 
 import express from 'express';
-import { LegalJournalModel } from '../../models/legalJournal';
+import LegalJournalModel from '../../models/legalJournal';
 import { Logger } from '../../utils/logger';
 import { JournalQueries } from '../../models/legalJournal';
 import { requireAuth, requireAdmin } from '../auth';
