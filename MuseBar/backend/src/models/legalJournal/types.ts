@@ -45,9 +45,25 @@ export interface IntegrityCheckResult {
   errors: string[];
 }
 
-export interface VATBreakdown extends Record<string, { amount: number; vat: number }> {
-  vat_10: { amount: number; vat: number };
-  vat_20: { amount: number; vat: number };
+export interface VATBreakdownItem {
+  /**
+   * Base HT (assiette) for this VAT rate bucket.
+   */
+  amount: number;
+  /**
+   * VAT amount (TVA) for this bucket.
+   */
+  vat: number;
+  /**
+   * Total TTC for this bucket (sum of item total_price).
+   * This is what accounting typically calls "total soumis à TVA" per rate.
+   */
+  ttc: number;
+}
+
+export interface VATBreakdown extends Record<string, VATBreakdownItem> {
+  vat_10: VATBreakdownItem;
+  vat_20: VATBreakdownItem;
 }
 
 export interface PaymentBreakdown {

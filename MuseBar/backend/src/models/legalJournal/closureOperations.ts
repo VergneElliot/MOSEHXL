@@ -11,6 +11,22 @@ import { DEFAULT_APP_TIMEZONE } from '../../config/timezone';
 import { getBusinessDayPeriod } from './businessDayPeriod';
 import { computePaymentBreakdownFromOrders } from './paymentBreakdown';
 
+function roundTo4(amount: number): number {
+  return Math.round(amount * 10000) / 10000;
+}
+
+function isVat10Rate(rate: number): boolean {
+  // 10%: rate 0.10 or 10; otherwise treat as 20%
+  return rate <= 0.15 || (rate >= 9 && rate <= 11);
+}
+
+function vatFromTtc(ttc: number, rate: 0.1 | 0.2): number {
+  // Reverse extraction from TTC. For exactness and to avoid float drift:
+  // 10% => VAT = TTC / 11 ; 20% => VAT = TTC / 6
+  const denom = rate === 0.1 ? 11 : 6;
+  return roundTo4(ttc / denom);
+}
+
 export class ClosureOperations {
   /**
    * Create daily closure bulletin for one establishment (multi-tenant: only that establishment's orders).
@@ -53,17 +69,14 @@ export class ClosureOperations {
 
     const { totalAmount, paymentBreakdown } = computePaymentBreakdownFromOrders(orders, subBills);
     const totalTransactions = orders.length;
-    const totalVat = orders.reduce(
-      (sum: number, order: { total_tax?: string | number; taxAmount?: string | number }) =>
-        sum + parseFloat(String(order.total_tax ?? order.taxAmount ?? 0)),
-      0
-    );
+    const vatBreakdown = await getExactVatBreakdownFromOrderItems(pool, orderIds);
+    const computedTotalAmount = vatBreakdown.vat_10.ttc + vatBreakdown.vat_20.ttc;
+    const computedTotalVat = vatBreakdown.vat_10.vat + vatBreakdown.vat_20.vat;
 
     const netTipsTotal = orders.reduce((sum: number, order: { tips?: string | number }) => sum + parseFloat(String(order.tips || '0')), 0);
     const netChangeTotal = orders.reduce((sum: number, order: { change?: string | number }) => sum + parseFloat(String(order.change || '0')), 0);
     const tipsTotal = Math.max(0, netTipsTotal);
     const changeTotal = Math.max(0, netChangeTotal);
-    const vatBreakdown = await getExactVatBreakdownFromOrderItems(pool, orderIds);
 
     // Get legal journal entries for sequence calculation
     const entries = await JournalQueries.getEntriesForPeriod(start.toDate(), end.toDate());
@@ -71,7 +84,7 @@ export class ClosureOperations {
     const lastSequence = entries.length > 0 ? Math.max(...entries.map((e: any) => e.sequence_number)) : 0;
 
     // Generate closure hash
-    const closureData = `DAILY|${date.toISOString().split('T')[0]}|${totalTransactions}|${totalAmount}|${totalVat}|${firstSequence}|${lastSequence}`;
+    const closureData = `DAILY|${date.toISOString().split('T')[0]}|${totalTransactions}|${computedTotalAmount}|${computedTotalVat}|${firstSequence}|${lastSequence}`;
     const closureHash = JournalSigning.generateClosureHash(closureData);
 
     // Insert closure bulletin (scoped to this establishment)
@@ -80,8 +93,8 @@ export class ClosureOperations {
       start.toDate(),
       end.toDate(),
       totalTransactions,
-      totalAmount,
-      totalVat,
+      computedTotalAmount,
+      computedTotalVat,
       vatBreakdown,
       paymentBreakdown,
       tipsTotal,
@@ -173,16 +186,11 @@ export class ClosureOperations {
 
     const { totalAmount, paymentBreakdown } = computePaymentBreakdownFromOrders(orders, subBills);
     const totalTransactions = orders.length;
-    const totalVat = orders.reduce(
-      (sum: number, order: { total_tax?: string | number; taxAmount?: string | number }) =>
-        sum + parseFloat(String(order.total_tax ?? order.taxAmount ?? '0')),
-      0
-    );
+    const vatBreakdown = await getExactVatBreakdownFromOrderItems(pool, orderIds);
+    const computedTotalAmount = vatBreakdown.vat_10.ttc + vatBreakdown.vat_20.ttc;
+    const computedTotalVat = vatBreakdown.vat_10.vat + vatBreakdown.vat_20.vat;
     const tipsTotal = Math.max(0, orders.reduce((sum: number, order: { tips?: string | number }) => sum + parseFloat(String(order.tips || '0')), 0));
     const changeTotal = Math.max(0, orders.reduce((sum: number, order: { change?: string | number }) => sum + parseFloat(String(order.change || '0')), 0));
-
-    // Exact VAT breakdown from order_items (no rounding for storage)
-    const vatBreakdown = await getExactVatBreakdownFromOrderItems(pool, orderIds);
 
     // Get journal sequence range
     const entries = await JournalQueries.getEntriesForPeriod(startDate, endDate);
@@ -190,7 +198,7 @@ export class ClosureOperations {
     const lastSequence = entries.length > 0 ? Math.max(...entries.map(e => e.sequence_number)) : 0;
 
     // Generate closure hash
-    const closureData = `${closureType}|${startDate.toISOString()}|${endDate.toISOString()}|${totalTransactions}|${totalAmount}|${totalVat}|${firstSequence}|${lastSequence}`;
+    const closureData = `${closureType}|${startDate.toISOString()}|${endDate.toISOString()}|${totalTransactions}|${computedTotalAmount}|${computedTotalVat}|${firstSequence}|${lastSequence}`;
     const closureHash = JournalSigning.generateClosureHash(closureData);
 
     return await JournalQueries.insertClosureBulletin(
@@ -198,8 +206,8 @@ export class ClosureOperations {
       startDate,
       endDate,
       totalTransactions,
-      totalAmount,
-      totalVat,
+      computedTotalAmount,
+      computedTotalVat,
       vatBreakdown,
       paymentBreakdown,
       tipsTotal,
@@ -240,33 +248,43 @@ async function getExactVatBreakdownFromOrderItems(
   orderIds: number[]
 ): Promise<VATBreakdown> {
   const vatBreakdown: VATBreakdown = {
-    vat_10: { amount: 0, vat: 0 },
-    vat_20: { amount: 0, vat: 0 }
+    vat_10: { amount: 0, vat: 0, ttc: 0 },
+    vat_20: { amount: 0, vat: 0, ttc: 0 }
   };
   if (orderIds.length === 0) return vatBreakdown;
 
   const itemsResult = await pool.query(
-    'SELECT total_price, tax_amount, tax_rate FROM order_items WHERE order_id = ANY($1)',
+    'SELECT total_price, tax_rate FROM order_items WHERE order_id = ANY($1)',
     [orderIds]
   );
-  const items = itemsResult.rows as Array<{ total_price: string | number; tax_amount: string | number; tax_rate: string | number }>;
+  const items = itemsResult.rows as Array<{ total_price: string | number; tax_rate: string | number }>;
 
+  let ttc10 = 0;
+  let ttc20 = 0;
   for (const item of items) {
     const totalPrice = parseFloat(String(item.total_price ?? 0));
-    const taxAmount = parseFloat(String(item.tax_amount ?? 0));
     const rate = parseFloat(String(item.tax_rate ?? 0.2));
-    // 10%: rate 0.10 or 10; otherwise treat as 20%
-    const is10 = rate <= 0.15 || (rate >= 9 && rate <= 11);
-    const amountHt = totalPrice - taxAmount;
-
-    if (is10) {
-      vatBreakdown.vat_10.amount += amountHt;
-      vatBreakdown.vat_10.vat += taxAmount;
+    if (isVat10Rate(rate)) {
+      ttc10 += totalPrice;
     } else {
-      vatBreakdown.vat_20.amount += amountHt;
-      vatBreakdown.vat_20.vat += taxAmount;
+      ttc20 += totalPrice;
     }
   }
+
+  // Compute VAT/HT from the bucket totals (audit-friendly, avoids per-line rounding drift)
+  const vat10 = vatFromTtc(ttc10, 0.1);
+  const vat20 = vatFromTtc(ttc20, 0.2);
+  const ht10 = roundTo4(ttc10 - vat10);
+  const ht20 = roundTo4(ttc20 - vat20);
+
+  vatBreakdown.vat_10.ttc = roundTo4(ttc10);
+  vatBreakdown.vat_10.vat = vat10;
+  vatBreakdown.vat_10.amount = ht10;
+
+  vatBreakdown.vat_20.ttc = roundTo4(ttc20);
+  vatBreakdown.vat_20.vat = vat20;
+  vatBreakdown.vat_20.amount = ht20;
+
   return vatBreakdown;
 }
 
