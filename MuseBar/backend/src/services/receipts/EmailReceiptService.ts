@@ -403,7 +403,7 @@ export class EmailReceiptService {
               ${data.vat_breakdown.vat_10 ? `
                 <tr>
                   <td>Total soumis à TVA 10%:</td>
-                  <td class="value">${data.vat_breakdown.vat_10.amount.toFixed(2)} EUR</td>
+                  <td class="value">${(((data.vat_breakdown.vat_10 as any).ttc ?? (data.vat_breakdown.vat_10.amount + data.vat_breakdown.vat_10.vat)) as number).toFixed(2)} EUR</td>
                 </tr>
                 <tr>
                   <td>Montant TVA 10%:</td>
@@ -413,7 +413,7 @@ export class EmailReceiptService {
               ${data.vat_breakdown.vat_20 ? `
                 <tr>
                   <td>Total soumis à TVA 20%:</td>
-                  <td class="value">${data.vat_breakdown.vat_20.amount.toFixed(2)} EUR</td>
+                  <td class="value">${(((data.vat_breakdown.vat_20 as any).ttc ?? (data.vat_breakdown.vat_20.amount + data.vat_breakdown.vat_20.vat)) as number).toFixed(2)} EUR</td>
                 </tr>
                 <tr>
                   <td>Montant TVA 20%:</td>

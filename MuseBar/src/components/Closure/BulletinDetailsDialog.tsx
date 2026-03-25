@@ -28,27 +28,6 @@ function roundToCents(amount: number): number {
   return Math.round(amount * 100);
 }
 
-function allocateRoundedCents(exactAmounts: number[], targetTotalCents: number): number[] {
-  const exactCents = exactAmounts.map((a) => (Number.isFinite(a) ? a * 100 : 0));
-  const floored = exactCents.map((c) => Math.floor(c));
-  const remainders = exactCents.map((c, idx) => ({ idx, r: c - floored[idx] }));
-
-  const sumFloored = floored.reduce((s, v) => s + v, 0);
-  let missing = targetTotalCents - sumFloored;
-
-  // Distribute missing cents to biggest remainders (or remove from smallest if negative)
-  remainders.sort((a, b) => (missing >= 0 ? b.r - a.r : a.r - b.r));
-  const out = [...floored];
-
-  for (let i = 0; i < remainders.length && missing !== 0; i++) {
-    const { idx } = remainders[i];
-    out[idx] += missing >= 0 ? 1 : -1;
-    missing += missing >= 0 ? -1 : 1;
-  }
-
-  return out;
-}
-
 const BulletinDetailsDialog: React.FC<BulletinDetailsDialogProps> = ({
   open,
   bulletin,
@@ -72,19 +51,20 @@ const BulletinDetailsDialog: React.FC<BulletinDetailsDialogProps> = ({
   const vat20Base = toFiniteNumber(bulletin.vat_breakdown?.vat_20?.amount);
   const vat10Amount = toFiniteNumber(bulletin.vat_breakdown?.vat_10?.vat);
   const vat20Amount = toFiniteNumber(bulletin.vat_breakdown?.vat_20?.vat);
-  const totalSoumisTVA = vat10Base + vat20Base;
 
-  // Display-safe rounding: ensure the rounded 10%+20% lines add up to the rounded totals.
-  const baseTotalCents = roundToCents(Number.isFinite(totalSoumisTVA) && totalSoumisTVA > 0 ? totalSoumisTVA : totalHt);
-  const [vat10BaseCents, vat20BaseCents] = allocateRoundedCents([vat10Base, vat20Base], baseTotalCents);
+  // "Total soumis à TVA X%" must be the exact TTC sum of all items in that VAT bucket.
+  // Prefer backend-provided TTC bucket totals (sum of order_items.total_price), fallback to base+vat.
+  const vat10TtcExact = toFiniteNumber((bulletin.vat_breakdown as any)?.vat_10?.ttc) || vat10Base + vat10Amount;
+  const vat20TtcExact = toFiniteNumber((bulletin.vat_breakdown as any)?.vat_20?.ttc) || vat20Base + vat20Amount;
 
+  // Round only for display, never "rebalance" buckets (accounting wants the bucket sums themselves).
+  const vat10TtcDisplay = roundToCents(vat10TtcExact) / 100;
+  const vat20TtcDisplay = roundToCents(vat20TtcExact) / 100;
+  const vat10AmountDisplay = roundToCents(vat10Amount) / 100;
+  const vat20AmountDisplay = roundToCents(vat20Amount) / 100;
+
+  const ttcTotalCents = roundToCents(totalTtc);
   const vatTotalCents = roundToCents(totalVat);
-  const [vat10AmountCents, vat20AmountCents] = allocateRoundedCents([vat10Amount, vat20Amount], vatTotalCents);
-
-  const vat10BaseDisplay = vat10BaseCents / 100;
-  const vat20BaseDisplay = vat20BaseCents / 100;
-  const vat10AmountDisplay = vat10AmountCents / 100;
-  const vat20AmountDisplay = vat20AmountCents / 100;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -114,10 +94,10 @@ const BulletinDetailsDialog: React.FC<BulletinDetailsDialogProps> = ({
 
             <Grid item xs={6} md={4}>
               <Typography variant="caption" color="textSecondary">
-                Total soumis à TVA (HT)
+                Total HT
               </Typography>
               <Typography variant="h6" fontWeight="bold">
-                {formatCurrency(Number.isFinite(totalSoumisTVA) && totalSoumisTVA > 0 ? totalSoumisTVA : totalHt)}
+                {formatCurrency((ttcTotalCents - vatTotalCents) / 100)}
               </Typography>
             </Grid>
 
@@ -143,7 +123,7 @@ const BulletinDetailsDialog: React.FC<BulletinDetailsDialogProps> = ({
                   Total soumis à TVA 10%
                 </Typography>
                 <Typography variant="body1" fontWeight="bold">
-                  {formatCurrency(vat10BaseDisplay)}
+                  {formatCurrency(vat10TtcDisplay)}
                 </Typography>
                 <Typography variant="caption" color="textSecondary" sx={{ mt: 1 }}>
                   Montant TVA 10%
@@ -160,7 +140,7 @@ const BulletinDetailsDialog: React.FC<BulletinDetailsDialogProps> = ({
                   Total soumis à TVA 20%
                 </Typography>
                 <Typography variant="body1" fontWeight="bold">
-                  {formatCurrency(vat20BaseDisplay)}
+                  {formatCurrency(vat20TtcDisplay)}
                 </Typography>
                 <Typography variant="caption" color="textSecondary" sx={{ mt: 1 }}>
                   Montant TVA 20%

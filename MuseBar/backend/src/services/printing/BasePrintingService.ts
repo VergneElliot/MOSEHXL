@@ -218,11 +218,15 @@ export abstract class BasePrintingService implements IPrintingService {
     content += '--------------------------------\n';
     content += ESC_POS.BOLD_ON + 'DETAIL TVA:\n' + ESC_POS.BOLD_OFF;
     if (data.vat_breakdown.vat_10) {
-      content += this.padLine('Soumis TVA 10%:', `${data.vat_breakdown.vat_10.amount.toFixed(2)} EUR`, 32) + '\n';
+      const ttc10 =
+        (data.vat_breakdown.vat_10 as any).ttc ?? (data.vat_breakdown.vat_10.amount + data.vat_breakdown.vat_10.vat);
+      content += this.padLine('Soumis TVA 10%:', `${ttc10.toFixed(2)} EUR`, 32) + '\n';
       content += this.padLine('Montant TVA 10%:', `${data.vat_breakdown.vat_10.vat.toFixed(2)} EUR`, 32) + '\n';
     }
     if (data.vat_breakdown.vat_20) {
-      content += this.padLine('Soumis TVA 20%:', `${data.vat_breakdown.vat_20.amount.toFixed(2)} EUR`, 32) + '\n';
+      const ttc20 =
+        (data.vat_breakdown.vat_20 as any).ttc ?? (data.vat_breakdown.vat_20.amount + data.vat_breakdown.vat_20.vat);
+      content += this.padLine('Soumis TVA 20%:', `${ttc20.toFixed(2)} EUR`, 32) + '\n';
       content += this.padLine('Montant TVA 20%:', `${data.vat_breakdown.vat_20.vat.toFixed(2)} EUR`, 32) + '\n';
     }
     

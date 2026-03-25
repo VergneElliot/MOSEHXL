@@ -122,8 +122,8 @@ export interface ClosureBulletin {
   total_amount: number;
   total_vat: number;
   vat_breakdown: {
-    vat_10: { amount: number; vat: number };
-    vat_20: { amount: number; vat: number };
+    vat_10: { amount: number; vat: number; ttc?: number };
+    vat_20: { amount: number; vat: number; ttc?: number };
   };
   payment_methods_breakdown: { [key: string]: number };
   first_sequence: number;
