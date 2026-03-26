@@ -15,6 +15,7 @@ import {
   DialogContent,
   DialogActions,
   TextField,
+  Grid,
 } from '@mui/material';
 import {
   Clear as ClearIcon,
@@ -96,10 +97,22 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
 
   return (
     <Card sx={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <CardContent sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <Box sx={{ flexShrink: 0 }} display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-          <Typography variant="h6" component="h2">
-            Commande ({currentOrder.length} article{currentOrder.length > 1 ? 's' : ''})
+      <CardContent
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          pt: 0.4,
+          px: 1.25,
+          pb: 0.75,
+          '&:last-child': { pb: 0.75 },
+        }}
+      >
+        <Box sx={{ flexShrink: 0 }} display="flex" justifyContent="space-between" alignItems="center" mb={0.25}>
+          <Typography variant="subtitle1" component="h2" sx={{ fontWeight: 700 }}>
+            Commande
           </Typography>
           {currentOrder.length > 0 && (
             <IconButton onClick={onClearOrder} color="error" size="small" title="Vider la commande">
@@ -108,29 +121,76 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
           )}
         </Box>
 
-        {currentOrder.length === 0 ? (
-          <>
-            <Box
-              display="flex"
-              alignItems="center"
-              justifyContent="center"
-              flexGrow={1}
-              textAlign="center"
-              py={4}
-            >
-              <Typography color="textSecondary">Aucun article sélectionné</Typography>
-            </Box>
-            {onFaireDeLaMonnaie && (
-              <Box sx={{ flexShrink: 0, pt: 1 }}>
+        <Box sx={{ flexShrink: 0, mb: 1.5 }}>
+          <Grid container spacing={1}>
+            <Grid item xs={6}>
+              <Button
+                variant="contained"
+                fullWidth
+                size="medium"
+                onClick={onQuickCard}
+                disabled={!canProcessPayment}
+                startIcon={<CreditCardIcon />}
+                sx={{
+                  py: isMobile ? 1 : 1.1,
+                  fontSize: isMobile ? '0.9rem' : '0.95rem',
+                  fontWeight: 'bold',
+                  bgcolor: 'primary.main',
+                }}
+              >
+                Paiement CB
+              </Button>
+            </Grid>
+            <Grid item xs={6}>
+              <Button
+                variant="contained"
+                fullWidth
+                size="medium"
+                onClick={onQuickCash}
+                disabled={!canProcessPayment}
+                startIcon={<CashIcon />}
+                sx={{
+                  py: isMobile ? 1 : 1.1,
+                  fontSize: isMobile ? '0.9rem' : '0.95rem',
+                  fontWeight: 'bold',
+                  bgcolor: 'success.main',
+                  color: 'success.contrastText',
+                  '&:hover': { bgcolor: 'success.dark' },
+                }}
+              >
+                Paiement espèces
+              </Button>
+            </Grid>
+            <Grid item xs={6}>
+              <Button
+                variant="outlined"
+                fullWidth
+                size="medium"
+                onClick={onCheckout}
+                disabled={!canProcessPayment}
+                startIcon={<OptionsIcon />}
+                sx={{
+                  py: isMobile ? 0.3 : 0.4,
+                  minHeight: isMobile ? 30 : 32,
+                  fontSize: isMobile ? '0.82rem' : '0.88rem',
+                  fontWeight: 'bold',
+                }}
+              >
+                Options de paiement
+              </Button>
+            </Grid>
+            <Grid item xs={6}>
+              {onFaireDeLaMonnaie ? (
                 <Button
                   variant="outlined"
                   fullWidth
-                  size="large"
+                  size="medium"
                   onClick={handleOpenChangeDialog}
                   startIcon={<ChangeIcon />}
                   sx={{
-                    py: isMobile ? 1.25 : 1.5,
-                    fontSize: isMobile ? '0.95rem' : '1rem',
+                    py: isMobile ? 0.3 : 0.4,
+                    minHeight: isMobile ? 30 : 32,
+                    fontSize: isMobile ? '0.82rem' : '0.88rem',
                     fontWeight: 'bold',
                     borderColor: 'error.light',
                     color: 'error.dark',
@@ -139,12 +199,27 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
                 >
                   Faire de la monnaie
                 </Button>
-              </Box>
-            )}
-          </>
-        ) : (
-          <>
-            <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+              ) : (
+                <Box />
+              )}
+            </Grid>
+          </Grid>
+        </Box>
+
+        <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+          {currentOrder.length === 0 ? (
+            <Box
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              textAlign="center"
+              py={4}
+              minHeight="100%"
+            >
+              <Typography color="textSecondary">Aucun article sélectionné</Typography>
+            </Box>
+          ) : (
+            <>
               <List sx={{ py: 0 }}>
                 {currentOrder.map((item, index) => (
                   <OrderSummaryItem
@@ -160,105 +235,33 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
                   />
                 ))}
               </List>
-            </Box>
+              <Divider sx={{ my: 2 }} />
 
-            <Divider sx={{ my: 2 }} />
+              <Box sx={{ flexShrink: 0, pb: 0.5 }}>
+                <Box display="flex" justifyContent="space-between" mb={1}>
+                  <Typography variant="body2">Sous-total HT:</Typography>
+                  <Typography variant="body2">{formatCurrency(orderSubtotal - orderTax)}</Typography>
+                </Box>
 
-            <Box sx={{ flexShrink: 0 }}>
-              <Box display="flex" justifyContent="space-between" mb={1}>
-                <Typography variant="body2">Sous-total HT:</Typography>
-                <Typography variant="body2">{formatCurrency(orderSubtotal - orderTax)}</Typography>
+                <Box display="flex" justifyContent="space-between" mb={1}>
+                  <Typography variant="body2">TVA:</Typography>
+                  <Typography variant="body2">{formatCurrency(orderTax)}</Typography>
+                </Box>
+
+                <Divider sx={{ my: 1 }} />
+
+                <Box display="flex" justifyContent="space-between" mb={1}>
+                  <Typography variant="h6" fontWeight="bold">
+                    Total TTC:
+                  </Typography>
+                  <Typography variant="h6" fontWeight="bold" color="primary">
+                    {formatCurrency(orderTotal)}
+                  </Typography>
+                </Box>
               </Box>
-
-              <Box display="flex" justifyContent="space-between" mb={1}>
-                <Typography variant="body2">TVA:</Typography>
-                <Typography variant="body2">{formatCurrency(orderTax)}</Typography>
-              </Box>
-
-              <Divider sx={{ my: 1 }} />
-
-              <Box display="flex" justifyContent="space-between" mb={2}>
-                <Typography variant="h6" fontWeight="bold">
-                  Total TTC:
-                </Typography>
-                <Typography variant="h6" fontWeight="bold" color="primary">
-                  {formatCurrency(orderTotal)}
-                </Typography>
-              </Box>
-
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <Button
-                  variant="contained"
-                  fullWidth
-                  size="large"
-                  onClick={onQuickCard}
-                  disabled={!canProcessPayment}
-                  startIcon={<CreditCardIcon />}
-                  sx={{
-                    py: isMobile ? 1.25 : 1.5,
-                    fontSize: isMobile ? '0.95rem' : '1rem',
-                    fontWeight: 'bold',
-                    bgcolor: 'primary.main',
-                  }}
-                >
-                  Paiement CB
-                </Button>
-                <Button
-                  variant="contained"
-                  fullWidth
-                  size="large"
-                  onClick={onQuickCash}
-                  disabled={!canProcessPayment}
-                  startIcon={<CashIcon />}
-                  sx={{
-                    py: isMobile ? 1.25 : 1.5,
-                    fontSize: isMobile ? '0.95rem' : '1rem',
-                    fontWeight: 'bold',
-                    bgcolor: 'success.main',
-                    color: 'success.contrastText',
-                    '&:hover': { bgcolor: 'success.dark' },
-                  }}
-                >
-                  Paiement espèces
-                </Button>
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  size="large"
-                  onClick={onCheckout}
-                  disabled={!canProcessPayment}
-                  startIcon={<OptionsIcon />}
-                  sx={{
-                    py: isMobile ? 1.25 : 1.5,
-                    fontSize: isMobile ? '0.95rem' : '1rem',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  Options de paiement
-                </Button>
-                {onFaireDeLaMonnaie && (
-                  <Button
-                    variant="outlined"
-                    fullWidth
-                    size="large"
-                    onClick={handleOpenChangeDialog}
-                    startIcon={<ChangeIcon />}
-                    sx={{
-                      py: isMobile ? 1.25 : 1.5,
-                      fontSize: isMobile ? '0.95rem' : '1rem',
-                      fontWeight: 'bold',
-                      borderColor: 'error.light',
-                      color: 'error.dark',
-                      '&:hover': { borderColor: 'error.main', bgcolor: 'error.light' },
-                    }}
-                  >
-                    Faire de la monnaie
-                  </Button>
-                )}
-              </Box>
-            </Box>
-          </>
-        )}
+            </>
+          )}
+        </Box>
       </CardContent>
 
       <Dialog open={changeDialogOpen} onClose={handleCloseChangeDialog} maxWidth="xs" fullWidth>

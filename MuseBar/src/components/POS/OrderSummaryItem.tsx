@@ -29,7 +29,10 @@ const OrderSummaryItem: React.FC<OrderSummaryItemProps> = ({
       <ListItem sx={{ px: 0, py: 1 }}>
         <Box sx={{ width: '100%' }}>
           <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={0.5}>
-            <Typography variant="body2" sx={{ fontWeight: 'medium', flexGrow: 1 }}>
+            <Typography
+              variant="body1"
+              sx={{ fontWeight: 700, fontSize: { xs: '1.22rem', md: '1.42rem' }, lineHeight: 1.2, flexGrow: 1 }}
+            >
               {item.productName}
             </Typography>
             <IconButton
@@ -45,7 +48,7 @@ const OrderSummaryItem: React.FC<OrderSummaryItemProps> = ({
 
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
             <Box textAlign="left">
-              <Typography variant="body2" color="primary" fontWeight="bold">
+              <Typography variant="body1" color="primary" fontWeight="bold" sx={{ fontSize: { xs: '1rem', md: '1.08rem' } }}>
                 {formatCurrency(item.totalPrice)}
               </Typography>
             </Box>
