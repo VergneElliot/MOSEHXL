@@ -54,7 +54,7 @@ function TabPanel(props: TabPanelProps) {
             overflowY: scrollMode === 'auto' ? 'auto' : 'hidden',
             display: 'flex',
             flexDirection: 'column',
-            p: 3,
+            p: scrollMode === 'hidden' ? 1 : 3,
           }}
         >
           {children}
