@@ -16,6 +16,7 @@ export interface ClosureAPIActions {
 export interface CreateClosureData {
   date: string;
   type: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL';
+  force?: boolean;
 }
 
 export const useClosureAPI = (
@@ -98,6 +99,7 @@ export const useClosureAPI = (
           {
           date: closureData.date,
           type: closureData.type,
+          force: closureData.force === true,
         }
         );
         addBulletin(result.closure ?? (result as unknown as ClosureBulletin));

@@ -35,13 +35,18 @@ export class ClosureOperations {
    * @param timezone - IANA timezone (e.g. Europe/Paris). Defaults to DEFAULT_APP_TIMEZONE.
    * @returns The created closure bulletin
    */
-  static async createDailyClosure(date: Date, establishmentId: string, timezone: string = DEFAULT_APP_TIMEZONE): Promise<ClosureBulletin> {
+  static async createDailyClosure(
+    date: Date,
+    establishmentId: string,
+    timezone: string = DEFAULT_APP_TIMEZONE,
+    force = false
+  ): Promise<ClosureBulletin> {
     // Business day period uses configurable timezone (Paris for France)
     const { start, end } = getBusinessDayPeriod(date, '02:00', timezone);
 
     // Check if closure already exists for this establishment
     const exists = await JournalQueries.closureBulletinExists('DAILY', start.toDate(), end.toDate(), establishmentId);
-    if (exists) {
+    if (exists && !force) {
       throw new Error('Daily closure bulletin already exists for this period');
     }
 
@@ -109,7 +114,7 @@ export class ClosureOperations {
   /**
    * Create weekly closure bulletin for one establishment.
    */
-  static async createWeeklyClosure(date: Date, establishmentId: string): Promise<ClosureBulletin> {
+  static async createWeeklyClosure(date: Date, establishmentId: string, force = false): Promise<ClosureBulletin> {
     // Get the start of the week (Monday) and end of the week (Sunday)
     const startOfWeek = new Date(date);
     const dayOfWeek = startOfWeek.getDay();
@@ -121,29 +126,29 @@ export class ClosureOperations {
     endOfWeek.setDate(endOfWeek.getDate() + 6);
     endOfWeek.setHours(23, 59, 59, 999);
 
-    return await this.createPeriodClosure('WEEKLY', startOfWeek, endOfWeek, date, establishmentId);
+    return await this.createPeriodClosure('WEEKLY', startOfWeek, endOfWeek, date, establishmentId, force);
   }
 
   /**
    * Create monthly closure bulletin for one establishment.
    */
-  static async createMonthlyClosure(date: Date, establishmentId: string): Promise<ClosureBulletin> {
+  static async createMonthlyClosure(date: Date, establishmentId: string, force = false): Promise<ClosureBulletin> {
     // Get the start and end of the month
     const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
     const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
 
-    return await this.createPeriodClosure('MONTHLY', startOfMonth, endOfMonth, date, establishmentId);
+    return await this.createPeriodClosure('MONTHLY', startOfMonth, endOfMonth, date, establishmentId, force);
   }
 
   /**
    * Create annual closure bulletin for one establishment.
    */
-  static async createAnnualClosure(date: Date, establishmentId: string): Promise<ClosureBulletin> {
+  static async createAnnualClosure(date: Date, establishmentId: string, force = false): Promise<ClosureBulletin> {
     // Get the start and end of the year
     const startOfYear = new Date(date.getFullYear(), 0, 1);
     const endOfYear = new Date(date.getFullYear(), 11, 31, 23, 59, 59, 999);
 
-    return await this.createPeriodClosure('ANNUAL', startOfYear, endOfYear, date, establishmentId);
+    return await this.createPeriodClosure('ANNUAL', startOfYear, endOfYear, date, establishmentId, force);
   }
 
   /**
@@ -154,11 +159,12 @@ export class ClosureOperations {
     startDate: Date,
     endDate: Date,
     referenceDate: Date,
-    establishmentId: string
+    establishmentId: string,
+    force = false
   ): Promise<ClosureBulletin> {
     // Check if closure already exists for this establishment
     const exists = await JournalQueries.closureBulletinExists(closureType, startDate, endDate, establishmentId);
-    if (exists) {
+    if (exists && !force) {
       throw new Error(`${closureType.toLowerCase()} closure bulletin already exists for this period`);
     }
 

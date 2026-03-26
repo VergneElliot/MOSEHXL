@@ -91,20 +91,20 @@ export class LegalJournalModel {
   }
 
   // Closure operations (establishmentId required for multi-tenant data isolation)
-  static async createDailyClosure(date: Date, establishmentId: string, timezone?: string) {
-    return await ClosureOperations.createDailyClosure(date, establishmentId, timezone);
+  static async createDailyClosure(date: Date, establishmentId: string, timezone?: string, force?: boolean) {
+    return await ClosureOperations.createDailyClosure(date, establishmentId, timezone, force);
   }
 
-  static async createWeeklyClosure(date: Date, establishmentId: string) {
-    return await ClosureOperations.createWeeklyClosure(date, establishmentId);
+  static async createWeeklyClosure(date: Date, establishmentId: string, force?: boolean) {
+    return await ClosureOperations.createWeeklyClosure(date, establishmentId, force);
   }
 
-  static async createMonthlyClosure(date: Date, establishmentId: string) {
-    return await ClosureOperations.createMonthlyClosure(date, establishmentId);
+  static async createMonthlyClosure(date: Date, establishmentId: string, force?: boolean) {
+    return await ClosureOperations.createMonthlyClosure(date, establishmentId, force);
   }
 
-  static async createAnnualClosure(date: Date, establishmentId: string) {
-    return await ClosureOperations.createAnnualClosure(date, establishmentId);
+  static async createAnnualClosure(date: Date, establishmentId: string, force?: boolean) {
+    return await ClosureOperations.createAnnualClosure(date, establishmentId, force);
   }
 
   static async getClosureBulletins(type?: 'DAILY' | 'MONTHLY' | 'ANNUAL', establishmentId?: string) {
