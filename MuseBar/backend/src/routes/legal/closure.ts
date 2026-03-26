@@ -9,6 +9,15 @@ import { requireAuth, requireAdmin } from '../auth';
 
 const router = express.Router();
 
+function parseForceFlag(force: unknown): boolean {
+  if (force === true || force === 1) return true;
+  if (typeof force === 'string') {
+    const normalized = force.trim().toLowerCase();
+    return normalized === 'true' || normalized === '1' || normalized === 'on' || normalized === 'yes';
+  }
+  return false;
+}
+
 // All closure routes require authentication.
 // Closure bulletins are legally binding fiscal documents (NF 525).
 router.use(requireAuth);
@@ -33,7 +42,7 @@ router.post('/daily', async (req, res) => {
       return res.status(400).json({ error: 'Invalid date format' });
     }
 
-    const forceCreate = force === true || force === 'true';
+    const forceCreate = parseForceFlag(force);
     const closure = await LegalJournalModel.createDailyClosure(closureDate, establishmentId, undefined, forceCreate);
 
     res.status(201).json({
@@ -66,7 +75,7 @@ router.post('/weekly', async (req, res) => {
     if (isNaN(closureDate.getTime())) {
       return res.status(400).json({ error: 'Invalid date format' });
     }
-    const forceCreate = force === true || force === 'true';
+    const forceCreate = parseForceFlag(force);
     const closure = await LegalJournalModel.createWeeklyClosure(closureDate, establishmentId, forceCreate);
     
     res.status(201).json({
@@ -99,7 +108,7 @@ router.post('/monthly', async (req, res) => {
     if (isNaN(closureDate.getTime())) {
       return res.status(400).json({ error: 'Invalid date format' });
     }
-    const forceCreate = force === true || force === 'true';
+    const forceCreate = parseForceFlag(force);
     const closure = await LegalJournalModel.createMonthlyClosure(closureDate, establishmentId, forceCreate);
     
     res.status(201).json({
@@ -132,7 +141,7 @@ router.post('/annual', async (req, res) => {
     if (isNaN(closureDate.getTime())) {
       return res.status(400).json({ error: 'Invalid date format' });
     }
-    const forceCreate = force === true || force === 'true';
+    const forceCreate = parseForceFlag(force);
     const closure = await LegalJournalModel.createAnnualClosure(closureDate, establishmentId, forceCreate);
     
     res.status(201).json({
@@ -172,7 +181,7 @@ router.post('/create', async (req, res) => {
       return res.status(400).json({ error: 'Invalid date format' });
     }
 
-    const forceCreate = force === true || force === 'true';
+    const forceCreate = parseForceFlag(force);
 
     let closure;
     switch (type) {
