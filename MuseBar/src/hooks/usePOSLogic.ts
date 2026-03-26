@@ -41,17 +41,18 @@ export const usePOSLogic = (
   const filteredProducts = useMemo(() => {
     let filtered = products.filter(product => product.isActive);
 
-    // Filter by category
-    if (selectedCategory) {
-      filtered = filtered.filter(product => product.categoryId?.toString() === selectedCategory);
-    }
-
-    // Filter by search query
+    // Filter by search query (search intentionally ignores selected category)
     if (searchQuery.trim()) {
       const normalizedQuery = normalizeAccents(searchQuery.trim());
       filtered = filtered.filter(product =>
         normalizeAccents(product.name).includes(normalizedQuery)
       );
+      return filtered;
+    }
+
+    // Filter by category only when search is empty
+    if (selectedCategory) {
+      filtered = filtered.filter(product => product.categoryId?.toString() === selectedCategory);
     }
 
     return filtered;
