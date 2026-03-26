@@ -23,6 +23,16 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, formatCurrency 
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const topN = isMobile ? 3 : 5;
   const topProduits = stats.topProduits.slice(0, topN);
+  const paymentTotal = stats.cardTotal + stats.cashTotal;
+
+  const formatPercentage = (value: number): string => {
+    if (!Number.isFinite(value) || value <= 0) return '0%';
+    const rounded = Math.round(value * 10) / 10;
+    return Number.isInteger(rounded) ? `${rounded}%` : `${rounded.toFixed(1)}%`;
+  };
+
+  const cardPercentage = paymentTotal > 0 ? (stats.cardTotal / paymentTotal) * 100 : 0;
+  const cashPercentage = paymentTotal > 0 ? (stats.cashTotal / paymentTotal) * 100 : 0;
 
   const statsData = [
     {
@@ -42,7 +52,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, formatCurrency 
     },
     {
       title: 'Paiements Carte',
-      value: formatCurrency(stats.cardTotal),
+      value: `${formatCurrency(stats.cardTotal)} (${formatPercentage(cardPercentage)})`,
       icon: <CreditCard />,
       color: theme.palette.info.main,
       description: 'Total paiements par carte',
@@ -50,7 +60,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, formatCurrency 
     },
     {
       title: 'Paiements Espèces',
-      value: formatCurrency(stats.cashTotal),
+      value: `${formatCurrency(stats.cashTotal)} (${formatPercentage(cashPercentage)})`,
       icon: <Money />,
       color: theme.palette.warning.main,
       description: 'Total paiements en espèces',
