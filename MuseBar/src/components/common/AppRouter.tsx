@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Tabs, Tab, Paper } from '@mui/material';
+import { Box, Tabs, Tab, Paper, useTheme, useMediaQuery } from '@mui/material';
 import {
   RestaurantMenu as MenuIcon,
   PointOfSale as POSIcon,
@@ -94,6 +94,8 @@ const AppRouter: React.FC<AppRouterProps> = ({
   onHappyHourStatusUpdate,
 }) => {
   const [tabValue, setTabValue] = useState(0);
+  const theme = useTheme();
+  const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
 
   const TABS: TabConfig[] = [
     { label: 'Caisse', icon: <POSIcon />, value: 'pos', permission: 'access_pos' },
@@ -139,7 +141,7 @@ const AppRouter: React.FC<AppRouterProps> = ({
         flex: 1,
         minHeight: 0,
         display: 'flex',
-        flexDirection: 'column',
+        flexDirection: { xs: 'column', md: 'row' },
         overflow: 'hidden',
       }}
     >
@@ -147,18 +149,31 @@ const AppRouter: React.FC<AppRouterProps> = ({
         value={tabValue}
         onChange={handleTabChange}
         aria-label="Navigation principale"
-        variant="scrollable"
-        scrollButtons="auto"
-        allowScrollButtonsMobile
+        orientation={isDesktop ? 'vertical' : 'horizontal'}
+        variant={isDesktop ? 'standard' : 'scrollable'}
+        scrollButtons={isDesktop ? false : 'auto'}
+        allowScrollButtonsMobile={!isDesktop}
         sx={{
+          borderRight: { md: 1 },
+          borderBottom: { xs: 1, md: 0 },
+          borderColor: 'divider',
+          minWidth: { md: 220 },
+          width: { xs: '100%', md: 220 },
+          flexShrink: 0,
           '& .MuiTabs-scrollButtons': {
             color: 'primary.main',
           },
+          '& .MuiTabs-flexContainer': {
+            alignItems: { md: 'stretch' },
+          },
           '& .MuiTab-root': {
-            minWidth: { xs: 'auto', sm: 90 },
+            minWidth: { xs: 'auto', md: 200 },
             fontSize: { xs: '0.75rem', sm: '0.875rem' },
             px: { xs: 1, sm: 2 },
             py: { xs: 1.5, sm: 2 },
+            justifyContent: { md: 'flex-start' },
+            alignItems: { md: 'flex-start' },
+            textAlign: { md: 'left' },
           },
           '& .MuiTab-iconWrapper': {
             fontSize: { xs: 18, sm: 20 },
@@ -174,50 +189,53 @@ const AppRouter: React.FC<AppRouterProps> = ({
             sx={{
               textTransform: 'none',
               fontWeight: tabValue === idx ? 600 : 400,
+              alignItems: { md: 'flex-start' },
             }}
           />
         ))}
       </Tabs>
 
-      {filteredTabs.map((tab, i) => (
-        <TabPanel
-          value={tabValue}
-          index={i}
-          key={tab.value}
-          // POS (caisse) has its own nested scroll containers; keep outer panel non-scrollable
-          // All other tabs (menu, settings, history, etc.) should be able to scroll vertically
-          scrollMode={tab.value === 'pos' ? 'hidden' : 'auto'}
-        >
-          {tab.value === 'pos' && (
-            <POSContainer
-              categories={categories}
-              products={products}
-              isHappyHourActive={isHappyHourActive}
-              onDataUpdate={onDataUpdate}
-            />
-          )}
-          {tab.value === 'menu' && (
-            <MenuContainer
-              categories={categories}
-              products={products}
-              onDataUpdate={onDataUpdate}
-            />
-          )}
-          {tab.value === 'history' && <HistoryContainer />}
-          {tab.value === 'settings' && (
-            <Settings
-              isHappyHourActive={isHappyHourActive}
-              timeUntilHappyHour={timeUntilHappyHour}
-              onHappyHourStatusUpdate={onHappyHourStatusUpdate}
-              products={products}
-            />
-          )}
-          {tab.value === 'compliance' && <LegalComplianceDashboard />}
-          {tab.value === 'closures' && <ClosureContainer />}
-          {tab.value === 'user_management' && user?.role === 'establishment_admin' && <UserManagement token={token} />}
-          {tab.value === 'audit_trail' && user?.role === 'establishment_admin' && <AuditTrailDashboard token={token} />}
-        </TabPanel>
-      ))}
+      <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        {filteredTabs.map((tab, i) => (
+          <TabPanel
+            value={tabValue}
+            index={i}
+            key={tab.value}
+            // POS (caisse) has its own nested scroll containers; keep outer panel non-scrollable
+            // All other tabs (menu, settings, history, etc.) should be able to scroll vertically
+            scrollMode={tab.value === 'pos' ? 'hidden' : 'auto'}
+          >
+            {tab.value === 'pos' && (
+              <POSContainer
+                categories={categories}
+                products={products}
+                isHappyHourActive={isHappyHourActive}
+                onDataUpdate={onDataUpdate}
+              />
+            )}
+            {tab.value === 'menu' && (
+              <MenuContainer
+                categories={categories}
+                products={products}
+                onDataUpdate={onDataUpdate}
+              />
+            )}
+            {tab.value === 'history' && <HistoryContainer />}
+            {tab.value === 'settings' && (
+              <Settings
+                isHappyHourActive={isHappyHourActive}
+                timeUntilHappyHour={timeUntilHappyHour}
+                onHappyHourStatusUpdate={onHappyHourStatusUpdate}
+                products={products}
+              />
+            )}
+            {tab.value === 'compliance' && <LegalComplianceDashboard />}
+            {tab.value === 'closures' && <ClosureContainer />}
+            {tab.value === 'user_management' && user?.role === 'establishment_admin' && <UserManagement token={token} />}
+            {tab.value === 'audit_trail' && user?.role === 'establishment_admin' && <AuditTrailDashboard token={token} />}
+          </TabPanel>
+        ))}
+      </Box>
     </Paper>
   );
 };

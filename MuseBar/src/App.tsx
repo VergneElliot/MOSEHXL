@@ -114,8 +114,7 @@ function App() {
                 onLogout={handleLogout}
                 user={user!}
               />
-              <Container
-                maxWidth="xl"
+              <Box
                 sx={{
                   flex: 1,
                   minHeight: 0,
@@ -123,6 +122,7 @@ function App() {
                   flexDirection: 'column',
                   overflow: 'hidden',
                   mt: 2,
+                  px: 0,
                 }}
               >
                 <AppRouter
@@ -135,7 +135,7 @@ function App() {
                   onDataUpdate={updateData}
                   onHappyHourStatusUpdate={updateHappyHourStatus}
                 />
-              </Container>
+              </Box>
             </Box>
           )}
         </>
