@@ -279,7 +279,7 @@ export class JournalQueries {
       query += ' WHERE ' + conditions.join(' AND ');
     }
 
-    query += ' ORDER BY period_start DESC';
+    query += ' ORDER BY period_start DESC, created_at DESC, id DESC';
 
     const result = await pool.query(query, values);
     // Parse JSON fields and ensure tips_total/change_total are present
@@ -325,7 +325,7 @@ export class JournalQueries {
 
     // Page query (applies LIMIT/OFFSET after conditions)
     const pageValues = [...values];
-    let pageQuery = `SELECT * FROM closure_bulletins${whereClause} ORDER BY period_start DESC`;
+    let pageQuery = `SELECT * FROM closure_bulletins${whereClause} ORDER BY period_start DESC, created_at DESC, id DESC`;
 
     if (opts?.limit != null && Number.isFinite(opts.limit) && opts.limit > 0) {
       pageValues.push(opts.limit);

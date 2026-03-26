@@ -108,8 +108,6 @@ const ClosureContainer: React.FC = () => {
     }
   };
 
-  const canCreateForToday = state.todayStatus ? !state.todayStatus.has_closure : true;
-
   return (
     <Box sx={{ position: 'relative' }}>
       {/* Header */}
@@ -126,9 +124,9 @@ const ClosureContainer: React.FC = () => {
 
           <Tooltip
             title={
-              canCreateForToday
-                ? 'Créer un bulletin manuellement (si aucune clôture planifiée pour aujourd’hui)'
-                : 'Une clôture journalière est déjà enregistrée pour aujourd’hui'
+              state.todayStatus?.has_closure
+                ? 'Une clôture existe déjà aujourd’hui. Utilisez "Forcer la création" dans le dialogue pour créer un bulletin correctif.'
+                : 'Créer un bulletin manuellement'
             }
           >
             <span>
@@ -137,7 +135,7 @@ const ClosureContainer: React.FC = () => {
                 color="primary"
                 startIcon={<Add />}
                 onClick={handleCreateClosure}
-                disabled={state.loading || !canCreateForToday}
+                disabled={state.loading}
               >
                 Créer une clôture
               </Button>
@@ -202,12 +200,15 @@ const ClosureContainer: React.FC = () => {
       <CreateClosureDialog
         open={state.showCreateDialog}
         onClose={() => actions.setShowCreateDialog(false)}
-        onCreate={async ({ date, type }: { date: string; type: ClosureType }) => api.createClosure({ date, type })}
+        onCreate={async ({ date, type, force }: { date: string; type: ClosureType; force?: boolean }) =>
+          api.createClosure({ date, type, force })
+        }
         creating={state.creating}
         selectedDate={state.selectedDate}
         selectedClosureType={state.selectedClosureType}
         onDateChange={actions.setSelectedDate}
         onClosureTypeChange={actions.setSelectedClosureType}
+        disableForceCreation={false}
       />
 
       <BulletinDetailsDialog

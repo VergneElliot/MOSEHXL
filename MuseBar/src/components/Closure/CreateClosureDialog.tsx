@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Box,
   Button,
@@ -20,7 +20,7 @@ export type ClosureType = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL';
 interface CreateClosureDialogProps {
   open: boolean;
   onClose: () => void;
-  onCreate: (payload: { date: string; type: ClosureType }) => Promise<void>;
+  onCreate: (payload: { date: string; type: ClosureType; force?: boolean }) => Promise<void>;
   creating: boolean;
   selectedDate: string;
   selectedClosureType: ClosureType;
@@ -41,6 +41,7 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
   disableForceCreation = true,
 }) => {
   const todayISO = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const [forceCreation, setForceCreation] = useState(false);
 
   const canCreate = !creating && selectedDate.trim().length > 0 && !!selectedClosureType;
 
@@ -84,8 +85,13 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
             <Box>
               <FormControlLabel
                 disabled={disableForceCreation}
-                control={<Checkbox checked={false} />}
-                label="Forcer la création (à valider)"
+                control={
+                  <Checkbox
+                    checked={forceCreation}
+                    onChange={(e) => setForceCreation(e.target.checked)}
+                  />
+                }
+                label="Forcer la création (crée un bulletin correctif, sans supprimer l'ancien)"
               />
             </Box>
           </Tooltip>
@@ -101,7 +107,7 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
           Annuler
         </Button>
         <Button
-          onClick={() => onCreate({ date: selectedDate || todayISO, type: selectedClosureType })}
+          onClick={() => onCreate({ date: selectedDate || todayISO, type: selectedClosureType, force: forceCreation })}
           variant="contained"
           color="primary"
           disabled={!canCreate}

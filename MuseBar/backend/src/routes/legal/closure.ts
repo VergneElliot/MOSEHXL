@@ -24,7 +24,7 @@ router.post('/daily', async (req, res) => {
       return res.status(400).json({ error: 'Closure must be scoped to an establishment. Only establishment users can create closures.' });
     }
 
-    const { date } = req.body;
+    const { date, force } = req.body;
     if (!date) {
       return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
     }
@@ -33,11 +33,14 @@ router.post('/daily', async (req, res) => {
       return res.status(400).json({ error: 'Invalid date format' });
     }
 
-    const closure = await LegalJournalModel.createDailyClosure(closureDate, establishmentId);
+    const forceCreate = force === true || force === 'true';
+    const closure = await LegalJournalModel.createDailyClosure(closureDate, establishmentId, undefined, forceCreate);
 
     res.status(201).json({
       ...closure,
-      compliance_note: 'Daily closure bulletin created per French fiscal requirements'
+      compliance_note: forceCreate
+        ? 'Daily closure bulletin created as corrective replacement (previous bulletins kept for audit trail)'
+        : 'Daily closure bulletin created per French fiscal requirements'
     });
   } catch (error) {
     console.error('Error creating daily closure:', error);
@@ -55,7 +58,7 @@ router.post('/weekly', async (req, res) => {
     if (!establishmentId) {
       return res.status(400).json({ error: 'Closure must be scoped to an establishment. Only establishment users can create closures.' });
     }
-    const { date } = req.body;
+    const { date, force } = req.body;
     if (!date) {
       return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
     }
@@ -63,11 +66,14 @@ router.post('/weekly', async (req, res) => {
     if (isNaN(closureDate.getTime())) {
       return res.status(400).json({ error: 'Invalid date format' });
     }
-    const closure = await LegalJournalModel.createWeeklyClosure(closureDate, establishmentId);
+    const forceCreate = force === true || force === 'true';
+    const closure = await LegalJournalModel.createWeeklyClosure(closureDate, establishmentId, forceCreate);
     
     res.status(201).json({
       ...closure,
-      compliance_note: 'Weekly closure bulletin created per French fiscal requirements'
+      compliance_note: forceCreate
+        ? 'Weekly closure bulletin created as corrective replacement (previous bulletins kept for audit trail)'
+        : 'Weekly closure bulletin created per French fiscal requirements'
     });
   } catch (error) {
     console.error('Error creating weekly closure:', error);
@@ -85,7 +91,7 @@ router.post('/monthly', async (req, res) => {
     if (!establishmentId) {
       return res.status(400).json({ error: 'Closure must be scoped to an establishment. Only establishment users can create closures.' });
     }
-    const { date } = req.body;
+    const { date, force } = req.body;
     if (!date) {
       return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
     }
@@ -93,11 +99,14 @@ router.post('/monthly', async (req, res) => {
     if (isNaN(closureDate.getTime())) {
       return res.status(400).json({ error: 'Invalid date format' });
     }
-    const closure = await LegalJournalModel.createMonthlyClosure(closureDate, establishmentId);
+    const forceCreate = force === true || force === 'true';
+    const closure = await LegalJournalModel.createMonthlyClosure(closureDate, establishmentId, forceCreate);
     
     res.status(201).json({
       ...closure,
-      compliance_note: 'Monthly closure bulletin created per French fiscal requirements'
+      compliance_note: forceCreate
+        ? 'Monthly closure bulletin created as corrective replacement (previous bulletins kept for audit trail)'
+        : 'Monthly closure bulletin created per French fiscal requirements'
     });
   } catch (error) {
     console.error('Error creating monthly closure:', error);
@@ -115,7 +124,7 @@ router.post('/annual', async (req, res) => {
     if (!establishmentId) {
       return res.status(400).json({ error: 'Closure must be scoped to an establishment. Only establishment users can create closures.' });
     }
-    const { date } = req.body;
+    const { date, force } = req.body;
     if (!date) {
       return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
     }
@@ -123,11 +132,14 @@ router.post('/annual', async (req, res) => {
     if (isNaN(closureDate.getTime())) {
       return res.status(400).json({ error: 'Invalid date format' });
     }
-    const closure = await LegalJournalModel.createAnnualClosure(closureDate, establishmentId);
+    const forceCreate = force === true || force === 'true';
+    const closure = await LegalJournalModel.createAnnualClosure(closureDate, establishmentId, forceCreate);
     
     res.status(201).json({
       ...closure,
-      compliance_note: 'Annual closure bulletin created per French fiscal requirements'
+      compliance_note: forceCreate
+        ? 'Annual closure bulletin created as corrective replacement (previous bulletins kept for audit trail)'
+        : 'Annual closure bulletin created per French fiscal requirements'
     });
   } catch (error) {
     console.error('Error creating annual closure:', error);
@@ -160,19 +172,21 @@ router.post('/create', async (req, res) => {
       return res.status(400).json({ error: 'Invalid date format' });
     }
 
+    const forceCreate = force === true || force === 'true';
+
     let closure;
     switch (type) {
       case 'DAILY':
-        closure = await LegalJournalModel.createDailyClosure(closureDate, establishmentId);
+        closure = await LegalJournalModel.createDailyClosure(closureDate, establishmentId, undefined, forceCreate);
         break;
       case 'WEEKLY':
-        closure = await LegalJournalModel.createWeeklyClosure(closureDate, establishmentId);
+        closure = await LegalJournalModel.createWeeklyClosure(closureDate, establishmentId, forceCreate);
         break;
       case 'MONTHLY':
-        closure = await LegalJournalModel.createMonthlyClosure(closureDate, establishmentId);
+        closure = await LegalJournalModel.createMonthlyClosure(closureDate, establishmentId, forceCreate);
         break;
       case 'ANNUAL':
-        closure = await LegalJournalModel.createAnnualClosure(closureDate, establishmentId);
+        closure = await LegalJournalModel.createAnnualClosure(closureDate, establishmentId, forceCreate);
         break;
       default:
         return res.status(400).json({ error: 'Invalid closure type' });
@@ -180,7 +194,9 @@ router.post('/create', async (req, res) => {
 
     res.status(201).json({
       closure,
-      compliance_note: `${type} closure bulletin created per French fiscal requirements`
+      compliance_note: forceCreate
+        ? `${type} closure bulletin created as corrective replacement (previous bulletins kept for audit trail)`
+        : `${type} closure bulletin created per French fiscal requirements`
     });
   } catch (error) {
     if (error instanceof Error && error.message.includes('already exists')) {
