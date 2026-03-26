@@ -121,7 +121,7 @@ function App() {
                   display: 'flex',
                   flexDirection: 'column',
                   overflow: 'hidden',
-                  mt: 2,
+                  mt: 0,
                   px: 0,
                 }}
               >
