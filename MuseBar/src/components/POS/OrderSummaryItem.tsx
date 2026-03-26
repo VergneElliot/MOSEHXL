@@ -1,5 +1,5 @@
 import React from 'react';
-import { ListItem, Box, Typography, IconButton, Button, Chip, Divider } from '@mui/material';
+import { ListItem, Box, Typography, IconButton, Button, Divider } from '@mui/material';
 import { Delete as DeleteIcon, LocalOffer as OffertIcon, Person as PersoIcon } from '@mui/icons-material';
 import type { OrderItem } from '../../types';
 
@@ -28,7 +28,7 @@ const OrderSummaryItem: React.FC<OrderSummaryItemProps> = ({
     <>
       <ListItem sx={{ px: 0, py: 1 }}>
         <Box sx={{ width: '100%' }}>
-          <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={0.5}>
+          <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={0.2}>
             <Typography
               variant="body1"
               sx={{ fontWeight: 700, fontSize: { xs: '1.22rem', md: '1.42rem' }, lineHeight: 1.2, flexGrow: 1 }}
@@ -46,59 +46,57 @@ const OrderSummaryItem: React.FC<OrderSummaryItemProps> = ({
             </IconButton>
           </Box>
 
-          <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
-            <Box textAlign="left">
-              <Typography variant="body1" color="primary" fontWeight="bold" sx={{ fontSize: { xs: '1rem', md: '1.08rem' } }}>
-                {formatCurrency(item.totalPrice)}
-              </Typography>
+          <Box
+            display="flex"
+            justifyContent="space-between"
+            alignItems="center"
+            gap={0.75}
+            mb={0.25}
+            sx={{ flexWrap: 'nowrap' }}
+          >
+            <Typography variant="body1" color="primary" fontWeight="bold" sx={{ fontSize: { xs: '1rem', md: '1.08rem' }, flexShrink: 0 }}>
+              {formatCurrency(item.totalPrice)}
+            </Typography>
+
+            <Box display="flex" flexWrap="nowrap" gap={0.4} sx={{ ml: 'auto', overflowX: 'auto', pb: 0.25 }}>
+              {onApplyHappyHour && (
+                <Button
+                  size="small"
+                  variant={item.isHappyHourApplied ? 'contained' : 'outlined'}
+                  color="secondary"
+                  onClick={() => onApplyHappyHour(index)}
+                  sx={{ minWidth: 'auto', px: 0.75, py: 0.15, fontSize: '0.62rem', whiteSpace: 'nowrap' }}
+                >
+                  Happy Hour
+                </Button>
+              )}
+              {onApplyOffert && (
+                <Button
+                  size="small"
+                  variant={item.isOffert ? 'contained' : 'outlined'}
+                  color="success"
+                  onClick={() => onApplyOffert(index)}
+                  startIcon={<OffertIcon sx={{ fontSize: 12 }} />}
+                  sx={{ minWidth: 'auto', px: 0.75, py: 0.15, fontSize: '0.62rem', whiteSpace: 'nowrap', '& .MuiButton-startIcon': { mr: 0.35 } }}
+                >
+                  Offert
+                </Button>
+              )}
+              {onApplyPerso && (
+                <Button
+                  size="small"
+                  variant={item.isPerso ? 'contained' : 'outlined'}
+                  color="info"
+                  onClick={() => onApplyPerso(index)}
+                  startIcon={<PersoIcon sx={{ fontSize: 12 }} />}
+                  sx={{ minWidth: 'auto', px: 0.75, py: 0.15, fontSize: '0.62rem', whiteSpace: 'nowrap', '& .MuiButton-startIcon': { mr: 0.35 } }}
+                >
+                  Perso
+                </Button>
+              )}
             </Box>
           </Box>
 
-          <Box display="flex" flexWrap="wrap" gap={0.5} sx={{ mt: 0.5 }}>
-            {onApplyHappyHour && (
-              <Button
-                size="small"
-                variant={item.isHappyHourApplied ? 'contained' : 'outlined'}
-                color="secondary"
-                onClick={() => onApplyHappyHour(index)}
-                sx={{ minWidth: 'auto', px: 1, py: 0.25, fontSize: '0.7rem' }}
-              >
-                Happy Hour
-              </Button>
-            )}
-            {onApplyOffert && (
-              <Button
-                size="small"
-                variant={item.isOffert ? 'contained' : 'outlined'}
-                color="success"
-                onClick={() => onApplyOffert(index)}
-                startIcon={<OffertIcon sx={{ fontSize: 14 }} />}
-                sx={{ minWidth: 'auto', px: 1, py: 0.25, fontSize: '0.7rem' }}
-              >
-                Offert
-              </Button>
-            )}
-            {onApplyPerso && (
-              <Button
-                size="small"
-                variant={item.isPerso ? 'contained' : 'outlined'}
-                color="info"
-                onClick={() => onApplyPerso(index)}
-                startIcon={<PersoIcon sx={{ fontSize: 14 }} />}
-                sx={{ minWidth: 'auto', px: 1, py: 0.25, fontSize: '0.7rem' }}
-              >
-                Perso
-              </Button>
-            )}
-          </Box>
-
-          {(item.isHappyHourApplied || item.isOffert || item.isPerso) && (
-            <Box sx={{ mt: 0.5 }} display="flex" gap={0.5} flexWrap="wrap">
-              {item.isHappyHourApplied && <Chip label="Happy Hour" size="small" color="secondary" />}
-              {item.isOffert && <Chip label="Offert" size="small" color="success" />}
-              {item.isPerso && <Chip label="Personnel" size="small" color="info" />}
-            </Box>
-          )}
         </Box>
       </ListItem>
       {!isLast && <Divider />}
