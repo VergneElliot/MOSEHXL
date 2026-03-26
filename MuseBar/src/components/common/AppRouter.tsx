@@ -168,15 +168,15 @@ const AppRouter: React.FC<AppRouterProps> = ({
           },
           '& .MuiTab-root': {
             minWidth: { xs: 'auto', md: 200 },
-            fontSize: { xs: '0.75rem', sm: '0.875rem' },
+            fontSize: { xs: '1.1rem', sm: '1.3rem', md: '1.68rem' },
             px: { xs: 1, sm: 2 },
-            py: { xs: 1.5, sm: 2 },
+            py: { xs: 1.75, sm: 2.25 },
             justifyContent: { md: 'flex-start' },
             alignItems: { md: 'flex-start' },
             textAlign: { md: 'left' },
           },
           '& .MuiTab-iconWrapper': {
-            fontSize: { xs: 18, sm: 20 },
+            fontSize: { xs: 24, sm: 28 },
           },
         }}
       >

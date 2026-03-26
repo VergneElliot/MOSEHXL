@@ -130,7 +130,7 @@ const DiversCard: React.FC<DiversCardProps> = ({ onAdd, isMobile, theme }) => {
             <Typography
               variant={isMobile ? 'body2' : 'h6'}
               component="h3"
-              sx={{ fontWeight: 'bold', fontSize: isMobile ? '0.875rem' : '1.1rem' }}
+              sx={{ fontWeight: 'bold', fontSize: isMobile ? '1.3rem' : '2.3rem' }}
             >
               Divers
             </Typography>
@@ -149,9 +149,9 @@ const DiversCard: React.FC<DiversCardProps> = ({ onAdd, isMobile, theme }) => {
           }}
           sx={{
             mt: 1,
-            minHeight: isMobile ? 30 : 32,
+            minHeight: isMobile ? 34 : 42,
             py: isMobile ? 0.5 : 0.75,
-            fontSize: isMobile ? '0.7rem' : '0.8rem',
+            fontSize: isMobile ? '1rem' : '1.9rem',
           }}
         >
           Ajouter
@@ -275,7 +275,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           sx={{
             fontWeight: 'bold',
             mb: 1,
-            fontSize: isMobile ? '0.875rem' : '1.1rem',
+            fontSize: isMobile ? '1.3rem' : '2.4rem',
             lineHeight: 1.2,
             height: isMobile ? '2.4em' : 'auto',
             overflow: 'hidden',
@@ -300,7 +300,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
               sx={{
                 textDecoration: 'line-through',
                 color: 'text.secondary',
-                fontSize: '0.75rem',
+                fontSize: isMobile ? '1rem' : '1.8rem',
               }}
             >
               {formatCurrency(product.price)}
@@ -312,7 +312,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
             color={isDiscounted ? 'secondary' : 'primary'}
             sx={{
               fontWeight: 'bold',
-              fontSize: isMobile ? '1rem' : '1.2rem',
+              fontSize: isMobile ? '1.5rem' : '2.8rem',
             }}
           >
             {formatCurrency(currentPrice)}
@@ -348,7 +348,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
               }}
               sx={{
                 width: 44,
-                '& .MuiInputBase-root': { fontSize: '0.875rem' },
+                '& .MuiInputBase-root': { fontSize: isMobile ? '1.2rem' : '2rem' },
                 '& .MuiInputBase-input': {
                   textAlign: 'center',
                   py: 0,
@@ -378,9 +378,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
               fullWidth
               onClick={handleAdd}
               sx={{
-                minHeight: isMobile ? 30 : 32,
+                minHeight: isMobile ? 34 : 42,
                 py: isMobile ? 0.5 : 0.75,
-                fontSize: isMobile ? '0.7rem' : '0.8rem',
+                fontSize: isMobile ? '1rem' : '1.9rem',
               }}
             >
               Ajouter
