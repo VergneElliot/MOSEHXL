@@ -1,4 +1,3 @@
-import axios, { AxiosInstance } from 'axios';
 import * as crypto from 'crypto';
 import { BasePrintingService } from './BasePrintingService';
 import { 
@@ -14,9 +13,25 @@ interface CloudPRNTPrinter {
   printerMAC: string;
   statusCode: string;
   statusText: string;
-  clientAction?: any[];
-  jobList?: any[];
+  clientAction?: unknown[];
+  jobList?: unknown[];
 }
+
+type CloudPRNTPollRequest = {
+  printerMAC: string;
+  statusCode: string;
+  statusText: string;
+};
+
+type StarCloudPRNTJobType = 'receipt' | 'closure_bulletin';
+
+type StarCloudPRNTJob = {
+  id: string;
+  printerId: string;
+  type: StarCloudPRNTJobType;
+  data: ReceiptData | ClosureBulletinData;
+  createdAt: Date;
+};
 
 export class StarCloudPRNTService extends BasePrintingService {
   private serverUrl: string;
@@ -34,8 +49,8 @@ export class StarCloudPRNTService extends BasePrintingService {
       // Start polling for printer status updates
       this.startPolling();
       
-      console.log('Star CloudPRNT service initialized');
-      console.log(`Server URL: ${this.serverUrl}`);
+      process.stdout.write('Star CloudPRNT service initialized\n');
+      process.stdout.write(`Server URL: ${this.serverUrl}\n`);
       
       this.isInitialized = true;
     } catch (error) {
@@ -134,7 +149,7 @@ export class StarCloudPRNTService extends BasePrintingService {
   /**
    * Handle CloudPRNT poll request from printer
    */
-  async handlePoll(request: any): Promise<any> {
+  async handlePoll(request: CloudPRNTPollRequest): Promise<{ jobReady: boolean; mediaTypes?: string[]; jobList?: Array<{ jobId: string; jobType: StarCloudPRNTJobType }> }> {
     const { printerMAC, statusCode, statusText } = request;
     
     // Update printer status
@@ -199,6 +214,7 @@ export class StarCloudPRNTService extends BasePrintingService {
     this.pollInterval = setInterval(() => {
       // Check for stale printers
       const staleTime = Date.now() - 60000; // 1 minute
+      void staleTime;
       // Remove stale printers logic would go here
     }, 30000);
   }
@@ -215,14 +231,19 @@ export class StarCloudPRNTService extends BasePrintingService {
     return crypto.randomBytes(16).toString('hex');
   }
 
-  private async storePrintJob(printerId: string, jobId: string, type: string, data: any): Promise<void> {
+  private getJobStore(): Map<string, StarCloudPRNTJob> {
+    const g = global as typeof globalThis & { starCloudPRNTJobs?: Map<string, StarCloudPRNTJob> };
+    if (!g.starCloudPRNTJobs) {
+      g.starCloudPRNTJobs = new Map<string, StarCloudPRNTJob>();
+    }
+    return g.starCloudPRNTJobs;
+  }
+
+  private async storePrintJob(printerId: string, jobId: string, type: StarCloudPRNTJobType, data: ReceiptData | ClosureBulletinData): Promise<void> {
     // In a real implementation, this would store to database or Redis
     // For now, we'll use in-memory storage
-    if (!global.starCloudPRNTJobs) {
-      global.starCloudPRNTJobs = new Map();
-    }
-    
-    global.starCloudPRNTJobs.set(jobId, {
+    const store = this.getJobStore();
+    store.set(jobId, {
       id: jobId,
       printerId,
       type,
@@ -231,13 +252,10 @@ export class StarCloudPRNTService extends BasePrintingService {
     });
   }
 
-  private async getPendingJobs(printerId: string): Promise<any[]> {
-    if (!global.starCloudPRNTJobs) {
-      return [];
-    }
-
-    const jobs = [];
-    for (const [jobId, job] of global.starCloudPRNTJobs.entries()) {
+  private async getPendingJobs(printerId: string): Promise<StarCloudPRNTJob[]> {
+    const store = this.getJobStore();
+    const jobs: StarCloudPRNTJob[] = [];
+    for (const [, job] of store.entries()) {
       if (job.printerId === printerId) {
         jobs.push(job);
       }
@@ -246,18 +264,14 @@ export class StarCloudPRNTService extends BasePrintingService {
     return jobs;
   }
 
-  private async retrievePrintJob(jobId: string): Promise<any> {
-    if (!global.starCloudPRNTJobs) {
-      return null;
-    }
-    
-    return global.starCloudPRNTJobs.get(jobId);
+  private async retrievePrintJob(jobId: string): Promise<StarCloudPRNTJob | null> {
+    const store = this.getJobStore();
+    return store.get(jobId) ?? null;
   }
 
   private async removePrintJob(jobId: string): Promise<void> {
-    if (global.starCloudPRNTJobs) {
-      global.starCloudPRNTJobs.delete(jobId);
-    }
+    const store = this.getJobStore();
+    store.delete(jobId);
   }
 
   private convertToStarPRNT(escposContent: string): Buffer {
@@ -278,5 +292,5 @@ export class StarCloudPRNTService extends BasePrintingService {
 
 // Extend global namespace for temporary job storage
 declare global {
-  var starCloudPRNTJobs: Map<string, any>;
+  var starCloudPRNTJobs: Map<string, StarCloudPRNTJob> | undefined;
 }

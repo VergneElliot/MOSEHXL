@@ -5,8 +5,7 @@
 
 import { PrintQueue } from './printQueue';
 import { PrintTemplates } from './printTemplates';
-import { PrintCommands } from './printCommands';
-import { ReceiptData, ClosureBulletinData, PrinterConfig, PrinterStatus, PrintQueueStats } from './types';
+import { ReceiptData, ClosureBulletinData, PrinterConfig, PrinterStatus, PrintQueueStats, PrintJob } from './types';
 
 /**
  * Default printer configuration
@@ -85,7 +84,7 @@ export class ThermalPrintService {
         checkJob();
       });
     } catch (error) {
-      console.error('Error printing receipt:', error);
+      process.stderr.write(`Error printing receipt: ${error instanceof Error ? error.message : String(error)}\n`);
       return false;
     }
   }
@@ -130,7 +129,7 @@ export class ThermalPrintService {
         checkJob();
       });
     } catch (error) {
-      console.error('Error printing closure bulletin:', error);
+      process.stderr.write(`Error printing closure bulletin: ${error instanceof Error ? error.message : String(error)}\n`);
       return false;
     }
   }
@@ -154,7 +153,6 @@ export class ThermalPrintService {
    */
   async testPrinter(): Promise<boolean> {
     try {
-      const testContent = PrintTemplates.generateTestPrint();
       const jobId = this.printQueue.addReceiptJob({
         order_id: 0,
         sequence_number: 0,
@@ -203,7 +201,7 @@ export class ThermalPrintService {
         checkJob();
       });
     } catch (error) {
-      console.error('Error testing printer:', error);
+      process.stderr.write(`Error testing printer: ${error instanceof Error ? error.message : String(error)}\n`);
       return false;
     }
   }
@@ -290,21 +288,21 @@ export class ThermalPrintService {
   /**
    * Get all print jobs
    */
-  getAllJobs(): any[] {
+  getAllJobs(): PrintJob[] {
     return this.printQueue.getAllJobs();
   }
   
   /**
    * Listen to queue events
    */
-  onQueueEvent(event: string, callback: (...args: any[]) => void): void {
+  onQueueEvent(event: string, callback: (...args: unknown[]) => void): void {
     this.printQueue.on(event, callback);
   }
   
   /**
    * Remove queue event listener
    */
-  offQueueEvent(event: string, callback: (...args: any[]) => void): void {
+  offQueueEvent(event: string, callback: (...args: unknown[]) => void): void {
     this.printQueue.off(event, callback);
   }
 }

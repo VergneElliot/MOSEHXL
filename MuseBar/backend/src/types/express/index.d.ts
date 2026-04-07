@@ -16,6 +16,6 @@ declare module 'express-serve-static-core' {
       establishment_id: string | null;
     };
     requestId?: string;
-    invitationValidation?: any;
+    invitationValidation?: unknown;
   }
 } 

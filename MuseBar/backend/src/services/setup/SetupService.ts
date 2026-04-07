@@ -146,7 +146,7 @@ export class SetupService {
   /**
    * Validate setup data
    */
-  validateSetupData(setupData: BusinessSetupRequest): { isValid: boolean; errors: any[] } {
+  validateSetupData(setupData: BusinessSetupRequest): { isValid: boolean; errors: Array<{ field: string; message: string }> } {
     try {
       const errors = SetupValidator.validateSetupData(setupData);
       return {
@@ -172,7 +172,7 @@ export class SetupService {
   validateSetupStep(
     stepId: string,
     data: Partial<BusinessSetupRequest>
-  ): { isValid: boolean; errors: any[] } {
+  ): { isValid: boolean; errors: string[] } {
     return SetupWizard.validateSetupStep(stepId, data);
   }
 

@@ -57,13 +57,19 @@ export class InvitationOperations {
         setTimeout(() => reject(new Error('Invitation completion query timed out')), 5000);
       });
 
-      const updateResult = await Promise.race([updatePromise, timeoutPromise]) as any;
+      const updateResult = await Promise.race([updatePromise, timeoutPromise]) as { rows: Array<Record<string, unknown>> };
 
       if (updateResult.rows.length === 0) {
         throw new Error(`Invitation with token ${token.substring(0, 8)}... not found or already completed`);
       }
 
-      const invitation = updateResult.rows[0];
+      const invitation = updateResult.rows[0] as {
+        id: string;
+        invitation_token: string;
+        establishment_id: string;
+        email: string;
+        accepted_at: Date;
+      };
       this.logger.info('Invitation marked as completed', { 
         invitationId: invitation.id,
         token: token.substring(0, 8) + '...',

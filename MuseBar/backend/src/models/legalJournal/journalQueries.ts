@@ -67,7 +67,7 @@ export class JournalQueries {
    */
   static async getEntries(limit?: number, offset?: number): Promise<JournalEntry[]> {
     let query = 'SELECT * FROM legal_journal ORDER BY sequence_number DESC';
-    const values: any[] = [];
+    const values: number[] = [];
     
     if (limit) {
       query += ` LIMIT $${values.length + 1}`;
@@ -163,9 +163,7 @@ export class JournalQueries {
    */
   static async resetJournalDevOnly(): Promise<void> {
     if (process.env.NODE_ENV === 'production') {
-      const err: any = new Error('Journal reset not allowed in production');
-      err.statusCode = 403;
-      throw err;
+      throw Object.assign(new Error('Journal reset not allowed in production'), { statusCode: 403 });
     }
 
     await pool.query('DELETE FROM legal_journal');
@@ -183,7 +181,7 @@ export class JournalQueries {
     limit?: number
   ): Promise<JournalEntry[]> {
     let query = 'SELECT * FROM legal_journal WHERE transaction_type = $1 ORDER BY sequence_number DESC';
-    const values: any[] = [transactionType];
+    const values: Array<string | number> = [transactionType];
     
     if (limit) {
       query += ` LIMIT $2`;
@@ -264,7 +262,7 @@ export class JournalQueries {
     establishmentId?: string
   ): Promise<ClosureBulletin[]> {
     let query = 'SELECT * FROM closure_bulletins';
-    const values: any[] = [];
+    const values: Array<string | number> = [];
     const conditions: string[] = [];
 
     if (type) {
@@ -283,13 +281,23 @@ export class JournalQueries {
 
     const result = await pool.query(query, values);
     // Parse JSON fields and ensure tips_total/change_total are present
-    return result.rows.map((row: any) => ({
-      ...row,
-      vat_breakdown: parseJsonField(row.vat_breakdown, {}),
-      payment_methods_breakdown: parseJsonField(row.payment_methods_breakdown, {}),
-      tips_total: row.tips_total || 0,
-      change_total: row.change_total || 0
-    }));
+    return result.rows.map((row) => {
+      const r = row as Record<string, unknown> & {
+        vat_breakdown?: unknown;
+        payment_methods_breakdown?: unknown;
+        fond_de_caisse?: number;
+        tips_total?: number;
+        change_total?: number;
+      };
+      return {
+        ...(r as Record<string, unknown>),
+        vat_breakdown: parseJsonField(r.vat_breakdown, {}),
+        payment_methods_breakdown: parseJsonField(r.payment_methods_breakdown, {}),
+        fond_de_caisse: r.fond_de_caisse ?? 0,
+        tips_total: r.tips_total || 0,
+        change_total: r.change_total || 0
+      } as ClosureBulletin;
+    });
   }
 
   /**
@@ -301,7 +309,7 @@ export class JournalQueries {
     establishmentId?: string,
     opts?: { limit?: number; offset?: number }
   ): Promise<{ bulletins: ClosureBulletin[]; total: number }> {
-    const values: any[] = [];
+    const values: Array<string | number> = [];
     const conditions: string[] = [];
 
     if (type) {
@@ -340,15 +348,46 @@ export class JournalQueries {
     const result = await pool.query(pageQuery, pageValues);
 
     // Parse JSON fields and ensure tips_total/change_total are present
-    const bulletins = result.rows.map((row: any) => ({
-      ...row,
-      vat_breakdown: parseJsonField(row.vat_breakdown, {}),
-      payment_methods_breakdown: parseJsonField(row.payment_methods_breakdown, {}),
-      tips_total: row.tips_total || 0,
-      change_total: row.change_total || 0,
-    }));
+    const bulletins = result.rows.map((row) => {
+      const r = row as Record<string, unknown> & {
+        vat_breakdown?: unknown;
+        payment_methods_breakdown?: unknown;
+        fond_de_caisse?: number;
+        tips_total?: number;
+        change_total?: number;
+      };
+      return {
+        ...(r as Record<string, unknown>),
+        vat_breakdown: parseJsonField(r.vat_breakdown, {}),
+        payment_methods_breakdown: parseJsonField(r.payment_methods_breakdown, {}),
+        fond_de_caisse: r.fond_de_caisse ?? 0,
+        tips_total: r.tips_total || 0,
+        change_total: r.change_total || 0,
+      } as ClosureBulletin;
+    });
 
     return { bulletins, total };
+  }
+
+  /**
+   * Get the most recently used "fond de caisse" value for an establishment.
+   * Informational only (must not affect accounting totals).
+   */
+  static async getLastFondDeCaisse(establishmentId: string): Promise<number | null> {
+    const result = await pool.query(
+      `
+        SELECT fond_de_caisse
+        FROM closure_bulletins
+        WHERE (establishment_id IS NOT DISTINCT FROM $1)
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+      `,
+      [establishmentId]
+    );
+    const row = result.rows[0] as { fond_de_caisse?: unknown } | undefined;
+    if (!row) return null;
+    const n = typeof row.fond_de_caisse === 'number' ? row.fond_de_caisse : parseFloat(String(row.fond_de_caisse ?? ''));
+    return Number.isFinite(n) ? n : null;
   }
 
   /**
@@ -360,6 +399,7 @@ export class JournalQueries {
     startDate: Date,
     endDate: Date,
     totalTransactions: number,
+    fondDeCaisse: number,
     totalAmount: number,
     totalVat: number,
     vatBreakdown: Record<string, { amount: number; vat: number }>,
@@ -373,10 +413,10 @@ export class JournalQueries {
   ): Promise<ClosureBulletin> {
     const query = `
       INSERT INTO closure_bulletins (
-        closure_type, period_start, period_end, total_transactions, total_amount, 
+        closure_type, period_start, period_end, total_transactions, fond_de_caisse, total_amount, 
         total_vat, vat_breakdown, payment_methods_breakdown, tips_total, change_total, first_sequence, 
         last_sequence, closure_hash, is_closed, closed_at, establishment_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
       RETURNING *
     `;
 
@@ -385,6 +425,7 @@ export class JournalQueries {
       startDate,
       endDate,
       totalTransactions,
+      fondDeCaisse,
       totalAmount,
       totalVat,
       JSON.stringify(vatBreakdown),

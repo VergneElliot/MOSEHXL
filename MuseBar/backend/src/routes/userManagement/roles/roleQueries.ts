@@ -17,17 +17,20 @@ export async function fetchCustomRoles(establishmentId: string): Promise<Role[]>
     ORDER BY name
   `, [establishmentId]);
 
-  return customRolesResult.rows.map((row: any) => ({
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    permissions: row.permissions,
-    isSystemRole: false,
-    establishmentId
-  }));
+  return customRolesResult.rows.map((row) => {
+    const r = row as { id: string; name: string; description: string; permissions: unknown };
+    return ({
+      id: r.id,
+      name: r.name,
+      description: r.description,
+      permissions: r.permissions as Role['permissions'],
+      isSystemRole: false,
+      establishmentId
+    });
+  });
 }
 
-export async function fetchCustomRoleById(roleId: string, establishmentId: string) {
+export async function fetchCustomRoleById(roleId: string, establishmentId: string): Promise<(Role & { establishment_id: string; is_active: boolean }) | null> {
   const roleResult = await pool.query(`
     SELECT 
       id,
@@ -42,7 +45,12 @@ export async function fetchCustomRoleById(roleId: string, establishmentId: strin
     WHERE id = $1 AND establishment_id = $2
   `, [roleId, establishmentId]);
 
-  return roleResult.rows[0] || null;
+  const row = roleResult.rows[0] as (Role & { establishment_id: string; is_active: boolean; permissions: unknown }) | undefined;
+  if (!row) return null;
+  return {
+    ...(row as unknown as Role & { establishment_id: string; is_active: boolean }),
+    permissions: row.permissions as Role['permissions'],
+  };
 }
 
 export async function checkRoleNameExists(name: string, establishmentId: string): Promise<boolean> {
@@ -57,7 +65,7 @@ export async function insertCustomRole(params: {
   establishmentId: string;
   name: string;
   description: string;
-  permissions: any;
+  permissions: unknown;
   createdBy: number;
 }): Promise<string> {
   const result = await pool.query(`
@@ -83,9 +91,12 @@ export async function insertCustomRole(params: {
   return result.rows[0].id as string;
 }
 
-export async function updateCustomRole(roleId: string, updates: { name?: string; description?: string; permissions?: any; }): Promise<any> {
+export async function updateCustomRole(
+  roleId: string,
+  updates: { name?: string; description?: string; permissions?: unknown; }
+): Promise<(Role & { establishment_id: string; is_active: boolean }) | null> {
   const updateFragments: string[] = [];
-  const values: any[] = [];
+  const values: Array<string | Date> = [];
   let paramCount = 0;
 
   if (updates.name !== undefined) {
@@ -125,7 +136,12 @@ export async function updateCustomRole(roleId: string, updates: { name?: string;
   `;
 
   const result = await pool.query(updateQuery, values);
-  return result.rows[0];
+  const row = result.rows[0] as (Role & { establishment_id: string; is_active: boolean; permissions: unknown }) | undefined;
+  if (!row) return null;
+  return {
+    ...(row as unknown as Role & { establishment_id: string; is_active: boolean }),
+    permissions: row.permissions as Role['permissions'],
+  };
 }
 
 export async function deactivateCustomRole(roleId: string): Promise<void> {

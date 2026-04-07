@@ -138,7 +138,7 @@ export class ArchiveService {
 
   // Generate export content based on format and type
   private static async generateExportContent(exportData: ExportData): Promise<string> {
-    let data: any = {};
+    let data: Record<string, unknown> = {};
 
     switch (exportData.export_type) {
       case 'DAILY':
@@ -237,7 +237,13 @@ export class ArchiveService {
   }
 
   // Convert data to XML format
-  private static convertToXML(data: any): string {
+  private static convertToXML(data: {
+    export_type?: string;
+    compliance_info?: { legal_reference?: string; export_timestamp?: string; register_id?: string };
+    closure_data?: { total_transactions: number; total_amount: number; total_vat: number; period_start: string; period_end: string };
+    period?: { start: string; end: string };
+    summary?: { total_transactions: number; total_amount: number; total_vat: number };
+  }): string {
     const xmlDeclaration = '<?xml version="1.0" encoding="UTF-8"?>';
     const rootElement = '<musebar_export>';
     const closingRoot = '</musebar_export>';
@@ -267,21 +273,28 @@ export class ArchiveService {
   }
 
   // Convert data to CSV format
-  private static convertToCSV(data: any): string {
+  private static convertToCSV(data: {
+    export_type?: string;
+    compliance_info?: { export_timestamp?: string };
+    closure_data?: { total_transactions: number; total_amount: number; total_vat: number; period_start: string; period_end: string };
+    period?: { start: string; end: string };
+    summary?: { total_transactions: number; total_amount: number; total_vat: number };
+  }): string {
     let csvContent = 'Export Type,Period Start,Period End,Total Transactions,Total Amount,Total VAT,Export Timestamp\n';
     
+    const exportTimestamp = data.compliance_info?.export_timestamp || new Date().toISOString();
     if (data.export_type === 'DAILY' && data.closure_data) {
-      csvContent += `${data.export_type},${data.closure_data.period_start},${data.closure_data.period_end},${data.closure_data.total_transactions},${data.closure_data.total_amount},${data.closure_data.total_vat},${data.compliance_info.export_timestamp}\n`;
+      csvContent += `${data.export_type},${data.closure_data.period_start},${data.closure_data.period_end},${data.closure_data.total_transactions},${data.closure_data.total_amount},${data.closure_data.total_vat},${exportTimestamp}\n`;
     } else if (data.export_type === 'MONTHLY') {
-      csvContent += `${data.export_type},${data.period.start},${data.period.end},${data.summary.total_transactions},${data.summary.total_amount},${data.summary.total_vat},${data.compliance_info.export_timestamp}\n`;
+      csvContent += `${data.export_type},${data.period?.start ?? ''},${data.period?.end ?? ''},${data.summary?.total_transactions ?? ''},${data.summary?.total_amount ?? ''},${data.summary?.total_vat ?? ''},${exportTimestamp}\n`;
     }
     
     return csvContent;
   }
 
   /** PDF export: placeholder until a real PDF library is integrated. */
-  private static convertToPDF(data: any): string {
-    return `MuseBar export (${data?.export_type ?? 'unknown'}) — PDF generation not implemented.`;
+  private static convertToPDF(data: { export_type?: string }): string {
+    return `MuseBar export (${data.export_type ?? 'unknown'}) — PDF generation not implemented.`;
   }
 
   // Get all archive exports

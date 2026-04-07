@@ -66,7 +66,7 @@ export interface InvitationAcceptanceData {
 /**
  * API response interface
  */
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   message?: string;
   data?: T;
@@ -190,7 +190,7 @@ export interface ServiceInitialization {
 export interface AuditLogEntry {
   user_id: string;
   action_type: string;
-  action_details: Record<string, any>;
+  action_details: Record<string, unknown>;
   ip_address?: string;
   user_agent?: string;
 }
@@ -210,7 +210,7 @@ export interface ValidationError {
 export interface RouteConfig {
   path: string;
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-  middleware: any[];
+  middleware: Array<(req: Request, res: Response, next: NextFunction) => unknown>;
   handler: RouteHandler;
   description: string;
 }
@@ -221,6 +221,6 @@ export interface RouteConfig {
 export interface RouteGroup {
   prefix: string;
   routes: RouteConfig[];
-  middleware?: any[];
+  middleware?: Array<(req: Request, res: Response, next: NextFunction) => unknown>;
 }
 

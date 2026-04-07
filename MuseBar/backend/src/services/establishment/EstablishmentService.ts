@@ -6,7 +6,7 @@
 
 import { pool } from '../../app';
 import crypto from 'crypto';
-import { EstablishmentModel, CreateEstablishmentData } from '../../models/establishment';
+import { EstablishmentModel } from '../../models/establishment';
 import { AuditTrailModel } from '../../models/auditTrail';
 import { EmailService } from '../email';
 import { Logger } from '../../utils/logger';
@@ -33,7 +33,7 @@ export interface CreateEstablishmentResponse {
 }
 
 export interface GetEstablishmentsResponse {
-  establishments: any[];
+  establishments: unknown[];
   total: number;
 }
 
@@ -168,8 +168,8 @@ export class EstablishmentService {
   }
 
   public async getEstablishmentById(id: string): Promise<{
-    establishment: any;
-    invitations: any[];
+    establishment: unknown;
+    invitations: unknown[];
   }> {
     try {
       const result = await pool.query(

@@ -32,11 +32,7 @@ const InvitationValidationStep: React.FC<InvitationValidationStepProps> = ({
   const [validationResult, setValidationResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    validateInvitation();
-  }, [token]);
-
-  const validateInvitation = async () => {
+  const validateInvitation = React.useCallback(async () => {
     try {
       setIsValidating(true);
       setError(null);
@@ -57,7 +53,11 @@ const InvitationValidationStep: React.FC<InvitationValidationStepProps> = ({
     } finally {
       setIsValidating(false);
     }
-  };
+  }, [token, onComplete, onError]);
+
+  useEffect(() => {
+    validateInvitation();
+  }, [validateInvitation]);
 
   const getStatusIcon = () => {
     if (isValidating) return <CircularProgress size={24} />;

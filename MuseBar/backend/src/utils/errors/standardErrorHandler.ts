@@ -16,13 +16,13 @@ export interface StandardErrorResponse {
   code: string;
   timestamp: string;
   requestId?: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 /**
  * Standard success response interface
  */
-export interface StandardSuccessResponse<T = any> {
+export interface StandardSuccessResponse<T = unknown> {
   success: true;
   data: T;
   timestamp: string;
@@ -51,14 +51,14 @@ export enum ErrorTypes {
 export class StandardError extends Error {
   public readonly code: string;
   public readonly statusCode: number;
-  public readonly details?: Record<string, any>;
+  public readonly details?: Record<string, unknown>;
   public readonly isOperational: boolean;
 
   constructor(
     message: string,
     code: ErrorTypes,
     statusCode: number = 500,
-    details?: Record<string, any>,
+    details?: Record<string, unknown>,
     isOperational: boolean = true
   ) {
     super(message);
@@ -89,7 +89,7 @@ export class StandardError extends Error {
   /**
    * Static factory methods for common errors
    */
-  static validation(message: string, details?: Record<string, any>): StandardError {
+  static validation(message: string, details?: Record<string, unknown>): StandardError {
     return new StandardError(message, ErrorTypes.VALIDATION_ERROR, 400, details);
   }
 
@@ -108,15 +108,15 @@ export class StandardError extends Error {
     return new StandardError(message, ErrorTypes.FORBIDDEN, 403);
   }
 
-  static conflict(message: string, details?: Record<string, any>): StandardError {
+  static conflict(message: string, details?: Record<string, unknown>): StandardError {
     return new StandardError(message, ErrorTypes.CONFLICT, 409, details);
   }
 
-  static database(message: string, details?: Record<string, any>): StandardError {
+  static database(message: string, details?: Record<string, unknown>): StandardError {
     return new StandardError(message, ErrorTypes.DATABASE_ERROR, 500, details);
   }
 
-  static internal(message: string = 'Internal server error', details?: Record<string, any>): StandardError {
+  static internal(message: string = 'Internal server error', details?: Record<string, unknown>): StandardError {
     return new StandardError(message, ErrorTypes.INTERNAL_ERROR, 500, details);
   }
 
@@ -145,17 +145,14 @@ export class ErrorHandler {
       service: string;
       userId?: number;
       requestId?: string;
-      metadata?: Record<string, any>;
+      metadata?: Record<string, unknown>;
     }
   ): StandardErrorResponse {
-    const { operation, service, userId, requestId, metadata } = context;
+    const { operation, service, requestId, userId, metadata } = context;
 
     // Log the error
-    this.logger.error(
-      `Error in ${operation}`,
-      error,
-      service
-    );
+    void metadata;
+    this.logger.error(`Error in ${operation}`, error, service, requestId, userId);
 
     // Return standardized error response
     if (error instanceof StandardError) {
@@ -181,7 +178,7 @@ export class ErrorHandler {
       service: string;
       userId?: number;
       requestId?: string;
-      metadata?: Record<string, any>;
+      metadata?: Record<string, unknown>;
     }
   ): Promise<StandardSuccessResponse<T> | StandardErrorResponse> {
     try {
@@ -210,7 +207,7 @@ export class ErrorHandler {
   static validateAndThrow(
     condition: boolean,
     message: string,
-    details?: Record<string, any>
+    details?: Record<string, unknown>
   ): void {
     if (!condition) {
       throw StandardError.validation(message, details);
@@ -237,29 +234,35 @@ export class ErrorHandler {
   static async handleDatabaseOperation<T>(
     operation: () => Promise<T>,
     operationName: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): Promise<T> {
     try {
       return await operation();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const e = error as {
+        code?: unknown;
+        constraint?: unknown;
+        column?: unknown;
+        message?: unknown;
+      };
       // Convert database errors to standardized format
-      if (error.code === '23505') { // Unique constraint violation
+      if (e.code === '23505') { // Unique constraint violation
         throw StandardError.conflict('Resource already exists', {
-          constraintViolation: error.constraint,
+          constraintViolation: e.constraint,
           ...metadata
         });
       }
       
-      if (error.code === '23503') { // Foreign key constraint violation
+      if (e.code === '23503') { // Foreign key constraint violation
         throw StandardError.validation('Referenced resource does not exist', {
-          constraintViolation: error.constraint,
+          constraintViolation: e.constraint,
           ...metadata
         });
       }
 
-      if (error.code === '23502') { // Not null constraint violation
+      if (e.code === '23502') { // Not null constraint violation
         throw StandardError.validation('Required field is missing', {
-          missingField: error.column,
+          missingField: e.column,
           ...metadata
         });
       }
@@ -268,8 +271,8 @@ export class ErrorHandler {
       throw StandardError.database(
         `Database operation failed: ${operationName}`,
         {
-          originalError: error.message,
-          sqlState: error.code,
+          originalError: typeof e.message === 'string' ? e.message : undefined,
+          sqlState: e.code,
           ...metadata
         }
       );

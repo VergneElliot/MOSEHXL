@@ -8,6 +8,7 @@ import { requireAuth, requireAdmin } from './auth';
 import { EstablishmentSearchService } from '../services/establishment';
 import { Logger } from '../utils/logger';
 import { getEnvironmentConfig } from '../config/environment';
+import type { EstablishmentStatus } from '../services/establishment/types';
 
 const router = express.Router();
 const config = getEnvironmentConfig();
@@ -22,7 +23,7 @@ router.get('/', requireAuth, requireAdmin, async (req, res) => {
     const filters = {
       name: req.query.name as string,
       email: req.query.email as string,
-      status: req.query.status as any,
+      status: req.query.status as EstablishmentStatus,
       business_type: req.query.business_type as string,
       subscription_plan: req.query.subscription_plan as string,
       created_after: req.query.created_after ? new Date(req.query.created_after as string) : undefined,
@@ -34,7 +35,7 @@ router.get('/', requireAuth, requireAdmin, async (req, res) => {
     const options = {
       page: parseInt(req.query.page as string) || 1,
       limit: Math.min(parseInt(req.query.limit as string) || 20, 100), // Max 100 per page
-      sortBy: (req.query.sortBy as any) || 'created_at',
+      sortBy: (req.query.sortBy as 'name' | 'created_at' | 'status' | 'setup_progress') || 'created_at',
       sortOrder: (req.query.sortOrder as 'asc' | 'desc') || 'desc'
     };
 

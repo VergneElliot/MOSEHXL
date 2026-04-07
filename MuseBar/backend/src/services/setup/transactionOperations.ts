@@ -17,7 +17,7 @@ export class TransactionOperations {
    * Create transaction context
    */
   static async createTransactionContext(
-    pool: any
+    pool: { connect: () => Promise<PoolClient> }
   ): Promise<TransactionContext> {
     try {
       const client = await pool.connect();
@@ -158,7 +158,7 @@ export class TransactionOperations {
    * Execute with transaction wrapper
    */
   static async executeWithTransaction<T>(
-    pool: any,
+    pool: { connect: () => Promise<PoolClient> },
     operation: (client: PoolClient) => Promise<T>
   ): Promise<T> {
     const context = await this.createTransactionContext(pool);

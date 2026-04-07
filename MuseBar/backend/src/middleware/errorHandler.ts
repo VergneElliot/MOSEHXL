@@ -101,7 +101,7 @@ export class ExternalServiceError extends AppError {
 // Async wrapper (single definition; was duplicated in errorHandler and errorHandling)
 // ---------------------------------------------------------------------------
 
-export const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) => {
+export const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>) => {
   return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
@@ -113,9 +113,10 @@ export const asyncHandler = (fn: (req: Request, res: Response, next: NextFunctio
 
 export const createErrorHandler = (logger?: Logger) => {
   return (err: unknown, req: Request, res: Response, _next: NextFunction) => {
+    void _next;
     const normalized = normalizeError(err);
-    const requestId = (req as any).requestId;
-    const userId = (req as any).user?.id;
+    const requestId = (req as Request & { requestId?: string }).requestId;
+    const userId = (req as Request & { user?: { id?: number } }).user?.id;
 
     if (logger) {
       if (normalized.statusCode >= 500) {
@@ -147,18 +148,36 @@ export const createErrorHandler = (logger?: Logger) => {
         );
       }
     } else {
-      console.error('Error:', {
-        message: normalized.message,
-        stack: err instanceof Error ? err.stack : undefined,
-        url: req.originalUrl,
-        method: req.method,
-        requestId,
-        userId,
-      });
+      process.stderr.write(
+        `[ERROR_HANDLER] ${normalized.message} ` +
+          JSON.stringify(
+            {
+              stack: err instanceof Error ? err.stack : undefined,
+              url: req.originalUrl,
+              method: req.method,
+              requestId,
+              userId,
+            },
+            null,
+            2
+          ) +
+          '\n'
+      );
     }
 
     const isDev = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
-    const payload: any = {
+    const payload: {
+      success: false;
+      error: {
+        message: string;
+        code: string;
+        statusCode: number;
+        timestamp: string;
+        requestId?: string;
+        details?: Record<string, unknown>;
+        stack?: string;
+      };
+    } = {
       success: false,
       error: {
         message: normalized.isOperational ? normalized.message : 'Internal server error',
@@ -197,7 +216,7 @@ function normalizeError(err: unknown): NormalizedError {
     };
   }
 
-  const e = err as any;
+  const e = err as { code?: unknown; name?: unknown; message?: unknown; statusCode?: unknown };
 
   // PostgreSQL
   if (e && e.code) {

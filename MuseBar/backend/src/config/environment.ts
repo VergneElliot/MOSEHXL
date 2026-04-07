@@ -81,22 +81,22 @@ export const validateEnvironment = (): void => {
 
   // Report errors
   if (missing.length > 0) {
-    console.error('❌ Missing required environment variables:');
-    missing.forEach(variable => console.error(`   - ${variable}`));
+    process.stderr.write('❌ Missing required environment variables:\n');
+    missing.forEach(variable => process.stderr.write(`   - ${variable}\n`));
   }
 
   if (invalid.length > 0) {
-    console.error('❌ Invalid environment variables:');
-    invalid.forEach(error => console.error(`   - ${error}`));
+    process.stderr.write('❌ Invalid environment variables:\n');
+    invalid.forEach(error => process.stderr.write(`   - ${error}\n`));
   }
 
   if (missing.length > 0 || invalid.length > 0) {
-    console.error('\n💡 Create a .env file in your backend directory with the required variables.');
-    console.error('💡 See .env.example for a template.');
+    process.stderr.write('\n💡 Create a .env file in your backend directory with the required variables.\n');
+    process.stderr.write('💡 See .env.example for a template.\n');
     process.exit(1);
   }
 
-  console.log('✅ Environment validation passed');
+  process.stdout.write('✅ Environment validation passed\n');
 };
 
 /**
@@ -231,12 +231,12 @@ export const initializeEnvironment = (): EnvironmentConfig => {
   const config = getEnvironmentConfig();
   
   if (process.env.NODE_ENV !== 'test') {
-    console.log(`🌍 Environment: ${config.app.environment}`);
-    console.log(`📱 Application: ${config.app.name} v${config.app.version}`);
-    console.log(`🚀 Server: ${config.server.host}:${config.server.port}`);
-    console.log(`📊 Database: ${config.database.host}:${config.database.port}/${config.database.database}`);
-    console.log(`🔐 Security: JWT (${config.security.jwtExpiresIn}), BCrypt (${config.security.bcryptRounds} rounds)`);
-    console.log(`📝 Logging: ${config.logging.level} level`);
+    process.stdout.write(`🌍 Environment: ${config.app.environment}\n`);
+    process.stdout.write(`📱 Application: ${config.app.name} v${config.app.version}\n`);
+    process.stdout.write(`🚀 Server: ${config.server.host}:${config.server.port}\n`);
+    process.stdout.write(`📊 Database: ${config.database.host}:${config.database.port}/${config.database.database}\n`);
+    process.stdout.write(`🔐 Security: JWT (${config.security.jwtExpiresIn}), BCrypt (${config.security.bcryptRounds} rounds)\n`);
+    process.stdout.write(`📝 Logging: ${config.logging.level} level\n`);
   }
   
   return config;

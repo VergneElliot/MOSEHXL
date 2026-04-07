@@ -12,7 +12,7 @@ export const isValidEmail = (email: string): boolean => {
   return emailRegex.test(email);
 };
 
-export const isValidPrice = (price: number): boolean => {
+export const isValidPrice = (price: unknown): boolean => {
   return typeof price === 'number' && price >= 0 && Number.isFinite(price);
 };
 
@@ -77,13 +77,13 @@ export const validateParams = (paramRules: ParamValidationRule[]) => {
 interface ValidationRule {
   field: string;
   required: boolean;
-  validator?: (value: any) => boolean;
+  validator?: (value: unknown) => boolean;
   message?: string;
 }
 
 interface ParamValidationRule {
   param: string;
-  validator: (value: any) => boolean;
+  validator: (value: string) => boolean;
   message?: string;
 }
 
@@ -93,35 +93,35 @@ export const commonValidations = {
   orderCreate: [
     { field: 'total_amount', required: true, validator: isValidPrice, message: 'Le montant total doit être un nombre positif' },
     { field: 'total_tax', required: true, validator: isValidPrice, message: 'Le montant de la TVA doit être un nombre positif' },
-    { field: 'payment_method', required: true, validator: (val: string) => ['cash', 'card', 'split'].includes(val), message: 'Méthode de paiement invalide' },
-    { field: 'status', required: true, validator: (val: string) => ['pending', 'completed', 'cancelled'].includes(val), message: 'Statut invalide' },
-    { field: 'notes', required: false, validator: (val: string) => isValidString(val, 0, 1000), message: 'Les notes ne doivent pas dépasser 1000 caractères' },
-    { field: 'items', required: true, validator: (val: any[]) => Array.isArray(val) && val.length > 0, message: 'Au moins un article est requis' }
+    { field: 'payment_method', required: true, validator: (val: unknown) => typeof val === 'string' && ['cash', 'card', 'split'].includes(val), message: 'Méthode de paiement invalide' },
+    { field: 'status', required: true, validator: (val: unknown) => typeof val === 'string' && ['pending', 'completed', 'cancelled'].includes(val), message: 'Statut invalide' },
+    { field: 'notes', required: false, validator: (val: unknown) => typeof val === 'string' && isValidString(val, 0, 1000), message: 'Les notes ne doivent pas dépasser 1000 caractères' },
+    { field: 'items', required: true, validator: (val: unknown) => Array.isArray(val) && val.length > 0, message: 'Au moins un article est requis' }
   ],
 
   // Category validations
   categoryCreate: [
-    { field: 'name', required: true, validator: (val: string) => isValidString(val, 2, 100), message: 'Le nom doit contenir entre 2 et 100 caractères' },
-    { field: 'description', required: false, validator: (val: string) => isValidString(val, 0, 500), message: 'La description ne doit pas dépasser 500 caractères' },
-    { field: 'color', required: false, validator: (val: string) => /^#[0-9A-F]{6}$/i.test(val), message: 'Format de couleur invalide (ex: #FF0000)' }
+    { field: 'name', required: true, validator: (val: unknown) => typeof val === 'string' && isValidString(val, 2, 100), message: 'Le nom doit contenir entre 2 et 100 caractères' },
+    { field: 'description', required: false, validator: (val: unknown) => typeof val === 'string' && isValidString(val, 0, 500), message: 'La description ne doit pas dépasser 500 caractères' },
+    { field: 'color', required: false, validator: (val: unknown) => typeof val === 'string' && /^#[0-9A-F]{6}$/i.test(val), message: 'Format de couleur invalide (ex: #FF0000)' }
   ],
 
   // Product validations
   productCreate: [
-    { field: 'name', required: true, validator: (val: string) => isValidString(val, 2, 100), message: 'Le nom doit contenir entre 2 et 100 caractères' },
-    { field: 'description', required: false, validator: (val: string) => isValidString(val, 0, 500), message: 'La description ne doit pas dépasser 500 caractères' },
+    { field: 'name', required: true, validator: (val: unknown) => typeof val === 'string' && isValidString(val, 2, 100), message: 'Le nom doit contenir entre 2 et 100 caractères' },
+    { field: 'description', required: false, validator: (val: unknown) => typeof val === 'string' && isValidString(val, 0, 500), message: 'La description ne doit pas dépasser 500 caractères' },
     { field: 'price', required: true, validator: isValidPrice, message: 'Le prix doit être un nombre positif' },
-    { field: 'taxRate', required: true, validator: (val: number) => typeof val === 'number' && val >= 0 && val <= 1, message: 'Le taux de TVA doit être entre 0 et 1' },
+    { field: 'taxRate', required: true, validator: (val: unknown) => typeof val === 'number' && val >= 0 && val <= 1, message: 'Le taux de TVA doit être entre 0 et 1' },
     { field: 'categoryId', required: true, validator: isValidId, message: 'ID de catégorie invalide' },
-    { field: 'isHappyHourEligible', required: false, validator: (val: boolean) => typeof val === 'boolean', message: 'isHappyHourEligible doit être un booléen' }
+    { field: 'isHappyHourEligible', required: false, validator: (val: unknown) => typeof val === 'boolean', message: 'isHappyHourEligible doit être un booléen' }
   ],
 
   // User validations
   userCreate: [
     { field: 'email', required: true, validator: isValidEmail, message: 'Format d\'email invalide' },
-    { field: 'password', required: true, validator: (val: string) => validatePassword(val).isValid, message: 'Le mot de passe doit faire 8–128 caractères avec majuscule, minuscule et un chiffre' },
-    { field: 'firstName', required: true, validator: (val: string) => isValidString(val, 2, 50), message: 'Le prénom doit contenir entre 2 et 50 caractères' },
-    { field: 'lastName', required: true, validator: (val: string) => isValidString(val, 2, 50), message: 'Le nom doit contenir entre 2 et 50 caractères' }
+    { field: 'password', required: true, validator: (val: unknown) => typeof val === 'string' && validatePassword(val).isValid, message: 'Le mot de passe doit faire 8–128 caractères avec majuscule, minuscule et un chiffre' },
+    { field: 'firstName', required: true, validator: (val: unknown) => typeof val === 'string' && isValidString(val, 2, 50), message: 'Le prénom doit contenir entre 2 et 50 caractères' },
+    { field: 'lastName', required: true, validator: (val: unknown) => typeof val === 'string' && isValidString(val, 2, 50), message: 'Le nom doit contenir entre 2 et 50 caractères' }
   ]
 };
 

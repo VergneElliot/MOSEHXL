@@ -92,9 +92,9 @@ router.post('/reset', requireAdmin, async (req, res) => {
       message: 'Journal reset successfully (development only)',
     });
   } catch (error: unknown) {
-    const maybeAny = error as any;
-    if (maybeAny?.statusCode === 403) {
-      return res.status(403).json({ error: maybeAny.message || 'Journal reset not allowed in production' });
+    const e = error as { statusCode?: number; message?: string };
+    if (e?.statusCode === 403) {
+      return res.status(403).json({ error: e.message || 'Journal reset not allowed in production' });
     }
     logger.error('Error resetting journal', error instanceof Error ? error : new Error(String(error)), 'LEGAL_JOURNAL');
     res.status(500).json({ error: 'Failed to reset journal' });

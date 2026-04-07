@@ -4,6 +4,7 @@
  */
 
 import { Pool } from 'pg';
+import type { PoolClient } from 'pg';
 import { Logger } from '../../utils/logger';
 import { InvitationQueries } from '../../utils/database';
 import { validatePassword as validatePasswordShared } from '../../utils/passwordValidation';
@@ -11,7 +12,7 @@ import {
   EstablishmentAccountCreationRequest,
   EstablishmentAccountCreationResponse 
 } from '../../routes/establishmentAccountCreation/types';
-import { AccountCreationOrchestrator, AccountCreationResult } from './AccountCreationOrchestrator';
+import { AccountCreationOrchestrator } from './AccountCreationOrchestrator';
 
 /**
  * Establishment Account Service Class
@@ -107,7 +108,20 @@ export class EstablishmentAccountService {
   /**
    * Validate invitation token (uses shared InvitationQueries.getInvitationByToken).
    */
-  private async validateInvitationToken(client: any, token: string): Promise<any> {
+  private async validateInvitationToken(
+    client: PoolClient,
+    token: string
+  ): Promise<
+    | {
+        isValid: false;
+        error: string;
+      }
+    | {
+        isValid: true;
+        establishment: { id: string; name: string; email: string; status: unknown };
+        token: string;
+      }
+  > {
     try {
       const invitation = await InvitationQueries.getInvitationByToken(client, token);
       if (!invitation) {
@@ -146,7 +160,10 @@ export class EstablishmentAccountService {
   /**
    * Send completion email
    */
-  private async sendCompletionEmail(establishment: any, user: any): Promise<void> {
+  private async sendCompletionEmail(
+    establishment: { id: string },
+    user: { email: string }
+  ): Promise<void> {
     try {
       // TODO: Implement email service integration
       // This will send a welcome email to the new establishment admin
@@ -155,7 +172,7 @@ export class EstablishmentAccountService {
         userEmail: user.email
       });
     } catch (error) {
-      this.logger.warn('Failed to send completion email', error as Error);
+      this.logger.warn('Failed to send completion email', { error: error instanceof Error ? error.message : String(error) });
       // Don't fail the entire process if email fails
     }
   }
@@ -165,7 +182,7 @@ export class EstablishmentAccountService {
    */
   public async validateInvitation(token: string): Promise<{
     isValid: boolean;
-    establishment?: any;
+    establishment?: { id: string; name: string; email: string; status: unknown };
     error?: string;
   }> {
     const client = await this.pool.connect();

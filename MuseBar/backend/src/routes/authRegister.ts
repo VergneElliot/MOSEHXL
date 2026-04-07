@@ -272,7 +272,7 @@ router.post('/setup', async (req, res) => {
       user: { id: user.id, email: user.email, is_admin: user.is_admin },
     });
   } catch (error) {
-    const e = error as any;
+    const e = error as { statusCode?: number; message?: string };
     if (e?.statusCode === 400) {
       return res.status(400).json({ error: e.message || 'Admin user already exists' });
     }

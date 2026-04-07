@@ -6,7 +6,7 @@ export interface AuditEntry {
   action_type: string;
   resource_type?: string;
   resource_id?: string;
-  action_details?: any;
+  action_details?: Record<string, unknown>;
   ip_address?: string;
   user_agent?: string;
   session_id?: string;
@@ -47,7 +47,7 @@ export class AuditTrailModel {
       
       return result.rows[0];
     } catch (err) {
-      console.error('[AUDIT LOG] Error logging action:', err);
+      process.stderr.write(`[AUDIT LOG] Error logging action: ${err instanceof Error ? err.message : String(err)}\n`);
       throw err;
     }
   }

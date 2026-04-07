@@ -258,10 +258,13 @@ export class InvitationEmail {
   /**
    * Test email configuration (for testing endpoints)
    */
-  public async testConfiguration(): Promise<any> {
+  public async testConfiguration(): Promise<unknown> {
     try {
       // Delegate to the underlying email service
-      return await (this.emailService as any).testConfiguration();
+      const svc = this.emailService as EmailService & {
+        testConfiguration: () => Promise<unknown>;
+      };
+      return await svc.testConfiguration();
     } catch (error) {
       this.logger.error(
         'Failed to test email configuration',
@@ -275,10 +278,13 @@ export class InvitationEmail {
   /**
    * Get email statistics (for monitoring endpoints)
    */
-  public getEmailStats(): any {
+  public getEmailStats(): unknown {
     try {
       // Delegate to the underlying email service
-      return (this.emailService as any).getEmailStats();
+      const svc = this.emailService as EmailService & {
+        getEmailStats: () => unknown;
+      };
+      return svc.getEmailStats();
     } catch (error) {
       this.logger.error(
         'Failed to get email stats',
@@ -292,10 +298,13 @@ export class InvitationEmail {
   /**
    * Validate email configuration (for health checks)
    */
-  public validateConfiguration(): any {
+  public validateConfiguration(): unknown {
     try {
       // Delegate to the underlying email service
-      return (this.emailService as any).validateConfiguration();
+      const svc = this.emailService as EmailService & {
+        validateConfiguration: () => unknown;
+      };
+      return svc.validateConfiguration();
     } catch (error) {
       this.logger.error(
         'Failed to validate email configuration',

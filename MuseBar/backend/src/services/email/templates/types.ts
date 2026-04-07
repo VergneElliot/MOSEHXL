@@ -32,7 +32,7 @@ export interface ProcessedTemplate {
 /**
  * Template processing data
  */
-export type TemplateData = Record<string, any>;
+export type TemplateData = Record<string, unknown>;
 
 /**
  * Template categories for organization

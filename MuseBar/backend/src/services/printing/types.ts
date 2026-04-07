@@ -43,6 +43,7 @@ export interface ClosureBulletinData {
   period_start: string;
   period_end: string;
   total_transactions: number;
+  fond_de_caisse: number;
   total_amount: number;
   total_vat: number;
   vat_breakdown: {
@@ -77,7 +78,7 @@ export interface PrintResult {
   message: string;
   printJobId?: string;
   provider?: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 export interface PrinterStatus {

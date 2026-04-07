@@ -225,6 +225,7 @@ export class InvitationAcceptance {
    * Resend invitation
    */
   public async resendInvitation(invitationId: string, userId: string): Promise<InvitationResult> {
+    void userId;
     try {
       // Get invitation details
       const invitationResult = await pool.query(`

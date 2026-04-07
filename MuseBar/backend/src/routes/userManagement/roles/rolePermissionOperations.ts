@@ -170,7 +170,7 @@ export class RolePermissionOperations {
       const hasPermission = this.checkPermissionExists(permissions, permission);
 
       // Log permission check
-      await RoleAuditLogger.logPermissionAccess(context, roleId!, false);
+      await RoleAuditLogger.logPermissionAccess(context, roleId!, isSystemRole);
 
       res.json({
         success: true,
@@ -199,11 +199,11 @@ export class RolePermissionOperations {
    */
   private static checkPermissionExists(permissions: RolePermissions, permissionPath: string): boolean {
     const parts = permissionPath.split('.');
-    let current: any = permissions;
+    let current: unknown = permissions;
 
     for (const part of parts) {
-      if (current && typeof current === 'object' && part in current) {
-        current = current[part];
+      if (current && typeof current === 'object' && part in (current as Record<string, unknown>)) {
+        current = (current as Record<string, unknown>)[part];
       } else {
         return false;
       }

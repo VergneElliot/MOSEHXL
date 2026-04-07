@@ -4,6 +4,7 @@
  */
 
 import express from 'express';
+import type { NextFunction, Response } from 'express';
 import { requireAuth, requireAdmin } from '../auth';
 import { validateBody, validateParams } from '../../middleware/validation';
 import { Logger } from '../../utils/logger';
@@ -11,8 +12,6 @@ import {
   AuthenticatedRequest,
   UserUpdateData,
   UserFilterParams,
-  ApiResponse,
-  TeamMember,
   ServiceInitialization
 } from './types';
 import {
@@ -41,13 +40,14 @@ let logger: Logger;
  */
 export function initializeUserRoutes(services: ServiceInitialization): void {
   logger = services.logger;
+  void logger;
 }
 
 /**
  * GET /establishment-users
  * Get users for establishment (Admin/Manager only)
  */
-router.get('/establishment-users', requireAuth, async (req: any, res: any, next: any) => {
+router.get('/establishment-users', requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const user = req.user!;
     const {
@@ -58,7 +58,7 @@ router.get('/establishment-users', requireAuth, async (req: any, res: any, next:
       search,
       sortBy = 'created_at',
       sortOrder = 'desc'
-    }: UserFilterParams = req.query as any;
+    }: UserFilterParams = req.query as unknown as UserFilterParams;
 
     const establishmentId = req.query.establishmentId as string || user.establishment_id;
 
@@ -84,7 +84,7 @@ router.get('/establishment-users', requireAuth, async (req: any, res: any, next:
       status,
       search,
       sortBy,
-      sortOrder: sortOrder as any
+      sortOrder
     });
 
     await logViewEstablishmentUsers(user.id, {
@@ -122,7 +122,7 @@ router.get('/establishment-users', requireAuth, async (req: any, res: any, next:
  */
 router.get('/user/:userId', requireAuth, validateParams([
   { param: 'userId', validator: (v: string) => typeof v === 'string' && v.length > 0 }
-]), async (req: any, res: any, next: any) => {
+]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { userId } = req.params;
     const user = req.user!;
@@ -176,7 +176,7 @@ router.put('/user/:userId', requireAuth, validateParams([
   { field: 'email', required: false },
   { field: 'role', required: false },
   { field: 'isActive', required: false }
-]), async (req: any, res: any, next: any) => {
+]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { userId } = req.params;
     const { firstName, lastName, email, role, isActive }: UserUpdateData = req.body;
@@ -267,7 +267,7 @@ router.put('/user/:userId', requireAuth, validateParams([
  */
 router.delete('/user/:userId', requireAuth, requireAdmin, validateParams([
   { param: 'userId', validator: (v: string) => typeof v === 'string' && v.length > 0 }
-]), async (req: any, res: any, next: any) => {
+]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { userId } = req.params;
     const user = req.user!;
@@ -289,7 +289,7 @@ router.delete('/user/:userId', requireAuth, requireAdmin, validateParams([
         message: 'User not found'
       });
     }
-    const result = await deleteOrDeactivateUser(userId, permanent);
+    await deleteOrDeactivateUser(userId, permanent);
 
     await logDeactivateOrDeleteUser(user.id, {
       targetUserId: userId,
@@ -320,7 +320,7 @@ router.delete('/user/:userId', requireAuth, requireAdmin, validateParams([
  */
 router.post('/user/:userId/reactivate', requireAuth, requireAdmin, validateParams([
   { param: 'userId', validator: (v: string) => typeof v === 'string' && v.length > 0 }
-]), async (req: any, res: any, next: any) => {
+]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { userId } = req.params;
     const user = req.user!;

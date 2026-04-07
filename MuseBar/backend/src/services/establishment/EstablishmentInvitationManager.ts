@@ -125,7 +125,7 @@ export class EstablishmentInvitationManager {
     token: string
   ): Promise<{
     isValid: boolean;
-    invitation?: any;
+    invitation?: unknown;
     error?: string;
   }> {
     try {

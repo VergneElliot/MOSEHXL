@@ -108,7 +108,7 @@ export class SetupAuditManager {
     userId: number,
     establishmentId: string,
     stepId: string,
-    stepData: any,
+    stepData: Record<string, unknown>,
     context: SetupContext
   ): Promise<void> {
     try {
@@ -201,10 +201,10 @@ export class SetupAuditManager {
    * Get setup audit history
    */
   public static async getSetupAuditHistory(
-    pool: any,
+    pool: { query: (queryText: string, values?: unknown[]) => Promise<{ rows: unknown[] }> },
     establishmentId: string,
     limit: number = 50
-  ): Promise<any[]> {
+  ): Promise<Array<Record<string, unknown>>> {
     try {
       const result = await pool.query(`
         SELECT * FROM audit_trail 
@@ -214,18 +214,7 @@ export class SetupAuditManager {
         LIMIT $2
       `, [establishmentId, limit]);
 
-      return result.rows.map((row: any) => ({
-        id: row.id,
-        action: row.action,
-        entity_type: row.entity_type,
-        entity_id: row.entity_id,
-        old_values: row.old_values,
-        new_values: row.new_values,
-        ip_address: row.ip_address,
-        user_agent: row.user_agent,
-        metadata: row.metadata,
-        created_at: row.created_at
-      }));
+      return result.rows.map((row) => row as Record<string, unknown>);
     } catch (error) {
       this.logger.error(
         'Failed to get setup audit history',
@@ -270,7 +259,7 @@ export class SetupAuditManager {
         undefined,
         'SETUP_AUDIT'
       );
-    } catch (error) {
+    } catch {
       this.logger.warn(
         'Failed to create cleanup audit entry',
         undefined,

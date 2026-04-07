@@ -53,7 +53,7 @@ router.get('/', async (req, res) => {
     );
 
     res.json({ orders: ordersWithDetails, total: totalResult.rows[0]?.total ?? 0 });
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch orders' });
   }
 });
@@ -71,7 +71,7 @@ router.get('/:id', validateParams([paramValidations.id]), async (req, res) => {
     const items = await OrderItemModel.getByOrderId(id);
     const subBills = order.payment_method === 'split' ? await SubBillModel.getByOrderId(id) : [];
     res.json({ ...order, items, sub_bills: subBills, tips: order.tips || 0, change: order.change || 0 });
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch order' });
   }
 });
@@ -165,7 +165,7 @@ router.post('/', validateBody(commonValidations.orderCreate), async (req, res) =
     }
 
     res.status(201).json({ ...order, items: createdItems, sub_bills: createdSubBills });
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to create order' });
   }
 });
@@ -182,7 +182,7 @@ router.put('/:id', validateParams([paramValidations.id]), async (req, res) => {
     if (!order) return res.status(404).json({ error: 'Order not found' });
     const updatedOrder = await OrderModel.update(id, req.body, establishmentId);
     res.json(updatedOrder);
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to update order' });
   }
 });
@@ -203,7 +203,7 @@ router.delete('/:id', validateParams([paramValidations.id]), async (req, res) =>
     } else {
       res.status(500).json({ error: 'Failed to delete order' });
     }
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to delete order' });
   }
 });

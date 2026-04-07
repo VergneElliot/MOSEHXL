@@ -24,6 +24,7 @@ export abstract class BasePrintingService implements IPrintingService {
   abstract listPrinters(): Promise<Printer[]>;
 
   async testPrint(printerId?: string): Promise<PrintResult> {
+    void printerId;
     const testData: ReceiptData = {
       order_id: 99999,
       sequence_number: 99999,
@@ -225,13 +226,15 @@ export abstract class BasePrintingService implements IPrintingService {
     content += ESC_POS.BOLD_ON + 'DETAIL TVA:\n' + ESC_POS.BOLD_OFF;
     if (data.vat_breakdown.vat_10) {
       const ttc10 =
-        (data.vat_breakdown.vat_10 as any).ttc ?? (data.vat_breakdown.vat_10.amount + data.vat_breakdown.vat_10.vat);
+        (data.vat_breakdown.vat_10 as { ttc?: number }).ttc ??
+        (data.vat_breakdown.vat_10.amount + data.vat_breakdown.vat_10.vat);
       content += this.padLine('Soumis TVA 10%:', `${ttc10.toFixed(2)} EUR`, 32) + '\n';
       content += this.padLine('Montant TVA 10%:', `${vat10Shown.toFixed(2)} EUR`, 32) + '\n';
     }
     if (data.vat_breakdown.vat_20) {
       const ttc20 =
-        (data.vat_breakdown.vat_20 as any).ttc ?? (data.vat_breakdown.vat_20.amount + data.vat_breakdown.vat_20.vat);
+        (data.vat_breakdown.vat_20 as { ttc?: number }).ttc ??
+        (data.vat_breakdown.vat_20.amount + data.vat_breakdown.vat_20.vat);
       content += this.padLine('Soumis TVA 20%:', `${ttc20.toFixed(2)} EUR`, 32) + '\n';
       content += this.padLine('Montant TVA 20%:', `${vat20Shown.toFixed(2)} EUR`, 32) + '\n';
     }

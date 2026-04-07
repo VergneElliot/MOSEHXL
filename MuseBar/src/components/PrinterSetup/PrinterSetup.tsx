@@ -5,10 +5,6 @@ import {
   Typography,
   Button,
   TextField,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
   CircularProgress,
   Alert,
   Stepper,
@@ -18,28 +14,17 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction,
-  IconButton,
   Chip,
-  Tabs,
-  Tab,
   Grid,
   Card,
   CardContent,
-  CardActions,
-  FormHelperText,
-  Switch,
-  FormControlLabel
 } from '@mui/material';
 import {
   Print as PrintIcon,
   Check as CheckIcon,
-  Close as CloseIcon,
-  Settings as SettingsIcon,
   Computer as ComputerIcon,
   Cloud as CloudIcon,
   Wifi as WifiIcon,
-  Email as EmailIcon
 } from '@mui/icons-material';
 import { apiConfig } from '../../config/api';
 

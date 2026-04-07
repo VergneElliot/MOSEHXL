@@ -25,12 +25,12 @@ export class InputSanitizationService {
 
         // Sanitize query parameters
         if (req.query && typeof req.query === 'object') {
-          req.query = InputSanitizationService.sanitizeObject(req.query);
+          req.query = InputSanitizationService.sanitizeObject(req.query) as unknown as Request['query'];
         }
 
         // Sanitize URL parameters
         if (req.params && typeof req.params === 'object') {
-          req.params = InputSanitizationService.sanitizeObject(req.params);
+          req.params = InputSanitizationService.sanitizeObject(req.params) as unknown as Request['params'];
         }
 
         next();
@@ -56,7 +56,7 @@ export class InputSanitizationService {
   /**
    * Sanitize object recursively
    */
-  public static sanitizeObject(obj: any): any {
+  public static sanitizeObject(obj: unknown): unknown {
     if (obj === null || obj === undefined) {
       return obj;
     }
@@ -70,11 +70,10 @@ export class InputSanitizationService {
     }
 
     if (typeof obj === 'object') {
-      const sanitized: any = {};
-      for (const key in obj) {
-        if (obj.hasOwnProperty(key)) {
-          sanitized[key] = InputSanitizationService.sanitizeObject(obj[key]);
-        }
+      const input = obj as Record<string, unknown>;
+      const sanitized: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(input)) {
+        sanitized[key] = InputSanitizationService.sanitizeObject(value);
       }
       return sanitized;
     }

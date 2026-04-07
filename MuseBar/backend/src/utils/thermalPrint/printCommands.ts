@@ -93,6 +93,7 @@ export class PrintCommands {
    * Generate image/logo command (placeholder for future implementation)
    */
   static generateImage(imageData: Buffer): string {
+    void imageData;
     // Placeholder for image printing functionality
     // Would require image processing and conversion to ESC/POS format
     return '';

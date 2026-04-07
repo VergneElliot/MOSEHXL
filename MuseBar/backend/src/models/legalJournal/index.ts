@@ -91,20 +91,26 @@ export class LegalJournalModel {
   }
 
   // Closure operations (establishmentId required for multi-tenant data isolation)
-  static async createDailyClosure(date: Date, establishmentId: string, timezone?: string, force?: boolean) {
-    return await ClosureOperations.createDailyClosure(date, establishmentId, timezone, force);
+  static async createDailyClosure(
+    date: Date,
+    establishmentId: string,
+    timezone?: string,
+    force?: boolean,
+    fondDeCaisse?: number
+  ) {
+    return await ClosureOperations.createDailyClosure(date, establishmentId, timezone, force, fondDeCaisse);
   }
 
-  static async createWeeklyClosure(date: Date, establishmentId: string, force?: boolean) {
-    return await ClosureOperations.createWeeklyClosure(date, establishmentId, force);
+  static async createWeeklyClosure(date: Date, establishmentId: string, force?: boolean, fondDeCaisse?: number) {
+    return await ClosureOperations.createWeeklyClosure(date, establishmentId, force ?? false, fondDeCaisse);
   }
 
-  static async createMonthlyClosure(date: Date, establishmentId: string, force?: boolean) {
-    return await ClosureOperations.createMonthlyClosure(date, establishmentId, force);
+  static async createMonthlyClosure(date: Date, establishmentId: string, force?: boolean, fondDeCaisse?: number) {
+    return await ClosureOperations.createMonthlyClosure(date, establishmentId, force ?? false, fondDeCaisse);
   }
 
-  static async createAnnualClosure(date: Date, establishmentId: string, force?: boolean) {
-    return await ClosureOperations.createAnnualClosure(date, establishmentId, force);
+  static async createAnnualClosure(date: Date, establishmentId: string, force?: boolean, fondDeCaisse?: number) {
+    return await ClosureOperations.createAnnualClosure(date, establishmentId, force ?? false, fondDeCaisse);
   }
 
   static async getClosureBulletins(type?: 'DAILY' | 'MONTHLY' | 'ANNUAL', establishmentId?: string) {
@@ -117,6 +123,10 @@ export class LegalJournalModel {
     opts?: { limit?: number; offset?: number }
   ) {
     return await ClosureOperations.getClosureBulletinsPaginated(type, establishmentId, opts);
+  }
+
+  static async getLastFondDeCaisse(establishmentId: string): Promise<number | null> {
+    return await JournalQueries.getLastFondDeCaisse(establishmentId);
   }
 }
 

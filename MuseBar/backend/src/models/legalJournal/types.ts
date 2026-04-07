@@ -26,6 +26,11 @@ export interface ClosureBulletin {
   period_start: Date;
   period_end: Date;
   total_transactions: number;
+  /**
+   * Cash float left in the register at closure time (informational).
+   * Must not be included in any accounting totals.
+   */
+  fond_de_caisse: number;
   total_amount: number;
   total_vat: number;
   vat_breakdown: Record<string, { amount: number; vat: number }>;
