@@ -59,7 +59,10 @@ const ClosureContainer: React.FC = () => {
   useEffect(() => {
     if (didInitRef.current) return;
     didInitRef.current = true;
-    void api.refreshAllData();
+    void Promise.all([
+      apiRef.current.loadTodayStatus(),
+      apiRef.current.loadMonthlyStats(),
+    ]);
   }, [api]);
 
   // Load bulletins whenever pagination changes
@@ -200,8 +203,8 @@ const ClosureContainer: React.FC = () => {
       <CreateClosureDialog
         open={state.showCreateDialog}
         onClose={() => actions.setShowCreateDialog(false)}
-        onCreate={async ({ date, type, force }: { date: string; type: ClosureType; force?: boolean }) =>
-          api.createClosure({ date, type, force })
+        onCreate={async ({ date, type, force, fond_de_caisse }: { date: string; type: ClosureType; force?: boolean; fond_de_caisse: number }) =>
+          api.createClosure({ date, type, force, fond_de_caisse })
         }
         creating={state.creating}
         selectedDate={state.selectedDate}
@@ -209,6 +212,7 @@ const ClosureContainer: React.FC = () => {
         onDateChange={actions.setSelectedDate}
         onClosureTypeChange={actions.setSelectedClosureType}
         disableForceCreation={false}
+        defaultFondDeCaisse={state.todayStatus?.last_fond_de_caisse ?? null}
       />
 
       <BulletinDetailsDialog

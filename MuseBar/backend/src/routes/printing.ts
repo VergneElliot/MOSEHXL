@@ -320,6 +320,7 @@ export async function printClosureBulletinResponse(
     period_start: new Date(bulletin.period_start).toISOString(),
     period_end: new Date(bulletin.period_end).toISOString(),
     total_transactions: Number(bulletin.total_transactions),
+    fond_de_caisse: bulletin.fond_de_caisse ? parseFloat(bulletin.fond_de_caisse) : 0,
     total_amount: parseFloat(bulletin.total_amount),
     total_vat: parseFloat(bulletin.total_vat),
     vat_breakdown: bulletin.vat_breakdown,
