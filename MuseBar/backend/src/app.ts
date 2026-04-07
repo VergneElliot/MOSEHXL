@@ -53,7 +53,7 @@ export const pool = new Pool({
   database: config.database.database,
   password: config.database.password,
   port: config.database.port,
-  ssl: config.database.ssl ? { rejectUnauthorized: true } : false,
+  ssl: config.database.ssl ? { rejectUnauthorized: config.database.sslRejectUnauthorized } : false,
   max: config.database.maxConnections,
   idleTimeoutMillis: config.database.idleTimeoutMillis,
   options: `--timezone=${DEFAULT_APP_TIMEZONE}`,
