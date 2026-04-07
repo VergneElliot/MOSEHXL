@@ -67,7 +67,7 @@ export class JournalQueries {
    */
   static async getEntries(limit?: number, offset?: number): Promise<JournalEntry[]> {
     let query = 'SELECT * FROM legal_journal ORDER BY sequence_number DESC';
-    const values: any[] = [];
+    const values: number[] = [];
     
     if (limit) {
       query += ` LIMIT $${values.length + 1}`;
@@ -163,9 +163,7 @@ export class JournalQueries {
    */
   static async resetJournalDevOnly(): Promise<void> {
     if (process.env.NODE_ENV === 'production') {
-      const err: any = new Error('Journal reset not allowed in production');
-      err.statusCode = 403;
-      throw err;
+      throw Object.assign(new Error('Journal reset not allowed in production'), { statusCode: 403 });
     }
 
     await pool.query('DELETE FROM legal_journal');
@@ -183,7 +181,7 @@ export class JournalQueries {
     limit?: number
   ): Promise<JournalEntry[]> {
     let query = 'SELECT * FROM legal_journal WHERE transaction_type = $1 ORDER BY sequence_number DESC';
-    const values: any[] = [transactionType];
+    const values: Array<string | number> = [transactionType];
     
     if (limit) {
       query += ` LIMIT $2`;
@@ -264,7 +262,7 @@ export class JournalQueries {
     establishmentId?: string
   ): Promise<ClosureBulletin[]> {
     let query = 'SELECT * FROM closure_bulletins';
-    const values: any[] = [];
+    const values: Array<string | number> = [];
     const conditions: string[] = [];
 
     if (type) {
@@ -283,13 +281,21 @@ export class JournalQueries {
 
     const result = await pool.query(query, values);
     // Parse JSON fields and ensure tips_total/change_total are present
-    return result.rows.map((row: any) => ({
-      ...row,
-      vat_breakdown: parseJsonField(row.vat_breakdown, {}),
-      payment_methods_breakdown: parseJsonField(row.payment_methods_breakdown, {}),
-      tips_total: row.tips_total || 0,
-      change_total: row.change_total || 0
-    }));
+    return result.rows.map((row) => {
+      const r = row as Record<string, unknown> & {
+        vat_breakdown?: unknown;
+        payment_methods_breakdown?: unknown;
+        tips_total?: number;
+        change_total?: number;
+      };
+      return {
+        ...(r as Record<string, unknown>),
+        vat_breakdown: parseJsonField(r.vat_breakdown, {}),
+        payment_methods_breakdown: parseJsonField(r.payment_methods_breakdown, {}),
+        tips_total: r.tips_total || 0,
+        change_total: r.change_total || 0
+      } as ClosureBulletin;
+    });
   }
 
   /**
@@ -301,7 +307,7 @@ export class JournalQueries {
     establishmentId?: string,
     opts?: { limit?: number; offset?: number }
   ): Promise<{ bulletins: ClosureBulletin[]; total: number }> {
-    const values: any[] = [];
+    const values: Array<string | number> = [];
     const conditions: string[] = [];
 
     if (type) {
@@ -340,13 +346,21 @@ export class JournalQueries {
     const result = await pool.query(pageQuery, pageValues);
 
     // Parse JSON fields and ensure tips_total/change_total are present
-    const bulletins = result.rows.map((row: any) => ({
-      ...row,
-      vat_breakdown: parseJsonField(row.vat_breakdown, {}),
-      payment_methods_breakdown: parseJsonField(row.payment_methods_breakdown, {}),
-      tips_total: row.tips_total || 0,
-      change_total: row.change_total || 0,
-    }));
+    const bulletins = result.rows.map((row) => {
+      const r = row as Record<string, unknown> & {
+        vat_breakdown?: unknown;
+        payment_methods_breakdown?: unknown;
+        tips_total?: number;
+        change_total?: number;
+      };
+      return {
+        ...(r as Record<string, unknown>),
+        vat_breakdown: parseJsonField(r.vat_breakdown, {}),
+        payment_methods_breakdown: parseJsonField(r.payment_methods_breakdown, {}),
+        tips_total: r.tips_total || 0,
+        change_total: r.change_total || 0,
+      } as ClosureBulletin;
+    });
 
     return { bulletins, total };
   }

@@ -86,7 +86,10 @@ export class ClosureScheduler {
 
   // Determine if closure should be executed.
   // nowParis must be a moment-timezone object in Europe/Paris.
-  static async shouldExecuteClosure(settings: any, nowParis: moment.Moment) {
+  static async shouldExecuteClosure(
+    settings: { daily_closure_time: string; grace_period_minutes: number },
+    nowParis: moment.Moment
+  ) {
     const [hours, minutes] = settings.daily_closure_time.split(':').map(Number);
 
     // Build the target closure time for today in Paris — safe across DST transitions.

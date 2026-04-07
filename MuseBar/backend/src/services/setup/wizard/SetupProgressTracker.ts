@@ -98,28 +98,33 @@ export class SetupProgressTracker {
    * Get setup progress from database
    */
   public static async getSetupProgress(
-    pool: any,
+    pool: { connect: () => Promise<PoolClient> },
     establishmentId: string
   ): Promise<SetupProgress | null> {
     try {
-      const result = await pool.query(
-        'SELECT * FROM setup_progress WHERE establishment_id = $1',
-        [establishmentId]
-      );
+      const client = await pool.connect();
+      try {
+        const result = await client.query(
+          'SELECT * FROM setup_progress WHERE establishment_id = $1',
+          [establishmentId]
+        );
 
-      if (result.rows.length === 0) {
-        return null;
+        if (result.rows.length === 0) {
+          return null;
+        }
+
+        const row = result.rows[0] as Record<string, unknown>;
+        return {
+          invitation_validated: Boolean(row.invitation_validated),
+          user_created: Boolean(row.user_created),
+          establishment_updated: Boolean(row.establishment_updated),
+          default_data_created: Boolean(row.default_data_created),
+          schema_initialized: Boolean(row.schema_initialized),
+          audit_logged: Boolean(row.audit_logged)
+        };
+      } finally {
+        client.release();
       }
-
-      const row = result.rows[0];
-      return {
-        invitation_validated: row.invitation_validated,
-        user_created: row.user_created,
-        establishment_updated: row.establishment_updated,
-        default_data_created: row.default_data_created,
-        schema_initialized: row.schema_initialized,
-        audit_logged: row.audit_logged
-      };
     } catch (error) {
       this.logger.error(
         'Error getting setup progress',

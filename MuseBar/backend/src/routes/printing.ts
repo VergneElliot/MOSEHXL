@@ -1,59 +1,38 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import { PrintingServiceFactory, IPrintingService, PrintingConfig } from '../services/printing';
+import type { PrintResult, ReceiptData as PrintingReceiptData, ClosureBulletinData as PrintingClosureBulletinData } from '../services/printing/types';
 import { pool } from '../app';
 import { authenticateToken } from '../middleware/auth';
 import { getLogger } from '../utils/logger';
+import type { AuthenticatedRequest } from './userManagement/types';
 
 const router = Router();
 
 // Cache for printing services per establishment
 const printingServices: Map<number, IPrintingService> = new Map();
 
-type RequestUser = {
+type PrintingUser = {
   establishment_id: number;
-  id?: number;
+  id: number;
   username?: string;
 };
 
-type RequestWithUser = Request & { user?: RequestUser };
-
-type VatBreakdownEntry = {
-  rate: number;
-  subtotal_ht: number;
-  vat: number;
-};
-
-type ReceiptItem = {
-  tax_rate?: number;
-  total_price?: string | number;
-};
-
-type ReceiptData = {
-  order_id: unknown;
-  sequence_number: unknown;
-  total_amount: number;
-  total_tax: number;
-  payment_method: unknown;
-  created_at: unknown;
-  items: unknown;
-  business_info: {
-    name: unknown;
-    address: unknown;
-    phone: unknown;
-    email: unknown;
-    siret: unknown;
-    tax_identification: unknown;
+function getPrintingUser(req: AuthenticatedRequest): PrintingUser | null {
+  const establishmentIdRaw = req.user?.establishment_id;
+  const establishmentId =
+    typeof establishmentIdRaw === 'number'
+      ? establishmentIdRaw
+      : typeof establishmentIdRaw === 'string'
+        ? parseInt(establishmentIdRaw, 10)
+        : NaN;
+  if (!Number.isFinite(establishmentId) || establishmentId <= 0) return null;
+  if (!req.user) return null;
+  return {
+    establishment_id: establishmentId,
+    id: req.user.id,
+    username: (req.user as { username?: string }).username,
   };
-  receipt_type: 'detailed' | 'summary';
-  tips?: number;
-  change?: number;
-  compliance_info: {
-    receipt_hash: unknown;
-    cash_register_id: string;
-    operator_id: string | undefined;
-  };
-  vat_breakdown?: VatBreakdownEntry[];
-};
+}
 
 /**
  * Get printing service for establishment
@@ -113,16 +92,16 @@ async function getPrintingService(establishmentId: number): Promise<IPrintingSer
 }
 
 // Middleware to ensure establishment context
-const ensureEstablishment = (req: RequestWithUser, res: Response, next: NextFunction) => {
-  const user = req.user;
-  if (!user || !user.establishment_id) {
+const ensureEstablishment = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  const user = getPrintingUser(req);
+  if (!user) {
     return res.status(400).json({ error: 'Establishment context required' });
   }
   next();
 };
 
 /** In-process handler: get status and printers. Used by routes and by printingCompat. */
-export async function getStatusResponse(user: RequestUser) {
+export async function getStatusResponse(user: PrintingUser) {
   const service = await getPrintingService(user.establishment_id);
   const status = await service.checkPrinterStatus();
   const printers = await service.listPrinters();
@@ -130,15 +109,15 @@ export async function getStatusResponse(user: RequestUser) {
 }
 
 /** In-process handler: test print. Used by routes and by printingCompat. */
-export async function testPrintResponse(user: RequestUser, printerId?: string) {
+export async function testPrintResponse(user: PrintingUser, printerId?: string) {
   const service = await getPrintingService(user.establishment_id);
   return await service.testPrint(printerId);
 }
 
 // GET /api/printing/status
-router.get('/status', authenticateToken, ensureEstablishment, async (req: RequestWithUser, res: Response) => {
+router.get('/status', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const user = req.user!;
+    const user = getPrintingUser(req)!;
     const data = await getStatusResponse(user);
     res.json(data);
   } catch (error) {
@@ -151,9 +130,9 @@ router.get('/status', authenticateToken, ensureEstablishment, async (req: Reques
 });
 
 // GET /api/printing/printers
-router.get('/printers', authenticateToken, ensureEstablishment, async (req: RequestWithUser, res: Response) => {
+router.get('/printers', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const user = req.user!;
+    const user = getPrintingUser(req)!;
     const service = await getPrintingService(user.establishment_id);
     
     const printers = await service.listPrinters();
@@ -172,9 +151,9 @@ router.get('/printers', authenticateToken, ensureEstablishment, async (req: Requ
 });
 
 // POST /api/printing/test
-router.post('/test', authenticateToken, ensureEstablishment, async (req: RequestWithUser, res: Response) => {
+router.post('/test', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const user = req.user!;
+    const user = getPrintingUser(req)!;
     const result = await testPrintResponse(user, req.body?.printerId);
     res.json(result);
   } catch (error) {
@@ -188,10 +167,10 @@ router.post('/test', authenticateToken, ensureEstablishment, async (req: Request
 
 /** In-process handler: print receipt. Used by routes and by printingCompat. */
 export async function printReceiptResponse(
-  user: RequestUser,
+  user: PrintingUser,
   orderId: number,
   type: string = 'detailed'
-): Promise<{ result: unknown; receiptData: ReceiptData }> {
+): Promise<{ result: PrintResult; receiptData: PrintingReceiptData }> {
   const establishmentId = user.establishment_id;
   const receiptResult = await pool.query(
     `SELECT 
@@ -234,27 +213,27 @@ export async function printReceiptResponse(
   }
 
   const receiptRow = receiptResult.rows[0];
-  const receiptData: ReceiptData = {
-    order_id: receiptRow.order_id,
-    sequence_number: receiptRow.sequence_number,
+  const receiptData: PrintingReceiptData = {
+    order_id: Number(receiptRow.order_id),
+    sequence_number: Number(receiptRow.sequence_number),
     total_amount: parseFloat(receiptRow.total_amount),
     total_tax: parseFloat(receiptRow.total_tax),
-    payment_method: receiptRow.payment_method,
-    created_at: receiptRow.created_at,
-    items: receiptRow.items,
+    payment_method: String(receiptRow.payment_method ?? ''),
+    created_at: new Date(receiptRow.created_at).toISOString(),
+    items: Array.isArray(receiptRow.items) ? receiptRow.items : [],
     business_info: {
-      name: receiptRow.business_name,
-      address: receiptRow.business_address,
-      phone: receiptRow.business_phone,
-      email: receiptRow.business_email,
-      siret: receiptRow.siret,
-      tax_identification: receiptRow.tax_identification
+      name: String(receiptRow.business_name ?? ''),
+      address: String(receiptRow.business_address ?? ''),
+      phone: String(receiptRow.business_phone ?? ''),
+      email: String(receiptRow.business_email ?? ''),
+      siret: receiptRow.siret ? String(receiptRow.siret) : undefined,
+      tax_identification: receiptRow.tax_identification ? String(receiptRow.tax_identification) : undefined
     },
     receipt_type: type as 'detailed' | 'summary',
     tips: receiptRow.tips ? parseFloat(receiptRow.tips) : undefined,
     change: receiptRow.change ? parseFloat(receiptRow.change) : undefined,
     compliance_info: {
-      receipt_hash: receiptRow.receipt_hash,
+      receipt_hash: receiptRow.receipt_hash ? String(receiptRow.receipt_hash) : undefined,
       cash_register_id: `CR-${user.establishment_id}`,
       operator_id: user.username
     }
@@ -269,11 +248,11 @@ export async function printReceiptResponse(
     return 0;
   };
 
-  const items: ReceiptItem[] = Array.isArray(receiptRow.items)
-    ? (receiptRow.items as ReceiptItem[])
+  const items: Array<{ tax_rate?: number; total_price?: string | number }> = Array.isArray(receiptRow.items)
+    ? (receiptRow.items as Array<{ tax_rate?: number; total_price?: string | number }>)
     : [];
 
-  const vatBreakdown: VatBreakdownEntry[] = [];
+  const vatBreakdown: Array<{ rate: number; subtotal_ht: number; vat: number }> = [];
   const vat10Items = items.filter((item) => item.tax_rate === 10);
   const vat20Items = items.filter((item) => item.tax_rate === 20);
   if (vat10Items.length > 0) {
@@ -311,9 +290,9 @@ export async function printReceiptResponse(
 
 /** In-process handler: print closure bulletin. Used by routes and by printingCompat. */
 export async function printClosureBulletinResponse(
-  user: RequestUser,
+  user: PrintingUser,
   bulletinId: number
-): Promise<{ result: unknown; bulletinData: unknown }> {
+): Promise<{ result: PrintResult; bulletinData: PrintingClosureBulletinData }> {
   const bulletinResult = await pool.query(
     `SELECT 
       cb.*,
@@ -335,31 +314,31 @@ export async function printClosureBulletinResponse(
   }
 
   const bulletin = bulletinResult.rows[0];
-  const bulletinData = {
-    id: bulletin.id,
+  const bulletinData: PrintingClosureBulletinData = {
+    id: Number(bulletin.id),
     closure_type: bulletin.closure_type,
-    period_start: bulletin.period_start,
-    period_end: bulletin.period_end,
-    total_transactions: bulletin.total_transactions,
+    period_start: new Date(bulletin.period_start).toISOString(),
+    period_end: new Date(bulletin.period_end).toISOString(),
+    total_transactions: Number(bulletin.total_transactions),
     total_amount: parseFloat(bulletin.total_amount),
     total_vat: parseFloat(bulletin.total_vat),
     vat_breakdown: bulletin.vat_breakdown,
     payment_methods_breakdown: bulletin.payment_methods_breakdown,
-    first_sequence: bulletin.first_sequence,
-    last_sequence: bulletin.last_sequence,
-    closure_hash: bulletin.closure_hash,
-    is_closed: bulletin.is_closed,
+    first_sequence: Number(bulletin.first_sequence),
+    last_sequence: Number(bulletin.last_sequence),
+    closure_hash: String(bulletin.closure_hash),
+    is_closed: Boolean(bulletin.is_closed),
     closed_at: bulletin.closed_at,
     created_at: bulletin.created_at,
     tips_total: bulletin.tips_total ? parseFloat(bulletin.tips_total) : undefined,
     change_total: bulletin.change_total ? parseFloat(bulletin.change_total) : undefined,
     business_info: {
-      name: bulletin.business_name,
-      address: bulletin.business_address,
-      phone: bulletin.business_phone,
-      email: bulletin.business_email,
-      siret: bulletin.siret,
-      tax_identification: bulletin.tax_identification
+      name: String(bulletin.business_name ?? ''),
+      address: String(bulletin.business_address ?? ''),
+      phone: String(bulletin.business_phone ?? ''),
+      email: String(bulletin.business_email ?? ''),
+      siret: bulletin.siret ? String(bulletin.siret) : undefined,
+      tax_identification: bulletin.tax_identification ? String(bulletin.tax_identification) : undefined
     },
     compliance_info: {
       cash_register_id: `CR-${user.establishment_id}`,
@@ -389,9 +368,9 @@ export async function printClosureBulletinResponse(
 }
 
 // POST /api/printing/receipt/:orderId
-router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, async (req: RequestWithUser, res: Response) => {
+router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const user = req.user!;
+    const user = getPrintingUser(req)!;
     const orderId = parseInt(req.params.orderId);
     const type = (req.query.type as string) || 'detailed';
     const { result, receiptData } = await printReceiptResponse(user, orderId, type);
@@ -410,9 +389,9 @@ router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, async (
 });
 
 // POST /api/printing/closure/:bulletinId
-router.post('/closure/:bulletinId', authenticateToken, ensureEstablishment, async (req: RequestWithUser, res: Response) => {
+router.post('/closure/:bulletinId', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const user = req.user!;
+    const user = getPrintingUser(req)!;
     const bulletinId = parseInt(req.params.bulletinId);
     const { result, bulletinData } = await printClosureBulletinResponse(user, bulletinId);
     res.json({ ...result, bulletin_data: bulletinData });
@@ -430,9 +409,9 @@ router.post('/closure/:bulletinId', authenticateToken, ensureEstablishment, asyn
 });
 
 // GET /api/printing/configuration
-router.get('/configuration', authenticateToken, ensureEstablishment, async (req: RequestWithUser, res: Response) => {
+router.get('/configuration', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const user = req.user!;
+    const user = getPrintingUser(req)!;
     
     const configResult = await pool.query(
       `SELECT * FROM printing_configurations 
@@ -455,9 +434,9 @@ router.get('/configuration', authenticateToken, ensureEstablishment, async (req:
 });
 
 // POST /api/printing/configuration
-router.post('/configuration', authenticateToken, ensureEstablishment, async (req: RequestWithUser, res: Response) => {
+router.post('/configuration', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const user = req.user!;
+    const user = getPrintingUser(req)!;
     const { provider, config } = req.body;
     
     if (!provider) {
@@ -498,9 +477,9 @@ router.post('/configuration', authenticateToken, ensureEstablishment, async (req
 });
 
 // GET /api/printing/history
-router.get('/history', authenticateToken, ensureEstablishment, async (req: RequestWithUser, res: Response) => {
+router.get('/history', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const user = req.user!;
+    const user = getPrintingUser(req)!;
     const { limit = 50, offset = 0 } = req.query;
     
     const historyResult = await pool.query(

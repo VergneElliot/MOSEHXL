@@ -9,7 +9,7 @@ import { AuthenticatedRequest, Role, RolePermissions } from '../types';
 /**
  * Extended authenticated request for role operations
  */
-export interface RoleRequest<T = any> extends AuthenticatedRequest {
+export interface RoleRequest<T = unknown> extends AuthenticatedRequest {
   params: {
     roleId?: string;
   };
@@ -73,10 +73,10 @@ export interface RoleUpdateData {
 /**
  * Role validation result
  */
-export interface RoleValidationResult {
+export interface RoleValidationResult<T = unknown> {
   isValid: boolean;
   errors: string[];
-  data?: any;
+  data?: T;
 }
 
 /**
@@ -145,5 +145,5 @@ export interface RoleAuditLogData {
   roleId?: string;
   roleName?: string;
   establishmentId: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }

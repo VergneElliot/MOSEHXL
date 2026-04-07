@@ -1,5 +1,6 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import { authenticateToken } from '../middleware/auth';
+import type { AuthenticatedRequest } from './userManagement/types';
 import {
   getStatusResponse,
   testPrintResponse,
@@ -10,12 +11,24 @@ import {
 const router = Router();
 
 /** Ensure establishment context (same as printing router). */
-type RequestUser = { establishment_id: number };
-type RequestWithUser = Request & { user?: RequestUser };
+type PrintingUser = { establishment_id: number; id: number; username?: string };
 
-const ensureEstablishment = (req: RequestWithUser, res: Response, next: NextFunction) => {
-  const user = req.user;
-  if (!user || !user.establishment_id) {
+function getPrintingUser(req: AuthenticatedRequest): PrintingUser | null {
+  const establishmentIdRaw = req.user?.establishment_id;
+  const asNumber =
+    typeof establishmentIdRaw === 'number'
+      ? establishmentIdRaw
+      : typeof establishmentIdRaw === 'string'
+        ? parseInt(establishmentIdRaw, 10)
+        : NaN;
+  if (!Number.isFinite(asNumber) || asNumber <= 0) return null;
+  if (!req.user) return null;
+  return { establishment_id: asNumber, id: req.user.id, username: (req.user as { username?: string } | undefined)?.username };
+}
+
+const ensureEstablishment = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  const user = getPrintingUser(req);
+  if (!user) {
     return res.status(400).json({ error: 'Establishment context required' });
   }
   next();
@@ -27,17 +40,20 @@ const ensureEstablishment = (req: RequestWithUser, res: Response, next: NextFunc
  */
 
 // POST /api/legal/receipt/:orderId/thermal-print
-router.post('/api/legal/receipt/:orderId/thermal-print', authenticateToken, ensureEstablishment, async (req: RequestWithUser, res: Response) => {
+router.post('/api/legal/receipt/:orderId/thermal-print', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const user = req.user!;
+    const user = getPrintingUser(req)!;
     const orderId = parseInt(req.params.orderId);
     const type = (req.query.type as string) || 'detailed';
     const { result, receiptData } = await printReceiptResponse(user, orderId, type);
+    const r = result as { success?: boolean; message?: string; metadata?: Record<string, unknown> };
     res.json({
-      success: result.success,
-      message: result.message,
+      success: Boolean(r.success),
+      message: r.message,
       receipt_data: receiptData,
-      receipt_content: result.metadata?.html || result.metadata?.content || ''
+      receipt_content: (r.metadata as { html?: unknown; content?: unknown } | undefined)?.html ||
+        (r.metadata as { html?: unknown; content?: unknown } | undefined)?.content ||
+        ''
     });
   } catch (error: unknown) {
     const e = error as { statusCode?: number; message?: string };
@@ -48,15 +64,18 @@ router.post('/api/legal/receipt/:orderId/thermal-print', authenticateToken, ensu
 });
 
 // POST /api/legal/closure/:bulletinId/thermal-print
-router.post('/api/legal/closure/:bulletinId/thermal-print', authenticateToken, ensureEstablishment, async (req: RequestWithUser, res: Response) => {
+router.post('/api/legal/closure/:bulletinId/thermal-print', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const user = req.user!;
+    const user = getPrintingUser(req)!;
     const bulletinId = parseInt(req.params.bulletinId);
     const { result } = await printClosureBulletinResponse(user, bulletinId);
+    const r = result as { success?: boolean; message?: string; metadata?: Record<string, unknown> };
     res.json({
-      success: result.success,
-      message: result.message,
-      bulletin_content: result.metadata?.html || result.metadata?.content || ''
+      success: Boolean(r.success),
+      message: r.message,
+      bulletin_content: (r.metadata as { html?: unknown; content?: unknown } | undefined)?.html ||
+        (r.metadata as { html?: unknown; content?: unknown } | undefined)?.content ||
+        ''
     });
   } catch (error: unknown) {
     const e = error as { statusCode?: number; message?: string };
@@ -67,9 +86,9 @@ router.post('/api/legal/closure/:bulletinId/thermal-print', authenticateToken, e
 });
 
 // GET /api/legal/thermal-printer/status
-router.get('/api/legal/thermal-printer/status', authenticateToken, ensureEstablishment, async (req: RequestWithUser, res: Response) => {
+router.get('/api/legal/thermal-printer/status', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const user = req.user!;
+    const user = getPrintingUser(req)!;
     const data = await getStatusResponse(user);
     res.json({
       available: data.status?.available ?? false,
@@ -84,15 +103,15 @@ router.get('/api/legal/thermal-printer/status', authenticateToken, ensureEstabli
 });
 
 // POST /api/legal/thermal-printer/test
-router.post('/api/legal/thermal-printer/test', authenticateToken, ensureEstablishment, async (req: Request, res: Response) => {
+router.post('/api/legal/thermal-printer/test', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = getPrintingUser(req)!;
     const result = await testPrintResponse(user, req.body?.printerId);
     res.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     res.status(500).json({
       success: false,
-      message: (error?.message as string) || 'Test print failed'
+      message: error instanceof Error ? error.message : 'Test print failed'
     });
   }
 });

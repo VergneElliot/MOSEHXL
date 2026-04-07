@@ -25,8 +25,11 @@ export async function getRoleDistribution(establishmentId: string): Promise<Reco
   `, [establishmentId]);
 
   const roleDistribution: Record<string, number> = {};
-  roleDistributionResult.rows.forEach((row: any) => {
-    roleDistribution[row.role] = parseInt(row.count);
+  roleDistributionResult.rows.forEach((row) => {
+    const r = row as { role?: string; count?: string };
+    if (typeof r.role === 'string') {
+      roleDistribution[r.role] = parseInt(r.count ?? '0');
+    }
   });
   return roleDistribution;
 }
@@ -46,7 +49,7 @@ export async function fetchTeamMembers(establishmentId: string, includeInactive:
     WHERE u.establishment_id = $1
   `;
 
-  const queryParams: any[] = [establishmentId];
+  const queryParams: string[] = [establishmentId];
 
   if (!includeInactive) {
     query += ' AND u.is_active = true';

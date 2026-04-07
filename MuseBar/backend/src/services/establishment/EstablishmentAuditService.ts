@@ -13,7 +13,7 @@ export interface AuditData {
   establishment_id: string;
   user_id: string;
   action: string;
-  details: Record<string, any>;
+  details: Record<string, unknown>;
   ip_address?: string;
   user_agent?: string;
 }
@@ -202,7 +202,7 @@ export class EstablishmentAuditService {
     client: PoolClient,
     establishmentId: string,
     userId: string,
-    establishmentData: Record<string, any>,
+    establishmentData: Record<string, unknown>,
     ipAddress?: string,
     userAgent?: string
   ): Promise<AuditLogEntry> {

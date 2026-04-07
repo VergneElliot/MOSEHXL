@@ -26,7 +26,7 @@ export async function fetchEstablishmentUsers(establishmentId: string, params: U
     FROM users u
     WHERE u.establishment_id = $1
   `;
-  const queryParams: any[] = [establishmentId];
+  const queryParams: Array<string | number | boolean> = [establishmentId];
   let paramCount = 1;
 
   if (role) {
@@ -64,7 +64,7 @@ export async function fetchEstablishmentUsers(establishmentId: string, params: U
 
   // Count query
   let countQuery = 'SELECT COUNT(*) FROM users u WHERE u.establishment_id = $1';
-  const countParams: any[] = [establishmentId];
+  const countParams: Array<string | number | boolean> = [establishmentId];
   let countParamIndex = 1;
 
   if (role) {
@@ -120,7 +120,7 @@ export async function fetchUserRowById(userId: string) {
 
 export async function updateUserById(userId: string, updates: UserUpdateData) {
   const fragments: string[] = [];
-  const values: any[] = [];
+  const values: Array<string | boolean | Date> = [];
   let paramCount = 0;
 
   if (updates.firstName !== undefined) {

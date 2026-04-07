@@ -29,22 +29,28 @@ import { Logger } from '../../utils/logger';
 export class SetupDatabase {
   private static logger = Logger.getInstance();
 
+  private static isPoolLike(pool: unknown): pool is { connect: () => Promise<PoolClient> } {
+    return typeof (pool as { connect?: unknown })?.connect === 'function';
+  }
+
   // ===== INVITATION OPERATIONS =====
   
   /**
    * Validate invitation token
    */
   static async validateInvitation(
-    pool: any,
+    pool: unknown,
     token: string
   ): Promise<InvitationValidation> {
+    if (!this.isPoolLike(pool)) throw new Error('Invalid pool provided to validateInvitation');
     return InvitationOperations.validateInvitation(pool, token);
   }
 
   /**
    * Check setup status for invitation
    */
-  static async checkSetupStatus(pool: any, token: string) {
+  static async checkSetupStatus(pool: unknown, token: string) {
+    if (!this.isPoolLike(pool)) throw new Error('Invalid pool provided to checkSetupStatus');
     return InvitationOperations.checkSetupStatus(pool, token);
   }
 
@@ -182,7 +188,8 @@ export class SetupDatabase {
   /**
    * Create transaction context
    */
-  static async createTransactionContext(pool: any): Promise<TransactionContext> {
+  static async createTransactionContext(pool: unknown): Promise<TransactionContext> {
+    if (!this.isPoolLike(pool)) throw new Error('Invalid pool provided to createTransactionContext');
     return TransactionOperations.createTransactionContext(pool);
   }
 
@@ -222,9 +229,10 @@ export class SetupDatabase {
    * Execute with transaction wrapper
    */
   static async executeWithTransaction<T>(
-    pool: any,
+    pool: unknown,
     operation: (client: PoolClient) => Promise<T>
   ): Promise<T> {
+    if (!this.isPoolLike(pool)) throw new Error('Invalid pool provided to executeWithTransaction');
     return TransactionOperations.executeWithTransaction(pool, operation);
   }
 

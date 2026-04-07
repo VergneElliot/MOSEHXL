@@ -3,7 +3,7 @@
  * Generates complete formatted content for different document types
  */
 
-import { ReceiptData, ClosureBulletinData, FormattedContent } from './types';
+import { ReceiptData, ClosureBulletinData, FormattedContent, PaymentMethod } from './types';
 import { PrintFormatters } from './printFormatters';
 import { PrintCommands, PrintCommandBuilder } from './printCommands';
 
@@ -12,6 +12,12 @@ import { PrintCommands, PrintCommandBuilder } from './printCommands';
  */
 export class PrintTemplates {
   private static readonly PAPER_WIDTH = 32; // Standard thermal printer width
+
+  private static asPaymentMethod(method: string): PaymentMethod {
+    if (method === 'cash' || method === 'card' || method === 'split') return method;
+    // Best-effort fallback so template never crashes on unexpected values
+    return 'cash';
+  }
   
   /**
    * Generate complete receipt content
@@ -37,7 +43,7 @@ export class PrintTemplates {
       .newLine()
       .text(`Date: ${PrintFormatters.formatDate(data.created_at)}`)
       .newLine()
-      .text(`Paiement: ${PrintFormatters.formatPaymentMethod(data.payment_method as any)}`)
+      .text(`Paiement: ${PrintFormatters.formatPaymentMethod(this.asPaymentMethod(data.payment_method))}`)
       .newLine()
       .separator('=', this.PAPER_WIDTH);
     
@@ -128,7 +134,7 @@ export class PrintTemplates {
       builder.text('PAIEMENTS PAR MODE:', { bold: true }).newLine();
       
       for (const payment of data.transactions_summary) {
-        const methodText = PrintFormatters.formatPaymentMethod(payment.payment_method as any);
+        const methodText = PrintFormatters.formatPaymentMethod(this.asPaymentMethod(payment.payment_method));
         const countText = `${payment.count} trans.`;
         const amountText = PrintFormatters.formatCurrency(payment.total);
         
@@ -205,7 +211,7 @@ export class PrintTemplates {
     builder
       .text(`Date: ${PrintFormatters.formatDate(data.created_at)}`)
       .newLine()
-      .text(`Paiement: ${PrintFormatters.formatPaymentMethod(data.payment_method as any)}`)
+      .text(`Paiement: ${PrintFormatters.formatPaymentMethod(this.asPaymentMethod(data.payment_method))}`)
       .newLine()
       .separator('-', this.PAPER_WIDTH);
     
@@ -287,7 +293,7 @@ export class PrintTemplates {
     builder.text('Détail par mode de paiement:', { bold: true }).newLine();
     
     for (const method of data.paymentMethods) {
-      const methodText = PrintFormatters.formatPaymentMethod(method.method as any);
+      const methodText = PrintFormatters.formatPaymentMethod(this.asPaymentMethod(method.method));
       builder
         .text(`${methodText}:`)
         .newLine()
@@ -307,7 +313,7 @@ export class PrintTemplates {
   /**
    * Parse template variables in content
    */
-  static parseTemplate(template: string, variables: Record<string, any>): string {
+  static parseTemplate(template: string, variables: Record<string, unknown>): string {
     let content = template;
     
     for (const [key, value] of Object.entries(variables)) {

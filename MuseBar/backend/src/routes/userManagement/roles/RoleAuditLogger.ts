@@ -315,7 +315,7 @@ export class RoleAuditLogger {
     context: RoleOperationContext,
     action: string,
     errors: string[],
-    requestData?: any
+    requestData?: Record<string, unknown>
   ): Promise<void> {
     try {
       this.logger.warn(

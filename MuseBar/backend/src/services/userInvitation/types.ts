@@ -16,7 +16,13 @@ export type InvitationStatus = 'pending' | 'accepted' | 'cancelled' | 'expired';
 /**
  * User roles
  */
-export type UserRole = 'cashier' | 'manager' | 'supervisor' | 'establishment_admin';
+export type UserRole =
+  | 'cashier'
+  | 'manager'
+  | 'supervisor'
+  | 'establishment_admin'
+  | 'establishment_manager'
+  | 'establishment_staff';
 
 /**
  * Subscription plans

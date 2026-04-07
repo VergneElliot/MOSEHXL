@@ -288,7 +288,7 @@ router.get('/today-status', async (req, res) => {
         ? (({ total_transactions: _ignored, ...rest }) => {
             void _ignored;
             return rest;
-          })(todayBulletin as any)
+          })(todayBulletin as unknown as { total_transactions?: number } & Record<string, unknown>)
         : null;
 
       res.json({

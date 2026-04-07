@@ -143,17 +143,16 @@ export class ErrorHandler {
     context: {
       operation: string;
       service: string;
+      userId?: number;
       requestId?: string;
+      metadata?: Record<string, unknown>;
     }
   ): StandardErrorResponse {
-    const { operation, service, requestId } = context;
+    const { operation, service, requestId, userId, metadata } = context;
 
     // Log the error
-    this.logger.error(
-      `Error in ${operation}`,
-      error,
-      service
-    );
+    void metadata;
+    this.logger.error(`Error in ${operation}`, error, service, requestId, userId);
 
     // Return standardized error response
     if (error instanceof StandardError) {
@@ -208,7 +207,7 @@ export class ErrorHandler {
   static validateAndThrow(
     condition: boolean,
     message: string,
-    details?: Record<string, any>
+    details?: Record<string, unknown>
   ): void {
     if (!condition) {
       throw StandardError.validation(message, details);
@@ -235,29 +234,35 @@ export class ErrorHandler {
   static async handleDatabaseOperation<T>(
     operation: () => Promise<T>,
     operationName: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): Promise<T> {
     try {
       return await operation();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const e = error as {
+        code?: unknown;
+        constraint?: unknown;
+        column?: unknown;
+        message?: unknown;
+      };
       // Convert database errors to standardized format
-      if (error.code === '23505') { // Unique constraint violation
+      if (e.code === '23505') { // Unique constraint violation
         throw StandardError.conflict('Resource already exists', {
-          constraintViolation: error.constraint,
+          constraintViolation: e.constraint,
           ...metadata
         });
       }
       
-      if (error.code === '23503') { // Foreign key constraint violation
+      if (e.code === '23503') { // Foreign key constraint violation
         throw StandardError.validation('Referenced resource does not exist', {
-          constraintViolation: error.constraint,
+          constraintViolation: e.constraint,
           ...metadata
         });
       }
 
-      if (error.code === '23502') { // Not null constraint violation
+      if (e.code === '23502') { // Not null constraint violation
         throw StandardError.validation('Required field is missing', {
-          missingField: error.column,
+          missingField: e.column,
           ...metadata
         });
       }
@@ -266,8 +271,8 @@ export class ErrorHandler {
       throw StandardError.database(
         `Database operation failed: ${operationName}`,
         {
-          originalError: error.message,
-          sqlState: error.code,
+          originalError: typeof e.message === 'string' ? e.message : undefined,
+          sqlState: e.code,
           ...metadata
         }
       );

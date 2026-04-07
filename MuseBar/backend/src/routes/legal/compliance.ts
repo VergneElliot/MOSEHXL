@@ -36,9 +36,9 @@ router.get('/status', requireAdmin, async (req, res) => {
       fiscal_requirements: 'Article 286-I-3 bis du CGI',
       verified_at: new Date().toISOString()
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     process.stderr.write(`Error checking compliance status: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to check compliance status', details: error.message });
+    res.status(500).json({ error: 'Failed to check compliance status', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 
@@ -100,9 +100,9 @@ router.get('/report', requireAdmin, async (req, res) => {
     };
     
     res.json(report);
-  } catch (error: any) {
+  } catch (error: unknown) {
     process.stderr.write(`Error generating compliance report: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to generate compliance report', details: error.message });
+    res.status(500).json({ error: 'Failed to generate compliance report', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 
@@ -136,9 +136,9 @@ router.get('/requirements', async (req, res) => {
       ],
       compliance_notes: 'Requirements based on French fiscal law'
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     process.stderr.write(`Error fetching regulatory requirements: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to fetch regulatory requirements', details: error.message });
+    res.status(500).json({ error: 'Failed to fetch regulatory requirements', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 

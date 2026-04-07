@@ -78,7 +78,7 @@ export class UserQueries {
     email: string
   ): Promise<{
     exists: boolean;
-    user?: any;
+    user?: unknown;
     hasEstablishment?: boolean;
   }> {
     const user = await this.getUserByEmail(client, email);
@@ -136,7 +136,7 @@ export class UserQueries {
       WHERE u.establishment_id = $1
     `;
     
-    const queryParams: any[] = [establishmentId];
+    const queryParams: Array<string | number | boolean> = [establishmentId];
     let paramCount = 1;
 
     if (role) {
@@ -194,7 +194,7 @@ export class UserQueries {
     const { role, isActive, search } = options;
 
     let query = 'SELECT COUNT(*) FROM users u WHERE u.establishment_id = $1';
-    const queryParams: any[] = [establishmentId];
+    const queryParams: Array<string | number | boolean> = [establishmentId];
     let paramCount = 1;
 
     if (role) {
@@ -300,7 +300,7 @@ export class EstablishmentQueries {
       FROM establishments
     `;
     
-    const queryParams: any[] = [];
+    const queryParams: Array<string | number> = [];
     let paramCount = 0;
 
     if (status) {
@@ -342,7 +342,7 @@ export class EstablishmentQueries {
     activatedAt?: Date
   ) {
     const updateFields = ['status = $2', 'updated_at = CURRENT_TIMESTAMP'];
-    const queryParams: any[] = [establishmentId, status];
+    const queryParams: Array<string | Date> = [establishmentId, status];
     let paramCount = 2;
 
     if (activatedAt) {
@@ -388,7 +388,7 @@ export class InvitationQueries {
       WHERE establishment_id = $1
     `;
     
-    const queryParams: any[] = [establishmentId];
+    const queryParams: Array<string | number> = [establishmentId];
     let paramCount = 1;
 
     if (status) {

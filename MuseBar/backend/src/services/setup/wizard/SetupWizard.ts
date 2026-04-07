@@ -142,7 +142,8 @@ export class SetupWizard {
       this.logger.info('Generating authentication token', {}, 'SETUP_WIZARD');
       if (!invitation) throw new Error('Setup did not produce invitation data');
       if (!newUser) throw new Error('Setup did not produce user data');
-      const token = SetupAuthManager.generateAuthToken(newUser, invitation.establishment_id);
+      if (!invitation.establishment?.id) throw new Error('Invitation missing establishment context');
+      const token = SetupAuthManager.generateAuthToken(newUser, invitation.establishment.id);
 
       // Commit transaction
       await SetupDatabase.commitTransaction(client, context);
@@ -152,13 +153,17 @@ export class SetupWizard {
         'Business setup completed successfully',
         { 
           userId: newUser.id,
-          establishmentId: invitation.establishment_id,
+          establishmentId: invitation.establishment.id,
           transactionId: context.transactionId,
           duration: metrics.totalDuration,
           retryCount: metrics.retryCount
         },
         'SETUP_WIZARD'
       );
+
+      if (!newUser.first_name || !newUser.last_name) {
+        throw new Error('User profile incomplete after setup');
+      }
 
       return {
         success: true,
@@ -170,8 +175,8 @@ export class SetupWizard {
           last_name: newUser.last_name,
           role: newUser.role,
           establishment: {
-            id: invitation.establishment_id,
-            name: invitation.establishment_name,
+            id: invitation.establishment.id,
+            name: invitation.establishment.name,
             status: 'active'
           }
         },
@@ -185,7 +190,7 @@ export class SetupWizard {
         await SetupAuditManager.createFailureAuditEntry(
           client,
           newUser?.id || null,
-          invitation.establishment_id,
+          invitation.establishment?.id ?? '',
           error as Error,
           undefined,
           setupContext
@@ -239,7 +244,10 @@ export class SetupWizard {
     }
 
     // Get establishment ID for logging progress
-    const invitation = await SetupDatabase.validateInvitation(client as any, setupData.invitation_token);
+    const invitation = await SetupDatabase.validateInvitation(
+      client as unknown as { query: (text: string, params?: unknown[]) => Promise<{ rows: unknown[] }> },
+      setupData.invitation_token
+    );
     if (invitation.isValid && invitation.establishment?.id) {
       await SetupProgressTracker.logSetupProgress(
         client, 

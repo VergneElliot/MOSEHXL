@@ -5,13 +5,9 @@
 
 import { randomUUID } from 'crypto';
 import { Request, Response, NextFunction } from 'express';
+import type { CategoryLoggers } from './categoryLoggers';
 
-type LoggerLike = {
-  debug: (...args: unknown[]) => void;
-  error: (...args: unknown[]) => void;
-  api: (...args: unknown[]) => void;
-  httpRequest: (...args: unknown[]) => void;
-};
+type LoggerLike = Pick<CategoryLoggers, 'debug' | 'error' | 'security' | 'authentication' | 'api' | 'httpRequest'>;
 
 /**
  * Request logging middleware and utilities
@@ -237,7 +233,7 @@ export class RequestLogger {
    * Log rate limiting event
    */
   public static logRateLimit(
-    logger: any,
+    logger: LoggerLike,
     ip: string,
     endpoint: string,
     requestId?: string,
@@ -260,11 +256,11 @@ export class RequestLogger {
    * Log authentication failure
    */
   public static logAuthFailure(
-    logger: any,
+    logger: LoggerLike,
     reason: string,
     ip: string,
     requestId?: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): void {
     logger.authentication(
       'FAILED_LOGIN',

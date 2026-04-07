@@ -16,7 +16,9 @@ export class PerformanceMonitor {
           message: string,
           duration?: number,
           metadata?: Record<string, unknown>,
-          category?: string
+          category?: string,
+          requestId?: string,
+          userId?: number
         ) => void;
       }
     | undefined;
@@ -25,7 +27,7 @@ export class PerformanceMonitor {
   /**
    * Initialize performance monitor with logger instance
    */
-  public static initialize(logger: { performance: (...args: unknown[]) => void }): void {
+  public static initialize(logger: { performance: (message: string, duration?: number, metadata?: Record<string, unknown>, category?: string, requestId?: string, userId?: number) => void }): void {
     PerformanceMonitor.logger = logger;
   }
 

@@ -13,11 +13,20 @@ import { SetupJwtPayload } from './types';
 export class SetupAuthManager {
   private static logger = Logger.getInstance();
 
+  private static assertAuthUser(
+    user: unknown
+  ): asserts user is { id: number; email: string; role: string } {
+    const u = user as { id?: unknown; email?: unknown; role?: unknown };
+    if (typeof u?.id !== 'number' || typeof u?.email !== 'string' || typeof u?.role !== 'string') {
+      throw new Error('Invalid user object for token generation');
+    }
+  }
+
   /**
    * Generate authentication token for setup completion
    */
   public static generateAuthToken(
-    user: any, 
+    user: unknown, 
     establishmentId: string,
     expiresIn: '7d' | '24h' | '1h' | '30m' = '7d'
   ): string {
@@ -26,6 +35,7 @@ export class SetupAuthManager {
       throw new Error('JWT_SECRET environment variable is not set');
     }
 
+    this.assertAuthUser(user);
     const payload: SetupJwtPayload = {
       userId: user.id,
       email: user.email,
@@ -138,10 +148,17 @@ export class SetupAuthManager {
     }
 
     try {
-      const decoded = jwt.verify(token, jwtSecret) as any;
+      const decoded = jwt.verify(token, jwtSecret) as {
+        establishmentId?: unknown;
+        stepId?: unknown;
+        type?: unknown;
+      };
       
       if (decoded.type !== 'temporary_setup') {
         throw new Error('Invalid token type');
+      }
+      if (typeof decoded.establishmentId !== 'string' || typeof decoded.stepId !== 'string') {
+        throw new Error('Invalid temporary token payload');
       }
 
       this.logger.debug(
@@ -153,7 +170,7 @@ export class SetupAuthManager {
       return {
         establishmentId: decoded.establishmentId,
         stepId: decoded.stepId,
-        type: decoded.type
+        type: 'temporary_setup'
       };
     } catch (error) {
       this.logger.warn(
@@ -186,8 +203,8 @@ export class SetupAuthManager {
    */
   public static isTokenExpired(token: string): boolean {
     try {
-      const decoded = jwt.decode(token) as any;
-      if (!decoded || !decoded.exp) {
+      const decoded = jwt.decode(token) as { exp?: unknown } | null;
+      if (!decoded || typeof decoded.exp !== 'number') {
         return true;
       }
       return Date.now() >= decoded.exp * 1000;
@@ -201,8 +218,8 @@ export class SetupAuthManager {
    */
   public static getTokenExpiration(token: string): Date | null {
     try {
-      const decoded = jwt.decode(token) as any;
-      if (!decoded || !decoded.exp) {
+      const decoded = jwt.decode(token) as { exp?: unknown } | null;
+      if (!decoded || typeof decoded.exp !== 'number') {
         return null;
       }
       return new Date(decoded.exp * 1000);

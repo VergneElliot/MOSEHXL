@@ -64,7 +64,7 @@ export class PrintingServiceFactory {
   static async getDefaultService(): Promise<IPrintingService> {
     // Get default configuration from environment or use browser as fallback
     const defaultConfig: PrintingConfig = {
-      provider: process.env.PRINTING_PROVIDER as any || 'browser',
+      provider: (process.env.PRINTING_PROVIDER as PrintingConfig['provider']) || 'browser',
       apiKey: process.env.PRINTNODE_API_KEY,
       networkPrinterIp: process.env.NETWORK_PRINTER_IP,
       networkPrinterPort: parseInt(process.env.NETWORK_PRINTER_PORT || '9100'),

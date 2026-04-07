@@ -121,7 +121,7 @@ export class EstablishmentCreationOrchestrator {
         client,
         establishment.id,
         createdByUserId,
-        data,
+        data as unknown as Record<string, unknown>,
         ipAddress,
         userAgent
       );
@@ -204,8 +204,8 @@ export class EstablishmentCreationOrchestrator {
    */
   private async sendCreationConfirmationEmail(
     data: EnhancedCreateEstablishmentRequest,
-    establishment: any,
-    invitationData: any
+    establishment: { id: string; name: string; email: string },
+    invitationData: { token: string; link: string; setup_instructions: string }
   ): Promise<void> {
     try {
       await this.emailService.sendTemplateEmail(

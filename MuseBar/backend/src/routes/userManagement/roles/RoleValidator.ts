@@ -22,12 +22,16 @@ import {
 export class RoleValidator {
   private static logger = Logger.getInstance();
 
+  private static asRoleRecord(value: unknown): { name?: unknown; establishment_id?: unknown } {
+    return (value ?? {}) as { name?: unknown; establishment_id?: unknown };
+  }
+
   /**
    * Validate role creation data
    */
   public static async validateRoleCreation(
-    req: RoleRequest
-  ): Promise<RoleValidationResult> {
+    req: RoleRequest<CreateRoleRequest>
+  ): Promise<RoleValidationResult<{ name: string; description: string; permissions: unknown; establishmentId: string }>> {
     const errors: string[] = [];
     const { name, description, permissions, establishmentId } = req.body;
 
@@ -83,7 +87,7 @@ export class RoleValidator {
     return {
       isValid: errors.length === 0,
       errors,
-      data: errors.length === 0 ? { name, description, permissions, establishmentId } : undefined
+      data: errors.length === 0 ? { name, description, permissions, establishmentId: establishmentId as string } : undefined
     };
   }
 
@@ -92,7 +96,7 @@ export class RoleValidator {
    */
   public static async validateRoleCreationData(
     data: CreateRoleRequest
-  ): Promise<RoleValidationResult> {
+  ): Promise<RoleValidationResult<{ name: string; description: string; permissions: unknown; establishmentId: string }>> {
     const errors: string[] = [];
     const { name, description, permissions, establishmentId } = data;
 
@@ -148,7 +152,7 @@ export class RoleValidator {
     return {
       isValid: errors.length === 0,
       errors,
-      data: errors.length === 0 ? { name, description, permissions, establishmentId } : undefined
+      data: errors.length === 0 ? { name, description, permissions, establishmentId: establishmentId as string } : undefined
     };
   }
 
@@ -156,11 +160,12 @@ export class RoleValidator {
    * Validate role update data
    */
   public static async validateRoleUpdate(
-    req: RoleRequest,
-    currentRole: any
-  ): Promise<RoleValidationResult> {
+    req: RoleRequest<UpdateRoleRequest>,
+    currentRole: unknown
+  ): Promise<RoleValidationResult<{ name?: string; description?: string; permissions?: unknown }>> {
     const errors: string[] = [];
     const { name, description, permissions } = req.body;
+    const role = this.asRoleRecord(currentRole);
 
     // Check if any updates are provided
     if (name === undefined && description === undefined && permissions === undefined) {
@@ -174,10 +179,11 @@ export class RoleValidator {
         errors.push('Role name must be a non-empty string');
       } else if (name.length > 100) {
         errors.push('Role name must be 100 characters or less');
-      } else if (name !== currentRole.name) {
+      } else if (name !== role.name) {
         // Check if new name already exists
         try {
-          const exists = await checkRoleNameExists(name, currentRole.establishment_id);
+          const establishmentId = typeof role.establishment_id === 'string' ? role.establishment_id : '';
+          const exists = await checkRoleNameExists(name, establishmentId);
           if (exists) {
             errors.push('Role with this name already exists');
           }
@@ -222,10 +228,11 @@ export class RoleValidator {
    */
   public static async validateRoleUpdateData(
     data: UpdateRoleRequest,
-    currentRole: any
+    currentRole: unknown
   ): Promise<RoleValidationResult> {
     const errors: string[] = [];
     const { name, description, permissions } = data;
+    const role = this.asRoleRecord(currentRole);
 
     // Check if any updates are provided
     if (name === undefined && description === undefined && permissions === undefined) {
@@ -239,10 +246,11 @@ export class RoleValidator {
         errors.push('Role name must be a non-empty string');
       } else if (name.length > 100) {
         errors.push('Role name must be 100 characters or less');
-      } else if (name !== currentRole.name) {
+      } else if (name !== role.name) {
         // Check if new name already exists
         try {
-          const exists = await checkRoleNameExists(name, currentRole.establishment_id);
+          const establishmentId = typeof role.establishment_id === 'string' ? role.establishment_id : '';
+          const exists = await checkRoleNameExists(name, establishmentId);
           if (exists) {
             errors.push('Role with this name already exists');
           }
@@ -285,8 +293,14 @@ export class RoleValidator {
   /**
    * Validate permissions object
    */
-  private static validatePermissions(permissions: any): string[] {
+  private static validatePermissions(permissions: unknown): string[] {
     const errors: string[] = [];
+
+    if (!permissions || typeof permissions !== 'object') {
+      errors.push('Permissions must be an object');
+      return errors;
+    }
+    const perms = permissions as Record<string, unknown>;
     
     const requiredPermissions = [
       'canManageUsers',
@@ -298,16 +312,16 @@ export class RoleValidator {
     ];
 
     for (const permission of requiredPermissions) {
-      if (!(permission in permissions)) {
+      if (!(permission in perms)) {
         errors.push(`Missing required permission: ${permission}`);
-      } else if (typeof permissions[permission] !== 'boolean') {
+      } else if (typeof perms[permission] !== 'boolean') {
         errors.push(`Permission '${permission}' must be a boolean value`);
       }
     }
 
     // Check for unknown permissions
     const knownPermissions = new Set(requiredPermissions);
-    for (const key in permissions) {
+    for (const key in perms) {
       if (!knownPermissions.has(key)) {
         errors.push(`Unknown permission: ${key}`);
       }
@@ -379,7 +393,7 @@ export class RoleValidator {
    */
   public static async validateRoleDeletion(
     roleId: string,
-    roleData: any
+    roleData: unknown
   ): Promise<RoleValidationResult> {
     const errors: string[] = [];
 
@@ -423,9 +437,9 @@ export class RoleValidator {
   public static validateEstablishmentId(
     req: RoleRequest,
     requireEstablishmentId: boolean = true
-  ): RoleValidationResult {
+  ): RoleValidationResult<{ establishmentId: string }> {
     const errors: string[] = [];
-    const establishmentId = req.query.establishmentId as string || req.user!.establishment_id;
+    const establishmentId = (req.query.establishmentId as string) || req.user!.establishment_id || '';
 
     if (requireEstablishmentId && !establishmentId) {
       errors.push('Establishment ID is required');

@@ -33,7 +33,7 @@ export interface CreateEstablishmentResponse {
 }
 
 export interface GetEstablishmentsResponse {
-  establishments: any[];
+  establishments: unknown[];
   total: number;
 }
 
@@ -168,8 +168,8 @@ export class EstablishmentService {
   }
 
   public async getEstablishmentById(id: string): Promise<{
-    establishment: any;
-    invitations: any[];
+    establishment: unknown;
+    invitations: unknown[];
   }> {
     try {
       const result = await pool.query(

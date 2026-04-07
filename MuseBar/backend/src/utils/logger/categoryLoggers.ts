@@ -138,7 +138,7 @@ export class CategoryLoggers extends LoggerCore {
   public authentication(
     action: 'LOGIN' | 'LOGOUT' | 'FAILED_LOGIN' | 'PASSWORD_CHANGE' | 'TOKEN_REFRESH',
     userId?: number,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
     requestId?: string
   ): void {
     const message = `Authentication: ${action}`;
@@ -161,7 +161,7 @@ export class CategoryLoggers extends LoggerCore {
     action: string,
     result: 'SUCCESS' | 'ERROR' | 'VALIDATION_ERROR',
     duration?: number,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
     requestId?: string,
     userId?: number
   ): void {
@@ -185,7 +185,7 @@ export class CategoryLoggers extends LoggerCore {
   public system(
     event: string,
     component: string,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
     requestId?: string
   ): void {
     const message = `System Event: ${event} in ${component}`;

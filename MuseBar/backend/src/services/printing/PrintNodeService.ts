@@ -19,7 +19,7 @@ interface PrintNodePrinter {
   description: string;
   capabilities: {
     bins: string[];
-    papers: any[];
+    papers: unknown[];
   };
   default: boolean;
   state: string;
