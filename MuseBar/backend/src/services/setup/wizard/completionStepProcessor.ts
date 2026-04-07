@@ -26,6 +26,7 @@ export class CompletionStepProcessor {
         client, 
         setupData.invitation_token
       );
+      void invitation;
       
       const existingUser = await SetupDatabase.checkUserExists(client, setupData.email);
       if (!existingUser.exists) {

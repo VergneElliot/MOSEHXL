@@ -4,12 +4,9 @@
  */
 
 import { Logger } from '../../../utils/logger';
-import { RolePermissions } from '../types';
 import { 
   RoleRequest, 
   RoleValidationResult, 
-  RoleCreationData, 
-  RoleUpdateData,
   RoleOperationContext,
   CreateRoleRequest,
   UpdateRoleRequest
@@ -17,7 +14,6 @@ import {
 import { 
   isSystemRoleId,
   checkRoleNameExists,
-  fetchCustomRoleById
 } from '../roles';
 
 /**

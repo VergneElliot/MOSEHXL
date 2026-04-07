@@ -11,6 +11,7 @@ export async function createDefaultProducts(
   categoryMap: Map<string, string>,
   context?: SetupContext
 ): Promise<void> {
+  void context;
   const config = getDefaultDataConfig();
 
   logger.info('Creating default products', { establishmentId, count: config.products.length }, 'SETUP_DEFAULTS');

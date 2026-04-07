@@ -5,7 +5,6 @@
 
 import { PrintQueue } from './printQueue';
 import { PrintTemplates } from './printTemplates';
-import { PrintCommands } from './printCommands';
 import { ReceiptData, ClosureBulletinData, PrinterConfig, PrinterStatus, PrintQueueStats } from './types';
 
 /**
@@ -154,7 +153,6 @@ export class ThermalPrintService {
    */
   async testPrinter(): Promise<boolean> {
     try {
-      const testContent = PrintTemplates.generateTestPrint();
       const jobId = this.printQueue.addReceiptJob({
         order_id: 0,
         sequence_number: 0,

@@ -18,7 +18,7 @@ router.use(requireAuth);
  */
 router.post('/create', requireAdmin, async (req, res) => {
   try {
-    const { archiveType, startDate, endDate, description } = req.body;
+    const { archiveType, startDate, endDate } = req.body;
     
     if (!archiveType || !startDate || !endDate) {
       return res.status(400).json({ error: 'Archive type, start date, and end date are required' });
@@ -54,7 +54,7 @@ router.post('/create', requireAdmin, async (req, res) => {
  */
 router.get('/list', requireAdmin, async (req, res) => {
   try {
-    const { type, limit = 50, offset = 0 } = req.query;
+    void req.query;
     
     const archives = await ArchiveService.getArchiveExports();
     

@@ -8,11 +8,8 @@ import { requireAuth, requireAdmin } from '../auth';
 import { validateBody, validateParams } from '../../middleware/validation';
 import { Logger } from '../../utils/logger';
 import {
-  AuthenticatedRequest,
   UserUpdateData,
   UserFilterParams,
-  ApiResponse,
-  TeamMember,
   ServiceInitialization
 } from './types';
 import {
@@ -41,6 +38,7 @@ let logger: Logger;
  */
 export function initializeUserRoutes(services: ServiceInitialization): void {
   logger = services.logger;
+  void logger;
 }
 
 /**
@@ -289,7 +287,7 @@ router.delete('/user/:userId', requireAuth, requireAdmin, validateParams([
         message: 'User not found'
       });
     }
-    const result = await deleteOrDeactivateUser(userId, permanent);
+    await deleteOrDeactivateUser(userId, permanent);
 
     await logDeactivateOrDeleteUser(user.id, {
       targetUserId: userId,

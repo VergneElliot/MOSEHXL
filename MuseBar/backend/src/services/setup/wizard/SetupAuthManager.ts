@@ -73,7 +73,7 @@ export class SetupAuthManager {
       );
 
       return decoded;
-    } catch (error) {
+    } catch {
       this.logger.warn(
         'Invalid authentication token',
         undefined,
@@ -176,7 +176,7 @@ export class SetupAuthManager {
         email: decoded?.email,
         establishmentId: decoded?.establishmentId
       };
-    } catch (error) {
+    } catch {
       return {};
     }
   }
@@ -191,7 +191,7 @@ export class SetupAuthManager {
         return true;
       }
       return Date.now() >= decoded.exp * 1000;
-    } catch (error) {
+    } catch {
       return true;
     }
   }
@@ -206,7 +206,7 @@ export class SetupAuthManager {
         return null;
       }
       return new Date(decoded.exp * 1000);
-    } catch (error) {
+    } catch {
       return null;
     }
   }

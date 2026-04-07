@@ -200,6 +200,7 @@ export class InvitationCreator {
    * Cancel invitation
    */
   public async cancelInvitation(invitationId: string, userId: string): Promise<boolean> {
+    void userId;
     try {
       const result = await pool.query(`
         UPDATE user_invitations 

@@ -1,5 +1,5 @@
 import * as QRCode from 'qrcode';
-import { ReceiptData, ClosureBulletinData } from '../printing/types';
+import { ReceiptData } from '../printing/types';
 
 export class QRReceiptService {
   private baseUrl: string;

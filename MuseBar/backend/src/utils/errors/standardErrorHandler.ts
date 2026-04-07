@@ -143,12 +143,10 @@ export class ErrorHandler {
     context: {
       operation: string;
       service: string;
-      userId?: number;
       requestId?: string;
-      metadata?: Record<string, any>;
     }
   ): StandardErrorResponse {
-    const { operation, service, userId, requestId, metadata } = context;
+    const { operation, service, requestId } = context;
 
     // Log the error
     this.logger.error(

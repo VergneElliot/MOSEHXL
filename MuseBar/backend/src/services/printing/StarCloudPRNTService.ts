@@ -1,4 +1,3 @@
-import axios, { AxiosInstance } from 'axios';
 import * as crypto from 'crypto';
 import { BasePrintingService } from './BasePrintingService';
 import { 
@@ -199,6 +198,7 @@ export class StarCloudPRNTService extends BasePrintingService {
     this.pollInterval = setInterval(() => {
       // Check for stale printers
       const staleTime = Date.now() - 60000; // 1 minute
+      void staleTime;
       // Remove stale printers logic would go here
     }, 30000);
   }
@@ -237,7 +237,7 @@ export class StarCloudPRNTService extends BasePrintingService {
     }
 
     const jobs = [];
-    for (const [jobId, job] of global.starCloudPRNTJobs.entries()) {
+    for (const [, job] of global.starCloudPRNTJobs.entries()) {
       if (job.printerId === printerId) {
         jobs.push(job);
       }

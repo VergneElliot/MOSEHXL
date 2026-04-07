@@ -5,7 +5,7 @@
 
 import express from 'express';
 import LegalJournalModel from '../../models/legalJournal';
-import { requireAuth, requireAdmin } from '../auth';
+import { requireAuth } from '../auth';
 
 const router = express.Router();
 
@@ -285,7 +285,10 @@ router.get('/today-status', async (req, res) => {
       // This endpoint is only meant to power UI status/alert; we intentionally omit total_transactions
       // to remove the "transactions counter" feature from the UI.
       const bulletinWithoutTotalTransactions = todayBulletin
-        ? (({ total_transactions: _ignored, ...rest }) => rest)(todayBulletin as any)
+        ? (({ total_transactions: _ignored, ...rest }) => {
+            void _ignored;
+            return rest;
+          })(todayBulletin as any)
         : null;
 
       res.json({

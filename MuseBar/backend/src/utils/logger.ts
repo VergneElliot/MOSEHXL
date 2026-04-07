@@ -12,7 +12,6 @@
  */
 
 import { EnvironmentConfig } from '../config/environment';
-import { Request, Response, NextFunction } from 'express';
 import { CategoryLoggers } from './logger/categoryLoggers';
 import { PerformanceMonitor } from './logger/performanceMonitor';
 import { RequestLogger } from './logger/requestLogger';

@@ -3,7 +3,7 @@
  * Handles all text formatting, layout, and content preparation
  */
 
-import { ReceiptData, ClosureBulletinData, PaymentMethod, ClosureType } from './types';
+import { PaymentMethod, ClosureType } from './types';
 
 /**
  * Text Formatting Utilities

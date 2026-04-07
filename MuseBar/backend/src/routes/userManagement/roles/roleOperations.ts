@@ -10,7 +10,6 @@ import {
   RoleRequest,
   RolesListResponse,
   SingleRoleResponse,
-  RolePermissionsResponse,
   RoleOperationResponse
 } from './types';
 import { RoleValidator } from './RoleValidator';
@@ -19,8 +18,6 @@ import { getSystemRoles, getSystemRoleById } from './rolePermissions';
 import {
   fetchCustomRoles,
   fetchCustomRoleById,
-  insertCustomRole,
-  updateCustomRole,
   deactivateCustomRole,
   countUsersWithRole,
   isSystemRoleId

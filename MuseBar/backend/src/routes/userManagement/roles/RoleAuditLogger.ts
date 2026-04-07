@@ -5,7 +5,7 @@
 
 import { Logger } from '../../../utils/logger';
 import { RolePermissions } from '../types';
-import { RoleAuditLogData, RoleOperationContext } from './types';
+import { RoleOperationContext } from './types';
 // Note: Removed circular imports - functions are defined in this file
 
 /**

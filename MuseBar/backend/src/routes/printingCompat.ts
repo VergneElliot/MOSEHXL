@@ -48,7 +48,7 @@ router.post('/api/legal/closure/:bulletinId/thermal-print', authenticateToken, e
   try {
     const user = (req as any).user;
     const bulletinId = parseInt(req.params.bulletinId);
-    const { result, bulletinData } = await printClosureBulletinResponse(user, bulletinId);
+    const { result } = await printClosureBulletinResponse(user, bulletinId);
     res.json({
       success: result.success,
       message: result.message,

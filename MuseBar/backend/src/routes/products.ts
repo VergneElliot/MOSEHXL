@@ -15,7 +15,7 @@ router.get('/', async (req, res) => {
   try {
     const products = await ProductModel.getAll(establishmentId);
     res.json(products);
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch products' });
   }
 });
@@ -27,7 +27,7 @@ router.get('/archived', async (req, res) => {
   try {
     const products = await ProductModel.getAllArchived(establishmentId);
     res.json(products);
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch archived products' });
   }
 });
@@ -39,7 +39,7 @@ router.get('/all', async (req, res) => {
   try {
     const products = await ProductModel.getAllIncludingArchived(establishmentId);
     res.json(products);
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch all products' });
   }
 });
@@ -52,7 +52,7 @@ router.get('/category/:categoryId', validateParams([{ param: 'categoryId', valid
     const categoryId = parseInt(req.params.categoryId);
     const products = await ProductModel.getByCategory(categoryId, establishmentId);
     res.json(products);
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch products by category' });
   }
 });
@@ -66,7 +66,7 @@ router.get('/:id', validateParams([paramValidations.id]), async (req, res) => {
     const product = await ProductModel.getById(id, establishmentId);
     if (!product) return res.status(404).json({ error: 'Product not found' });
     res.json(product);
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch product' });
   }
 });
@@ -97,7 +97,7 @@ router.post('/', async (req, res) => {
       user_agent: req.headers['user-agent'],
     }).catch(() => {});
     res.status(201).json(product);
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to create product' });
   }
 });
@@ -132,7 +132,7 @@ router.put('/:id', validateParams([paramValidations.id]), async (req, res) => {
       user_agent: req.headers['user-agent'],
     }).catch(() => {});
     res.json(product);
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to update product' });
   }
 });
@@ -184,7 +184,7 @@ router.put('/:id/restore', validateParams([paramValidations.id]), async (req, re
       user_agent: req.headers['user-agent'],
     }).catch(() => {});
     res.json({ message: 'Produit restauré avec succès' });
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to restore product' });
   }
 });

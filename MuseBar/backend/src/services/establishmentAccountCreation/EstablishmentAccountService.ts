@@ -11,7 +11,7 @@ import {
   EstablishmentAccountCreationRequest,
   EstablishmentAccountCreationResponse 
 } from '../../routes/establishmentAccountCreation/types';
-import { AccountCreationOrchestrator, AccountCreationResult } from './AccountCreationOrchestrator';
+import { AccountCreationOrchestrator } from './AccountCreationOrchestrator';
 
 /**
  * Establishment Account Service Class

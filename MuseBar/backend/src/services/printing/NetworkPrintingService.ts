@@ -59,6 +59,7 @@ export class NetworkPrintingService extends BasePrintingService {
   }
 
   async checkPrinterStatus(printerId?: string): Promise<PrinterStatus> {
+    void printerId;
     return new Promise((resolve) => {
       const client = new net.Socket();
       const timeoutHandle = setTimeout(() => {

@@ -24,6 +24,7 @@ export abstract class BasePrintingService implements IPrintingService {
   abstract listPrinters(): Promise<Printer[]>;
 
   async testPrint(printerId?: string): Promise<PrintResult> {
+    void printerId;
     const testData: ReceiptData = {
       order_id: 99999,
       sequence_number: 99999,

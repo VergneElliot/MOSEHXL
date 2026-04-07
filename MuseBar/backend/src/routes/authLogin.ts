@@ -113,7 +113,7 @@ router.get('/me', requireAuth, async (req, res) => {
       email_verified: userRow?.email_verified ?? false,
       permissions,
     });
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -149,7 +149,7 @@ router.post('/refresh', requireAuth, async (req, res) => {
     }).catch(() => {});
 
     return res.json({ token, expiresIn: rememberMe ? '7d' : '12h' });
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
