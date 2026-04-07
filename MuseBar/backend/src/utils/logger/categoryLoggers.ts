@@ -16,7 +16,7 @@ export class CategoryLoggers extends LoggerCore {
   public performance(
     message: string,
     duration?: number,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
     category = 'PERFORMANCE',
     requestId?: string,
     userId?: number
@@ -69,7 +69,7 @@ export class CategoryLoggers extends LoggerCore {
     table?: string,
     duration?: number,
     rowsAffected?: number,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
     requestId?: string,
     userId?: number
   ): void {
@@ -92,7 +92,7 @@ export class CategoryLoggers extends LoggerCore {
   public security(
     event: string,
     severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' = 'MEDIUM',
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
     requestId?: string,
     userId?: number
   ): void {
@@ -116,7 +116,7 @@ export class CategoryLoggers extends LoggerCore {
     event: string,
     entityType?: string,
     entityId?: string | number,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
     requestId?: string,
     userId?: number
   ): void {

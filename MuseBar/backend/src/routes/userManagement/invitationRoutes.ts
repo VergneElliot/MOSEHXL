@@ -4,6 +4,7 @@
  */
 
 import express from 'express';
+import type { NextFunction, Response } from 'express';
 import { requireAuth, requireAdmin } from '../auth';
 import { validateBody, validateParams } from '../../middleware/validation';
 import { UserInvitationService } from '../../services/userInvitationService';
@@ -11,6 +12,7 @@ import { EstablishmentModel } from '../../models/establishment';
 import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';
 import {
+  AuthenticatedRequest,
   EstablishmentInvitationData,
   UserInvitationData,
   InvitationAcceptanceData,
@@ -38,7 +40,7 @@ export function initializeInvitationRoutes(services: ServiceInitialization): voi
 router.post('/send-establishment-invitation', requireAuth, requireAdmin, validateBody([
   { field: 'name', required: true },
   { field: 'email', required: true },
-]), async (req: any, res: any, next: any) => {
+]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { name, email, phone, address, subscription_plan }: EstablishmentInvitationData = req.body;
     const user = req.user!;
@@ -109,7 +111,7 @@ router.post('/send-user-invitation', requireAuth, validateBody([
   { field: 'lastName', required: true },
   { field: 'role', required: true },
   { field: 'establishmentId', required: true },
-]), async (req: any, res: any, next: any) => {
+]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { email, firstName, lastName, role, establishmentId }: UserInvitationData = req.body;
     const user = req.user!;
@@ -204,7 +206,7 @@ router.post('/send-user-invitation', requireAuth, validateBody([
 router.post('/accept-invitation', validateBody([
   { field: 'token', required: true },
   { field: 'password', required: true },
-]), async (req: any, res: any, next: any) => {
+]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { token, password, firstName, lastName }: InvitationAcceptanceData = req.body;
 
@@ -264,7 +266,7 @@ router.post('/accept-invitation', validateBody([
  * GET /pending-invitations
  * Get pending invitations for establishment
  */
-router.get('/pending-invitations', requireAuth, async (req: any, res: any, next: any) => {
+router.get('/pending-invitations', requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const user = req.user!;
     const establishmentId = req.query.establishmentId as string || user.establishment_id;
@@ -313,7 +315,7 @@ router.get('/pending-invitations', requireAuth, async (req: any, res: any, next:
  */
 router.delete('/cancel-invitation/:invitationId', requireAuth, validateParams([
   { param: 'invitationId', validator: (v: string) => typeof v === 'string' && v.length > 0 }
-]), async (req: any, res: any, next: any) => {
+]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { invitationId } = req.params;
     const user = req.user!;
@@ -361,7 +363,7 @@ router.delete('/cancel-invitation/:invitationId', requireAuth, validateParams([
  */
 router.post('/resend-invitation/:invitationId', requireAuth, validateParams([
   { param: 'invitationId', validator: (v: string) => typeof v === 'string' && v.length > 0 }
-]), async (req: any, res: any, next: any) => {
+]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { invitationId } = req.params;
     const user = req.user!;

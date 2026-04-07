@@ -16,13 +16,13 @@ export interface StandardErrorResponse {
   code: string;
   timestamp: string;
   requestId?: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 /**
  * Standard success response interface
  */
-export interface StandardSuccessResponse<T = any> {
+export interface StandardSuccessResponse<T = unknown> {
   success: true;
   data: T;
   timestamp: string;
@@ -51,14 +51,14 @@ export enum ErrorTypes {
 export class StandardError extends Error {
   public readonly code: string;
   public readonly statusCode: number;
-  public readonly details?: Record<string, any>;
+  public readonly details?: Record<string, unknown>;
   public readonly isOperational: boolean;
 
   constructor(
     message: string,
     code: ErrorTypes,
     statusCode: number = 500,
-    details?: Record<string, any>,
+    details?: Record<string, unknown>,
     isOperational: boolean = true
   ) {
     super(message);
@@ -89,7 +89,7 @@ export class StandardError extends Error {
   /**
    * Static factory methods for common errors
    */
-  static validation(message: string, details?: Record<string, any>): StandardError {
+  static validation(message: string, details?: Record<string, unknown>): StandardError {
     return new StandardError(message, ErrorTypes.VALIDATION_ERROR, 400, details);
   }
 
@@ -108,15 +108,15 @@ export class StandardError extends Error {
     return new StandardError(message, ErrorTypes.FORBIDDEN, 403);
   }
 
-  static conflict(message: string, details?: Record<string, any>): StandardError {
+  static conflict(message: string, details?: Record<string, unknown>): StandardError {
     return new StandardError(message, ErrorTypes.CONFLICT, 409, details);
   }
 
-  static database(message: string, details?: Record<string, any>): StandardError {
+  static database(message: string, details?: Record<string, unknown>): StandardError {
     return new StandardError(message, ErrorTypes.DATABASE_ERROR, 500, details);
   }
 
-  static internal(message: string = 'Internal server error', details?: Record<string, any>): StandardError {
+  static internal(message: string = 'Internal server error', details?: Record<string, unknown>): StandardError {
     return new StandardError(message, ErrorTypes.INTERNAL_ERROR, 500, details);
   }
 
@@ -179,7 +179,7 @@ export class ErrorHandler {
       service: string;
       userId?: number;
       requestId?: string;
-      metadata?: Record<string, any>;
+      metadata?: Record<string, unknown>;
     }
   ): Promise<StandardSuccessResponse<T> | StandardErrorResponse> {
     try {
