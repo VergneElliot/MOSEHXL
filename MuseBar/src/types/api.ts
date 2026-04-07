@@ -119,6 +119,11 @@ export interface ClosureBulletin {
   period_start: string;
   period_end: string;
   total_transactions: number;
+  /**
+   * Fond de caisse (cash float) left in register at closure time.
+   * Informational only: must not affect totals.
+   */
+  fond_de_caisse: number;
   total_amount: number;
   total_vat: number;
   vat_breakdown: {
@@ -144,6 +149,7 @@ export interface ClosureTodayStatus {
   has_closure: boolean;
   closure_status: string;
   bulletin: ClosureTodayBulletin | null;
+  last_fond_de_caisse?: number | null;
   compliance_note?: string;
 }
 

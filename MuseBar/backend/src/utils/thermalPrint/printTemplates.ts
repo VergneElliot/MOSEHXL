@@ -127,6 +127,8 @@ export class PrintTemplates {
       .newLine()
       .text(PrintFormatters.padLine('TVA totale:', PrintFormatters.formatCurrency(data.total_vat), this.PAPER_WIDTH))
       .newLine()
+      .text(PrintFormatters.padLine('Fond de caisse:', PrintFormatters.formatCurrency(data.fond_de_caisse), this.PAPER_WIDTH))
+      .newLine()
       .separator('-', this.PAPER_WIDTH);
     
     // Payment Methods Summary

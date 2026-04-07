@@ -285,6 +285,7 @@ export class JournalQueries {
       const r = row as Record<string, unknown> & {
         vat_breakdown?: unknown;
         payment_methods_breakdown?: unknown;
+        fond_de_caisse?: number;
         tips_total?: number;
         change_total?: number;
       };
@@ -292,6 +293,7 @@ export class JournalQueries {
         ...(r as Record<string, unknown>),
         vat_breakdown: parseJsonField(r.vat_breakdown, {}),
         payment_methods_breakdown: parseJsonField(r.payment_methods_breakdown, {}),
+        fond_de_caisse: r.fond_de_caisse ?? 0,
         tips_total: r.tips_total || 0,
         change_total: r.change_total || 0
       } as ClosureBulletin;
@@ -350,6 +352,7 @@ export class JournalQueries {
       const r = row as Record<string, unknown> & {
         vat_breakdown?: unknown;
         payment_methods_breakdown?: unknown;
+        fond_de_caisse?: number;
         tips_total?: number;
         change_total?: number;
       };
@@ -357,12 +360,34 @@ export class JournalQueries {
         ...(r as Record<string, unknown>),
         vat_breakdown: parseJsonField(r.vat_breakdown, {}),
         payment_methods_breakdown: parseJsonField(r.payment_methods_breakdown, {}),
+        fond_de_caisse: r.fond_de_caisse ?? 0,
         tips_total: r.tips_total || 0,
         change_total: r.change_total || 0,
       } as ClosureBulletin;
     });
 
     return { bulletins, total };
+  }
+
+  /**
+   * Get the most recently used "fond de caisse" value for an establishment.
+   * Informational only (must not affect accounting totals).
+   */
+  static async getLastFondDeCaisse(establishmentId: string): Promise<number | null> {
+    const result = await pool.query(
+      `
+        SELECT fond_de_caisse
+        FROM closure_bulletins
+        WHERE (establishment_id IS NOT DISTINCT FROM $1)
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+      `,
+      [establishmentId]
+    );
+    const row = result.rows[0] as { fond_de_caisse?: unknown } | undefined;
+    if (!row) return null;
+    const n = typeof row.fond_de_caisse === 'number' ? row.fond_de_caisse : parseFloat(String(row.fond_de_caisse ?? ''));
+    return Number.isFinite(n) ? n : null;
   }
 
   /**
@@ -374,6 +399,7 @@ export class JournalQueries {
     startDate: Date,
     endDate: Date,
     totalTransactions: number,
+    fondDeCaisse: number,
     totalAmount: number,
     totalVat: number,
     vatBreakdown: Record<string, { amount: number; vat: number }>,
@@ -387,10 +413,10 @@ export class JournalQueries {
   ): Promise<ClosureBulletin> {
     const query = `
       INSERT INTO closure_bulletins (
-        closure_type, period_start, period_end, total_transactions, total_amount, 
+        closure_type, period_start, period_end, total_transactions, fond_de_caisse, total_amount, 
         total_vat, vat_breakdown, payment_methods_breakdown, tips_total, change_total, first_sequence, 
         last_sequence, closure_hash, is_closed, closed_at, establishment_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
       RETURNING *
     `;
 
@@ -399,6 +425,7 @@ export class JournalQueries {
       startDate,
       endDate,
       totalTransactions,
+      fondDeCaisse,
       totalAmount,
       totalVat,
       JSON.stringify(vatBreakdown),

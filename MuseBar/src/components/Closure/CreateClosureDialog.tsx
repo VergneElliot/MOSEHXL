@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Button,
@@ -20,13 +20,14 @@ export type ClosureType = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL';
 interface CreateClosureDialogProps {
   open: boolean;
   onClose: () => void;
-  onCreate: (payload: { date: string; type: ClosureType; force?: boolean }) => Promise<void>;
+  onCreate: (payload: { date: string; type: ClosureType; force?: boolean; fond_de_caisse: number }) => Promise<void>;
   creating: boolean;
   selectedDate: string;
   selectedClosureType: ClosureType;
   onDateChange: (date: string) => void;
   onClosureTypeChange: (type: ClosureType) => void;
   disableForceCreation?: boolean;
+  defaultFondDeCaisse?: number | null;
 }
 
 const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
@@ -39,11 +40,29 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
   onDateChange,
   onClosureTypeChange,
   disableForceCreation = true,
+  defaultFondDeCaisse = null,
 }) => {
   const todayISO = useMemo(() => new Date().toISOString().split('T')[0], []);
   const [forceCreation, setForceCreation] = useState(false);
+  const [fondDeCaisse, setFondDeCaisse] = useState<string>('');
 
-  const canCreate = !creating && selectedDate.trim().length > 0 && !!selectedClosureType;
+  useEffect(() => {
+    if (!open) return;
+    const initial = defaultFondDeCaisse ?? 0;
+    setFondDeCaisse(String(initial));
+  }, [open, defaultFondDeCaisse]);
+
+  const fondDeCaisseNumber = useMemo(() => {
+    const n = parseFloat(fondDeCaisse.replace(',', '.'));
+    if (!Number.isFinite(n) || n < 0) return null;
+    return n;
+  }, [fondDeCaisse]);
+
+  const canCreate =
+    !creating &&
+    selectedDate.trim().length > 0 &&
+    !!selectedClosureType &&
+    fondDeCaisseNumber !== null;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -73,6 +92,24 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
             InputLabelProps={{ shrink: true }}
             size="small"
             fullWidth
+          />
+
+          <TextField
+            label="Fond de caisse (€)"
+            value={fondDeCaisse}
+            onChange={(e) => setFondDeCaisse(e.target.value)}
+            size="small"
+            fullWidth
+            required
+            error={fondDeCaisse.trim().length === 0 || fondDeCaisseNumber === null}
+            helperText={
+              fondDeCaisse.trim().length === 0
+                ? 'Champ obligatoire'
+                : fondDeCaisseNumber === null
+                  ? 'Veuillez saisir un montant valide (≥ 0)'
+                  : 'Montant informatif (n’impacte pas les totaux)'
+            }
+            inputMode="decimal"
           />
 
           <Tooltip
@@ -107,7 +144,14 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
           Annuler
         </Button>
         <Button
-          onClick={() => onCreate({ date: selectedDate || todayISO, type: selectedClosureType, force: forceCreation })}
+          onClick={() =>
+            onCreate({
+              date: selectedDate || todayISO,
+              type: selectedClosureType,
+              force: forceCreation,
+              fond_de_caisse: fondDeCaisseNumber ?? 0,
+            })
+          }
           variant="contained"
           color="primary"
           disabled={!canCreate}

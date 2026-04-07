@@ -248,6 +248,10 @@ export class BrowserPrintingService extends BasePrintingService {
                 <td class="value">${data.total_amount.toFixed(2)} EUR</td>
               </tr>
               <tr>
+                <td>Fond de caisse:</td>
+                <td class="value">${data.fond_de_caisse.toFixed(2)} EUR</td>
+              </tr>
+              <tr>
                 <td>Total HT:</td>
                 <td class="value">${htTotalShown.toFixed(2)} EUR</td>
               </tr>

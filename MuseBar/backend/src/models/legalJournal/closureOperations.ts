@@ -39,7 +39,8 @@ export class ClosureOperations {
     date: Date,
     establishmentId: string,
     timezone: string = DEFAULT_APP_TIMEZONE,
-    force = false
+    force = false,
+    fondDeCaisse?: number
   ): Promise<ClosureBulletin> {
     // Business day period uses configurable timezone (Paris for France)
     const { start, end } = getBusinessDayPeriod(date, '02:00', timezone);
@@ -92,12 +93,16 @@ export class ClosureOperations {
     const closureData = `DAILY|${date.toISOString().split('T')[0]}|${totalTransactions}|${computedTotalAmount}|${computedTotalVat}|${firstSequence}|${lastSequence}`;
     const closureHash = JournalSigning.generateClosureHash(closureData);
 
+    const lastFondDeCaisse = await JournalQueries.getLastFondDeCaisse(establishmentId);
+    const fondDeCaisseToStore = Number.isFinite(fondDeCaisse as number) ? (fondDeCaisse as number) : (lastFondDeCaisse ?? 0);
+
     // Insert closure bulletin (scoped to this establishment)
     return await JournalQueries.insertClosureBulletin(
       'DAILY',
       start.toDate(),
       end.toDate(),
       totalTransactions,
+      fondDeCaisseToStore,
       computedTotalAmount,
       computedTotalVat,
       vatBreakdown,
@@ -114,7 +119,12 @@ export class ClosureOperations {
   /**
    * Create weekly closure bulletin for one establishment.
    */
-  static async createWeeklyClosure(date: Date, establishmentId: string, force = false): Promise<ClosureBulletin> {
+  static async createWeeklyClosure(
+    date: Date,
+    establishmentId: string,
+    force = false,
+    fondDeCaisse?: number
+  ): Promise<ClosureBulletin> {
     // Get the start of the week (Monday) and end of the week (Sunday)
     const startOfWeek = new Date(date);
     const dayOfWeek = startOfWeek.getDay();
@@ -126,29 +136,39 @@ export class ClosureOperations {
     endOfWeek.setDate(endOfWeek.getDate() + 6);
     endOfWeek.setHours(23, 59, 59, 999);
 
-    return await this.createPeriodClosure('WEEKLY', startOfWeek, endOfWeek, date, establishmentId, force);
+    return await this.createPeriodClosure('WEEKLY', startOfWeek, endOfWeek, date, establishmentId, force, fondDeCaisse);
   }
 
   /**
    * Create monthly closure bulletin for one establishment.
    */
-  static async createMonthlyClosure(date: Date, establishmentId: string, force = false): Promise<ClosureBulletin> {
+  static async createMonthlyClosure(
+    date: Date,
+    establishmentId: string,
+    force = false,
+    fondDeCaisse?: number
+  ): Promise<ClosureBulletin> {
     // Get the start and end of the month
     const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
     const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
 
-    return await this.createPeriodClosure('MONTHLY', startOfMonth, endOfMonth, date, establishmentId, force);
+    return await this.createPeriodClosure('MONTHLY', startOfMonth, endOfMonth, date, establishmentId, force, fondDeCaisse);
   }
 
   /**
    * Create annual closure bulletin for one establishment.
    */
-  static async createAnnualClosure(date: Date, establishmentId: string, force = false): Promise<ClosureBulletin> {
+  static async createAnnualClosure(
+    date: Date,
+    establishmentId: string,
+    force = false,
+    fondDeCaisse?: number
+  ): Promise<ClosureBulletin> {
     // Get the start and end of the year
     const startOfYear = new Date(date.getFullYear(), 0, 1);
     const endOfYear = new Date(date.getFullYear(), 11, 31, 23, 59, 59, 999);
 
-    return await this.createPeriodClosure('ANNUAL', startOfYear, endOfYear, date, establishmentId, force);
+    return await this.createPeriodClosure('ANNUAL', startOfYear, endOfYear, date, establishmentId, force, fondDeCaisse);
   }
 
   /**
@@ -160,7 +180,8 @@ export class ClosureOperations {
     endDate: Date,
     referenceDate: Date,
     establishmentId: string,
-    force = false
+    force = false,
+    fondDeCaisse?: number
   ): Promise<ClosureBulletin> {
     // Check if closure already exists for this establishment
     const exists = await JournalQueries.closureBulletinExists(closureType, startDate, endDate, establishmentId);
@@ -207,11 +228,15 @@ export class ClosureOperations {
     const closureData = `${closureType}|${startDate.toISOString()}|${endDate.toISOString()}|${totalTransactions}|${computedTotalAmount}|${computedTotalVat}|${firstSequence}|${lastSequence}`;
     const closureHash = JournalSigning.generateClosureHash(closureData);
 
+    const lastFondDeCaisse = await JournalQueries.getLastFondDeCaisse(establishmentId);
+    const fondDeCaisseToStore = Number.isFinite(fondDeCaisse as number) ? (fondDeCaisse as number) : (lastFondDeCaisse ?? 0);
+
     return await JournalQueries.insertClosureBulletin(
       closureType,
       startDate,
       endDate,
       totalTransactions,
+      fondDeCaisseToStore,
       computedTotalAmount,
       computedTotalVat,
       vatBreakdown,

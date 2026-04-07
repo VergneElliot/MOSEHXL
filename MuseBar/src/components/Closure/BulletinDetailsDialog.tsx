@@ -47,6 +47,7 @@ const BulletinDetailsDialog: React.FC<BulletinDetailsDialogProps> = ({
 
   const tipsTotal = toFiniteNumber(bulletin.tips_total);
   const changeTotal = toFiniteNumber(bulletin.change_total);
+  const fondDeCaisse = toFiniteNumber(bulletin.fond_de_caisse);
 
   const vat10Base = toFiniteNumber(bulletin.vat_breakdown?.vat_10?.amount);
   const vat20Base = toFiniteNumber(bulletin.vat_breakdown?.vat_20?.amount);
@@ -188,6 +189,16 @@ const BulletinDetailsDialog: React.FC<BulletinDetailsDialogProps> = ({
               </Typography>
               <Typography variant="h6" fontWeight="bold">
                 {formatCurrency(changeTotal)}
+              </Typography>
+            </Grid>
+
+            <Grid item xs={12}>
+              <Divider sx={{ my: 1 }} />
+              <Typography variant="caption" color="textSecondary">
+                Fond de caisse (informatif)
+              </Typography>
+              <Typography variant="h6" fontWeight="bold">
+                {formatCurrency(fondDeCaisse)}
               </Typography>
             </Grid>
           </Grid>

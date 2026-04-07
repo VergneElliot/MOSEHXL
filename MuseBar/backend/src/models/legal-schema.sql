@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS closure_bulletins (
     period_start TIMESTAMPTZ NOT NULL,
     period_end TIMESTAMPTZ NOT NULL,
     total_transactions INTEGER NOT NULL DEFAULT 0,
+    fond_de_caisse DECIMAL(12,4) NOT NULL DEFAULT 0, -- Cash float left in register (informational only)
     total_amount DECIMAL(12,4) NOT NULL DEFAULT 0,
     total_vat DECIMAL(12,4) NOT NULL DEFAULT 0,
     vat_breakdown JSONB NOT NULL, -- VAT totals by rate (10%, 20%)
