@@ -148,14 +148,21 @@ export const createErrorHandler = (logger?: Logger) => {
         );
       }
     } else {
-      console.error('Error:', {
-        message: normalized.message,
-        stack: err instanceof Error ? err.stack : undefined,
-        url: req.originalUrl,
-        method: req.method,
-        requestId,
-        userId,
-      });
+      process.stderr.write(
+        `[ERROR_HANDLER] ${normalized.message} ` +
+          JSON.stringify(
+            {
+              stack: err instanceof Error ? err.stack : undefined,
+              url: req.originalUrl,
+              method: req.method,
+              requestId,
+              userId,
+            },
+            null,
+            2
+          ) +
+          '\n'
+      );
     }
 
     const isDev = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';

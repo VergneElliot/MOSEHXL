@@ -38,7 +38,7 @@ export function writeToConsole(level: keyof typeof LogLevel, message: string): v
 
   const reset = '\x1b[0m';
   const colorCode = colors[level] || colors.INFO;
-  console.log(`${colorCode}${message}${reset}`);
+  process.stdout.write(`${colorCode}${message}${reset}\n`);
 }
 
 

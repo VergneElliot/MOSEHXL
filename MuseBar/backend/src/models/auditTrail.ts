@@ -47,7 +47,7 @@ export class AuditTrailModel {
       
       return result.rows[0];
     } catch (err) {
-      console.error('[AUDIT LOG] Error logging action:', err);
+      process.stderr.write(`[AUDIT LOG] Error logging action: ${err instanceof Error ? err.message : String(err)}\n`);
       throw err;
     }
   }

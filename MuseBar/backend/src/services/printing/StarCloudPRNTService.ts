@@ -33,8 +33,8 @@ export class StarCloudPRNTService extends BasePrintingService {
       // Start polling for printer status updates
       this.startPolling();
       
-      console.log('Star CloudPRNT service initialized');
-      console.log(`Server URL: ${this.serverUrl}`);
+      process.stdout.write('Star CloudPRNT service initialized\n');
+      process.stdout.write(`Server URL: ${this.serverUrl}\n`);
       
       this.isInitialized = true;
     } catch (error) {

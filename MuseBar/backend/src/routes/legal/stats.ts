@@ -55,7 +55,7 @@ router.get('/monthly-live', async (req, res) => {
       closure_count,
     });
   } catch (error) {
-    console.error('Error fetching monthly live stats:', error);
+    process.stderr.write(`Error fetching monthly live stats: ${error instanceof Error ? error.message : String(error)}\n`);
     res.status(500).json({ error: 'Failed to fetch monthly live stats' });
   }
 });

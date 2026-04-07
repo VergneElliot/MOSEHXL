@@ -43,7 +43,7 @@ router.post('/create', requireAdmin, async (req, res) => {
       compliance_note: 'Archive created for regulatory retention requirements'
     });
   } catch (error: any) {
-    console.error('Error creating archive:', error);
+    process.stderr.write(`Error creating archive: ${error instanceof Error ? error.message : String(error)}\n`);
     res.status(500).json({ error: 'Failed to create archive', details: error.message });
   }
 });
@@ -64,7 +64,7 @@ router.get('/list', requireAdmin, async (req, res) => {
       compliance_note: 'Archive list for regulatory compliance'
     });
   } catch (error: any) {
-    console.error('Error fetching archives:', error);
+    process.stderr.write(`Error fetching archives: ${error instanceof Error ? error.message : String(error)}\n`);
     res.status(500).json({ error: 'Failed to fetch archives', details: error.message });
   }
 });
@@ -90,7 +90,7 @@ router.get('/:id', requireAdmin, async (req, res) => {
       compliance_note: 'Archive details for regulatory compliance'
     });
   } catch (error: any) {
-    console.error('Error fetching archive details:', error);
+    process.stderr.write(`Error fetching archive details: ${error instanceof Error ? error.message : String(error)}\n`);
     res.status(500).json({ error: 'Failed to fetch archive details', details: error.message });
   }
 });
@@ -119,7 +119,7 @@ router.post('/:id/export', requireAdmin, async (req, res) => {
       compliance_note: 'Archive export for regulatory reporting'
     });
   } catch (error: any) {
-    console.error('Error exporting archive:', error);
+    process.stderr.write(`Error exporting archive: ${error instanceof Error ? error.message : String(error)}\n`);
     res.status(500).json({ error: 'Failed to export archive', details: error.message });
   }
 });

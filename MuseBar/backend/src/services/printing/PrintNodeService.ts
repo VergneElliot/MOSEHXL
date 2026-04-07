@@ -67,7 +67,7 @@ export class PrintNodeService extends BasePrintingService {
     try {
       // Test API connection
       const response = await this.client.get('/whoami');
-      console.log(`PrintNode initialized for account: ${response.data.email}`);
+      process.stdout.write(`PrintNode initialized for account: ${response.data.email}\n`);
       
       // Get default printer if configured
       if (this.config.defaultPrinter) {
@@ -197,7 +197,7 @@ export class PrintNodeService extends BasePrintingService {
         provider: 'printnode'
       }));
     } catch (error) {
-      console.error('Error listing PrintNode printers:', error);
+      process.stderr.write(`Error listing PrintNode printers: ${error instanceof Error ? error.message : String(error)}\n`);
       return [];
     }
   }

@@ -36,7 +36,7 @@ export class DigitalReceiptService extends BasePrintingService implements IPrint
 
   async initialize(): Promise<void> {
     this.isInitialized = true;
-    console.log('Digital receipt service initialized');
+    process.stdout.write('Digital receipt service initialized\n');
   }
 
   async printReceipt(data: ReceiptData): Promise<PrintResult> {
@@ -59,7 +59,7 @@ export class DigitalReceiptService extends BasePrintingService implements IPrint
           await this.emailService.sendReceipt(data, this.digitalConfig.defaultEmail);
           results.emailSent = true;
         } catch (emailError) {
-          console.error('Failed to send email receipt:', emailError);
+          process.stderr.write(`Failed to send email receipt: ${emailError instanceof Error ? emailError.message : String(emailError)}\n`);
         }
       }
 
@@ -98,7 +98,7 @@ export class DigitalReceiptService extends BasePrintingService implements IPrint
           await this.emailService.sendClosureBulletin(data, this.digitalConfig.defaultEmail);
           results.emailSent = true;
         } catch (emailError) {
-          console.error('Failed to send email bulletin:', emailError);
+          process.stderr.write(`Failed to send email bulletin: ${emailError instanceof Error ? emailError.message : String(emailError)}\n`);
         }
       }
 
