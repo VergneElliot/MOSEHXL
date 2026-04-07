@@ -113,6 +113,7 @@ export const asyncHandler = (fn: (req: Request, res: Response, next: NextFunctio
 
 export const createErrorHandler = (logger?: Logger) => {
   return (err: unknown, req: Request, res: Response, _next: NextFunction) => {
+    void _next;
     const normalized = normalizeError(err);
     const requestId = (req as any).requestId;
     const userId = (req as any).user?.id;

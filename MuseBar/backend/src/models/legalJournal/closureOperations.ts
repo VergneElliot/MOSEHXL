@@ -72,7 +72,7 @@ export class ClosureOperations {
       subBills = subBillsResult.rows;
     }
 
-    const { totalAmount, paymentBreakdown } = computePaymentBreakdownFromOrders(orders, subBills);
+    const { paymentBreakdown } = computePaymentBreakdownFromOrders(orders, subBills);
     const totalTransactions = orders.length;
     const vatBreakdown = await getExactVatBreakdownFromOrderItems(pool, orderIds);
     const computedTotalAmount = vatBreakdown.vat_10.ttc + vatBreakdown.vat_20.ttc;
@@ -190,7 +190,7 @@ export class ClosureOperations {
       subBills = subBillsResult.rows;
     }
 
-    const { totalAmount, paymentBreakdown } = computePaymentBreakdownFromOrders(orders, subBills);
+    const { paymentBreakdown } = computePaymentBreakdownFromOrders(orders, subBills);
     const totalTransactions = orders.length;
     const vatBreakdown = await getExactVatBreakdownFromOrderItems(pool, orderIds);
     const computedTotalAmount = vatBreakdown.vat_10.ttc + vatBreakdown.vat_20.ttc;

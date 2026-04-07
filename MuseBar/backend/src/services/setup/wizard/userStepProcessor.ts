@@ -28,7 +28,6 @@ export class UserStepProcessor {
         setupData.invitation_token
       );
 
-      const existingUser = await SetupDatabase.checkUserExists(client, setupData.email);
       const newUser = await SetupDatabase.createOrUpdateUserAccount(
         client, 
         setupData, 

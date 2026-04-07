@@ -5,7 +5,6 @@
 
 import { PoolClient } from 'pg';
 import { Logger } from '../../utils/logger';
-import { randomUUID } from 'crypto';
 
 /**
  * Audit data interface

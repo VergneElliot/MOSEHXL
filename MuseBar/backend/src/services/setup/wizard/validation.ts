@@ -1,4 +1,4 @@
-import { BusinessSetupRequest, SetupValidationError } from '../types';
+import { BusinessSetupRequest } from '../types';
 
 export function validateSetupStep(stepId: string, data: Partial<BusinessSetupRequest>): { isValid: boolean; errors: any[] } {
   const errors: any[] = [];

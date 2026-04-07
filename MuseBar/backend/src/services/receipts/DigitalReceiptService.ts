@@ -118,6 +118,7 @@ export class DigitalReceiptService extends BasePrintingService implements IPrint
   }
 
   async checkPrinterStatus(printerId?: string): Promise<PrinterStatus> {
+    void printerId;
     // Check if email service is configured
     const emailConfigured = !!(this.digitalConfig.emailEnabled && this.digitalConfig.defaultEmail);
     

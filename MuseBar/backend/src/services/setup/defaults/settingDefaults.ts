@@ -10,6 +10,7 @@ export async function createDefaultSettings(
   establishmentId: string,
   context?: SetupContext
 ): Promise<void> {
+  void context;
   const config = getDefaultDataConfig();
 
   logger.info('Creating default settings', { establishmentId, settingsCount: Object.keys(config.settings).length }, 'SETUP_DEFAULTS');

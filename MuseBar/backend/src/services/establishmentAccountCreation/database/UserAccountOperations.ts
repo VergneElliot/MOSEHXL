@@ -3,7 +3,6 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { Logger } from '../../../utils/logger';
 import { validatePassword } from '../../../utils/passwordValidation';
-import { AuditTrailModel } from '../../../models/auditTrail';
 
 export interface UserAccountData {
   email: string;

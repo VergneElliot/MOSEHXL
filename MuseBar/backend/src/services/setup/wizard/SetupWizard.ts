@@ -21,7 +21,6 @@ import { SetupStepProcessor } from './SetupStepProcessor';
 import { SetupAuthManager } from './SetupAuthManager';
 import { SetupAuditManager } from './SetupAuditManager';
 import { getSetupSteps } from './steps';
-import { SetupExecutionMetrics } from './types';
 
 /**
  * Setup Wizard Orchestrator
@@ -147,7 +146,6 @@ export class SetupWizard {
       };
 
     } catch (error) {
-      const metrics = progressTracker.getMetrics();
       
       // Create failure audit entry
       if (invitation) {

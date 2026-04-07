@@ -12,7 +12,6 @@
 import { PoolClient } from 'pg';
 import { Logger } from '../../../utils/logger';
 import { BusinessSetupRequest, SetupContext, SetupProgress } from '../types';
-import { SetupProgressTracker } from './SetupProgressTracker';
 import { SetupStepResult, SetupRetryOptions } from './types';
 import { ValidationStepProcessor } from './validationStepProcessor';
 import { UserStepProcessor } from './userStepProcessor';
@@ -118,6 +117,7 @@ export class SetupStepProcessor {
     context: SetupContext,
     progress: SetupProgress
   ): Promise<SetupStepResult> {
+    void progress;
     switch (stepId) {
       // Validation steps
       case 'validate_data':

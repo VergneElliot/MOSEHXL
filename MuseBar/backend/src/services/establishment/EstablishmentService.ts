@@ -6,7 +6,7 @@
 
 import { pool } from '../../app';
 import crypto from 'crypto';
-import { EstablishmentModel, CreateEstablishmentData } from '../../models/establishment';
+import { EstablishmentModel } from '../../models/establishment';
 import { AuditTrailModel } from '../../models/auditTrail';
 import { EmailService } from '../email';
 import { Logger } from '../../utils/logger';

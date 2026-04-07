@@ -170,7 +170,7 @@ export class RolePermissionOperations {
       const hasPermission = this.checkPermissionExists(permissions, permission);
 
       // Log permission check
-      await RoleAuditLogger.logPermissionAccess(context, roleId!, false);
+      await RoleAuditLogger.logPermissionAccess(context, roleId!, isSystemRole);
 
       res.json({
         success: true,

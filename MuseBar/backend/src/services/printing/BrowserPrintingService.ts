@@ -64,6 +64,7 @@ export class BrowserPrintingService extends BasePrintingService {
   }
 
   async checkPrinterStatus(printerId?: string): Promise<PrinterStatus> {
+    void printerId;
     // Browser printing is always available
     return {
       available: true,

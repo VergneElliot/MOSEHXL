@@ -3,8 +3,6 @@
  * Extended type definitions for wizard-specific functionality
  */
 
-import { BusinessSetupRequest, SetupContext, SetupProgress } from '../types';
-
 /**
  * Setup step execution result
  */

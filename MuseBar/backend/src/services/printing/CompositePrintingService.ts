@@ -7,7 +7,6 @@ import {
   Printer,
   PrintingConfig 
 } from './types';
-import { PrintingServiceFactory } from './PrintingServiceFactory';
 import { getLogger } from '../../utils/logger';
 
 export class CompositePrintingService implements IPrintingService {

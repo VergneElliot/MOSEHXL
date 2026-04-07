@@ -3,7 +3,7 @@
  * Type definitions for role route handlers and operations
  */
 
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest, Role, RolePermissions } from '../types';
 
 /**

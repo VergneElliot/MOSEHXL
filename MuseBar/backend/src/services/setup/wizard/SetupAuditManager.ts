@@ -270,7 +270,7 @@ export class SetupAuditManager {
         undefined,
         'SETUP_AUDIT'
       );
-    } catch (error) {
+    } catch {
       this.logger.warn(
         'Failed to create cleanup audit entry',
         undefined,

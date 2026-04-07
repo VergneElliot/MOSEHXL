@@ -11,11 +11,9 @@ import { EstablishmentModel } from '../../models/establishment';
 import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';
 import {
-  AuthenticatedRequest,
   EstablishmentInvitationData,
   UserInvitationData,
   InvitationAcceptanceData,
-  ApiResponse,
   ServiceInitialization
 } from './types';
 
@@ -208,7 +206,7 @@ router.post('/accept-invitation', validateBody([
   { field: 'password', required: true },
 ]), async (req: any, res: any, next: any) => {
   try {
-    const { token, password, firstName, lastName, businessInfo }: InvitationAcceptanceData = req.body;
+    const { token, password, firstName, lastName }: InvitationAcceptanceData = req.body;
 
     if (!token || !password) {
       return res.status(400).json({

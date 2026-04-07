@@ -13,7 +13,6 @@ import { pool } from '../../app';
 import { EstablishmentAccountService } from '../../services/establishmentAccountCreation/EstablishmentAccountService';
 import { 
   EstablishmentAccountCreationRequest,
-  EstablishmentAccountCreationResponse 
 } from './types';
 
 const router = Router();
@@ -49,7 +48,7 @@ router.post('/complete',
       logger.info('Route handler started for establishment account creation');
       const { token, password } = req.body as EstablishmentAccountCreationRequest;
       const businessInfo = req.validatedBusinessInfo ?? req.body.businessInfo;
-      const invitation = req.invitationValidation;
+      void req.invitationValidation;
 
       logger.info('Extracted request data', { tokenPreview: token.substring(0, 8) + '...', businessType: businessInfo.businessType });
 

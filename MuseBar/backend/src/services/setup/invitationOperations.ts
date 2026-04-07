@@ -8,7 +8,6 @@ import { InvitationQueries } from '../../utils/database';
 import {
   InvitationValidation,
   InvitationData,
-  SetupProgress
 } from './types';
 import { Logger } from '../../utils/logger';
 

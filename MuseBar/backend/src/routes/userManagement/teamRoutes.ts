@@ -5,12 +5,9 @@
 
 import express from 'express';
 import { requireAuth, requireAdmin } from '../auth';
-import { pool } from '../../app';
-import { AuditTrailModel } from '../../models/auditTrail';
 import { UserInvitationService } from '../../services/userInvitationService';
 import { Logger } from '../../utils/logger';
 import {
-  AuthenticatedRequest,
   TeamStats,
   TeamMember,
   EmailTestResult,
@@ -31,6 +28,7 @@ let logger: Logger;
 export function initializeTeamRoutes(services: ServiceInitialization): void {
   userInvitationService = services.userInvitationService;
   logger = services.logger;
+  void logger;
 }
 
 /**
@@ -195,6 +193,7 @@ router.post('/test-email', requireAuth, requireAdmin, async (req: any, res: any,
         }
       });
     }
+    void next;
   } catch (error) {
     logger?.error(
       'Failed to test email configuration',
