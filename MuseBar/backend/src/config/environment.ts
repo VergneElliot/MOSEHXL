@@ -129,6 +129,11 @@ export interface EnvironmentConfig {
     user: string;
     password: string;
     ssl: boolean;
+    /**
+     * When ssl is enabled, controls certificate chain verification.
+     * Some managed Postgres providers use a self-signed chain; in that case set to false.
+     */
+    sslRejectUnauthorized: boolean;
     maxConnections: number;
     idleTimeoutMillis: number;
   };
@@ -184,6 +189,11 @@ export const getEnvironmentConfig = (): EnvironmentConfig => {
   const isProduction = nodeEnv === 'production';
   const isDevelopment = nodeEnv === 'development';
 
+  const sslRejectUnauthorized =
+    process.env.DB_SSL_REJECT_UNAUTHORIZED != null
+      ? process.env.DB_SSL_REJECT_UNAUTHORIZED.trim().toLowerCase() === 'true'
+      : false;
+
   return {
     database: {
       host: process.env.DB_HOST || 'localhost',
@@ -193,6 +203,7 @@ export const getEnvironmentConfig = (): EnvironmentConfig => {
       // No fallback: validateEnvironment() ensures DB_PASSWORD is set before we get here
       password: process.env.DB_PASSWORD!,
       ssl: isProduction,
+      sslRejectUnauthorized: isProduction ? sslRejectUnauthorized : true,
       maxConnections: parseInt(process.env.DB_MAX_CONNECTIONS || '20'),
       idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '30000'),
     },
