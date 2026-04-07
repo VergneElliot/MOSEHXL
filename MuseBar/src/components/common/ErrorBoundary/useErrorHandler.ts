@@ -12,6 +12,52 @@ import { ErrorInfo, ErrorSeverity, ErrorReport, UseErrorHandlerReturn } from './
  */
 export const useErrorHandler = (): UseErrorHandlerReturn => {
   /**
+   * Determine error severity based on error characteristics
+   */
+  const determineErrorSeverity = useCallback((error: Error): ErrorSeverity => {
+    const message = error.message.toLowerCase();
+    const stack = error.stack?.toLowerCase() || '';
+
+    // Critical errors that break core functionality
+    if (
+      message.includes('network error') ||
+      message.includes('failed to fetch') ||
+      message.includes('payment') ||
+      message.includes('transaction') ||
+      message.includes('database') ||
+      stack.includes('payment') ||
+      stack.includes('checkout')
+    ) {
+      return 'critical';
+    }
+
+    // High severity errors that impact user experience
+    if (
+      message.includes('permission denied') ||
+      message.includes('unauthorized') ||
+      message.includes('forbidden') ||
+      message.includes('authentication') ||
+      error.name === 'TypeError' ||
+      error.name === 'ReferenceError'
+    ) {
+      return 'high';
+    }
+
+    // Medium severity errors that may impact some features
+    if (
+      message.includes('not found') ||
+      message.includes('invalid') ||
+      message.includes('validation') ||
+      error.name === 'ValidationError'
+    ) {
+      return 'medium';
+    }
+
+    // Low severity errors (UI glitches, minor issues)
+    return 'low';
+  }, []);
+
+  /**
    * Report error to monitoring service
    */
   const reportError = useCallback(async (error: Error, errorInfo: ErrorInfo, errorId: string) => {
@@ -73,53 +119,7 @@ export const useErrorHandler = (): UseErrorHandlerReturn => {
     } catch {
       // Error reporting itself failed — nothing else to do client-side
     }
-  }, []);
-
-  /**
-   * Determine error severity based on error characteristics
-   */
-  const determineErrorSeverity = useCallback((error: Error): ErrorSeverity => {
-    const message = error.message.toLowerCase();
-    const stack = error.stack?.toLowerCase() || '';
-
-    // Critical errors that break core functionality
-    if (
-      message.includes('network error') ||
-      message.includes('failed to fetch') ||
-      message.includes('payment') ||
-      message.includes('transaction') ||
-      message.includes('database') ||
-      stack.includes('payment') ||
-      stack.includes('checkout')
-    ) {
-      return 'critical';
-    }
-
-    // High severity errors that impact user experience
-    if (
-      message.includes('permission denied') ||
-      message.includes('unauthorized') ||
-      message.includes('forbidden') ||
-      message.includes('authentication') ||
-      error.name === 'TypeError' ||
-      error.name === 'ReferenceError'
-    ) {
-      return 'high';
-    }
-
-    // Medium severity errors that may impact some features
-    if (
-      message.includes('not found') ||
-      message.includes('invalid') ||
-      message.includes('validation') ||
-      error.name === 'ValidationError'
-    ) {
-      return 'medium';
-    }
-
-    // Low severity errors (UI glitches, minor issues)
-    return 'low';
-  }, []);
+  }, [determineErrorSeverity]);
 
   /**
    * Check if error reporting should be enabled
