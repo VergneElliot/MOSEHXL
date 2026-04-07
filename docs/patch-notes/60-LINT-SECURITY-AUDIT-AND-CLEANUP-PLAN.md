@@ -9,6 +9,90 @@ Date: 2026-04-07
 
 ---
 
+## Current status (after execution)
+
+This section reflects the repo state after implementing Phases 1–6.
+
+### Frontend (MuseBar)
+
+#### Lint/build status
+- `npm run lint`: **clean**
+- `npm run build`: **clean**
+
+#### Security (npm audit)
+- After running safe fixes/updates: **26 vulnerabilities remain** (**9 low, 3 moderate, 14 high**).
+- These remaining vulnerabilities are still predominantly **`react-scripts` / CRA transitive dependencies**.
+- **Deferred**: fully eliminating these without risk likely requires a larger, explicitly scheduled change (e.g. CRA → Vite, or other build tooling migration), which falls under Phase 7 / breaking work.
+
+#### Outdated packages (high-level)
+- Patch/minor updates were applied in Phase 6.
+- Major upgrades remain deferred (React 19, MUI 7, TypeScript 6, ESLint 10).
+
+---
+
+### Backend (MuseBar/backend)
+
+#### Lint/build status
+- `npx eslint src/ ...`: **clean**
+- `npm run build`: **clean**
+
+#### Security (npm audit)
+- After `npm audit fix` + patch/minor updates: **0 vulnerabilities**.
+
+#### Outdated packages (high-level)
+- Patch/minor updates were applied in Phase 6.
+- Major upgrades remain deferred (Express 5, TypeScript 6).
+
+---
+
+## What was changed (high-level)
+
+### Frontend
+- Addressed the original 19 ESLint warnings (`no-unused-vars`, `react-hooks/exhaustive-deps`).
+- Preserved runtime behavior; changes were focused on cleanup and hook dependency correctness.
+
+### Backend
+- Removed/typed away large volumes of `any`, aligned Express handler types, and standardized `catch` typing to `unknown` with safe narrowing.
+- Replaced `console.*` usage where appropriate and reduced lint noise across routes/services/utils.
+- Fixed/standardized logger typing so request logging and performance logging remain type-safe and buildable.
+- Hardened printing route typing around `req.user.establishment_id` shape differences (string/null vs number) while keeping runtime behavior.
+- Ensured `tsc` builds cleanly after the lint/type tightening work.
+
+---
+
+## Phase-by-phase execution status
+
+### Phase 1 — Frontend lint quick wins (19 warnings)
+- **Status**: **Completed**
+
+### Phase 2 — Backend unused vars/imports (113 warnings)
+- **Status**: **Completed**
+
+### Phase 3 — Backend `no-console` (93 warnings)
+- **Status**: **Completed**
+
+### Phase 4 — Backend `no-explicit-any` (340 warnings)
+- **Status**: **Completed**
+
+### Phase 5 — Security vulnerabilities
+- **Backend**: **Completed** (audit is clean after `npm audit fix`)
+- **Frontend**: **Partially completed**
+  - Safe `npm audit fix`/updates applied.
+  - Remaining vulnerabilities are CRA/transitive and are deferred to a planned migration (breaking work).
+
+### Phase 6 — Safe package updates (patch/minor only)
+- **Status**: **Completed**
+  - `npm update` executed in both frontend and backend.
+  - Lint/build re-verified afterwards.
+
+### Phase 7 — Deferred majors (breaking upgrades)
+- **Status**: **Deferred (unchanged)**
+  - React 19, MUI 7, TypeScript 6 (frontend)
+  - Express 5, TypeScript 6 (backend)
+  - ESLint 10 + config migrations
+
+---
+
 ## Audit results
 
 ### Frontend (MuseBar)
