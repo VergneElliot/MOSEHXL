@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box,
   Chip,
@@ -31,6 +31,7 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [searchExpanded, setSearchExpanded] = useState(Boolean(searchQuery));
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const activeCategories = categories.filter(cat => cat.isActive);
   const hasSearchValue = searchQuery.trim().length > 0;
@@ -40,6 +41,16 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({
       setSearchExpanded(true);
     }
   }, [hasSearchValue]);
+
+  useEffect(() => {
+    if (!searchExpanded) return;
+    // Wait for the Collapse animation/layout so the input exists & is focusable
+    const id = window.setTimeout(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select?.();
+    }, 80);
+    return () => window.clearTimeout(id);
+  }, [searchExpanded]);
 
   const getChipTextColor = useMemo(
     () => (backgroundColor: string) => {
@@ -66,11 +77,23 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({
         {!searchExpanded ? (
           <Tooltip title="Rechercher un produit">
             <IconButton
-              color="primary"
               onClick={() => setSearchExpanded(true)}
               aria-label="Ouvrir la recherche"
               size={isMobile ? 'small' : 'medium'}
-              sx={{ flexShrink: 0 }}
+              sx={{
+                flexShrink: 0,
+                height: isMobile ? 36 : 42,
+                width: isMobile ? 36 : 42,
+                borderRadius: 999,
+                bgcolor: theme.palette.primary.main,
+                color: theme.palette.primary.contrastText,
+                boxShadow: 1,
+                '&:hover': { bgcolor: theme.palette.primary.dark },
+                '&:focus-visible': {
+                  outline: `3px solid ${theme.palette.primary.light}`,
+                  outlineOffset: 2,
+                },
+              }}
             >
               <SearchIcon />
             </IconButton>
@@ -82,6 +105,7 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({
               placeholder="Rechercher un produit..."
               value={searchQuery}
               onChange={e => onSearchChange(e.target.value)}
+              inputRef={searchInputRef}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
