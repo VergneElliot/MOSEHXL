@@ -5,16 +5,20 @@
 import { Pool } from 'pg';
 import { MigrationManager } from './migration-manager';
 import dotenv from 'dotenv';
+import { getEnvironmentConfig } from '../config/environment';
 
 // Load environment variables
 dotenv.config();
 
+const config = getEnvironmentConfig();
+
 const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'mosehxl_production',
-  password: process.env.DB_PASSWORD || 'password',
-  port: parseInt(process.env.DB_PORT || '5432'),
+  user: config.database.user,
+  host: config.database.host,
+  database: config.database.database,
+  password: config.database.password,
+  port: config.database.port,
+  ssl: config.database.ssl ? { rejectUnauthorized: true } : false,
 });
 
 const migrationManager = new MigrationManager(pool);
