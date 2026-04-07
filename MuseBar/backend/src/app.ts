@@ -4,9 +4,10 @@ import dotenv from 'dotenv';
 import { Pool } from 'pg';
 import { ClosureScheduler } from './utils/closureScheduler';
 import { Logger, requestLoggerMiddleware } from './utils/logger';
-import { EnvironmentConfig, initializeEnvironment } from './config/environment';
+import { initializeEnvironment } from './config/environment';
 import { DEFAULT_APP_TIMEZONE } from './config/timezone';
 import { createSecurityMiddleware } from './middleware/security';
+import type { Request, Response } from 'express';
 
 // Load environment variables
 dotenv.config();
@@ -19,7 +20,6 @@ const logger = Logger.getInstance(config);
 
 // Environment-specific configuration
 const NODE_ENV = process.env.NODE_ENV || 'production';
-const DEFAULT_DB_NAME = NODE_ENV === 'development' ? 'mosehxl_development' : 'mosehxl_production';
 
 // Starting MOSEHXL in production mode
 
@@ -113,7 +113,7 @@ app.use('/api/docs', docsRouter);
 import { asyncHandler, notFound, createErrorHandler } from './middleware/errorHandler';
 import { initializeErrorRecovery as initErrorRecovery } from './utils/errorRecovery';
 
-app.post('/api/client-errors', asyncHandler(async (req: any, res: any) => {
+app.post('/api/client-errors', asyncHandler(async (req: Request, res: Response) => {
   const errorData = req.body;
 
   logger.error(

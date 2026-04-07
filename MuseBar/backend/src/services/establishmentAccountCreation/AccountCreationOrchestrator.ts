@@ -63,7 +63,7 @@ export class AccountCreationOrchestrator {
    */
   public async createEstablishmentAccount(
     client: PoolClient,
-    invitationData: any,
+    invitationData: { token: string; establishment: { id: string; name: string; email: string } },
     password: string,
     businessInfo: BusinessInfo,
     ipAddress?: string,

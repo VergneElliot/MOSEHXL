@@ -97,9 +97,10 @@ export class SecurityMiddlewareFactory {
   ): void {
     let index = 0;
 
-    const runNext = (err?: any) => {
+    const runNext = (err?: unknown) => {
       if (err) {
-        logger.warn(`Security middleware error at index ${index}`, { error: err?.message ?? err });
+        const message = err instanceof Error ? err.message : String(err);
+        logger.warn(`Security middleware error at index ${index}`, { error: message });
         return next(err);
       }
       

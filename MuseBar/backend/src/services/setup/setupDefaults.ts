@@ -64,6 +64,7 @@ export class SetupDefaults {
     establishmentId: string,
     context?: SetupContext
   ): Promise<void> {
+    void context;
     await createPaymentMethods(client, establishmentId);
   }
 
@@ -118,6 +119,7 @@ export class SetupDefaults {
     businessType: 'cafe' | 'restaurant' | 'bar' | 'retail',
     context?: SetupContext
   ): Promise<void> {
+    void context;
     try {
       this.logger.info(
         'Customizing default data for business type',

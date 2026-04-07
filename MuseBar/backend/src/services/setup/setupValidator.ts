@@ -5,7 +5,7 @@
 
 import { PoolClient } from 'pg';
 import { InvitationQueries } from '../../utils/database';
-import { BusinessSetupRequest, InvitationValidation, InvitationData, UserExistsResult, SetupValidationError } from './types';
+import { BusinessSetupRequest, InvitationData, UserExistsResult, SetupValidationError } from './types';
 import {
   validateSetupData as vrValidateSetupData,
   validatePassword as vrValidatePassword,

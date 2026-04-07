@@ -46,6 +46,7 @@ export interface ClosureBulletinData {
   period_start: string;
   period_end: string;
   total_transactions: number;
+  fond_de_caisse: number;
   total_amount: number;
   total_vat: number;
   business_info: {

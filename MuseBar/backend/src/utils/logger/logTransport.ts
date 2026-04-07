@@ -23,7 +23,7 @@ export class FileTransport {
     try {
       fs.appendFileSync(filepath, logLine);
     } catch (error) {
-      console.error('Failed to write to log file:', error);
+      process.stderr.write(`Failed to write to log file: ${error instanceof Error ? error.message : String(error)}\n`);
     }
   }
 }

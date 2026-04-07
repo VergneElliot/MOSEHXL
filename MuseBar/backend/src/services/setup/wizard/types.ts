@@ -3,15 +3,13 @@
  * Extended type definitions for wizard-specific functionality
  */
 
-import { BusinessSetupRequest, SetupContext, SetupProgress } from '../types';
-
 /**
  * Setup step execution result
  */
 export interface SetupStepResult {
   success: boolean;
   message?: string;
-  data?: any;
+  data?: unknown;
   error?: Error;
 }
 
@@ -20,8 +18,8 @@ export interface SetupStepResult {
  */
 export interface SetupTransactionContext {
   transactionId: string;
-  client: any;
-  context: any;
+  client: unknown;
+  context: unknown;
 }
 
 /**
@@ -54,11 +52,11 @@ export interface SetupAuditEntry {
   action: string;
   entity_type: string;
   entity_id: string;
-  old_values: Record<string, any>;
-  new_values: Record<string, any>;
+  old_values: Record<string, unknown>;
+  new_values: Record<string, unknown>;
   ip_address?: string;
   user_agent?: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 /**

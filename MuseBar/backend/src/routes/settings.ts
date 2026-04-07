@@ -24,7 +24,7 @@ router.get('/happy-hour', async (req, res) => {
     const value = await HappyHourSettingsModel.getHappyHourSettings(establishmentId);
     return res.json(value);
   } catch (error) {
-    console.error('Error fetching happy hour settings:', error);
+    process.stderr.write(`Error fetching happy hour settings: ${error instanceof Error ? error.message : String(error)}\n`);
     res.status(500).json({ error: 'Failed to fetch Happy Hour settings' });
   }
 });
@@ -56,7 +56,7 @@ router.put('/happy-hour', async (req, res) => {
 
     res.json(settings);
   } catch (error) {
-    console.error('Error saving happy hour settings:', error);
+    process.stderr.write(`Error saving happy hour settings: ${error instanceof Error ? error.message : String(error)}\n`);
     res.status(500).json({ error: 'Failed to save Happy Hour settings' });
   }
 });

@@ -13,7 +13,7 @@ import { StatusTransitionRules } from './StatusTransitionRules';
  */
 export interface ValidationResult {
   isValid: boolean;
-  rule?: any;
+  rule?: unknown;
   errors: string[];
 }
 
@@ -56,7 +56,7 @@ export class StatusTransitionValidator {
       if (currentStatus !== request.fromStatus) {
         errors.push(`Expected status: ${request.fromStatus}, Current status: ${currentStatus}`);
       }
-    } catch (error) {
+    } catch {
       errors.push('Failed to verify current establishment status');
     }
 

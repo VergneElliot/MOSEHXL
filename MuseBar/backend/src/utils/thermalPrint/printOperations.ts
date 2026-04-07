@@ -3,7 +3,7 @@
  * Handles actual printing operations and platform-specific logic
  */
 
-import { spawn, ChildProcess } from 'child_process';
+import { spawn } from 'child_process';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
@@ -116,7 +116,7 @@ export class PrintOperations {
       const testContent = '\x1B\x40'; // ESC @ - Initialize printer
       await this.printContent(testContent, 'test');
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -152,7 +152,7 @@ export class PrintOperations {
   public async cleanupTempFile(filePath: string): Promise<void> {
     try {
       await fs.unlink(filePath);
-    } catch (error) {
+    } catch {
       // Ignore errors when cleaning up temp files
     }
   }

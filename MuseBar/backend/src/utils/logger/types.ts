@@ -9,7 +9,7 @@ export interface LogEntry {
   timestamp: string;
   level: keyof typeof LogLevel;
   message: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   category?: string;
   context?: string;
   requestId?: string;
@@ -32,7 +32,7 @@ export interface PerformanceMetric {
   operation: string;
   duration: number;
   timestamp: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 

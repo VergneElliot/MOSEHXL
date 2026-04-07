@@ -17,6 +17,7 @@ export interface CreateClosureData {
   date: string;
   type: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL';
   force?: boolean;
+  fond_de_caisse: number;
 }
 
 export const useClosureAPI = (
@@ -100,6 +101,7 @@ export const useClosureAPI = (
           date: closureData.date,
           type: closureData.type,
           force: closureData.force === true,
+          fond_de_caisse: closureData.fond_de_caisse,
         }
         );
         addBulletin(result.closure ?? (result as unknown as ClosureBulletin));

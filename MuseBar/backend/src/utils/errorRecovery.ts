@@ -86,7 +86,7 @@ export class ErrorRecovery {
   /**
    * Circuit breaker pattern implementation
    */
-  public createCircuitBreaker<T extends any[], R>(
+  public createCircuitBreaker<T extends unknown[], R>(
     operation: (...args: T) => Promise<R>,
     operationName: string,
     options: {

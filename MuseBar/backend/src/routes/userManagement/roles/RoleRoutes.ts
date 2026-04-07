@@ -20,6 +20,7 @@ let logger: Logger;
  */
 export function initializeRoleRoutes(services: ServiceInitialization): void {
   logger = services.logger;
+  void logger;
 }
 
 /**

@@ -41,8 +41,8 @@ export const mockFetch = (responses: Array<{ url?: string; response: any; status
   const mockFn = jest.fn();
   
   responses.forEach((response, index) => {
-    const call = response.url 
-      ? mockFn.mockImplementationOnce((url: string) => {
+    if (response.url) {
+      mockFn.mockImplementationOnce((url: string) => {
           if (url.includes(response.url!)) {
             return Promise.resolve({
               ok: (response.status || 200) < 400,
@@ -51,12 +51,14 @@ export const mockFetch = (responses: Array<{ url?: string; response: any; status
             });
           }
           return Promise.reject(new Error(`Unexpected URL: ${url}`));
-        })
-      : mockFn.mockResolvedValueOnce({
+        });
+    } else {
+      mockFn.mockResolvedValueOnce({
           ok: (response.status || 200) < 400,
           status: response.status || 200,
           json: () => Promise.resolve(response.response),
         });
+    }
   });
 
   global.fetch = mockFn;

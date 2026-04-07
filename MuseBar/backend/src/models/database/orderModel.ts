@@ -17,7 +17,7 @@ export const OrderModel = {
     establishmentId: string,
     opts?: { limit?: number; offset?: number }
   ): Promise<Order[]> {
-    const values: any[] = [establishmentId];
+    const values: Array<string | number> = [establishmentId];
     let query = 'SELECT * FROM orders WHERE establishment_id = $1 ORDER BY created_at DESC';
 
     if (opts?.limit != null && Number.isFinite(opts.limit) && opts.limit > 0) {

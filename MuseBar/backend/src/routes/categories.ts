@@ -15,7 +15,7 @@ router.get('/', async (req, res) => {
   try {
     const categories = await CategoryModel.getAll(establishmentId);
     res.json(categories);
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch categories' });
   }
 });
@@ -27,7 +27,7 @@ router.get('/archived', async (req, res) => {
   try {
     const categories = await CategoryModel.getAllArchived(establishmentId);
     res.json(categories);
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch archived categories' });
   }
 });
@@ -39,7 +39,7 @@ router.get('/all', async (req, res) => {
   try {
     const categories = await CategoryModel.getAllIncludingArchived(establishmentId);
     res.json(categories);
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch all categories' });
   }
 });
@@ -53,7 +53,7 @@ router.get('/:id', validateParams([paramValidations.id]), async (req, res) => {
     const category = await CategoryModel.getById(id, establishmentId);
     if (!category) return res.status(404).json({ error: 'Category not found' });
     res.json(category);
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch category' });
   }
 });
@@ -75,7 +75,7 @@ router.post('/', validateBody(commonValidations.categoryCreate), async (req, res
       user_agent: req.headers['user-agent'],
     }).catch(() => {});
     res.status(201).json(category);
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to create category' });
   }
 });
@@ -106,7 +106,7 @@ router.put('/:id', validateParams([paramValidations.id]), async (req, res) => {
       user_agent: req.headers['user-agent'],
     }).catch(() => {});
     res.json(category);
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to update category' });
   }
 });
@@ -132,7 +132,7 @@ router.delete('/:id', validateParams([paramValidations.id]), async (req, res) =>
       ? 'Catégorie supprimée définitivement avec succès'
       : 'Catégorie archivée avec succès (préservation légale requise)';
     res.json({ message, action: result.action, reason: result.reason });
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to delete category' });
   }
 });
@@ -155,7 +155,7 @@ router.post('/:id/restore', validateParams([paramValidations.id]), async (req, r
       user_agent: req.headers['user-agent'],
     }).catch(() => {});
     res.json({ message: 'Catégorie restaurée avec succès' });
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to restore category' });
   }
 });

@@ -25,9 +25,9 @@ export class NetworkPrintingService extends BasePrintingService {
     // Test connection to printer
     const status = await this.checkPrinterStatus();
     if (!status.available) {
-      console.warn(`Network printer at ${this.printerIp}:${this.printerPort} is not available: ${status.status}`);
+      process.stderr.write(`Network printer at ${this.printerIp}:${this.printerPort} is not available: ${status.status}\n`);
     } else {
-      console.log(`Network printer initialized at ${this.printerIp}:${this.printerPort}`);
+      process.stdout.write(`Network printer initialized at ${this.printerIp}:${this.printerPort}\n`);
     }
     this.isInitialized = true;
   }
@@ -59,6 +59,7 @@ export class NetworkPrintingService extends BasePrintingService {
   }
 
   async checkPrinterStatus(printerId?: string): Promise<PrinterStatus> {
+    void printerId;
     return new Promise((resolve) => {
       const client = new net.Socket();
       const timeoutHandle = setTimeout(() => {
@@ -129,7 +130,7 @@ export class NetworkPrintingService extends BasePrintingService {
       }, this.timeout);
 
       client.connect(this.printerPort, this.printerIp, () => {
-        console.log(`✅ Connected to network printer at ${this.printerIp}:${this.printerPort}`);
+        process.stdout.write(`✅ Connected to network printer at ${this.printerIp}:${this.printerPort}\n`);
         
         // Send the print content
         client.write(content, 'binary', (error) => {
@@ -143,7 +144,7 @@ export class NetworkPrintingService extends BasePrintingService {
               provider: 'network'
             });
           } else {
-            console.log(`📄 ${type} content sent to network printer`);
+            process.stdout.write(`📄 ${type} content sent to network printer\n`);
             // Give printer time to process before closing
             setTimeout(() => {
               client.end();
@@ -156,7 +157,7 @@ export class NetworkPrintingService extends BasePrintingService {
         if (!resolved) {
           resolved = true;
           clearTimeout(timeoutHandle);
-          console.log('🔌 Network printer connection closed');
+          process.stdout.write('🔌 Network printer connection closed\n');
           resolve({
             success: true,
             message: `${type} sent to network printer successfully`,
@@ -174,7 +175,7 @@ export class NetworkPrintingService extends BasePrintingService {
         if (!resolved) {
           resolved = true;
           clearTimeout(timeoutHandle);
-          console.error('❌ Network printer error:', error.message);
+          process.stderr.write(`❌ Network printer error: ${error.message}\n`);
           resolve({
             success: false,
             message: `Network printer error: ${error.message}`,

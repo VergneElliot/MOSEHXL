@@ -1,13 +1,38 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import { PrintingServiceFactory, IPrintingService, PrintingConfig } from '../services/printing';
+import type { PrintResult, ReceiptData as PrintingReceiptData, ClosureBulletinData as PrintingClosureBulletinData } from '../services/printing/types';
 import { pool } from '../app';
 import { authenticateToken } from '../middleware/auth';
 import { getLogger } from '../utils/logger';
+import type { AuthenticatedRequest } from './userManagement/types';
 
 const router = Router();
 
 // Cache for printing services per establishment
 const printingServices: Map<number, IPrintingService> = new Map();
+
+type PrintingUser = {
+  establishment_id: number;
+  id: number;
+  username?: string;
+};
+
+function getPrintingUser(req: AuthenticatedRequest): PrintingUser | null {
+  const establishmentIdRaw = req.user?.establishment_id;
+  const establishmentId =
+    typeof establishmentIdRaw === 'number'
+      ? establishmentIdRaw
+      : typeof establishmentIdRaw === 'string'
+        ? parseInt(establishmentIdRaw, 10)
+        : NaN;
+  if (!Number.isFinite(establishmentId) || establishmentId <= 0) return null;
+  if (!req.user) return null;
+  return {
+    establishment_id: establishmentId,
+    id: req.user.id,
+    username: (req.user as { username?: string }).username,
+  };
+}
 
 /**
  * Get printing service for establishment
@@ -67,16 +92,16 @@ async function getPrintingService(establishmentId: number): Promise<IPrintingSer
 }
 
 // Middleware to ensure establishment context
-const ensureEstablishment = (req: Request, res: Response, next: Function) => {
-  const user = (req as any).user;
-  if (!user || !user.establishment_id) {
+const ensureEstablishment = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  const user = getPrintingUser(req);
+  if (!user) {
     return res.status(400).json({ error: 'Establishment context required' });
   }
   next();
 };
 
 /** In-process handler: get status and printers. Used by routes and by printingCompat. */
-export async function getStatusResponse(user: { establishment_id: number }) {
+export async function getStatusResponse(user: PrintingUser) {
   const service = await getPrintingService(user.establishment_id);
   const status = await service.checkPrinterStatus();
   const printers = await service.listPrinters();
@@ -84,15 +109,16 @@ export async function getStatusResponse(user: { establishment_id: number }) {
 }
 
 /** In-process handler: test print. Used by routes and by printingCompat. */
-export async function testPrintResponse(user: { establishment_id: number }, printerId?: string) {
+export async function testPrintResponse(user: PrintingUser, printerId?: string) {
   const service = await getPrintingService(user.establishment_id);
   return await service.testPrint(printerId);
 }
 
 // GET /api/printing/status
-router.get('/status', authenticateToken, ensureEstablishment, async (req: Request, res: Response) => {
+router.get('/status', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const data = await getStatusResponse((req as any).user);
+    const user = getPrintingUser(req)!;
+    const data = await getStatusResponse(user);
     res.json(data);
   } catch (error) {
     getLogger().error('Error checking printer status', error instanceof Error ? error : undefined);
@@ -104,9 +130,9 @@ router.get('/status', authenticateToken, ensureEstablishment, async (req: Reques
 });
 
 // GET /api/printing/printers
-router.get('/printers', authenticateToken, ensureEstablishment, async (req: Request, res: Response) => {
+router.get('/printers', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = getPrintingUser(req)!;
     const service = await getPrintingService(user.establishment_id);
     
     const printers = await service.listPrinters();
@@ -125,9 +151,10 @@ router.get('/printers', authenticateToken, ensureEstablishment, async (req: Requ
 });
 
 // POST /api/printing/test
-router.post('/test', authenticateToken, ensureEstablishment, async (req: Request, res: Response) => {
+router.post('/test', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const result = await testPrintResponse((req as any).user, req.body?.printerId);
+    const user = getPrintingUser(req)!;
+    const result = await testPrintResponse(user, req.body?.printerId);
     res.json(result);
   } catch (error) {
     getLogger().error('Error test printing', error instanceof Error ? error : undefined);
@@ -140,10 +167,10 @@ router.post('/test', authenticateToken, ensureEstablishment, async (req: Request
 
 /** In-process handler: print receipt. Used by routes and by printingCompat. */
 export async function printReceiptResponse(
-  user: { establishment_id: number; username?: string },
+  user: PrintingUser,
   orderId: number,
   type: string = 'detailed'
-): Promise<{ result: any; receiptData: any }> {
+): Promise<{ result: PrintResult; receiptData: PrintingReceiptData }> {
   const establishmentId = user.establishment_id;
   const receiptResult = await pool.query(
     `SELECT 
@@ -181,52 +208,64 @@ export async function printReceiptResponse(
   );
 
   if (receiptResult.rows.length === 0) {
-    const err: any = new Error('Receipt not found');
-    err.statusCode = 404;
+    const err = Object.assign(new Error('Receipt not found'), { statusCode: 404 });
     throw err;
   }
 
   const receiptRow = receiptResult.rows[0];
-  const receiptData = {
-    order_id: receiptRow.order_id,
-    sequence_number: receiptRow.sequence_number,
+  const receiptData: PrintingReceiptData = {
+    order_id: Number(receiptRow.order_id),
+    sequence_number: Number(receiptRow.sequence_number),
     total_amount: parseFloat(receiptRow.total_amount),
     total_tax: parseFloat(receiptRow.total_tax),
-    payment_method: receiptRow.payment_method,
-    created_at: receiptRow.created_at,
-    items: receiptRow.items,
+    payment_method: String(receiptRow.payment_method ?? ''),
+    created_at: new Date(receiptRow.created_at).toISOString(),
+    items: Array.isArray(receiptRow.items) ? receiptRow.items : [],
     business_info: {
-      name: receiptRow.business_name,
-      address: receiptRow.business_address,
-      phone: receiptRow.business_phone,
-      email: receiptRow.business_email,
-      siret: receiptRow.siret,
-      tax_identification: receiptRow.tax_identification
+      name: String(receiptRow.business_name ?? ''),
+      address: String(receiptRow.business_address ?? ''),
+      phone: String(receiptRow.business_phone ?? ''),
+      email: String(receiptRow.business_email ?? ''),
+      siret: receiptRow.siret ? String(receiptRow.siret) : undefined,
+      tax_identification: receiptRow.tax_identification ? String(receiptRow.tax_identification) : undefined
     },
     receipt_type: type as 'detailed' | 'summary',
     tips: receiptRow.tips ? parseFloat(receiptRow.tips) : undefined,
     change: receiptRow.change ? parseFloat(receiptRow.change) : undefined,
     compliance_info: {
-      receipt_hash: receiptRow.receipt_hash,
+      receipt_hash: receiptRow.receipt_hash ? String(receiptRow.receipt_hash) : undefined,
       cash_register_id: `CR-${user.establishment_id}`,
       operator_id: user.username
     }
   };
 
-  const vatBreakdown: any[] = [];
-  const vat10Items = receiptRow.items?.filter((item: any) => item.tax_rate === 10) || [];
-  const vat20Items = receiptRow.items?.filter((item: any) => item.tax_rate === 20) || [];
+  const toNumber = (v: unknown): number => {
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string') {
+      const n = parseFloat(v);
+      return Number.isFinite(n) ? n : 0;
+    }
+    return 0;
+  };
+
+  const items: Array<{ tax_rate?: number; total_price?: string | number }> = Array.isArray(receiptRow.items)
+    ? (receiptRow.items as Array<{ tax_rate?: number; total_price?: string | number }>)
+    : [];
+
+  const vatBreakdown: Array<{ rate: number; subtotal_ht: number; vat: number }> = [];
+  const vat10Items = items.filter((item) => item.tax_rate === 10);
+  const vat20Items = items.filter((item) => item.tax_rate === 20);
   if (vat10Items.length > 0) {
-    const subtotal = vat10Items.reduce((sum: number, item: any) => sum + parseFloat(item.total_price), 0);
+    const subtotal = vat10Items.reduce((sum, item) => sum + toNumber(item.total_price), 0);
     const vat = subtotal * 0.1 / 1.1;
     vatBreakdown.push({ rate: 10, subtotal_ht: subtotal - vat, vat });
   }
   if (vat20Items.length > 0) {
-    const subtotal = vat20Items.reduce((sum: number, item: any) => sum + parseFloat(item.total_price), 0);
+    const subtotal = vat20Items.reduce((sum, item) => sum + toNumber(item.total_price), 0);
     const vat = subtotal * 0.2 / 1.2;
     vatBreakdown.push({ rate: 20, subtotal_ht: subtotal - vat, vat });
   }
-  (receiptData as any).vat_breakdown = vatBreakdown;
+  receiptData.vat_breakdown = vatBreakdown;
 
   const service = await getPrintingService(user.establishment_id);
   const result = await service.printReceipt(receiptData);
@@ -251,9 +290,9 @@ export async function printReceiptResponse(
 
 /** In-process handler: print closure bulletin. Used by routes and by printingCompat. */
 export async function printClosureBulletinResponse(
-  user: { establishment_id: number; username?: string },
+  user: PrintingUser,
   bulletinId: number
-): Promise<{ result: any; bulletinData: any }> {
+): Promise<{ result: PrintResult; bulletinData: PrintingClosureBulletinData }> {
   const bulletinResult = await pool.query(
     `SELECT 
       cb.*,
@@ -270,37 +309,37 @@ export async function printClosureBulletinResponse(
   );
 
   if (bulletinResult.rows.length === 0) {
-    const err: any = new Error('Closure bulletin not found');
-    err.statusCode = 404;
+    const err = Object.assign(new Error('Closure bulletin not found'), { statusCode: 404 });
     throw err;
   }
 
   const bulletin = bulletinResult.rows[0];
-  const bulletinData = {
-    id: bulletin.id,
+  const bulletinData: PrintingClosureBulletinData = {
+    id: Number(bulletin.id),
     closure_type: bulletin.closure_type,
-    period_start: bulletin.period_start,
-    period_end: bulletin.period_end,
-    total_transactions: bulletin.total_transactions,
+    period_start: new Date(bulletin.period_start).toISOString(),
+    period_end: new Date(bulletin.period_end).toISOString(),
+    total_transactions: Number(bulletin.total_transactions),
+    fond_de_caisse: bulletin.fond_de_caisse ? parseFloat(bulletin.fond_de_caisse) : 0,
     total_amount: parseFloat(bulletin.total_amount),
     total_vat: parseFloat(bulletin.total_vat),
     vat_breakdown: bulletin.vat_breakdown,
     payment_methods_breakdown: bulletin.payment_methods_breakdown,
-    first_sequence: bulletin.first_sequence,
-    last_sequence: bulletin.last_sequence,
-    closure_hash: bulletin.closure_hash,
-    is_closed: bulletin.is_closed,
+    first_sequence: Number(bulletin.first_sequence),
+    last_sequence: Number(bulletin.last_sequence),
+    closure_hash: String(bulletin.closure_hash),
+    is_closed: Boolean(bulletin.is_closed),
     closed_at: bulletin.closed_at,
     created_at: bulletin.created_at,
     tips_total: bulletin.tips_total ? parseFloat(bulletin.tips_total) : undefined,
     change_total: bulletin.change_total ? parseFloat(bulletin.change_total) : undefined,
     business_info: {
-      name: bulletin.business_name,
-      address: bulletin.business_address,
-      phone: bulletin.business_phone,
-      email: bulletin.business_email,
-      siret: bulletin.siret,
-      tax_identification: bulletin.tax_identification
+      name: String(bulletin.business_name ?? ''),
+      address: String(bulletin.business_address ?? ''),
+      phone: String(bulletin.business_phone ?? ''),
+      email: String(bulletin.business_email ?? ''),
+      siret: bulletin.siret ? String(bulletin.siret) : undefined,
+      tax_identification: bulletin.tax_identification ? String(bulletin.tax_identification) : undefined
     },
     compliance_info: {
       cash_register_id: `CR-${user.establishment_id}`,
@@ -330,48 +369,50 @@ export async function printClosureBulletinResponse(
 }
 
 // POST /api/printing/receipt/:orderId
-router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, async (req: Request, res: Response) => {
+router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = getPrintingUser(req)!;
     const orderId = parseInt(req.params.orderId);
     const type = (req.query.type as string) || 'detailed';
     const { result, receiptData } = await printReceiptResponse(user, orderId, type);
     res.json({ ...result, receipt_data: receiptData });
-  } catch (error: any) {
-    if (error?.statusCode === 404) {
+  } catch (error: unknown) {
+    const e = error as { statusCode?: number; message?: string };
+    if (e?.statusCode === 404) {
       return res.status(404).json({ error: 'Receipt not found' });
     }
     getLogger().error('Error printing receipt', error instanceof Error ? error : undefined);
     res.status(500).json({ 
       error: 'Failed to print receipt',
-      message: error instanceof Error ? error.message : 'Unknown error'
+      message: e?.message ?? (error instanceof Error ? error.message : 'Unknown error')
     });
   }
 });
 
 // POST /api/printing/closure/:bulletinId
-router.post('/closure/:bulletinId', authenticateToken, ensureEstablishment, async (req: Request, res: Response) => {
+router.post('/closure/:bulletinId', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = getPrintingUser(req)!;
     const bulletinId = parseInt(req.params.bulletinId);
     const { result, bulletinData } = await printClosureBulletinResponse(user, bulletinId);
     res.json({ ...result, bulletin_data: bulletinData });
-  } catch (error: any) {
-    if (error?.statusCode === 404) {
+  } catch (error: unknown) {
+    const e = error as { statusCode?: number; message?: string };
+    if (e?.statusCode === 404) {
       return res.status(404).json({ error: 'Closure bulletin not found' });
     }
     getLogger().error('Error printing closure bulletin', error instanceof Error ? error : undefined);
     res.status(500).json({ 
       error: 'Failed to print closure bulletin',
-      message: error instanceof Error ? error.message : 'Unknown error'
+      message: e?.message ?? (error instanceof Error ? error.message : 'Unknown error')
     });
   }
 });
 
 // GET /api/printing/configuration
-router.get('/configuration', authenticateToken, ensureEstablishment, async (req: Request, res: Response) => {
+router.get('/configuration', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = getPrintingUser(req)!;
     
     const configResult = await pool.query(
       `SELECT * FROM printing_configurations 
@@ -394,9 +435,9 @@ router.get('/configuration', authenticateToken, ensureEstablishment, async (req:
 });
 
 // POST /api/printing/configuration
-router.post('/configuration', authenticateToken, ensureEstablishment, async (req: Request, res: Response) => {
+router.post('/configuration', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = getPrintingUser(req)!;
     const { provider, config } = req.body;
     
     if (!provider) {
@@ -437,9 +478,9 @@ router.post('/configuration', authenticateToken, ensureEstablishment, async (req
 });
 
 // GET /api/printing/history
-router.get('/history', authenticateToken, ensureEstablishment, async (req: Request, res: Response) => {
+router.get('/history', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = getPrintingUser(req)!;
     const { limit = 50, offset = 0 } = req.query;
     
     const historyResult = await pool.query(

@@ -16,7 +16,7 @@ export class BrowserPrintingService extends BasePrintingService {
   async initialize(): Promise<void> {
     // Browser printing doesn't require initialization
     this.isInitialized = true;
-    console.log('Browser printing service initialized');
+    process.stdout.write('Browser printing service initialized\n');
   }
 
   async printReceipt(data: ReceiptData): Promise<PrintResult> {
@@ -64,6 +64,7 @@ export class BrowserPrintingService extends BasePrintingService {
   }
 
   async checkPrinterStatus(printerId?: string): Promise<PrinterStatus> {
+    void printerId;
     // Browser printing is always available
     return {
       available: true,
@@ -247,6 +248,10 @@ export class BrowserPrintingService extends BasePrintingService {
                 <td class="value">${data.total_amount.toFixed(2)} EUR</td>
               </tr>
               <tr>
+                <td>Fond de caisse:</td>
+                <td class="value">${data.fond_de_caisse.toFixed(2)} EUR</td>
+              </tr>
+              <tr>
                 <td>Total HT:</td>
                 <td class="value">${htTotalShown.toFixed(2)} EUR</td>
               </tr>
@@ -263,7 +268,7 @@ export class BrowserPrintingService extends BasePrintingService {
               ${data.vat_breakdown.vat_10 ? `
                 <tr>
                   <td>Total soumis à TVA 10%:</td>
-                  <td class="value">${(((data.vat_breakdown.vat_10 as any).ttc ?? (data.vat_breakdown.vat_10.amount + data.vat_breakdown.vat_10.vat)) as number).toFixed(2)} EUR</td>
+                  <td class="value">${(((data.vat_breakdown.vat_10 as { ttc?: number }).ttc ?? (data.vat_breakdown.vat_10.amount + data.vat_breakdown.vat_10.vat)) as number).toFixed(2)} EUR</td>
                 </tr>
                 <tr>
                   <td>Montant TVA 10%:</td>
@@ -273,7 +278,7 @@ export class BrowserPrintingService extends BasePrintingService {
               ${data.vat_breakdown.vat_20 ? `
                 <tr>
                   <td>Total soumis à TVA 20%:</td>
-                  <td class="value">${(((data.vat_breakdown.vat_20 as any).ttc ?? (data.vat_breakdown.vat_20.amount + data.vat_breakdown.vat_20.vat)) as number).toFixed(2)} EUR</td>
+                  <td class="value">${(((data.vat_breakdown.vat_20 as { ttc?: number }).ttc ?? (data.vat_breakdown.vat_20.amount + data.vat_breakdown.vat_20.vat)) as number).toFixed(2)} EUR</td>
                 </tr>
                 <tr>
                   <td>Montant TVA 20%:</td>

@@ -58,6 +58,7 @@ function validateBusinessInfoData(
   businessInfo: BusinessInfo,
   logger: Logger
 ): BusinessInfoValidationResult {
+  void logger;
   const errors: string[] = [];
 
   // Required field validation

@@ -13,7 +13,7 @@ const config = getEnvironmentConfig();
 const logger = Logger.getInstance(config);
 
 // GET /api/setup/validate/:token - Validate invitation token
-router.get('/validate/:token', validateParams([{ param: 'token', validator: (v:any)=> typeof v === 'string' && v.length > 0 }]), async (req, res) => {
+router.get('/validate/:token', validateParams([{ param: 'token', validator: (v: string)=> typeof v === 'string' && v.length > 0 }]), async (req, res) => {
   try {
     const { token } = req.params;
     const setupService = SetupService.getInstance();
@@ -34,7 +34,7 @@ router.get('/validate/:token', validateParams([{ param: 'token', validator: (v:a
 });
 
 // GET /api/setup/status/:token - Check setup completion status
-router.get('/status/:token', validateParams([{ param: 'token', validator: (v:any)=> typeof v === 'string' && v.length > 0 }]), async (req, res) => {
+router.get('/status/:token', validateParams([{ param: 'token', validator: (v: string)=> typeof v === 'string' && v.length > 0 }]), async (req, res) => {
   try {
     const { token } = req.params;
     const setupService = SetupService.getInstance();

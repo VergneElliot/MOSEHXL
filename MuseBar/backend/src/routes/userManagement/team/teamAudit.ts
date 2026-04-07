@@ -1,6 +1,12 @@
 import { AuditTrailModel } from '../../../models/auditTrail';
 
-export async function logViewTeamStats(userId: number, establishmentId: string, stats: any, ip: string, userAgent?: string) {
+export async function logViewTeamStats(
+  userId: number,
+  establishmentId: string,
+  stats: unknown,
+  ip?: string,
+  userAgent?: string
+) {
   await AuditTrailModel.logAction({
     user_id: String(userId),
     action_type: 'VIEW_TEAM_STATS',
@@ -10,7 +16,7 @@ export async function logViewTeamStats(userId: number, establishmentId: string, 
   });
 }
 
-export async function logViewTeamMembers(userId: number, establishmentId: string, memberCount: number, includeInactive: boolean, ip: string, userAgent?: string) {
+export async function logViewTeamMembers(userId: number, establishmentId: string, memberCount: number, includeInactive: boolean, ip?: string, userAgent?: string) {
   await AuditTrailModel.logAction({
     user_id: String(userId),
     action_type: 'VIEW_TEAM_MEMBERS',
@@ -20,7 +26,7 @@ export async function logViewTeamMembers(userId: number, establishmentId: string
   });
 }
 
-export async function logTestEmailConfiguration(userId: number, testEmail: string, result: 'success' | 'failure', ip: string, userAgent?: string) {
+export async function logTestEmailConfiguration(userId: number, testEmail: string, result: 'success' | 'failure', ip?: string, userAgent?: string) {
   await AuditTrailModel.logAction({
     user_id: String(userId),
     action_type: 'TEST_EMAIL_CONFIGURATION',
@@ -30,7 +36,7 @@ export async function logTestEmailConfiguration(userId: number, testEmail: strin
   });
 }
 
-export async function logViewEmailStats(userId: number, ip: string, userAgent?: string) {
+export async function logViewEmailStats(userId: number, ip?: string, userAgent?: string) {
   await AuditTrailModel.logAction({
     user_id: String(userId),
     action_type: 'VIEW_EMAIL_STATS',
@@ -40,7 +46,7 @@ export async function logViewEmailStats(userId: number, ip: string, userAgent?: 
   });
 }
 
-export async function logBulkInviteUsers(userId: number, establishmentId: string, totalInvitations: number, successful: number, failed: number, ip: string, userAgent?: string) {
+export async function logBulkInviteUsers(userId: number, establishmentId: string, totalInvitations: number, successful: number, failed: number, ip?: string, userAgent?: string) {
   await AuditTrailModel.logAction({
     user_id: String(userId),
     action_type: 'BULK_INVITE_USERS',

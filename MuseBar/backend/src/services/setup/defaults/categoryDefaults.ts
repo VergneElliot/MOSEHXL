@@ -10,6 +10,7 @@ export async function createDefaultCategories(
   establishmentId: string,
   context?: SetupContext
 ): Promise<Map<string, string>> {
+  void context;
   const config = getDefaultDataConfig();
   const categoryMap = new Map<string, string>();
 

@@ -7,7 +7,6 @@ import {
   Printer,
   PrintingConfig 
 } from './types';
-import { PrintingServiceFactory } from './PrintingServiceFactory';
 import { getLogger } from '../../utils/logger';
 
 export class CompositePrintingService implements IPrintingService {
@@ -323,10 +322,12 @@ export class CompositePrintingService implements IPrintingService {
     printType: string, 
     provider: string, 
     status: string, 
-    metadata: any
+    metadata: unknown
   ): Promise<void> {
     try {
-      getLogger().info(`Printing history: ${printType}`, { provider, status, ...metadata });
+      const meta =
+        metadata && typeof metadata === 'object' ? (metadata as Record<string, unknown>) : { metadata };
+      getLogger().info(`Printing history: ${printType}`, { provider, status, ...meta });
     } catch (error) {
       getLogger().error('Failed to log printing history', error instanceof Error ? error : undefined);
     }

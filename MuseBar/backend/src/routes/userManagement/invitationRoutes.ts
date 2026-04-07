@@ -4,6 +4,7 @@
  */
 
 import express from 'express';
+import type { NextFunction, Response } from 'express';
 import { requireAuth, requireAdmin } from '../auth';
 import { validateBody, validateParams } from '../../middleware/validation';
 import { UserInvitationService } from '../../services/userInvitationService';
@@ -15,7 +16,6 @@ import {
   EstablishmentInvitationData,
   UserInvitationData,
   InvitationAcceptanceData,
-  ApiResponse,
   ServiceInitialization
 } from './types';
 
@@ -40,7 +40,7 @@ export function initializeInvitationRoutes(services: ServiceInitialization): voi
 router.post('/send-establishment-invitation', requireAuth, requireAdmin, validateBody([
   { field: 'name', required: true },
   { field: 'email', required: true },
-]), async (req: any, res: any, next: any) => {
+]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { name, email, phone, address, subscription_plan }: EstablishmentInvitationData = req.body;
     const user = req.user!;
@@ -57,12 +57,15 @@ router.post('/send-establishment-invitation', requireAuth, requireAdmin, validat
 
     // Send establishment invitation
     const result = await userInvitationService.sendEstablishmentInvitation({
-      establishmentName: name,
-      establishmentEmail: email,
-      establishmentPhone: phone,
-      establishmentAddress: address,
-      subscriptionPlan: subscription_plan || 'basic',
-      invitedBy: String(user.id)
+      name,
+      email,
+      phone,
+      address,
+      subscription_plan: (subscription_plan === 'basic' || subscription_plan === 'premium' || subscription_plan === 'enterprise')
+        ? subscription_plan
+        : 'basic',
+      inviterUserId: String(user.id),
+      inviterName: user.email
     });
 
     // Log audit trail
@@ -111,7 +114,7 @@ router.post('/send-user-invitation', requireAuth, validateBody([
   { field: 'lastName', required: true },
   { field: 'role', required: true },
   { field: 'establishmentId', required: true },
-]), async (req: any, res: any, next: any) => {
+]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { email, firstName, lastName, role, establishmentId }: UserInvitationData = req.body;
     const user = req.user!;
@@ -151,15 +154,20 @@ router.post('/send-user-invitation', requireAuth, validateBody([
       });
     }
 
+    if (!['establishment_admin', 'establishment_manager', 'establishment_staff'].includes(role)) {
+      return res.status(400).json({ success: false, message: 'Invalid role' });
+    }
+
     // Send user invitation
     const result = await userInvitationService.sendUserInvitation({
       email,
       firstName,
       lastName,
-      role,
+      role: role as 'establishment_admin' | 'establishment_manager' | 'establishment_staff',
       establishmentId,
       establishmentName: establishment.name,
-      invitedBy: String(user.id)
+      inviterUserId: String(user.id),
+      inviterName: user.email
     });
 
     // Log audit trail
@@ -206,9 +214,9 @@ router.post('/send-user-invitation', requireAuth, validateBody([
 router.post('/accept-invitation', validateBody([
   { field: 'token', required: true },
   { field: 'password', required: true },
-]), async (req: any, res: any, next: any) => {
+]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const { token, password, firstName, lastName, businessInfo }: InvitationAcceptanceData = req.body;
+    const { token, password, firstName, lastName }: InvitationAcceptanceData = req.body;
 
     if (!token || !password) {
       return res.status(400).json({
@@ -243,11 +251,7 @@ router.post('/accept-invitation', validateBody([
     res.json({
       success: true,
       message: 'Invitation accepted successfully',
-      data: {
-        user: result.user,
-        token: result.token,
-        establishment: result.establishment
-      }
+      data: result
     });
   } catch (error) {
     logger?.error(
@@ -266,7 +270,7 @@ router.post('/accept-invitation', validateBody([
  * GET /pending-invitations
  * Get pending invitations for establishment
  */
-router.get('/pending-invitations', requireAuth, async (req: any, res: any, next: any) => {
+router.get('/pending-invitations', requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const user = req.user!;
     const establishmentId = req.query.establishmentId as string || user.establishment_id;
@@ -315,7 +319,7 @@ router.get('/pending-invitations', requireAuth, async (req: any, res: any, next:
  */
 router.delete('/cancel-invitation/:invitationId', requireAuth, validateParams([
   { param: 'invitationId', validator: (v: string) => typeof v === 'string' && v.length > 0 }
-]), async (req: any, res: any, next: any) => {
+]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { invitationId } = req.params;
     const user = req.user!;
@@ -363,7 +367,7 @@ router.delete('/cancel-invitation/:invitationId', requireAuth, validateParams([
  */
 router.post('/resend-invitation/:invitationId', requireAuth, validateParams([
   { param: 'invitationId', validator: (v: string) => typeof v === 'string' && v.length > 0 }
-]), async (req: any, res: any, next: any) => {
+]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { invitationId } = req.params;
     const user = req.user!;

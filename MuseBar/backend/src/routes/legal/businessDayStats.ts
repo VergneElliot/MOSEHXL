@@ -71,7 +71,7 @@ router.get('/business-day-stats', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error fetching business day stats:', error);
+    process.stderr.write(`Error fetching business day stats: ${error instanceof Error ? error.message : String(error)}\n`);
     res.status(500).json({ error: 'Failed to fetch business day statistics' });
   }
 });

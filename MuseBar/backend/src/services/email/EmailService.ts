@@ -49,7 +49,7 @@ export class EmailService {
   public async sendTemplateEmail(
     templateName: string,
     to: string,
-    templateData: Record<string, any>,
+    templateData: Record<string, unknown>,
     options: Partial<EmailOptions> = {}
   ): Promise<string> {
     // Process template

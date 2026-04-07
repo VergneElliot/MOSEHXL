@@ -10,13 +10,24 @@ import { PerformanceMetric } from './types';
  */
 export class PerformanceMonitor {
   private static metrics: PerformanceMetric[] = [];
-  private static logger: any; // Will be set to Logger instance
+  private static logger:
+    | {
+        performance: (
+          message: string,
+          duration?: number,
+          metadata?: Record<string, unknown>,
+          category?: string,
+          requestId?: string,
+          userId?: number
+        ) => void;
+      }
+    | undefined;
   private static maxMetrics = 1000;
 
   /**
    * Initialize performance monitor with logger instance
    */
-  public static initialize(logger: any): void {
+  public static initialize(logger: { performance: (message: string, duration?: number, metadata?: Record<string, unknown>, category?: string, requestId?: string, userId?: number) => void }): void {
     PerformanceMonitor.logger = logger;
   }
 
@@ -24,10 +35,10 @@ export class PerformanceMonitor {
    * Start timing an operation
    * Returns a function that when called will log the duration
    */
-  public static startTimer(operation: string): (metadata?: Record<string, any>) => void {
+  public static startTimer(operation: string): (metadata?: Record<string, unknown>) => void {
     const startTime = Date.now();
     
-    return (metadata?: Record<string, any>) => {
+    return (metadata?: Record<string, unknown>) => {
       const duration = Date.now() - startTime;
       const metric: PerformanceMetric = {
         operation,
@@ -54,7 +65,7 @@ export class PerformanceMonitor {
   /**
    * Time a synchronous operation
    */
-  public static time<T>(operation: string, fn: () => T, metadata?: Record<string, any>): T {
+  public static time<T>(operation: string, fn: () => T, metadata?: Record<string, unknown>): T {
     const timer = PerformanceMonitor.startTimer(operation);
     try {
       const result = fn();
@@ -76,7 +87,7 @@ export class PerformanceMonitor {
   public static async timeAsync<T>(
     operation: string, 
     fn: () => Promise<T>, 
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): Promise<T> {
     const timer = PerformanceMonitor.startTimer(operation);
     

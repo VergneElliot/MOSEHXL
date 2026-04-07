@@ -8,6 +8,13 @@ import { InvitationValidator } from './invitationValidator';
 import { InvitationCreator } from './invitationCreator';
 import { InvitationEmail } from './invitationEmail';
 import { InvitationAcceptance } from './invitationAcceptance';
+import type {
+  EstablishmentInvitationData,
+  UserInvitationData,
+  InvitationAcceptanceData,
+  InvitationResult,
+  InvitationRecord
+} from './types';
 
 // Export classes
 export { InvitationValidator, InvitationCreator, InvitationEmail, InvitationAcceptance };
@@ -75,7 +82,7 @@ export class UserInvitationService {
   /**
    * Send establishment invitation (System Admin only)
    */
-  public async sendEstablishmentInvitation(data: any): Promise<any> {
+  public async sendEstablishmentInvitation(data: EstablishmentInvitationData): Promise<InvitationResult> {
     try {
       // Validate invitation data
       const validation = await this.validator.validateEstablishmentInvitation(data);
@@ -132,7 +139,7 @@ export class UserInvitationService {
   /**
    * Send user invitation (Establishment Admin only)
    */
-  public async sendUserInvitation(data: any): Promise<any> {
+  public async sendUserInvitation(data: UserInvitationData): Promise<InvitationResult> {
     try {
       // Validate invitation data
       const validation = await this.validator.validateUserInvitation(data);
@@ -189,7 +196,7 @@ export class UserInvitationService {
   /**
    * Accept establishment invitation
    */
-  public async acceptEstablishmentInvitation(token: string, password: string): Promise<any> {
+  public async acceptEstablishmentInvitation(token: string, password: string): Promise<InvitationResult> {
     try {
       // Validate token
       const validation = await this.validator.validateInvitationToken(token);
@@ -232,7 +239,12 @@ export class UserInvitationService {
   /**
    * Accept user invitation
    */
-  public async acceptUserInvitation(token: string, password: string, firstName?: string, lastName?: string): Promise<any> {
+  public async acceptUserInvitation(
+    token: string,
+    password: string,
+    firstName?: string,
+    lastName?: string
+  ): Promise<InvitationResult> {
     try {
       // Validate token
       const validation = await this.validator.validateInvitationToken(token);
@@ -255,13 +267,13 @@ export class UserInvitationService {
       }
 
       // Accept invitation
-      return await this.acceptance.acceptUserInvitation({ 
-        token, 
-        password, 
-        firstName, 
-        lastName 
-      });
-
+      const payload: InvitationAcceptanceData = {
+        token,
+        password,
+        firstName,
+        lastName
+      };
+      return await this.acceptance.acceptUserInvitation(payload);
     } catch (error) {
       this.logger.error(
         'Failed to accept user invitation',
@@ -278,31 +290,89 @@ export class UserInvitationService {
   }
 
   /**
-   * Get invitation by token
+   * Re-send an invitation email
    */
-  public async getInvitationByToken(token: string): Promise<any | null> {
-    return await this.creator.getInvitationByToken(token);
+  public async resendInvitation(invitationId: string, userId: string): Promise<InvitationResult> {
+    return await this.acceptance.resendInvitation(invitationId, userId);
   }
 
   /**
-   * Get pending invitations for establishment
-   */
-  public async getPendingInvitations(establishmentId: string): Promise<any[]> {
-    return await this.creator.getPendingInvitations(establishmentId);
-  }
-
-  /**
-   * Cancel invitation
+   * Cancel an invitation
    */
   public async cancelInvitation(invitationId: string, userId: string): Promise<boolean> {
     return await this.creator.cancelInvitation(invitationId, userId);
   }
 
   /**
-   * Clean up expired invitations
+   * Get pending invitations for an establishment
    */
-  public async cleanupExpiredInvitations(): Promise<number> {
-    return await this.creator.cleanupExpiredInvitations();
+  public async getPendingInvitations(establishmentId: string) {
+    return await this.creator.getPendingInvitations(establishmentId);
+  }
+
+  /**
+   * Validate invitation token (and return invitation record if valid)
+   */
+  public async validateInvitationToken(token: string) {
+    return await this.validator.validateInvitationToken(token);
+  }
+
+  /**
+   * Get invitation record by token
+   */
+  public async getInvitationByToken(token: string): Promise<InvitationRecord | null> {
+    return await this.creator.getInvitationByToken(token);
+  }
+
+  /**
+   * Send invitation reminder email
+   */
+  public async sendInvitationReminder(invitationId: string): Promise<InvitationResult> {
+    const invitation = await this.creator.getInvitationById(invitationId);
+    if (!invitation) {
+      return {
+        success: false,
+        message: 'Invitation not found',
+        emailSent: false
+      };
+    }
+    return await this.emailService.sendInvitationReminder(invitation);
+  }
+
+  /**
+   * Test email configuration
+   */
+  public async testEmailConfiguration(_testEmail: string) {
+    void _testEmail;
+    return await this.emailService.testConfiguration();
+  }
+
+  /**
+   * Get email statistics
+   */
+  public async getEmailStats(establishmentId?: string) {
+    void establishmentId;
+    return await this.emailService.getEmailStats();
+  }
+
+  /**
+   * Bulk invite users
+   */
+  public async bulkInviteUsers(invitations: UserInvitationData[], userId: string): Promise<{
+    success: boolean;
+    message: string;
+    results: InvitationResult[];
+  }> {
+    const results: InvitationResult[] = [];
+    for (const inviteData of invitations) {
+      results.push(await this.sendUserInvitation({ ...inviteData, inviterUserId: userId }));
+    }
+    const successCount = results.filter((r) => r.success).length;
+    return {
+      success: true,
+      message: `${successCount}/${results.length} invitations sent`,
+      results
+    };
   }
 }
 
