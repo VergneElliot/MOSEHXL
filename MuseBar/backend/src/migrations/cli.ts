@@ -18,7 +18,7 @@ const pool = new Pool({
   database: config.database.database,
   password: config.database.password,
   port: config.database.port,
-  ssl: config.database.ssl ? { rejectUnauthorized: true } : false,
+  ssl: config.database.ssl ? { rejectUnauthorized: config.database.sslRejectUnauthorized } : false,
 });
 
 const migrationManager = new MigrationManager(pool);
