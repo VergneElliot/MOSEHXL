@@ -24,6 +24,16 @@ const OrderSummaryItem: React.FC<OrderSummaryItemProps> = ({
   onApplyOffert,
   onApplyPerso,
 }) => {
+  const lineActionButtonSx = {
+    minWidth: 'auto',
+    px: { xs: 1, md: 1.1 },
+    py: { xs: 0.35, md: 0.45 },
+    fontSize: { xs: '0.72rem', sm: '0.78rem', md: '0.84rem' },
+    fontWeight: 700,
+    whiteSpace: 'nowrap',
+    lineHeight: 1,
+  } as const;
+
   return (
     <>
       <ListItem sx={{ px: 0, py: 1 }}>
@@ -37,12 +47,12 @@ const OrderSummaryItem: React.FC<OrderSummaryItemProps> = ({
             </Typography>
             <IconButton
               onClick={() => onRemoveItem(index)}
-              size="small"
+              size="medium"
               color="error"
-              sx={{ ml: 0.5 }}
+              sx={{ ml: 0.5, p: 0.75 }}
               aria-label="Supprimer"
             >
-              <DeleteIcon fontSize="small" />
+              <DeleteIcon fontSize="medium" />
             </IconButton>
           </Box>
 
@@ -65,7 +75,7 @@ const OrderSummaryItem: React.FC<OrderSummaryItemProps> = ({
                   variant={item.isHappyHourApplied ? 'contained' : 'outlined'}
                   color="secondary"
                   onClick={() => onApplyHappyHour(index)}
-                  sx={{ minWidth: 'auto', px: 0.75, py: 0.15, fontSize: '0.62rem', whiteSpace: 'nowrap' }}
+                  sx={lineActionButtonSx}
                 >
                   Happy Hour
                 </Button>
@@ -76,8 +86,8 @@ const OrderSummaryItem: React.FC<OrderSummaryItemProps> = ({
                   variant={item.isOffert ? 'contained' : 'outlined'}
                   color="success"
                   onClick={() => onApplyOffert(index)}
-                  startIcon={<OffertIcon sx={{ fontSize: 12 }} />}
-                  sx={{ minWidth: 'auto', px: 0.75, py: 0.15, fontSize: '0.62rem', whiteSpace: 'nowrap', '& .MuiButton-startIcon': { mr: 0.35 } }}
+                  startIcon={<OffertIcon sx={{ fontSize: { xs: 16, md: 18 } }} />}
+                  sx={{ ...lineActionButtonSx, '& .MuiButton-startIcon': { mr: 0.45 } }}
                 >
                   Offert
                 </Button>
@@ -88,8 +98,8 @@ const OrderSummaryItem: React.FC<OrderSummaryItemProps> = ({
                   variant={item.isPerso ? 'contained' : 'outlined'}
                   color="info"
                   onClick={() => onApplyPerso(index)}
-                  startIcon={<PersoIcon sx={{ fontSize: 12 }} />}
-                  sx={{ minWidth: 'auto', px: 0.75, py: 0.15, fontSize: '0.62rem', whiteSpace: 'nowrap', '& .MuiButton-startIcon': { mr: 0.35 } }}
+                  startIcon={<PersoIcon sx={{ fontSize: { xs: 16, md: 18 } }} />}
+                  sx={{ ...lineActionButtonSx, '& .MuiButton-startIcon': { mr: 0.45 } }}
                 >
                   Perso
                 </Button>

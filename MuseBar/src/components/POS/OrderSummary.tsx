@@ -75,6 +75,38 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
   const [changeAmount, setChangeAmount] = useState('');
   const [changeSubmitting, setChangeSubmitting] = useState(false);
 
+  const totalLabelSx = {
+    fontWeight: 800,
+    fontSize: { xs: '1.05rem', sm: '1.15rem', md: '1.2rem', lg: '1.25rem' },
+    lineHeight: 1.1,
+  } as const;
+
+  const totalValueSx = {
+    fontWeight: 900,
+    fontSize: { xs: '1.65rem', sm: '1.9rem', md: '2.05rem', lg: '2.25rem' },
+    lineHeight: 1.1,
+  } as const;
+
+  const primaryPayButtonSx = {
+    py: isMobile ? 1.15 : 1.35,
+    minHeight: isMobile ? 44 : 50,
+    fontSize: { xs: '0.8rem', sm: '0.88rem', md: '0.95rem', lg: '1.02rem' },
+    fontWeight: 800,
+    whiteSpace: 'nowrap',
+    lineHeight: 1,
+    '& .MuiButton-startIcon': { mr: 0.6, ml: -0.25 },
+  } as const;
+
+  const secondaryPayButtonSx = {
+    py: isMobile ? 0.85 : 1.05,
+    minHeight: isMobile ? 40 : 46,
+    fontSize: { xs: '0.72rem', sm: '0.8rem', md: '0.86rem', lg: '0.94rem' },
+    fontWeight: 800,
+    whiteSpace: 'nowrap',
+    lineHeight: 1,
+    '& .MuiButton-startIcon': { mr: 0.5, ml: -0.25 },
+  } as const;
+
   const handleOpenChangeDialog = () => setChangeDialogOpen(true);
   const handleCloseChangeDialog = () => {
     if (!changeSubmitting) {
@@ -166,10 +198,10 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
           </Box>
 
           <Box display="flex" justifyContent="space-between">
-            <Typography variant="h6" fontWeight="bold">
+            <Typography variant="h6" sx={totalLabelSx}>
               Total TTC:
             </Typography>
-            <Typography variant="h6" fontWeight="bold" color="primary">
+            <Typography variant="h6" color="primary" sx={totalValueSx}>
               {formatCurrency(orderTotal)}
             </Typography>
           </Box>
@@ -185,13 +217,8 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
                   disabled={!canProcessPayment}
                   startIcon={<CreditCardIcon />}
                   sx={{
-                    py: isMobile ? 1 : 1.1,
-                    fontSize: { xs: '0.72rem', sm: '0.78rem', md: '0.82rem', lg: '0.9rem' },
-                    fontWeight: 'bold',
+                    ...primaryPayButtonSx,
                     bgcolor: 'primary.main',
-                    whiteSpace: 'nowrap',
-                    lineHeight: 1,
-                    '& .MuiButton-startIcon': { mr: 0.5, ml: -0.25 },
                   }}
                 >
                   Paiement CB
@@ -206,15 +233,10 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
                   disabled={!canProcessPayment}
                   startIcon={<CashIcon />}
                   sx={{
-                    py: isMobile ? 1 : 1.1,
-                    fontSize: { xs: '0.72rem', sm: '0.78rem', md: '0.82rem', lg: '0.9rem' },
-                    fontWeight: 'bold',
+                    ...primaryPayButtonSx,
                     bgcolor: 'success.main',
                     color: 'success.contrastText',
                     '&:hover': { bgcolor: 'success.dark' },
-                    whiteSpace: 'nowrap',
-                    lineHeight: 1,
-                    '& .MuiButton-startIcon': { mr: 0.5, ml: -0.25 },
                   }}
                 >
                   Paiement espèces
@@ -229,13 +251,7 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
                   disabled={!canProcessPayment}
                   startIcon={<OptionsIcon />}
                   sx={{
-                    py: isMobile ? 0.3 : 0.4,
-                    minHeight: isMobile ? 30 : 32,
-                    fontSize: { xs: '0.62rem', sm: '0.68rem', md: '0.72rem', lg: '0.82rem' },
-                    fontWeight: 'bold',
-                    whiteSpace: 'nowrap',
-                    lineHeight: 1,
-                    '& .MuiButton-startIcon': { mr: 0.35, ml: -0.25 },
+                    ...secondaryPayButtonSx,
                   }}
                 >
                   Options de paiement
@@ -250,16 +266,10 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
                     onClick={handleOpenChangeDialog}
                     startIcon={<ChangeIcon />}
                     sx={{
-                      py: isMobile ? 0.3 : 0.4,
-                      minHeight: isMobile ? 30 : 32,
-                      fontSize: { xs: '0.62rem', sm: '0.68rem', md: '0.72rem', lg: '0.82rem' },
-                      fontWeight: 'bold',
+                      ...secondaryPayButtonSx,
                       borderColor: 'error.light',
                       color: 'error.dark',
                       '&:hover': { borderColor: 'error.main', bgcolor: 'error.light' },
-                      whiteSpace: 'nowrap',
-                      lineHeight: 1,
-                      '& .MuiButton-startIcon': { mr: 0.35, ml: -0.25 },
                     }}
                   >
                     Faire de la monnaie
