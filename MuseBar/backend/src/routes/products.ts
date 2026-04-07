@@ -45,7 +45,10 @@ router.get('/all', async (req, res) => {
 });
 
 // GET /api/products/category/:categoryId
-router.get('/category/:categoryId', validateParams([{ param: 'categoryId', validator: (v: any) => !isNaN(parseInt(v)), message: 'Invalid category ID' }]), async (req, res) => {
+router.get(
+  '/category/:categoryId',
+  validateParams([{ param: 'categoryId', validator: (v: string) => !isNaN(parseInt(v)), message: 'Invalid category ID' }]),
+  async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -55,7 +58,8 @@ router.get('/category/:categoryId', validateParams([{ param: 'categoryId', valid
   } catch {
     res.status(500).json({ error: 'Failed to fetch products by category' });
   }
-});
+  }
+);
 
 // GET /api/products/:id
 router.get('/:id', validateParams([paramValidations.id]), async (req, res) => {
@@ -108,7 +112,7 @@ router.put('/:id', validateParams([paramValidations.id]), async (req, res) => {
   if (!establishmentId) return;
   try {
     const id = parseInt(req.params.id);
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (req.body.name !== undefined) updateData.name = req.body.name;
     if (req.body.price !== undefined) updateData.price = req.body.price;
     if (req.body.tax_rate !== undefined) updateData.tax_rate = req.body.tax_rate;
@@ -158,8 +162,9 @@ router.delete('/:id', validateParams([paramValidations.id]), async (req, res) =>
       ? 'Produit archivé avec succès (utilisé dans des commandes précédentes)'
       : 'Produit supprimé définitivement avec succès (jamais utilisé)';
     res.json({ message, action: result.action });
-  } catch (error: any) {
-    const message = error?.code === '23503'
+  } catch (error: unknown) {
+    const e = error as { code?: unknown };
+    const message = e?.code === '23503'
       ? 'Impossible de supprimer le produit : il est référencé dans des commandes existantes.'
       : 'Failed to delete product';
     res.status(500).json({ error: message });

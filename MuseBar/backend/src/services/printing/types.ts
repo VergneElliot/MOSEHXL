@@ -77,7 +77,7 @@ export interface PrintResult {
   message: string;
   printJobId?: string;
   provider?: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 export interface PrinterStatus {

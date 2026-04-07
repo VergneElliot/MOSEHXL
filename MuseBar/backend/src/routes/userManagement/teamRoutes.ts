@@ -114,18 +114,24 @@ router.get('/team-members', requireAuth, async (req: AuthenticatedRequest, res: 
     }
 
     const rows = await fetchTeamMembers(establishmentId, includeInactive);
-    const teamMembers: TeamMember[] = rows.map((row: any) => ({
-      ...row,
-      status: row.status ? 'active' : 'inactive',
-      permissions: {
-        canManageUsers: ['admin', 'manager'].includes(row.role),
-        canManageEstablishment: ['admin'].includes(row.role),
-        canViewReports: ['admin', 'manager'].includes(row.role),
-        canManageInventory: ['admin', 'manager', 'staff'].includes(row.role),
-        canProcessOrders: ['admin', 'manager', 'staff', 'cashier'].includes(row.role),
-        canManageSettings: ['admin'].includes(row.role)
-      }
-    }));
+    const teamMembers: TeamMember[] = rows.map((row) => {
+      const r = row as {
+        role?: string;
+        status?: boolean;
+      } & Record<string, unknown>;
+      return {
+        ...(r as unknown as TeamMember),
+        status: r.status ? 'active' : 'inactive',
+        permissions: {
+          canManageUsers: ['admin', 'manager'].includes(r.role ?? ''),
+          canManageEstablishment: ['admin'].includes(r.role ?? ''),
+          canViewReports: ['admin', 'manager'].includes(r.role ?? ''),
+          canManageInventory: ['admin', 'manager', 'staff'].includes(r.role ?? ''),
+          canProcessOrders: ['admin', 'manager', 'staff', 'cashier'].includes(r.role ?? ''),
+          canManageSettings: ['admin'].includes(r.role ?? '')
+        }
+      };
+    });
     await logViewTeamMembers(user.id, establishmentId, teamMembers.length, includeInactive, req.ip, req.headers['user-agent'] as string | undefined);
 
     res.json({
@@ -162,8 +168,7 @@ router.post('/test-email', requireAuth, requireAdmin, async (req: AuthenticatedR
     }
 
     // Test email service configuration
-    const emailService = (userInvitationService as any)['emailService'];
-    const testResult = await emailService.testConfiguration();
+    const testResult = await userInvitationService.testEmailConfiguration(testEmail);
 
     if (testResult) {
       await logTestEmailConfiguration(user.id, testEmail, 'success', req.ip, req.headers['user-agent'] as string | undefined);
@@ -225,8 +230,7 @@ router.get('/email-stats', requireAuth, requireAdmin, async (req: AuthenticatedR
     const user = req.user!;
 
     // Get email service statistics
-    const emailService = (userInvitationService as any)['emailService'];
-    const stats = await emailService.getEmailStats();
+    const stats = await userInvitationService.getEmailStats();
 
     await logViewEmailStats(user.id, req.ip, req.headers['user-agent'] as string | undefined);
 
@@ -282,8 +286,8 @@ router.post('/bulk-invite', requireAuth, requireAdmin, async (req: Authenticated
       });
     }
 
-    const results: any[] = [];
-    const errors: any[] = [];
+    const results: Array<{ email: string; success: boolean; invitationId?: string; message?: string }> = [];
+    const errors: Array<{ email: string; success: boolean; error: string }> = [];
 
     for (const invitation of invitations) {
       try {

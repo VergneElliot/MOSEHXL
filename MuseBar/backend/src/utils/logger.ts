@@ -23,7 +23,7 @@ export { LogEntry, LogLevel, PerformanceMetric } from './logger/types';
  * Main Logger class - combines all logging modules
  */
 export class Logger extends CategoryLoggers {
-  private static instance: Logger;
+  private static instance: Logger | undefined;
 
   private constructor(config: EnvironmentConfig) {
     super(config);
@@ -46,7 +46,7 @@ export class Logger extends CategoryLoggers {
    * Reset singleton instance (for testing)
    */
   public static resetInstance(): void {
-    Logger.instance = null as any;
+    Logger.instance = undefined;
   }
 }
 
@@ -89,25 +89,25 @@ export const getLogger = (): Logger => {
 /**
  * Quick logging functions for convenience
  */
-export const logError = (message: string, error?: Error | Record<string, any>, requestId?: string) => {
+export const logError = (message: string, error?: Error | Record<string, unknown>, requestId?: string) => {
   if (logger) {
     logger.error(message, error, 'ERROR', requestId);
   }
 };
 
-export const logInfo = (message: string, metadata?: Record<string, any>, requestId?: string) => {
+export const logInfo = (message: string, metadata?: Record<string, unknown>, requestId?: string) => {
   if (logger) {
     logger.info(message, metadata, 'INFO', requestId);
   }
 };
 
-export const logDebug = (message: string, metadata?: Record<string, any>, requestId?: string) => {
+export const logDebug = (message: string, metadata?: Record<string, unknown>, requestId?: string) => {
   if (logger) {
     logger.debug(message, metadata, 'DEBUG', requestId);
   }
 };
 
-export const logPerformance = (operation: string, duration: number, metadata?: Record<string, any>) => {
+export const logPerformance = (operation: string, duration: number, metadata?: Record<string, unknown>) => {
   if (logger) {
     logger.performance(`Operation: ${operation}`, duration, metadata);
   }

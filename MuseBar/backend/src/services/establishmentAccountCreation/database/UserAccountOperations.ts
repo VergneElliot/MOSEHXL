@@ -1,6 +1,7 @@
 import { PoolClient } from 'pg';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import type { SignOptions } from 'jsonwebtoken';
 import { Logger } from '../../../utils/logger';
 import { validatePassword } from '../../../utils/passwordValidation';
 
@@ -174,7 +175,7 @@ export class UserAccountOperations {
       establishment_id: user.establishment_id
     };
 
-    return jwt.sign(payload, this.jwtSecret, { expiresIn: this.jwtExpiresIn } as any);
+    return jwt.sign(payload, this.jwtSecret, { expiresIn: this.jwtExpiresIn } as SignOptions);
   }
 
   /**

@@ -232,7 +232,7 @@ export class EstablishmentModel {
   public static async updateEstablishment(id: string, data: UpdateEstablishmentData): Promise<Establishment> {
     try {
       const fields: string[] = [];
-      const values: any[] = [];
+      const values: Array<string | number | boolean | null> = [];
       let paramIndex = 1;
 
       if (data.name !== undefined) {

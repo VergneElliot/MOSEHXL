@@ -1,6 +1,11 @@
 import { AuditTrailModel } from '../../../models/auditTrail';
 
-export async function logViewEstablishmentUsers(userId: number, params: { establishmentId: string; userCount: number; filters: any; }, ip: string, userAgent?: string) {
+export async function logViewEstablishmentUsers(
+  userId: number,
+  params: { establishmentId: string; userCount: number; filters: Record<string, unknown>; },
+  ip?: string,
+  userAgent?: string
+) {
   await AuditTrailModel.logAction({
     user_id: String(userId),
     action_type: 'VIEW_ESTABLISHMENT_USERS',
@@ -10,7 +15,7 @@ export async function logViewEstablishmentUsers(userId: number, params: { establ
   });
 }
 
-export async function logViewUserDetails(userId: number, params: { targetUserId: string; establishmentId?: string; }, ip: string, userAgent?: string) {
+export async function logViewUserDetails(userId: number, params: { targetUserId: string; establishmentId?: string; }, ip?: string, userAgent?: string) {
   await AuditTrailModel.logAction({
     user_id: String(userId),
     action_type: 'VIEW_USER_DETAILS',
@@ -20,7 +25,12 @@ export async function logViewUserDetails(userId: number, params: { targetUserId:
   });
 }
 
-export async function logUpdateUser(userId: number, params: { targetUserId: string; updates: any; establishmentId?: string; }, ip: string, userAgent?: string) {
+export async function logUpdateUser(
+  userId: number,
+  params: { targetUserId: string; updates: Record<string, unknown>; establishmentId?: string; },
+  ip?: string,
+  userAgent?: string
+) {
   await AuditTrailModel.logAction({
     user_id: String(userId),
     action_type: 'UPDATE_USER',
@@ -30,7 +40,7 @@ export async function logUpdateUser(userId: number, params: { targetUserId: stri
   });
 }
 
-export async function logDeactivateOrDeleteUser(userId: number, params: { targetUserId: string; targetUserEmail: string; establishmentId?: string; permanent: boolean; }, ip: string, userAgent?: string) {
+export async function logDeactivateOrDeleteUser(userId: number, params: { targetUserId: string; targetUserEmail: string; establishmentId?: string; permanent: boolean; }, ip?: string, userAgent?: string) {
   await AuditTrailModel.logAction({
     user_id: String(userId),
     action_type: params.permanent ? 'DELETE_USER_PERMANENT' : 'DEACTIVATE_USER',
@@ -40,7 +50,7 @@ export async function logDeactivateOrDeleteUser(userId: number, params: { target
   });
 }
 
-export async function logReactivateUser(userId: number, params: { targetUserId: string; targetUserEmail: string; establishmentId?: string; }, ip: string, userAgent?: string) {
+export async function logReactivateUser(userId: number, params: { targetUserId: string; targetUserEmail: string; establishmentId?: string; }, ip?: string, userAgent?: string) {
   await AuditTrailModel.logAction({
     user_id: String(userId),
     action_type: 'REACTIVATE_USER',

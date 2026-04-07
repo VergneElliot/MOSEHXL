@@ -41,7 +41,7 @@ export class DigitalReceiptService extends BasePrintingService implements IPrint
 
   async printReceipt(data: ReceiptData): Promise<PrintResult> {
     try {
-      const results: any = {
+      const results: Record<string, unknown> = {
         qrCode: null,
         emailSent: false,
         receiptUrl: null
@@ -80,7 +80,7 @@ export class DigitalReceiptService extends BasePrintingService implements IPrint
 
   async printClosureBulletin(data: ClosureBulletinData): Promise<PrintResult> {
     try {
-      const results: any = {
+      const results: Record<string, unknown> = {
         qrCode: null,
         emailSent: false,
         bulletinUrl: null

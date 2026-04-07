@@ -13,7 +13,7 @@ import { StatusTransitionRules } from './StatusTransitionRules';
  */
 export interface ValidationResult {
   isValid: boolean;
-  rule?: any;
+  rule?: unknown;
   errors: string[];
 }
 

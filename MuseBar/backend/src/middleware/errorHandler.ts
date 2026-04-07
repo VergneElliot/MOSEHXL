@@ -115,8 +115,8 @@ export const createErrorHandler = (logger?: Logger) => {
   return (err: unknown, req: Request, res: Response, _next: NextFunction) => {
     void _next;
     const normalized = normalizeError(err);
-    const requestId = (req as any).requestId;
-    const userId = (req as any).user?.id;
+    const requestId = (req as Request & { requestId?: string }).requestId;
+    const userId = (req as Request & { user?: { id?: number } }).user?.id;
 
     if (logger) {
       if (normalized.statusCode >= 500) {
@@ -166,7 +166,18 @@ export const createErrorHandler = (logger?: Logger) => {
     }
 
     const isDev = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
-    const payload: any = {
+    const payload: {
+      success: false;
+      error: {
+        message: string;
+        code: string;
+        statusCode: number;
+        timestamp: string;
+        requestId?: string;
+        details?: Record<string, unknown>;
+        stack?: string;
+      };
+    } = {
       success: false,
       error: {
         message: normalized.isOperational ? normalized.message : 'Internal server error',
@@ -205,7 +216,7 @@ function normalizeError(err: unknown): NormalizedError {
     };
   }
 
-  const e = err as any;
+  const e = err as { code?: unknown; name?: unknown; message?: unknown; statusCode?: unknown };
 
   // PostgreSQL
   if (e && e.code) {

@@ -5,7 +5,7 @@
 
 import { PrintQueue } from './printQueue';
 import { PrintTemplates } from './printTemplates';
-import { ReceiptData, ClosureBulletinData, PrinterConfig, PrinterStatus, PrintQueueStats } from './types';
+import { ReceiptData, ClosureBulletinData, PrinterConfig, PrinterStatus, PrintQueueStats, PrintJob } from './types';
 
 /**
  * Default printer configuration
@@ -288,21 +288,21 @@ export class ThermalPrintService {
   /**
    * Get all print jobs
    */
-  getAllJobs(): any[] {
+  getAllJobs(): PrintJob[] {
     return this.printQueue.getAllJobs();
   }
   
   /**
    * Listen to queue events
    */
-  onQueueEvent(event: string, callback: (...args: any[]) => void): void {
+  onQueueEvent(event: string, callback: (...args: unknown[]) => void): void {
     this.printQueue.on(event, callback);
   }
   
   /**
    * Remove queue event listener
    */
-  offQueueEvent(event: string, callback: (...args: any[]) => void): void {
+  offQueueEvent(event: string, callback: (...args: unknown[]) => void): void {
     this.printQueue.off(event, callback);
   }
 }

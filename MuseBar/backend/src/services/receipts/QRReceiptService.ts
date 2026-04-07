@@ -119,7 +119,7 @@ export class QRReceiptService {
   /**
    * Verify QR code data (for scanning functionality)
    */
-  parseQRCodeData(qrData: string): any {
+  parseQRCodeData(qrData: string): unknown {
     try {
       // Try to parse as JSON first
       return JSON.parse(qrData);

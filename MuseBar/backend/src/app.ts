@@ -7,6 +7,7 @@ import { Logger, requestLoggerMiddleware } from './utils/logger';
 import { initializeEnvironment } from './config/environment';
 import { DEFAULT_APP_TIMEZONE } from './config/timezone';
 import { createSecurityMiddleware } from './middleware/security';
+import type { Request, Response } from 'express';
 
 // Load environment variables
 dotenv.config();
@@ -112,7 +113,7 @@ app.use('/api/docs', docsRouter);
 import { asyncHandler, notFound, createErrorHandler } from './middleware/errorHandler';
 import { initializeErrorRecovery as initErrorRecovery } from './utils/errorRecovery';
 
-app.post('/api/client-errors', asyncHandler(async (req: any, res: any) => {
+app.post('/api/client-errors', asyncHandler(async (req: Request, res: Response) => {
   const errorData = req.body;
 
   logger.error(

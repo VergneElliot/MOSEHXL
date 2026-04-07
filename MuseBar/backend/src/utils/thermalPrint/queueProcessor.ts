@@ -179,7 +179,7 @@ export class QueueProcessor extends EventEmitter {
     processing: boolean;
     paused: boolean;
     currentJob: string | null;
-    queueStats: any;
+    queueStats: ReturnType<QueueStorage['getStats']>;
   } {
     return {
       processing: this.processing,

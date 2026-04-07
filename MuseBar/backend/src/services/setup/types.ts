@@ -126,14 +126,14 @@ export interface DefaultDataConfig {
     category_name: string;
     is_active: boolean;
   }>;
-  settings: Record<string, any>;
+  settings: Record<string, unknown>;
 }
 
 /**
  * Database transaction context
  */
 export interface TransactionContext {
-  client: any; // PoolClient from pg
+  client: import('pg').PoolClient;
   transactionId: string;
   startTime: Date;
 }

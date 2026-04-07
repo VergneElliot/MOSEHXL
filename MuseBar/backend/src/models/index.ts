@@ -27,7 +27,7 @@ export const BusinessSettingsModel = {
     const record = settings as Record<string, unknown>;
     const values = [1, ...fields.map(field => record[field])];
 
-    const result = await pool.query(query, values as any[]);
+    const result = await pool.query(query, values as Array<string | number | boolean | null | Date>);
     return result.rows[0] || null;
   }
 }; 

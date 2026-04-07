@@ -87,7 +87,7 @@ export class LoggerCore {
   protected createLogEntry(
     level: keyof typeof LogLevel,
     message: string,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
     category?: string,
     requestId?: string,
     userId?: number
@@ -112,7 +112,7 @@ export class LoggerCore {
    */
   public error(
     message: string,
-    error?: Error | Record<string, any>,
+    error?: Error | Record<string, unknown>,
     category = 'ERROR',
     requestId?: string,
     userId?: number
@@ -129,7 +129,7 @@ export class LoggerCore {
 
   public warn(
     message: string,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
     category = 'WARNING',
     requestId?: string,
     userId?: number
@@ -140,7 +140,7 @@ export class LoggerCore {
 
   public info(
     message: string,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
     category = 'INFO',
     requestId?: string,
     userId?: number
@@ -151,7 +151,7 @@ export class LoggerCore {
 
   public debug(
     message: string,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
     category = 'DEBUG',
     requestId?: string,
     userId?: number

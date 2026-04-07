@@ -1,7 +1,10 @@
 import { BusinessSetupRequest } from '../types';
 
-export function validateSetupStep(stepId: string, data: Partial<BusinessSetupRequest>): { isValid: boolean; errors: any[] } {
-  const errors: any[] = [];
+export function validateSetupStep(
+  stepId: string,
+  data: Partial<BusinessSetupRequest>
+): { isValid: boolean; errors: Array<{ field: string; message: string }> } {
+  const errors: Array<{ field: string; message: string }> = [];
 
   switch (stepId) {
     case 'invitation':

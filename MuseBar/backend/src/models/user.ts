@@ -104,7 +104,7 @@ export class UserModel {
     );
 
     if (result.rows.length > 0) {
-      return result.rows.map((row: any) => row.name);
+      return result.rows.map((row) => (row as { name: string }).name);
     }
 
     // No explicit permissions — derive from the user's role.
@@ -116,7 +116,7 @@ export class UserModel {
     // by the establishment admin — no assumptions are made on their behalf.
     if (role === 'establishment_admin') {
       const allPerms = await pool.query('SELECT name FROM permissions');
-      return allPerms.rows.map((row: any) => row.name);
+      return allPerms.rows.map((row) => (row as { name: string }).name);
     }
 
     return [];
@@ -260,9 +260,7 @@ export class UserModel {
   ): Promise<{ id: number; email: string; is_admin: boolean }> {
     const existingAdmin = await pool.query('SELECT COUNT(*) FROM users WHERE is_admin = true');
     if (parseInt(existingAdmin.rows[0].count) > 0) {
-      const err: any = new Error('Admin user already exists');
-      err.statusCode = 400;
-      throw err;
+      throw Object.assign(new Error('Admin user already exists'), { statusCode: 400 });
     }
 
     const user = await UserModel.createUser(email, password, true);

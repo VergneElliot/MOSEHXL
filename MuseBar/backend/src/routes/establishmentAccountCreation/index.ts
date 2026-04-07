@@ -25,8 +25,8 @@ let establishmentAccountService: EstablishmentAccountService;
 declare global {
   namespace Express {
     interface Request {
-      invitationValidation?: any;
-      validatedBusinessInfo?: any;
+      invitationValidation?: unknown;
+      validatedBusinessInfo?: unknown;
     }
   }
 }

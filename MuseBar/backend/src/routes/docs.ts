@@ -20,7 +20,7 @@ router.get('/', swaggerUi.setup(swaggerDocument, {
     showRequestHeaders: true,
     showCommonExtensions: true,
     tryItOutEnabled: true,
-    requestInterceptor: (req: any) => {
+    requestInterceptor: (req: { headers: Record<string, string> }) => {
       // Add authorization header if token is available
       const token = localStorage.getItem('authToken');
       if (token) {

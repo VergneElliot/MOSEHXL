@@ -58,7 +58,7 @@ router.get('/establishment-users', requireAuth, async (req: AuthenticatedRequest
       search,
       sortBy = 'created_at',
       sortOrder = 'desc'
-    }: UserFilterParams = req.query as any;
+    }: UserFilterParams = req.query as unknown as UserFilterParams;
 
     const establishmentId = req.query.establishmentId as string || user.establishment_id;
 
@@ -84,7 +84,7 @@ router.get('/establishment-users', requireAuth, async (req: AuthenticatedRequest
       status,
       search,
       sortBy,
-      sortOrder: sortOrder as any
+      sortOrder
     });
 
     await logViewEstablishmentUsers(user.id, {

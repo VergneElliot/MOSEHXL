@@ -57,12 +57,15 @@ router.post('/send-establishment-invitation', requireAuth, requireAdmin, validat
 
     // Send establishment invitation
     const result = await userInvitationService.sendEstablishmentInvitation({
-      establishmentName: name,
-      establishmentEmail: email,
-      establishmentPhone: phone,
-      establishmentAddress: address,
-      subscriptionPlan: subscription_plan || 'basic',
-      invitedBy: String(user.id)
+      name,
+      email,
+      phone,
+      address,
+      subscription_plan: (subscription_plan === 'basic' || subscription_plan === 'premium' || subscription_plan === 'enterprise')
+        ? subscription_plan
+        : 'basic',
+      inviterUserId: String(user.id),
+      inviterName: user.email
     });
 
     // Log audit trail
@@ -151,15 +154,20 @@ router.post('/send-user-invitation', requireAuth, validateBody([
       });
     }
 
+    if (!['establishment_admin', 'establishment_manager', 'establishment_staff'].includes(role)) {
+      return res.status(400).json({ success: false, message: 'Invalid role' });
+    }
+
     // Send user invitation
     const result = await userInvitationService.sendUserInvitation({
       email,
       firstName,
       lastName,
-      role,
+      role: role as 'establishment_admin' | 'establishment_manager' | 'establishment_staff',
       establishmentId,
       establishmentName: establishment.name,
-      invitedBy: String(user.id)
+      inviterUserId: String(user.id),
+      inviterName: user.email
     });
 
     // Log audit trail
@@ -243,11 +251,7 @@ router.post('/accept-invitation', validateBody([
     res.json({
       success: true,
       message: 'Invitation accepted successfully',
-      data: {
-        user: result.user,
-        token: result.token,
-        establishment: result.establishment
-      }
+      data: result
     });
   } catch (error) {
     logger?.error(

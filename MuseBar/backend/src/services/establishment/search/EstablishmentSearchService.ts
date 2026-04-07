@@ -36,7 +36,7 @@ export interface SearchOptions {
  * Search result interface
  */
 export interface EstablishmentSearchResult {
-  establishments: any[];
+  establishments: unknown[];
   total: number;
   page: number;
   totalPages: number;
@@ -105,7 +105,7 @@ export class EstablishmentSearchService {
   private buildSearchQuery(
     filters: EstablishmentSearchFilters,
     options: SearchOptions
-  ): { query: string; params: any[] } {
+  ): { query: string; params: Array<string | number | Date | EstablishmentStatus> } {
     let query = `
       SELECT 
         e.*,
@@ -116,7 +116,7 @@ export class EstablishmentSearchService {
       WHERE 1=1
     `;
 
-    const params: any[] = [];
+    const params: Array<string | number | Date | EstablishmentStatus> = [];
     let paramIndex = 1;
 
     // Add filters
@@ -189,7 +189,7 @@ export class EstablishmentSearchService {
   /**
    * Build count query for total results
    */
-  private buildCountQuery(filters: EstablishmentSearchFilters): { query: string; params: any[] } {
+  private buildCountQuery(filters: EstablishmentSearchFilters): { query: string; params: Array<string | number | Date | EstablishmentStatus> } {
     let query = `
       SELECT COUNT(*) as count
       FROM establishments e
@@ -197,7 +197,7 @@ export class EstablishmentSearchService {
       WHERE 1=1
     `;
 
-    const params: any[] = [];
+    const params: Array<string | number | Date | EstablishmentStatus> = [];
     let paramIndex = 1;
 
     // Add same filters as search query
