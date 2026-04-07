@@ -6,6 +6,13 @@
 import { randomUUID } from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 
+type LoggerLike = {
+  debug: (...args: unknown[]) => void;
+  error: (...args: unknown[]) => void;
+  api: (...args: unknown[]) => void;
+  httpRequest: (...args: unknown[]) => void;
+};
+
 /**
  * Request logging middleware and utilities
  */
@@ -14,7 +21,7 @@ export class RequestLogger {
   /**
    * Create Express middleware for request logging
    */
-  public static createMiddleware(logger: any) {
+  public static createMiddleware(logger: LoggerLike) {
     return (req: Request, res: Response, next: NextFunction) => {
       const startTime = Date.now();
       const requestId = RequestLogger.generateRequestId();
@@ -98,7 +105,7 @@ export class RequestLogger {
   /**
    * Sanitize headers for logging (remove sensitive information)
    */
-  private static sanitizeHeaders(headers: any): Record<string, any> {
+  private static sanitizeHeaders(headers: Request['headers']): Record<string, unknown> {
     const sanitized = { ...headers };
     
     // Remove sensitive headers
@@ -123,12 +130,12 @@ export class RequestLogger {
   /**
    * Sanitize request body for logging (remove sensitive information)
    */
-  private static sanitizeBody(body: any): any {
+  private static sanitizeBody(body: unknown): unknown {
     if (!body || typeof body !== 'object') {
       return body;
     }
     
-    const sanitized = { ...body };
+    const sanitized = body as Record<string, unknown>;
     
     // Remove sensitive fields
     const sensitiveFields = [
@@ -144,14 +151,14 @@ export class RequestLogger {
       'social_security_number'
     ];
     
-    const sanitizeObject = (obj: any): any => {
+    const sanitizeObject = (obj: unknown): unknown => {
       if (Array.isArray(obj)) {
         return obj.map(sanitizeObject);
       }
       
       if (obj && typeof obj === 'object') {
-        const result: any = {};
-        for (const [key, value] of Object.entries(obj)) {
+        const result: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
           const lowerKey = key.toLowerCase();
           if (sensitiveFields.some(field => lowerKey.includes(field))) {
             result[key] = '[REDACTED]';
@@ -174,12 +181,12 @@ export class RequestLogger {
    * Log API endpoint access
    */
   public static logEndpointAccess(
-    logger: any,
+    logger: LoggerLike,
     endpoint: string,
     method: string,
     userId?: number,
     requestId?: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): void {
     logger.api(
       endpoint,
@@ -199,9 +206,9 @@ export class RequestLogger {
    * Log API validation error
    */
   public static logValidationError(
-    logger: any,
+    logger: LoggerLike,
     endpoint: string,
-    errors: any[],
+    errors: unknown[],
     requestId?: string,
     userId?: number
   ): void {
@@ -211,11 +218,15 @@ export class RequestLogger {
       'VALIDATION_ERROR',
       undefined,
       {
-        errors: errors.map(err => ({
-          field: err.field || err.path,
-          message: err.message,
-          value: err.value
-        }))
+        errors: errors.map((err) => {
+          const e = err as { field?: unknown; path?: unknown; message?: unknown; value?: unknown };
+          const fieldOrPath = (typeof e.field === 'string' && e.field) || (typeof e.path === 'string' && e.path);
+          return {
+            field: fieldOrPath,
+            message: typeof e.message === 'string' ? e.message : undefined,
+            value: e.value
+          };
+        })
       },
       requestId,
       userId

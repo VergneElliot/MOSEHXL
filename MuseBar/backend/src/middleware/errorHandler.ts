@@ -101,7 +101,7 @@ export class ExternalServiceError extends AppError {
 // Async wrapper (single definition; was duplicated in errorHandler and errorHandling)
 // ---------------------------------------------------------------------------
 
-export const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) => {
+export const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>) => {
   return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };

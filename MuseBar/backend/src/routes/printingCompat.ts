@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import {
   getStatusResponse,
@@ -10,8 +10,11 @@ import {
 const router = Router();
 
 /** Ensure establishment context (same as printing router). */
-const ensureEstablishment = (req: Request, res: Response, next: Function) => {
-  const user = (req as any).user;
+type RequestUser = { establishment_id: number };
+type RequestWithUser = Request & { user?: RequestUser };
+
+const ensureEstablishment = (req: RequestWithUser, res: Response, next: NextFunction) => {
+  const user = req.user;
   if (!user || !user.establishment_id) {
     return res.status(400).json({ error: 'Establishment context required' });
   }
@@ -24,9 +27,9 @@ const ensureEstablishment = (req: Request, res: Response, next: Function) => {
  */
 
 // POST /api/legal/receipt/:orderId/thermal-print
-router.post('/api/legal/receipt/:orderId/thermal-print', authenticateToken, ensureEstablishment, async (req: Request, res: Response) => {
+router.post('/api/legal/receipt/:orderId/thermal-print', authenticateToken, ensureEstablishment, async (req: RequestWithUser, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = req.user!;
     const orderId = parseInt(req.params.orderId);
     const type = (req.query.type as string) || 'detailed';
     const { result, receiptData } = await printReceiptResponse(user, orderId, type);
@@ -36,17 +39,18 @@ router.post('/api/legal/receipt/:orderId/thermal-print', authenticateToken, ensu
       receipt_data: receiptData,
       receipt_content: result.metadata?.html || result.metadata?.content || ''
     });
-  } catch (error: any) {
-    const status = error?.statusCode === 404 ? 404 : 500;
-    const data = status === 404 ? { error: 'Receipt not found' } : { error: (error?.message as string) || 'Printing failed' };
+  } catch (error: unknown) {
+    const e = error as { statusCode?: number; message?: string };
+    const status = e?.statusCode === 404 ? 404 : 500;
+    const data = status === 404 ? { error: 'Receipt not found' } : { error: e?.message || 'Printing failed' };
     res.status(status).json(data);
   }
 });
 
 // POST /api/legal/closure/:bulletinId/thermal-print
-router.post('/api/legal/closure/:bulletinId/thermal-print', authenticateToken, ensureEstablishment, async (req: Request, res: Response) => {
+router.post('/api/legal/closure/:bulletinId/thermal-print', authenticateToken, ensureEstablishment, async (req: RequestWithUser, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = req.user!;
     const bulletinId = parseInt(req.params.bulletinId);
     const { result } = await printClosureBulletinResponse(user, bulletinId);
     res.json({
@@ -54,26 +58,27 @@ router.post('/api/legal/closure/:bulletinId/thermal-print', authenticateToken, e
       message: result.message,
       bulletin_content: result.metadata?.html || result.metadata?.content || ''
     });
-  } catch (error: any) {
-    const status = error?.statusCode === 404 ? 404 : 500;
-    const data = status === 404 ? { error: 'Closure bulletin not found' } : { error: (error?.message as string) || 'Printing failed' };
+  } catch (error: unknown) {
+    const e = error as { statusCode?: number; message?: string };
+    const status = e?.statusCode === 404 ? 404 : 500;
+    const data = status === 404 ? { error: 'Closure bulletin not found' } : { error: e?.message || 'Printing failed' };
     res.status(status).json(data);
   }
 });
 
 // GET /api/legal/thermal-printer/status
-router.get('/api/legal/thermal-printer/status', authenticateToken, ensureEstablishment, async (req: Request, res: Response) => {
+router.get('/api/legal/thermal-printer/status', authenticateToken, ensureEstablishment, async (req: RequestWithUser, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = req.user!;
     const data = await getStatusResponse(user);
     res.json({
       available: data.status?.available ?? false,
       status: data.status?.status ?? 'Unknown'
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     res.status(500).json({
       available: false,
-      status: error?.message ?? 'Error checking printer'
+      status: error instanceof Error ? error.message : 'Error checking printer'
     });
   }
 });

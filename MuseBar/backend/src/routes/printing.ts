@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { PrintingServiceFactory, IPrintingService, PrintingConfig } from '../services/printing';
 import { pool } from '../app';
 import { authenticateToken } from '../middleware/auth';
@@ -8,6 +8,52 @@ const router = Router();
 
 // Cache for printing services per establishment
 const printingServices: Map<number, IPrintingService> = new Map();
+
+type RequestUser = {
+  establishment_id: number;
+  id?: number;
+  username?: string;
+};
+
+type RequestWithUser = Request & { user?: RequestUser };
+
+type VatBreakdownEntry = {
+  rate: number;
+  subtotal_ht: number;
+  vat: number;
+};
+
+type ReceiptItem = {
+  tax_rate?: number;
+  total_price?: string | number;
+};
+
+type ReceiptData = {
+  order_id: unknown;
+  sequence_number: unknown;
+  total_amount: number;
+  total_tax: number;
+  payment_method: unknown;
+  created_at: unknown;
+  items: unknown;
+  business_info: {
+    name: unknown;
+    address: unknown;
+    phone: unknown;
+    email: unknown;
+    siret: unknown;
+    tax_identification: unknown;
+  };
+  receipt_type: 'detailed' | 'summary';
+  tips?: number;
+  change?: number;
+  compliance_info: {
+    receipt_hash: unknown;
+    cash_register_id: string;
+    operator_id: string | undefined;
+  };
+  vat_breakdown?: VatBreakdownEntry[];
+};
 
 /**
  * Get printing service for establishment
@@ -67,8 +113,8 @@ async function getPrintingService(establishmentId: number): Promise<IPrintingSer
 }
 
 // Middleware to ensure establishment context
-const ensureEstablishment = (req: Request, res: Response, next: Function) => {
-  const user = (req as any).user;
+const ensureEstablishment = (req: RequestWithUser, res: Response, next: NextFunction) => {
+  const user = req.user;
   if (!user || !user.establishment_id) {
     return res.status(400).json({ error: 'Establishment context required' });
   }
@@ -76,7 +122,7 @@ const ensureEstablishment = (req: Request, res: Response, next: Function) => {
 };
 
 /** In-process handler: get status and printers. Used by routes and by printingCompat. */
-export async function getStatusResponse(user: { establishment_id: number }) {
+export async function getStatusResponse(user: RequestUser) {
   const service = await getPrintingService(user.establishment_id);
   const status = await service.checkPrinterStatus();
   const printers = await service.listPrinters();
@@ -84,15 +130,16 @@ export async function getStatusResponse(user: { establishment_id: number }) {
 }
 
 /** In-process handler: test print. Used by routes and by printingCompat. */
-export async function testPrintResponse(user: { establishment_id: number }, printerId?: string) {
+export async function testPrintResponse(user: RequestUser, printerId?: string) {
   const service = await getPrintingService(user.establishment_id);
   return await service.testPrint(printerId);
 }
 
 // GET /api/printing/status
-router.get('/status', authenticateToken, ensureEstablishment, async (req: Request, res: Response) => {
+router.get('/status', authenticateToken, ensureEstablishment, async (req: RequestWithUser, res: Response) => {
   try {
-    const data = await getStatusResponse((req as any).user);
+    const user = req.user!;
+    const data = await getStatusResponse(user);
     res.json(data);
   } catch (error) {
     getLogger().error('Error checking printer status', error instanceof Error ? error : undefined);
@@ -104,9 +151,9 @@ router.get('/status', authenticateToken, ensureEstablishment, async (req: Reques
 });
 
 // GET /api/printing/printers
-router.get('/printers', authenticateToken, ensureEstablishment, async (req: Request, res: Response) => {
+router.get('/printers', authenticateToken, ensureEstablishment, async (req: RequestWithUser, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = req.user!;
     const service = await getPrintingService(user.establishment_id);
     
     const printers = await service.listPrinters();
@@ -125,9 +172,10 @@ router.get('/printers', authenticateToken, ensureEstablishment, async (req: Requ
 });
 
 // POST /api/printing/test
-router.post('/test', authenticateToken, ensureEstablishment, async (req: Request, res: Response) => {
+router.post('/test', authenticateToken, ensureEstablishment, async (req: RequestWithUser, res: Response) => {
   try {
-    const result = await testPrintResponse((req as any).user, req.body?.printerId);
+    const user = req.user!;
+    const result = await testPrintResponse(user, req.body?.printerId);
     res.json(result);
   } catch (error) {
     getLogger().error('Error test printing', error instanceof Error ? error : undefined);
@@ -140,10 +188,10 @@ router.post('/test', authenticateToken, ensureEstablishment, async (req: Request
 
 /** In-process handler: print receipt. Used by routes and by printingCompat. */
 export async function printReceiptResponse(
-  user: { establishment_id: number; username?: string },
+  user: RequestUser,
   orderId: number,
   type: string = 'detailed'
-): Promise<{ result: any; receiptData: any }> {
+): Promise<{ result: unknown; receiptData: ReceiptData }> {
   const establishmentId = user.establishment_id;
   const receiptResult = await pool.query(
     `SELECT 
@@ -181,13 +229,12 @@ export async function printReceiptResponse(
   );
 
   if (receiptResult.rows.length === 0) {
-    const err: any = new Error('Receipt not found');
-    err.statusCode = 404;
+    const err = Object.assign(new Error('Receipt not found'), { statusCode: 404 });
     throw err;
   }
 
   const receiptRow = receiptResult.rows[0];
-  const receiptData = {
+  const receiptData: ReceiptData = {
     order_id: receiptRow.order_id,
     sequence_number: receiptRow.sequence_number,
     total_amount: parseFloat(receiptRow.total_amount),
@@ -213,20 +260,33 @@ export async function printReceiptResponse(
     }
   };
 
-  const vatBreakdown: any[] = [];
-  const vat10Items = receiptRow.items?.filter((item: any) => item.tax_rate === 10) || [];
-  const vat20Items = receiptRow.items?.filter((item: any) => item.tax_rate === 20) || [];
+  const toNumber = (v: unknown): number => {
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string') {
+      const n = parseFloat(v);
+      return Number.isFinite(n) ? n : 0;
+    }
+    return 0;
+  };
+
+  const items: ReceiptItem[] = Array.isArray(receiptRow.items)
+    ? (receiptRow.items as ReceiptItem[])
+    : [];
+
+  const vatBreakdown: VatBreakdownEntry[] = [];
+  const vat10Items = items.filter((item) => item.tax_rate === 10);
+  const vat20Items = items.filter((item) => item.tax_rate === 20);
   if (vat10Items.length > 0) {
-    const subtotal = vat10Items.reduce((sum: number, item: any) => sum + parseFloat(item.total_price), 0);
+    const subtotal = vat10Items.reduce((sum, item) => sum + toNumber(item.total_price), 0);
     const vat = subtotal * 0.1 / 1.1;
     vatBreakdown.push({ rate: 10, subtotal_ht: subtotal - vat, vat });
   }
   if (vat20Items.length > 0) {
-    const subtotal = vat20Items.reduce((sum: number, item: any) => sum + parseFloat(item.total_price), 0);
+    const subtotal = vat20Items.reduce((sum, item) => sum + toNumber(item.total_price), 0);
     const vat = subtotal * 0.2 / 1.2;
     vatBreakdown.push({ rate: 20, subtotal_ht: subtotal - vat, vat });
   }
-  (receiptData as any).vat_breakdown = vatBreakdown;
+  receiptData.vat_breakdown = vatBreakdown;
 
   const service = await getPrintingService(user.establishment_id);
   const result = await service.printReceipt(receiptData);
@@ -251,9 +311,9 @@ export async function printReceiptResponse(
 
 /** In-process handler: print closure bulletin. Used by routes and by printingCompat. */
 export async function printClosureBulletinResponse(
-  user: { establishment_id: number; username?: string },
+  user: RequestUser,
   bulletinId: number
-): Promise<{ result: any; bulletinData: any }> {
+): Promise<{ result: unknown; bulletinData: unknown }> {
   const bulletinResult = await pool.query(
     `SELECT 
       cb.*,
@@ -270,8 +330,7 @@ export async function printClosureBulletinResponse(
   );
 
   if (bulletinResult.rows.length === 0) {
-    const err: any = new Error('Closure bulletin not found');
-    err.statusCode = 404;
+    const err = Object.assign(new Error('Closure bulletin not found'), { statusCode: 404 });
     throw err;
   }
 
@@ -330,48 +389,50 @@ export async function printClosureBulletinResponse(
 }
 
 // POST /api/printing/receipt/:orderId
-router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, async (req: Request, res: Response) => {
+router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, async (req: RequestWithUser, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = req.user!;
     const orderId = parseInt(req.params.orderId);
     const type = (req.query.type as string) || 'detailed';
     const { result, receiptData } = await printReceiptResponse(user, orderId, type);
     res.json({ ...result, receipt_data: receiptData });
-  } catch (error: any) {
-    if (error?.statusCode === 404) {
+  } catch (error: unknown) {
+    const e = error as { statusCode?: number; message?: string };
+    if (e?.statusCode === 404) {
       return res.status(404).json({ error: 'Receipt not found' });
     }
     getLogger().error('Error printing receipt', error instanceof Error ? error : undefined);
     res.status(500).json({ 
       error: 'Failed to print receipt',
-      message: error instanceof Error ? error.message : 'Unknown error'
+      message: e?.message ?? (error instanceof Error ? error.message : 'Unknown error')
     });
   }
 });
 
 // POST /api/printing/closure/:bulletinId
-router.post('/closure/:bulletinId', authenticateToken, ensureEstablishment, async (req: Request, res: Response) => {
+router.post('/closure/:bulletinId', authenticateToken, ensureEstablishment, async (req: RequestWithUser, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = req.user!;
     const bulletinId = parseInt(req.params.bulletinId);
     const { result, bulletinData } = await printClosureBulletinResponse(user, bulletinId);
     res.json({ ...result, bulletin_data: bulletinData });
-  } catch (error: any) {
-    if (error?.statusCode === 404) {
+  } catch (error: unknown) {
+    const e = error as { statusCode?: number; message?: string };
+    if (e?.statusCode === 404) {
       return res.status(404).json({ error: 'Closure bulletin not found' });
     }
     getLogger().error('Error printing closure bulletin', error instanceof Error ? error : undefined);
     res.status(500).json({ 
       error: 'Failed to print closure bulletin',
-      message: error instanceof Error ? error.message : 'Unknown error'
+      message: e?.message ?? (error instanceof Error ? error.message : 'Unknown error')
     });
   }
 });
 
 // GET /api/printing/configuration
-router.get('/configuration', authenticateToken, ensureEstablishment, async (req: Request, res: Response) => {
+router.get('/configuration', authenticateToken, ensureEstablishment, async (req: RequestWithUser, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = req.user!;
     
     const configResult = await pool.query(
       `SELECT * FROM printing_configurations 
@@ -394,9 +455,9 @@ router.get('/configuration', authenticateToken, ensureEstablishment, async (req:
 });
 
 // POST /api/printing/configuration
-router.post('/configuration', authenticateToken, ensureEstablishment, async (req: Request, res: Response) => {
+router.post('/configuration', authenticateToken, ensureEstablishment, async (req: RequestWithUser, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = req.user!;
     const { provider, config } = req.body;
     
     if (!provider) {
@@ -437,9 +498,9 @@ router.post('/configuration', authenticateToken, ensureEstablishment, async (req
 });
 
 // GET /api/printing/history
-router.get('/history', authenticateToken, ensureEstablishment, async (req: Request, res: Response) => {
+router.get('/history', authenticateToken, ensureEstablishment, async (req: RequestWithUser, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = req.user!;
     const { limit = 50, offset = 0 } = req.query;
     
     const historyResult = await pool.query(

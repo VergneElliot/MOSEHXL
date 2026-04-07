@@ -28,15 +28,39 @@ import { getSetupSteps } from './steps';
 export class SetupWizard {
   private static logger = Logger.getInstance();
 
+  private static readonly poolConnectGuard = true;
+
+  private static isPoolLike(pool: unknown): pool is { connect: () => Promise<PoolClient> } {
+    return typeof (pool as { connect?: unknown })?.connect === 'function';
+  }
+
+  private static assertAuthUser(
+    user: unknown
+  ): asserts user is {
+    id: number;
+    email: string;
+    role: string;
+    first_name?: string;
+    last_name?: string;
+  } {
+    const u = user as { id?: unknown; email?: unknown; role?: unknown };
+    if (typeof u?.id !== 'number' || typeof u?.email !== 'string' || typeof u?.role !== 'string') {
+      throw new Error('Setup created invalid user object');
+    }
+  }
+
   /**
    * Complete business setup (main orchestrator)
    */
   public static async completeBusinessSetup(
-    pool: any,
+    pool: { connect: () => Promise<PoolClient> },
     setupData: BusinessSetupRequest,
     ipAddress?: string,
     userAgent?: string
   ): Promise<BusinessSetupResponse> {
+    if (!this.isPoolLike(pool)) {
+      throw new Error('Invalid pool provided to setup wizard');
+    }
     const context = await SetupDatabase.createTransactionContext(pool);
     const { client } = context;
     
@@ -49,8 +73,14 @@ export class SetupWizard {
       const progressTracker = new SetupProgressTracker();
       const progress = SetupProgressTracker.createEmptyProgress();
       
-      let invitation: any = null;
-      let newUser: any = null;
+      let invitation: InvitationValidation | null = null;
+      let newUser: {
+        id: number;
+        email: string;
+        role: string;
+        first_name?: string;
+        last_name?: string;
+      } | null = null;
       
       try {
         this.logger.info(
@@ -101,14 +131,17 @@ export class SetupWizard {
         
         // Store data from specific steps
         if (stepId === 'validate_invitation') {
-          invitation = stepResult.data;
+          invitation = stepResult.data as InvitationValidation;
         } else if (stepId === 'create_user') {
+          this.assertAuthUser(stepResult.data);
           newUser = stepResult.data;
         }
       }
 
       // Generate authentication token
       this.logger.info('Generating authentication token', {}, 'SETUP_WIZARD');
+      if (!invitation) throw new Error('Setup did not produce invitation data');
+      if (!newUser) throw new Error('Setup did not produce user data');
       const token = SetupAuthManager.generateAuthToken(newUser, invitation.establishment_id);
 
       // Commit transaction
@@ -227,7 +260,7 @@ export class SetupWizard {
    * Get setup wizard state
    */
   public static async getSetupWizardState(
-    pool: any,
+    pool: { connect: () => Promise<PoolClient> },
     invitationToken: string
   ): Promise<SetupWizardState> {
     try {
@@ -290,7 +323,7 @@ export class SetupWizard {
    */
   public static validateSetupStep(stepId: string, data: Partial<BusinessSetupRequest>) {
     // Basic validation - can be enhanced later
-    const errors: any[] = [];
+    const errors: string[] = [];
     
     if (!data.email || !data.password || !data.business_name) {
       errors.push('Missing required fields');
@@ -306,7 +339,7 @@ export class SetupWizard {
    * Validate invitation (public interface)
    */
   public static async validateInvitation(
-    pool: any,
+    pool: { connect: () => Promise<PoolClient> },
     token: string
   ): Promise<InvitationValidation> {
     return SetupDatabase.validateInvitation(pool, token);
@@ -316,7 +349,7 @@ export class SetupWizard {
    * Check setup status (public interface)
    */
   public static async checkSetupStatus(
-    pool: any,
+    pool: { connect: () => Promise<PoolClient> },
     token: string
   ): Promise<SetupStatusResponse> {
     const result = await SetupDatabase.checkSetupStatus(pool, token);
@@ -339,7 +372,7 @@ export class SetupWizard {
    * Cleanup failed setup
    */
   public static async cleanupFailedSetup(
-    pool: any,
+    pool: { connect: () => Promise<PoolClient> },
     establishmentId: string,
     userId?: number
   ): Promise<void> {
@@ -369,7 +402,7 @@ export class SetupWizard {
    * Get setup progress
    */
   public static async getSetupProgress(
-    pool: any,
+    pool: { connect: () => Promise<PoolClient> },
     establishmentId: string
   ): Promise<SetupProgress | null> {
     return SetupProgressTracker.getSetupProgress(pool, establishmentId);
@@ -379,7 +412,7 @@ export class SetupWizard {
    * Retry failed setup step
    */
   public static async retrySetupStep(
-    pool: any,
+    pool: { connect: () => Promise<PoolClient> },
     establishmentId: string,
     stepId: string
   ): Promise<{ success: boolean; message: string }> {

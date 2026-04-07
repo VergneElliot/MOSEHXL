@@ -4,10 +4,12 @@
  */
 
 import express from 'express';
+import type { NextFunction, Response } from 'express';
 import { requireAuth, requireAdmin } from '../auth';
 import { validateBody, validateParams } from '../../middleware/validation';
 import { Logger } from '../../utils/logger';
 import {
+  AuthenticatedRequest,
   UserUpdateData,
   UserFilterParams,
   ServiceInitialization
@@ -45,7 +47,7 @@ export function initializeUserRoutes(services: ServiceInitialization): void {
  * GET /establishment-users
  * Get users for establishment (Admin/Manager only)
  */
-router.get('/establishment-users', requireAuth, async (req: any, res: any, next: any) => {
+router.get('/establishment-users', requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const user = req.user!;
     const {
@@ -120,7 +122,7 @@ router.get('/establishment-users', requireAuth, async (req: any, res: any, next:
  */
 router.get('/user/:userId', requireAuth, validateParams([
   { param: 'userId', validator: (v: string) => typeof v === 'string' && v.length > 0 }
-]), async (req: any, res: any, next: any) => {
+]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { userId } = req.params;
     const user = req.user!;
@@ -174,7 +176,7 @@ router.put('/user/:userId', requireAuth, validateParams([
   { field: 'email', required: false },
   { field: 'role', required: false },
   { field: 'isActive', required: false }
-]), async (req: any, res: any, next: any) => {
+]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { userId } = req.params;
     const { firstName, lastName, email, role, isActive }: UserUpdateData = req.body;
@@ -265,7 +267,7 @@ router.put('/user/:userId', requireAuth, validateParams([
  */
 router.delete('/user/:userId', requireAuth, requireAdmin, validateParams([
   { param: 'userId', validator: (v: string) => typeof v === 'string' && v.length > 0 }
-]), async (req: any, res: any, next: any) => {
+]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { userId } = req.params;
     const user = req.user!;
@@ -318,7 +320,7 @@ router.delete('/user/:userId', requireAuth, requireAdmin, validateParams([
  */
 router.post('/user/:userId/reactivate', requireAuth, requireAdmin, validateParams([
   { param: 'userId', validator: (v: string) => typeof v === 'string' && v.length > 0 }
-]), async (req: any, res: any, next: any) => {
+]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { userId } = req.params;
     const user = req.user!;

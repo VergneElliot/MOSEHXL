@@ -4,10 +4,12 @@
  */
 
 import express from 'express';
+import type { NextFunction, Response } from 'express';
 import { requireAuth, requireAdmin } from '../auth';
 import { UserInvitationService } from '../../services/userInvitationService';
 import { Logger } from '../../utils/logger';
 import {
+  AuthenticatedRequest,
   TeamStats,
   TeamMember,
   EmailTestResult,
@@ -35,7 +37,7 @@ export function initializeTeamRoutes(services: ServiceInitialization): void {
  * GET /team-stats
  * Get team statistics for establishment
  */
-router.get('/team-stats', requireAuth, async (req: any, res: any, next: any) => {
+router.get('/team-stats', requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const user = req.user!;
     const establishmentId = req.query.establishmentId as string || user.establishment_id;
@@ -90,7 +92,7 @@ router.get('/team-stats', requireAuth, async (req: any, res: any, next: any) => 
  * GET /team-members
  * Get team members with detailed information
  */
-router.get('/team-members', requireAuth, async (req: any, res: any, next: any) => {
+router.get('/team-members', requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const user = req.user!;
     const establishmentId = req.query.establishmentId as string || user.establishment_id;
@@ -147,7 +149,7 @@ router.get('/team-members', requireAuth, async (req: any, res: any, next: any) =
  * POST /test-email
  * Test email configuration (Admin only)
  */
-router.post('/test-email', requireAuth, requireAdmin, async (req: any, res: any, next: any) => {
+router.post('/test-email', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { testEmail } = req.body;
     const user = req.user!;
@@ -218,7 +220,7 @@ router.post('/test-email', requireAuth, requireAdmin, async (req: any, res: any,
  * GET /email-stats
  * Get email service statistics (Admin only)
  */
-router.get('/email-stats', requireAuth, requireAdmin, async (req: any, res: any, next: any) => {
+router.get('/email-stats', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const user = req.user!;
 
@@ -253,7 +255,7 @@ router.get('/email-stats', requireAuth, requireAdmin, async (req: any, res: any,
  * POST /bulk-invite
  * Send bulk invitations (Admin only)
  */
-router.post('/bulk-invite', requireAuth, requireAdmin, async (req: any, res: any, next: any) => {
+router.post('/bulk-invite', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { invitations, establishmentId } = req.body;
     const user = req.user!;
