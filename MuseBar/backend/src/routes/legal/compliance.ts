@@ -37,7 +37,7 @@ router.get('/status', requireAdmin, async (req, res) => {
       verified_at: new Date().toISOString()
     });
   } catch (error: any) {
-    console.error('Error checking compliance status:', error);
+    process.stderr.write(`Error checking compliance status: ${error instanceof Error ? error.message : String(error)}\n`);
     res.status(500).json({ error: 'Failed to check compliance status', details: error.message });
   }
 });
@@ -101,7 +101,7 @@ router.get('/report', requireAdmin, async (req, res) => {
     
     res.json(report);
   } catch (error: any) {
-    console.error('Error generating compliance report:', error);
+    process.stderr.write(`Error generating compliance report: ${error instanceof Error ? error.message : String(error)}\n`);
     res.status(500).json({ error: 'Failed to generate compliance report', details: error.message });
   }
 });
@@ -137,7 +137,7 @@ router.get('/requirements', async (req, res) => {
       compliance_notes: 'Requirements based on French fiscal law'
     });
   } catch (error: any) {
-    console.error('Error fetching regulatory requirements:', error);
+    process.stderr.write(`Error fetching regulatory requirements: ${error instanceof Error ? error.message : String(error)}\n`);
     res.status(500).json({ error: 'Failed to fetch regulatory requirements', details: error.message });
   }
 });

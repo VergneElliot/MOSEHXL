@@ -84,7 +84,7 @@ export class ThermalPrintService {
         checkJob();
       });
     } catch (error) {
-      console.error('Error printing receipt:', error);
+      process.stderr.write(`Error printing receipt: ${error instanceof Error ? error.message : String(error)}\n`);
       return false;
     }
   }
@@ -129,7 +129,7 @@ export class ThermalPrintService {
         checkJob();
       });
     } catch (error) {
-      console.error('Error printing closure bulletin:', error);
+      process.stderr.write(`Error printing closure bulletin: ${error instanceof Error ? error.message : String(error)}\n`);
       return false;
     }
   }
@@ -201,7 +201,7 @@ export class ThermalPrintService {
         checkJob();
       });
     } catch (error) {
-      console.error('Error testing printer:', error);
+      process.stderr.write(`Error testing printer: ${error instanceof Error ? error.message : String(error)}\n`);
       return false;
     }
   }

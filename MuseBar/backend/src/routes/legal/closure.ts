@@ -52,7 +52,7 @@ router.post('/daily', async (req, res) => {
         : 'Daily closure bulletin created per French fiscal requirements'
     });
   } catch (error) {
-    console.error('Error creating daily closure:', error);
+    process.stderr.write(`Error creating daily closure: ${error instanceof Error ? error.message : String(error)}\n`);
     res.status(500).json({ error: 'Failed to create daily closure' });
   }
 });
@@ -85,7 +85,7 @@ router.post('/weekly', async (req, res) => {
         : 'Weekly closure bulletin created per French fiscal requirements'
     });
   } catch (error) {
-    console.error('Error creating weekly closure:', error);
+    process.stderr.write(`Error creating weekly closure: ${error instanceof Error ? error.message : String(error)}\n`);
     res.status(500).json({ error: 'Failed to create weekly closure' });
   }
 });
@@ -118,7 +118,7 @@ router.post('/monthly', async (req, res) => {
         : 'Monthly closure bulletin created per French fiscal requirements'
     });
   } catch (error) {
-    console.error('Error creating monthly closure:', error);
+    process.stderr.write(`Error creating monthly closure: ${error instanceof Error ? error.message : String(error)}\n`);
     res.status(500).json({ error: 'Failed to create monthly closure' });
   }
 });
@@ -151,7 +151,7 @@ router.post('/annual', async (req, res) => {
         : 'Annual closure bulletin created per French fiscal requirements'
     });
   } catch (error) {
-    console.error('Error creating annual closure:', error);
+    process.stderr.write(`Error creating annual closure: ${error instanceof Error ? error.message : String(error)}\n`);
     res.status(500).json({ error: 'Failed to create annual closure' });
   }
 });
@@ -211,7 +211,7 @@ router.post('/create', async (req, res) => {
     if (error instanceof Error && error.message.includes('already exists')) {
       return res.status(409).json({ error: error.message });
     }
-    console.error(`Error creating ${req.body.type} closure:`, error);
+    process.stderr.write(`Error creating ${String(req.body.type)} closure: ${error instanceof Error ? error.message : String(error)}\n`);
     res.status(500).json({ error: `Failed to create ${req.body.type} closure` });
   }
 });
@@ -262,7 +262,7 @@ router.get('/bulletins', async (req, res) => {
       compliance_note: 'Closure bulletins for regulatory reporting',
     });
   } catch (error) {
-    console.error('Error fetching closure bulletins:', error);
+    process.stderr.write(`Error fetching closure bulletins: ${error instanceof Error ? error.message : String(error)}\n`);
     res.status(500).json({ error: 'Failed to fetch closure bulletins' });
   }
 });
@@ -299,7 +299,7 @@ router.get('/today-status', async (req, res) => {
       compliance_note: 'Daily closure status for regulatory compliance'
     });
   } catch (error) {
-    console.error('Error fetching today\'s closure status:', error);
+    process.stderr.write(`Error fetching today's closure status: ${error instanceof Error ? error.message : String(error)}\n`);
     res.status(500).json({ error: 'Failed to fetch today\'s closure status' });
   }
 });
@@ -333,7 +333,7 @@ router.get('/monthly-latest', async (req, res) => {
 
     res.json(currentMonthBulletin);
   } catch (error) {
-    console.error('Error fetching latest monthly closure:', error);
+    process.stderr.write(`Error fetching latest monthly closure: ${error instanceof Error ? error.message : String(error)}\n`);
     res.status(500).json({ error: 'Failed to fetch latest monthly closure' });
   }
 });

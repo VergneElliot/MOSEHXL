@@ -2,6 +2,8 @@ import { Pool } from 'pg';
 import fs from 'fs';
 import path from 'path';
 
+/* eslint-disable no-console */
+
 export interface Migration {
   id: string;
   name: string;

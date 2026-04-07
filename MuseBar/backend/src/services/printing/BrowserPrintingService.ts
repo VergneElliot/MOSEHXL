@@ -16,7 +16,7 @@ export class BrowserPrintingService extends BasePrintingService {
   async initialize(): Promise<void> {
     // Browser printing doesn't require initialization
     this.isInitialized = true;
-    console.log('Browser printing service initialized');
+    process.stdout.write('Browser printing service initialized\n');
   }
 
   async printReceipt(data: ReceiptData): Promise<PrintResult> {

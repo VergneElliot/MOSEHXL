@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+/* eslint-disable no-console */
+
 import { Pool } from 'pg';
 import { MigrationManager } from './migration-manager';
 import dotenv from 'dotenv';
