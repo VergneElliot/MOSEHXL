@@ -100,14 +100,13 @@ export interface Printer {
 }
 
 export interface PrintingConfig {
-  provider: 'printnode' | 'star-cloudprnt' | 'network' | 'browser' | 'composite' | 'digital';
-  apiKey?: string;
-  defaultPrinter?: string;
-  networkPrinterIp?: string;
-  networkPrinterPort?: number;
-  fallbackProvider?: string;
-  providers?: PrintingConfig[];
+  /** Epson TM-Intelligent Server Direct Print (printer polls HTTPS, ePOS-Print XML). */
+  provider: 'epson-server-direct' | 'digital';
   establishmentId?: number;
+  /** Shown in printer lists / status (optional). */
+  printerLabel?: string;
+  /** Validated on GET /api/printing/epson/poll — stored in printing_configurations.config */
+  pollKey?: string;
   timeout?: number;
 }
 

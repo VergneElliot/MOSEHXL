@@ -22,9 +22,7 @@ import {
 import {
   Print as PrintIcon,
   Check as CheckIcon,
-  Computer as ComputerIcon,
   Cloud as CloudIcon,
-  Wifi as WifiIcon,
 } from '@mui/icons-material';
 import { apiConfig } from '../../config/api';
 
@@ -65,41 +63,18 @@ interface PrinterSetupProps {
 }
 
 const providerInfo: Record<string, ProviderInfo> = {
-  browser: {
-    name: 'Browser Printing',
-    icon: <ComputerIcon />,
-    description: 'Print using browser print dialog. Works with any printer.',
-    fields: []
-  },
-  network: {
-    name: 'Network Printer',
-    icon: <WifiIcon />,
-    description: 'Direct network printing to ESC/POS thermal printers.',
-    fields: [
-      { name: 'networkPrinterIp', label: 'Printer IP Address', type: 'text', required: true },
-      { name: 'networkPrinterPort', label: 'Printer Port', type: 'number', default: 9100 }
-    ]
-  },
-  printnode: {
-    name: 'PrintNode Cloud',
+  'epson-server-direct': {
+    name: 'Epson Server Direct Print',
     icon: <CloudIcon />,
-    description: 'Universal cloud printing service. Works with any printer.',
-    fields: [
-      { name: 'apiKey', label: 'PrintNode API Key', type: 'password', required: true },
-      { name: 'defaultPrinter', label: 'Default Printer Name', type: 'text' }
-    ]
+    description:
+      'TM-Intelligent Epson printers poll your MuseBar cloud URL for ePOS-Print jobs. Minimal software on site — configure the poll URL in the printer web settings (TMNet WebConfig).',
+    fields: [{ name: 'printerLabel', label: 'Printer display name (optional)', type: 'text', required: false }],
   },
-  'star-cloudprnt': {
-    name: 'Star CloudPRNT',
-    icon: <CloudIcon />,
-    description: 'Cloud printing for Star Micronics printers.',
-    fields: []
-  }
 };
 
 export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = false }) => {
   const [activeStep, setActiveStep] = useState(0);
-  const [selectedProvider, setSelectedProvider] = useState<string>('browser');
+  const [selectedProvider, setSelectedProvider] = useState<string>('epson-server-direct');
   const [config, setConfig] = useState<any>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -329,9 +304,6 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
                 value={config[field.name] || field.default || ''}
                 onChange={(e) => handleConfigChange(field.name, e.target.value)}
                 required={field.required}
-                helperText={field.name === 'apiKey' && 
-                  'Get your API key from printnode.com'
-                }
               />
             ))}
           </Box>
