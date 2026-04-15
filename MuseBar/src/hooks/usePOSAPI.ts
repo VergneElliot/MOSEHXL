@@ -32,7 +32,7 @@ export interface ChangeData {
 }
 
 export const usePOSAPI = (
-  onSuccess: (message: string) => void,
+  onSuccess: (message: string, order?: any) => void,
   onError: (message: string) => void,
   onDataUpdate: () => void
 ): POSAPIActions => {
@@ -42,7 +42,7 @@ export const usePOSAPI = (
   const createOrder = useCallback(
     async (orderData: CreateOrderData) => {
       try {
-        await apiService.createOrder({
+        const created = await apiService.createOrder({
           totalAmount: orderData.totalAmount,
           taxAmount: orderData.totalTax,
           paymentMethod: orderData.paymentMethod,
@@ -58,8 +58,9 @@ export const usePOSAPI = (
           change: orderData.change ?? 0,
           notes: orderData.notes,
         });
-        onSuccess('Commande créée avec succès');
+        onSuccess('Commande créée avec succès', created);
         onDataUpdate();
+        return created;
       } catch (error: unknown) {
         const err = error as { response?: { data?: { error?: string } }; message?: string };
         const errorMessage =

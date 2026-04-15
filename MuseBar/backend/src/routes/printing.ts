@@ -1,5 +1,5 @@
 import { Router, Response, NextFunction, Request } from 'express';
-import { PrintingServiceFactory, IPrintingService, PrintingConfig } from '../services/printing';
+import type { PrintingConfig, IPrintingService } from '../services/printing';
 import type { PrintResult, ReceiptData as PrintingReceiptData, ClosureBulletinData as PrintingClosureBulletinData } from '../services/printing/types';
 import { pool } from '../app';
 import { authenticateToken } from '../middleware/auth';
@@ -8,7 +8,6 @@ import type { AuthenticatedRequest } from './userManagement/types';
 import { epsonServerDirectPollHandler } from '../printing/epsonPollHandler';
 import {
   ALLOWED_PRINT_PROVIDERS,
-  getActivePrintingConfiguration,
   listPrintingConfigurations,
   savePrintingConfiguration,
   parseConfigCell,
@@ -20,6 +19,7 @@ import {
   logPrintingHistory,
   PrintingUser,
 } from '../printing/printDataRepo';
+import { createPrintingServiceManager } from '../printing/printingServiceManager';
 
 const router = Router();
 
@@ -36,8 +36,7 @@ router.get('/epson/poll', async (req: Request, res: Response) => {
   }
 });
 
-// Cache for printing services per establishment
-const printingServices: Map<number, IPrintingService> = new Map();
+const printingServiceManager = createPrintingServiceManager(pool, getLogger());
 
 function getPrintingUser(req: AuthenticatedRequest): PrintingUser | null {
   const establishmentIdRaw = req.user?.establishment_id;
@@ -60,39 +59,8 @@ function getPrintingUser(req: AuthenticatedRequest): PrintingUser | null {
  * Get printing service for establishment
  */
 async function getPrintingService(establishmentId: number): Promise<IPrintingService> {
-  // Check cache first
-  if (printingServices.has(establishmentId)) {
-    return printingServices.get(establishmentId)!;
-  }
-
-  try {
-    let config: PrintingConfig;
-
-    const active = await getActivePrintingConfiguration(pool, establishmentId);
-    if (active) {
-      config = {
-        provider: active.provider as PrintingConfig['provider'],
-        establishmentId,
-        ...active.config,
-      };
-    } else {
-      config = { provider: 'epson-server-direct', establishmentId };
-    }
-
-    const service = await PrintingServiceFactory.create(config);
-    printingServices.set(establishmentId, service);
-
-    return service;
-  } catch (error) {
-    getLogger().error('Error getting printing service', error instanceof Error ? error : undefined);
-
-    const fallbackService = await PrintingServiceFactory.create({
-      provider: 'epson-server-direct',
-      establishmentId,
-    });
-
-    return fallbackService;
-  }
+  // Backwards-compatible wrapper so other code in this file doesn't change shape.
+  return await printingServiceManager.getPrintingService(establishmentId);
 }
 
 // Middleware to ensure establishment context
@@ -208,6 +176,31 @@ export async function printClosureBulletinResponse(
   return { result, bulletinData };
 }
 
+// GET /api/printing/receipt/:orderId/preview
+// Preview-only: returns receipt_data but DOES NOT queue a print job.
+router.get('/receipt/:orderId/preview', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = getPrintingUser(req)!;
+    const orderId = parseInt(req.params.orderId, 10);
+    if (!Number.isFinite(orderId) || orderId <= 0) {
+      return res.status(400).json({ error: 'Invalid order id' });
+    }
+    const type = (req.query.type as string) || 'detailed';
+    const receiptData = await buildReceiptDataForOrder(pool, user.establishment_id, user, orderId, type);
+    res.json({ receipt_data: receiptData });
+  } catch (error: unknown) {
+    const e = error as { statusCode?: number; message?: string };
+    if (e?.statusCode === 404) {
+      return res.status(404).json({ error: 'Receipt not found' });
+    }
+    getLogger().error('Error generating receipt preview', error instanceof Error ? error : undefined);
+    res.status(500).json({
+      error: 'Failed to generate receipt preview',
+      message: e?.message ?? (error instanceof Error ? error.message : 'Unknown error'),
+    });
+  }
+});
+
 // POST /api/printing/receipt/:orderId
 router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -284,7 +277,7 @@ router.post('/configuration', authenticateToken, ensureEstablishment, async (req
       provider,
       bodyConfig
     );
-    printingServices.delete(user.establishment_id);
+    printingServiceManager.clearPrintingService(user.establishment_id);
 
     res.json({
       configuration,

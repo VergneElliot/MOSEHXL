@@ -11,6 +11,7 @@ import OrderSummary from './OrderSummary';
 import POSLayout from './POSLayout';
 import PaymentDialog from './PaymentDialog';
 import { DiversDialog, DiversFormData } from './DiversDialog';
+import PrintAfterSaleDialog from './PrintAfterSaleDialog';
 
 interface POSContainerProps {
   categories: Category[];
@@ -28,6 +29,8 @@ const POSContainer: React.FC<POSContainerProps> = ({
   // Custom hooks for state management
   const [state, actions] = usePOSState();
   const [diversDialogOpen, setDiversDialogOpen] = useState(false);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [lastOrderId, setLastOrderId] = useState<number | null>(null);
 
   // Custom hook for business logic
   const logic = usePOSLogic(
@@ -39,8 +42,13 @@ const POSContainer: React.FC<POSContainerProps> = ({
     isHappyHourActive
   );
 
-  const handlePaymentComplete = (message: string) => {
+  const handlePaymentComplete = (message: string, createdOrder?: any) => {
     actions.setSnackbar({ open: true, message, severity: 'success' });
+    const id = createdOrder?.id;
+    if (typeof id === 'number' && Number.isFinite(id)) {
+      setLastOrderId(id);
+      setPrintDialogOpen(true);
+    }
   };
   const handlePaymentError = (message: string) => {
     actions.setSnackbar({ open: true, message, severity: 'error' });
@@ -216,6 +224,12 @@ const POSContainer: React.FC<POSContainerProps> = ({
         onOrderError={handlePaymentError}
         onDataUpdate={onDataUpdate}
         onClearOrder={actions.clearOrder}
+      />
+
+      <PrintAfterSaleDialog
+        open={printDialogOpen}
+        orderId={lastOrderId}
+        onClose={() => setPrintDialogOpen(false)}
       />
 
       <DiversDialog

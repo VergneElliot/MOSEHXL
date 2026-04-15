@@ -20,7 +20,7 @@ export const usePaymentLogic = (
   orderItems: OrderItem[],
   orderTotal: number,
   orderTax: number,
-  onOrderComplete: (message: string) => void,
+  onOrderComplete: (message: string, createdOrder?: any) => void,
   onOrderError: (message: string) => void,
   onDataUpdate: () => void,
   onClearOrder: () => void,
@@ -48,8 +48,8 @@ export const usePaymentLogic = (
     totalWithTips: calculationsHook.totalWithTips,
     cashChange: calculationsHook.cashChange,
     onLoading: stateHook.setLoading,
-    onSuccess: () => {
-      onOrderComplete('Payment processed successfully');
+    onSuccess: (createdOrder) => {
+      onOrderComplete('Payment processed successfully', createdOrder);
       onClose();
       onClearOrder();
     },
