@@ -12,7 +12,7 @@ export interface PaymentDialogProps {
   orderTotal: number;
   orderTax: number;
   orderSubtotal: number;
-  onOrderComplete: (message: string) => void;
+  onOrderComplete: (message: string, createdOrder?: any) => void;
   onOrderError: (message: string) => void;
   onDataUpdate: () => void;
   onClearOrder: () => void;

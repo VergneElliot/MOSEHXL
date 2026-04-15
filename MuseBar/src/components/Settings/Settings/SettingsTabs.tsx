@@ -14,7 +14,7 @@ import {
 import { SettingsTab } from './types';
 import { EstablishmentSettings } from './EstablishmentSettings';
 import { ClosureSettings } from './ClosureSettings';
-import { PrinterSettings } from './PrinterSettings';
+import { PrinterSetup } from '../../PrinterSetup';
 import { HappyHourControl } from '../../HappyHour';
 
 import { Product } from '../../../types';
@@ -128,10 +128,7 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
       label: 'Imprimante',
       icon: <PrintIcon />,
       component: (
-        <PrinterSettings
-          onTestPrinter={settingsHook.testPrinter}
-          onCheckStatus={settingsHook.checkPrinterStatus}
-        />
+        <PrinterSetup embedded />
       ),
     },
   ];
