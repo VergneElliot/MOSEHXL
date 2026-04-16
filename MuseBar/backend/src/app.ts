@@ -3,7 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { Pool } from 'pg';
 import { ClosureScheduler } from './utils/closureScheduler';
-import { Logger, requestLoggerMiddleware } from './utils/logger';
+import { initializeLogger, requestLoggerMiddleware } from './utils/logger';
 import { initializeEnvironment } from './config/environment';
 import { DEFAULT_APP_TIMEZONE } from './config/timezone';
 import { createSecurityMiddleware } from './middleware/security';
@@ -16,7 +16,7 @@ const app = express();
 
 // Initialize environment config and logger
 const config = initializeEnvironment();
-const logger = Logger.getInstance(config);
+const logger = initializeLogger(config);
 
 // Environment-specific configuration
 const NODE_ENV = process.env.NODE_ENV || 'production';
