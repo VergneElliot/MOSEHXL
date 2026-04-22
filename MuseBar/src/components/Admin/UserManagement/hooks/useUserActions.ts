@@ -5,7 +5,7 @@
 
 import { useCallback, useMemo } from 'react';
 import { apiService } from '../../../../services/apiService';
-import { EstablishmentMember as User } from '../../../../types/auth';
+import { EstablishmentAssignableRole, EstablishmentMember as User } from '../../../../types/auth';
 
 /** Raw shape returned by the backend (snake_case). */
 interface ApiUser {
@@ -60,13 +60,12 @@ export const useUserActions = ({
   }, [onUsersUpdate, onLoading, onError]);
 
   /**
-   * Create a new user in the establishment.
-   * isAdmin=true maps to role 'establishment_admin'; false maps to 'staff'.
+   * Create a new user in the establishment (establishment_admin or staff only).
    */
   const createUser = useCallback(async (
     email: string,
     password: string,
-    isAdmin: boolean
+    role: EstablishmentAssignableRole
   ): Promise<boolean> => {
     onError(null);
     
@@ -74,7 +73,7 @@ export const useUserActions = ({
       const response = await apiService.post<ApiUser>('/auth/users', {
         email,
         password,
-        role: isAdmin ? 'establishment_admin' : 'staff',
+        role,
       });
       
       onUserAdd(mapApiUser(response.data));
@@ -97,19 +96,15 @@ export const useUserActions = ({
     }
   }, [onError]);
 
-  /**
-   * Update user role.
-   * isAdmin=true sets role to 'establishment_admin'; false sets role to 'staff'.
-   */
   const updateUserRole = useCallback(async (
     userId: number,
-    isAdmin: boolean
+    role: EstablishmentAssignableRole
   ): Promise<boolean> => {
     onError(null);
     
     try {
       await apiService.put(`/auth/users/${userId}/role`, {
-        role: isAdmin ? 'establishment_admin' : 'staff',
+        role,
       });
       return true;
     } catch {
