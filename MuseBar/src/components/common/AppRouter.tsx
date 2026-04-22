@@ -132,6 +132,13 @@ const AppRouter: React.FC<AppRouterProps> = ({
     if (tab.establishmentWide) {
       return !!user?.establishment_id;
     }
+    // Same rule as the tab content: owner/admin always, or staff with explicit grant.
+    if (tab.value === 'user_management') {
+      return (
+        user?.role === 'establishment_admin' ||
+        (user?.permissions?.includes('access_user_management') ?? false)
+      );
+    }
     if (tab.permission) return user?.permissions?.includes(tab.permission) ?? false;
     return true;
   });

@@ -208,6 +208,8 @@ router.put('/:id', requireEstablishmentAdmin, validateParams([paramValidations.i
 
 /**
  * DELETE /api/orders/:id
+ * Not used by the current React app. Fiscal rule: a **completed** (validated) order must
+ * not be hard-deleted — use annulation in Historique (`POST .../payment/cancel-unified`) instead.
  */
 router.delete('/:id', requireEstablishmentAdmin, validateParams([paramValidations.id]), async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
@@ -216,6 +218,12 @@ router.delete('/:id', requireEstablishmentAdmin, validateParams([paramValidation
     const id = parseInt(req.params.id);
     const order = await OrderModel.getById(id, establishmentId);
     if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (order.status === 'completed') {
+      return res.status(403).json({
+        error:
+          'Suppression interdite pour une commande validée. Utilisez l’annulation / retour depuis l’historique.',
+      });
+    }
     const deleted = await OrderModel.delete(id, establishmentId);
     if (deleted) {
       res.json({ message: 'Order deleted successfully' });

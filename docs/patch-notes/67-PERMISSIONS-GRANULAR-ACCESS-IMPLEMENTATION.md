@@ -32,10 +32,10 @@ All **full paths** below assume the mount prefix (e.g. `POST /api/orders/...`).
 | Method & path | Source file | Business action (what the handler does) | Current guards | Proposed permission key (plan 66) |
 |---------------|---------------|----------------------------------------|----------------|----------------------------------|
 | `POST /orders/payment/cancel-unified` | `src/routes/orders/orderCancel.ts` | **Unified cancellation** of a completed order (reversal lines, legal journal, audit). Used from History. | `requireAuth` + establishment via `getEstablishmentId` | `orders_cancel` |
-| `POST /orders/payment/retour` | `src/routes/orders/orderRetour.ts` | **Direct “retour”** (negative order / refund-style flow) from the POS. | `requireAuth` + establishment | `orders_cancel` (same class of *money / stock truth* as cancellation — confirm product label in UI) **or** a dedicated `orders_retour` if you want to split |
+| ~~`POST /orders/payment/retour`~~ | *(removed — was unused; POS did not call it.)* | Historique uses **`cancel-unified` only** (`useHistoryAPI.ts`). |
 | `POST /orders/payment/change` | `src/routes/orders/orderChange.ts` | **“Faire de la monnaie”** (card→cash change operation). | `requireAuth` + establishment | `access_pos` (v1) — no separate key in plan; revisit if you want `pos_cash_register_change` later |
 | `PUT /orders/:id` | `src/routes/orders/orderCRUD.ts` | Generic order update. | `requireAuth` (router-level) + establishment in model | Tighten in B/C: if still needed, align with the same money rules as the flows that call it; if unused from clients, consider deprecating or admin-only |
-| `DELETE /orders/:id` | `src/routes/orders/orderCRUD.ts` | Order delete. | `requireAuth` + establishment | **Do not expose to untrusted staff**; likely **establishment admin only** or remove from API surface if not required |
+| `DELETE /orders/:id` | `src/routes/orders/orderCRUD.ts` | Hard delete row (not used by the React app). **`status === 'completed'` → 403`** (use Historique / `cancel-unified` instead). | `requireAuth` + `requireEstablishmentAdmin` | Rare (e.g. draft/pending cleanup only) |
 
 **Note:** the History UI in the app calls **`cancel-unified` only** (see `MuseBar/src/hooks/useHistoryAPI.ts`); `retour` and `change` are used from POS (`MuseBar/src/hooks/usePOSAPI.ts`).
 
@@ -158,7 +158,7 @@ Mounted under `/api/user-management/invitations` (see `src/routes/userManagement
 
 ## 2) Resolutions to plan 66 “open questions” (from Step A)
 
-1. **Cancel from History** — the app uses **`POST /api/orders/payment/cancel-unified`** (see `useHistoryAPI.ts`). There is a **separate** `POST /api/orders/payment/retour` used from POS, which is the same *class* of fiscal operation; align keys as in §1.2.
+1. **Cancel from History** — the app uses **`POST /api/orders/payment/cancel-unified`** only (see `useHistoryAPI.ts`). The old **`/payment/retour`** route was removed: it was not wired from the POS UI.
 2. **“Discount endpoints”** — there are **no** separate `/discount` routes. Everything goes through **`POST /api/orders`** with line payload as in §1.3. **Implemented:** `is_manual_happy_hour` on each line + DB column `order_items.is_manual_happy_hour`; client sends it from `isHappyHourApplied && isManualHappyHour`.
 3. **Printing** — no new key; unchanged from plan 66.
 4. **Compliance** — keep permissive for now; closure routes get `access_closure` per plan.
@@ -177,8 +177,13 @@ Mounted under `/api/user-management/invitations` (see `src/routes/userManagement
 | Settings | `GET /api/settings/happy-hour` requires `access_pos` **or** `access_settings`; `PUT` requires `access_settings` only. |
 | Frontend | `ALL_PERMISSIONS` updated; AppRouter: Historique + Conformité légale without extra keys; Clôtures → `access_closure`; Gestion utilisateurs → `access_user_management`; POS hides HH/Offert/Perso buttons without perms; Historique hides retour without `orders_cancel`. |
 
-## 4) Remaining (optional)
+## 4) Follow-up fixes (clarifications)
+
+- **Gestion utilisateurs tab:** the tab list required `access_user_management` in `user.permissions` but the panel already allowed `establishment_admin`. The filter now matches: **tab visible if `role === 'establishment_admin'` OR `access_user_management`**. (No mix-up with `system_admin` — that role does not use this business UI.)
+- **`POST /payment/retour`:** removed; Historique is the only return path (`cancel-unified`). Dead POS hook/state removed.
+- **`DELETE /orders/:id`:** returns **403** for `status === 'completed'` (validated orders); not used by the app.
+
+## 5) Remaining (optional)
 
 - Backend unit tests for `requirePermission` + cancel (Step E).
 - Harden `POST /api/orders/legal/journal-entry` (integrity).
-- Commit and push when you are ready.

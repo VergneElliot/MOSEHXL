@@ -43,8 +43,7 @@ It is the working reference for what is complete, what is broken, and what needs
 - Order list with business-day statistics (CA, card/cash totals, top 3 products)
 - Search by order ID or date
 - Stats pulled from `GET /api/legal/business-day-stats`
-- Retour processing via `POST /api/orders/payment/retour` (with legal journal REFUND entry)
-- Cancellation via `POST /api/orders/payment/cancel-unified` (partial/full, with legal journal)
+- Return / annulation (full or partial) via `POST /api/orders/payment/cancel-unified` (legal journal REFUND, audit trail) — the only app path is **Historique** (`useHistoryAPI`).
 
 ### Settings
 - Business info (name, address, SIRET, TVA) — reads/writes `business_settings`
@@ -97,13 +96,13 @@ All 7 critical fixes from the initial audit have been resolved:
 |---|-----|--------|---------|
 | 1 | Wire legal journal on order creation | ✅ Done | `orderCRUD.ts` writes SALE + audit trail on `status === 'completed'` |
 | 2 | Fix retour/change validation failures | ✅ Done | Dedicated `/orders/payment/change` endpoint bypasses `orderCreate` validation |
-| 3 | Route retour/change to correct endpoints | ✅ Done | `usePOSAPI` → `/orders/payment/retour`; `useHistoryAPI` → `/orders/payment/cancel-unified` |
+| 3 | Route retour/change to correct endpoints | ✅ Done | `useHistoryAPI` → `/orders/payment/cancel-unified`; `usePOSAPI` → `/orders/payment/change` (monnaie) — dedicated `/retour` route removed (unused) |
 | 4 | Remove hardcoded credentials | ✅ Done | `auth.ts` is clean — no bypass, no debug routes |
 | 5 | Restore permissions query | ✅ Done | `/me` endpoint fetches `UserModel.getUserPermissions(userId)` |
-| 6 | UI dialogs for retour/change in POS | ⏳ Secondary | State and API exist; dialog components needed for v2.1 |
-| 7 | UI dialog for return in History | ⏳ Secondary | State and API exist; dialog component needed for v2.1 |
+| 6 | POS “retour” dialog | ❌ Dropped | Was unused; return flow is **Historique** only. |
+| 7 | UI dialog for return in History | ✅ Done | `ReturnDialog` + `cancel-unified` |
 
-Fixes 6 and 7 are UI convenience features. The backend endpoints work and can be called from the frontend. Dialog components are planned for v2.1.
+Return/annulation is fully implemented in Historique. POS `change` (faire de la monnaie) is wired; there is no separate POS retour.
 
 ---
 
