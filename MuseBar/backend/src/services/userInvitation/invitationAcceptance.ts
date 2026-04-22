@@ -68,7 +68,7 @@ export class InvitationAcceptance {
         acceptanceData.lastName || invitationRecord.establishment_name,
         'establishment_admin',
         establishment.id,
-        true,
+        false,
         true,
         true
       ]);
@@ -166,9 +166,9 @@ export class InvitationAcceptance {
         hashedPassword,
         acceptanceData.firstName || 'User',
         acceptanceData.lastName || 'User',
-        invitationRecord.role,
+        invitationRecord.role === 'establishment_admin' ? 'establishment_admin' : 'staff',
         invitationRecord.establishment_id,
-        invitationRecord.role === 'establishment_admin',
+        false,
         true,
         true
       ]);

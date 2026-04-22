@@ -55,8 +55,8 @@ export class UserAccountOperations {
             last_name = $2,
             phone = $3,
             establishment_id = $4,
-            role = 'admin',
-            is_admin = true,
+            role = 'establishment_admin',
+            is_admin = false,
             updated_at = CURRENT_TIMESTAMP
           WHERE email = $5
           RETURNING id, email, first_name, last_name, establishment_id
@@ -107,7 +107,7 @@ export class UserAccountOperations {
           is_admin,
           created_at,
           updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, 'admin', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ) VALUES ($1, $2, $3, $4, $5, $6, 'establishment_admin', false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         RETURNING id, email, first_name, last_name, establishment_id
       `, [
         setupData.first_name,

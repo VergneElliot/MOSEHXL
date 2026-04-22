@@ -5,7 +5,7 @@ interface SystemUserFormData {
   email: string;
   first_name: string;
   last_name: string;
-  role: 'system_admin' | 'system_operator';
+  role: 'system_admin';
   permissions: string[];
 }
 
@@ -83,15 +83,10 @@ export const SystemUserForm: React.FC<SystemUserFormProps> = ({
       <Grid item xs={12}>
         <TextField
           fullWidth
-          select
           label="Rôle"
-          value={formData.role}
-          onChange={handleChange('role')}
-          SelectProps={{ native: true }}
-        >
-          <option value="system_operator">Opérateur Système</option>
-          <option value="system_admin">Administrateur Système</option>
-        </TextField>
+          value="Administrateur Système"
+          disabled
+        />
       </Grid>
       <Grid item xs={12}>
         <Typography variant="h6" gutterBottom>

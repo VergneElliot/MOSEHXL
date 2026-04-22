@@ -71,7 +71,8 @@ export function requireAdmin(
   res: Response,
   next: NextFunction
 ) {
-  if (!req.user?.is_admin) {
+  // System admin is determined by role (single source of truth).
+  if (req.user?.role !== 'system_admin') {
     return res.status(403).json({ error: 'System administrator access required' });
   }
   next();
@@ -92,7 +93,8 @@ export function requireEstablishmentAdmin(
 /** Gate: user must hold the named permission (admins bypass). */
 export function requirePermission(permission: string) {
   return async (req: Request, res: Response, next: NextFunction) => {
-    if (req.user?.is_admin) return next();
+    // System admins bypass permission checks.
+    if (req.user?.role === 'system_admin') return next();
     const perms = await UserModel.getUserPermissions(Number(req.user?.id));
     if (!perms.includes(permission)) {
       return res.status(403).json({ error: 'Permission denied' });

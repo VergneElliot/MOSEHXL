@@ -23,7 +23,8 @@ function mapApiUser(raw: ApiUser): User {
   return {
     id: raw.id,
     email: raw.email,
-    isAdmin: raw.is_admin,
+    // Establishment "admin" is role-based; is_admin is system-only legacy.
+    isAdmin: raw.role === 'establishment_admin',
     role: raw.role,
     establishment_id: raw.establishment_id,
     permissions: raw.permissions,
@@ -60,7 +61,7 @@ export const useUserActions = ({
 
   /**
    * Create a new user in the establishment.
-   * isAdmin=true maps to role 'establishment_admin'; false maps to 'cashier'.
+   * isAdmin=true maps to role 'establishment_admin'; false maps to 'staff'.
    */
   const createUser = useCallback(async (
     email: string,
@@ -73,7 +74,7 @@ export const useUserActions = ({
       const response = await apiService.post<ApiUser>('/auth/users', {
         email,
         password,
-        role: isAdmin ? 'establishment_admin' : 'cashier',
+        role: isAdmin ? 'establishment_admin' : 'staff',
       });
       
       onUserAdd(mapApiUser(response.data));
@@ -98,7 +99,7 @@ export const useUserActions = ({
 
   /**
    * Update user role.
-   * isAdmin=true sets role to 'establishment_admin'; false sets role to 'cashier'.
+   * isAdmin=true sets role to 'establishment_admin'; false sets role to 'staff'.
    */
   const updateUserRole = useCallback(async (
     userId: number,
@@ -108,7 +109,7 @@ export const useUserActions = ({
     
     try {
       await apiService.put(`/auth/users/${userId}/role`, {
-        role: isAdmin ? 'establishment_admin' : 'cashier',
+        role: isAdmin ? 'establishment_admin' : 'staff',
       });
       return true;
     } catch {

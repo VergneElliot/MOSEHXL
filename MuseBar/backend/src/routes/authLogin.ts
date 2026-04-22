@@ -9,6 +9,38 @@ import {
 
 const router = express.Router();
 
+type CanonicalRole = 'system_admin' | 'establishment_admin' | 'staff';
+
+function normalizeRole(raw: unknown): CanonicalRole | null {
+  const v = typeof raw === 'string' ? raw.trim() : '';
+  if (!v) return null;
+
+  // Canonical roles
+  if (v === 'system_admin' || v === 'establishment_admin' || v === 'staff') return v;
+
+  // Legacy / transitional roles
+  if (v === 'system_operator') return 'system_admin';
+  if (v === 'admin') return 'establishment_admin';
+  if (v === 'cashier' || v === 'manager') return 'staff';
+
+  // Unknown role string: treat as non-admin staff (fail-safe).
+  return 'staff';
+}
+
+function deriveRole(opts: { roleFromDb: unknown; isAdminFlag: boolean; establishmentId: string | null }): CanonicalRole {
+  const normalized = normalizeRole(opts.roleFromDb);
+  if (normalized) return normalized;
+
+  // Backward-compatible fallback: if role is absent in DB, rely on legacy is_admin.
+  if (opts.isAdminFlag) return 'system_admin';
+
+  // If the user belongs to an establishment, default to staff (least privilege).
+  if (opts.establishmentId) return 'staff';
+
+  // No establishment + not admin: treat as system scope staff (least privilege).
+  return 'staff';
+}
+
 // ---------------------------------------------------------------------------
 // POST /api/auth/login
 // ---------------------------------------------------------------------------
@@ -51,8 +83,8 @@ router.post('/login', async (req, res) => {
     const d = await UserModel.getAuthLoginDetails(user.id);
 
     const is_admin: boolean = d?.is_admin ?? user.is_admin;
-    const role: string = is_admin ? 'system_admin' : (d?.role || 'establishment_admin');
     const establishment_id: string | null = d?.establishment_id || null;
+    const role: CanonicalRole = deriveRole({ roleFromDb: d?.role, isAdminFlag: is_admin, establishmentId: establishment_id });
 
     const token = generateToken(
       { id: user.id, email: user.email, is_admin, role, establishment_id },
@@ -132,8 +164,8 @@ router.post('/refresh', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
     const is_admin: boolean = d.is_admin;
-    const role: string = is_admin ? 'system_admin' : (d.role || 'establishment_admin');
     const establishment_id: string | null = d.establishment_id || null;
+    const role: CanonicalRole = deriveRole({ roleFromDb: d.role, isAdminFlag: is_admin, establishmentId: establishment_id });
 
     const token = generateToken(
       { id: userId, email: req.user!.email, is_admin, role, establishment_id },
