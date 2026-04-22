@@ -20,7 +20,9 @@ router.use('/closure', closureRouter);
 router.use('/archive', archiveRouter);
 router.use('/compliance', complianceRouter);
 router.use('/stats', statsRouter);
-router.use('/', businessInfoRouter);
+// Mount `business-day-stats` before `businessInfo` so `/legal/business-info` stays
+// permission-gated while stats stay available to all establishment users (see History tab).
 router.use('/', businessDayStatsRouter);
+router.use('/', businessInfoRouter);
 
 export default router; 
