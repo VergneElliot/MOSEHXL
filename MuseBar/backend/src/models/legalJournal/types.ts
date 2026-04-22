@@ -6,6 +6,8 @@
 export interface JournalEntry {
   id: number;
   sequence_number: number;
+  /** Tenant scope — sequence numbers are unique per (establishment_id, sequence_number). */
+  establishment_id: string;
   transaction_type: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE' | 'CHANGE';
   order_id?: number;
   amount: number;
@@ -77,6 +79,8 @@ export interface PaymentBreakdown {
 
 export interface OrderForJournal {
   id: number;
+  /** Required for per-establishment legal journal chain. */
+  establishment_id: string;
   total_amount?: number | string;
   total_tax?: number | string;
   taxAmount?: number | string;

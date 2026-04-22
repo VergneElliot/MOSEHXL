@@ -9,10 +9,10 @@ import { JournalSigning } from './journalSigning';
 
 export class JournalOperations {
   /**
-   * Add a new entry to the legal journal
-   * This is the core function for maintaining the legal journal chain
+   * Add a new entry to the legal journal (scoped to one establishment).
    */
   static async addEntry(
+    establishmentId: string,
     transactionType: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE' | 'CHANGE',
     orderId: number | null,
     amount: number,
@@ -21,25 +21,22 @@ export class JournalOperations {
     transactionData: Record<string, unknown>,
     userId?: string
   ): Promise<JournalEntry> {
-    // Get next sequence number
-    const sequenceNumber = await JournalQueries.getNextSequenceNumber();
-    
-    // Get the previous hash from the last entry
-    const lastEntry = await JournalQueries.getLastEntry();
-    const previousHash = lastEntry ? lastEntry.current_hash : '0000000000000000000000000000000000000000000000000000000000000000';
-    
-    // Create timestamp
+    const sequenceNumber = await JournalQueries.getNextSequenceNumber(establishmentId);
+
+    const lastEntry = await JournalQueries.getLastEntry(establishmentId);
+    const previousHash = lastEntry
+      ? lastEntry.current_hash
+      : '0000000000000000000000000000000000000000000000000000000000000000';
+
     const timestamp = new Date();
-    
-    // Generate data string for hashing (same format as original)
+
     const orderIdForHash = orderId === null ? 'null' : (orderId || '');
     const dataString = `${sequenceNumber}|${transactionType}|${orderIdForHash}|${amount}|${vatAmount}|${paymentMethod}|${timestamp.toISOString()}|${JournalSigning.getRegisterKey()}`;
-    
-    // Generate current hash
+
     const currentHash = JournalSigning.generateHash(dataString, previousHash);
-    
-    // Insert the entry
+
     return await JournalQueries.insertEntry(
+      establishmentId,
       sequenceNumber,
       transactionType,
       orderId,
@@ -55,23 +52,18 @@ export class JournalOperations {
     );
   }
 
-  /**
-   * Log a transaction in the legal journal (called after order creation)
-   * This is the main entry point for logging sales transactions
-   */
   static async logTransaction(order: OrderForJournal, userId?: string): Promise<JournalEntry> {
-    const rawAmount = typeof order.total_amount === 'number'
-      ? order.total_amount
-      : parseFloat(String(order.total_amount ?? 0));
-    const rawVatAmount = typeof order.total_tax === 'number'
-      ? order.total_tax
-      : parseFloat(String(order.total_tax ?? order.taxAmount ?? 0));
+    if (!order.establishment_id) {
+      throw new Error('order.establishment_id is required for legal journal (multi-tenant)');
+    }
+    const rawAmount = typeof order.total_amount === 'number' ? order.total_amount : parseFloat(String(order.total_amount ?? 0));
+    const rawVatAmount = typeof order.total_tax === 'number' ? order.total_tax : parseFloat(String(order.total_tax ?? order.taxAmount ?? 0));
 
-    // Defensive guard: never write NaN into the legal journal.
     const amount = Number.isFinite(rawAmount) ? rawAmount : 0;
     const vatAmount = Number.isFinite(rawVatAmount) ? rawVatAmount : 0;
-    
+
     return await this.addEntry(
+      order.establishment_id,
       'SALE',
       order.id,
       amount,
@@ -87,10 +79,8 @@ export class JournalOperations {
     );
   }
 
-  /**
-   * Log a refund transaction
-   */
   static async logRefund(
+    establishmentId: string,
     orderId: number,
     amount: number,
     vatAmount: number,
@@ -99,10 +89,11 @@ export class JournalOperations {
     userId?: string
   ): Promise<JournalEntry> {
     return await this.addEntry(
+      establishmentId,
       'REFUND',
       orderId,
-      -amount, // Negative amount for refunds
-      -vatAmount, // Negative VAT for refunds
+      -amount,
+      -vatAmount,
       paymentMethod,
       {
         ...refundData,
@@ -114,10 +105,8 @@ export class JournalOperations {
     );
   }
 
-  /**
-   * Log a correction entry
-   */
   static async logCorrection(
+    establishmentId: string,
     correctionType: string,
     amount: number,
     vatAmount: number,
@@ -125,6 +114,7 @@ export class JournalOperations {
     userId?: string
   ): Promise<JournalEntry> {
     return await this.addEntry(
+      establishmentId,
       'CORRECTION',
       null,
       amount,
@@ -139,10 +129,8 @@ export class JournalOperations {
     );
   }
 
-  /**
-   * Log a closure entry
-   */
   static async logClosure(
+    establishmentId: string,
     closureType: string,
     totalAmount: number,
     totalVat: number,
@@ -150,6 +138,7 @@ export class JournalOperations {
     userId?: string
   ): Promise<JournalEntry> {
     return await this.addEntry(
+      establishmentId,
       'CLOSURE',
       null,
       totalAmount,
@@ -164,16 +153,9 @@ export class JournalOperations {
     );
   }
 
-  /**
-   * Log a change operation (faire de la monnaie: card → cash).
-   * +X to card, -X to cash; one entry per operation, linked to the change order.
-   */
-  static async logChange(
-    orderId: number,
-    amount: number,
-    userId?: string
-  ): Promise<JournalEntry> {
+  static async logChange(establishmentId: string, orderId: number, amount: number, userId?: string): Promise<JournalEntry> {
     return await this.addEntry(
+      establishmentId,
       'CHANGE',
       orderId,
       amount,
@@ -189,14 +171,9 @@ export class JournalOperations {
     );
   }
 
-  /**
-   * Log an archive entry
-   */
-  static async logArchive(
-    archiveData: Record<string, unknown>,
-    userId?: string
-  ): Promise<JournalEntry> {
+  static async logArchive(establishmentId: string, archiveData: Record<string, unknown>, userId?: string): Promise<JournalEntry> {
     return await this.addEntry(
+      establishmentId,
       'ARCHIVE',
       null,
       0,
@@ -210,42 +187,27 @@ export class JournalOperations {
     );
   }
 
-  /**
-   * Get journal entries with optional filtering
-   */
-  static async getEntries(limit?: number, offset?: number): Promise<JournalEntry[]> {
-    return await JournalQueries.getEntries(limit, offset);
+  static async getEntries(establishmentId: string, limit?: number, offset?: number): Promise<JournalEntry[]> {
+    return await JournalQueries.getEntries(establishmentId, limit, offset);
   }
 
-  /**
-   * Get entries for a specific period
-   */
-  static async getEntriesForPeriod(start: Date, end: Date): Promise<JournalEntry[]> {
-    return await JournalQueries.getEntriesForPeriod(start, end);
+  static async getEntriesForPeriod(establishmentId: string, start: Date, end: Date): Promise<JournalEntry[]> {
+    return await JournalQueries.getEntriesForPeriod(establishmentId, start, end);
   }
 
-  /**
-   * Get entries by transaction type
-   */
   static async getEntriesByType(
+    establishmentId: string,
     transactionType: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE' | 'CHANGE',
     limit?: number
   ): Promise<JournalEntry[]> {
-    return await JournalQueries.getEntriesByType(transactionType, limit);
+    return await JournalQueries.getEntriesByType(establishmentId, transactionType, limit);
   }
 
-  /**
-   * Get entries for a specific order
-   */
-  static async getEntriesForOrder(orderId: number): Promise<JournalEntry[]> {
-    return await JournalQueries.getEntriesForOrder(orderId);
+  static async getEntriesForOrder(establishmentId: string, orderId: number): Promise<JournalEntry[]> {
+    return await JournalQueries.getEntriesForOrder(establishmentId, orderId);
   }
 
-  /**
-   * Verify journal integrity
-   */
-  static async verifyIntegrity() {
-    return await JournalSigning.verifyJournalIntegrity();
+  static async verifyIntegrity(establishmentId: string) {
+    return await JournalSigning.verifyJournalIntegrity(establishmentId);
   }
 }
-

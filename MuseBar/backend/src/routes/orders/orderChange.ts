@@ -59,7 +59,7 @@ router.post(
       const changeUserId = req.user ? String(req.user.id) : undefined;
 
       try {
-        await LegalJournalModel.logChange(order.id, amount, changeUserId);
+        await LegalJournalModel.logChange(establishmentId, order.id, amount, changeUserId);
       } catch (journalError: unknown) {
         logger.error(
           `Legal journal error (change) for order ${order.id}`,

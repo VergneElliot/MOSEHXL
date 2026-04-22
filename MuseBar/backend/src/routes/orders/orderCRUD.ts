@@ -154,6 +154,7 @@ router.post(
       LegalJournalModel.logTransaction(
         {
           id: order.id,
+          establishment_id: establishmentId,
           total_amount: order.total_amount,
           total_tax: order.total_tax,
           payment_method: order.payment_method,

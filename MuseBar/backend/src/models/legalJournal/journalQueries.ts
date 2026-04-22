@@ -23,51 +23,54 @@ export class JournalQueries {
    * Get the next sequence number for a new journal entry
    * @returns The next sequence number
    */
-  static async getNextSequenceNumber(): Promise<number> {
-    const query = 'SELECT COALESCE(MAX(sequence_number), 0) + 1 as next_sequence FROM legal_journal';
-    const result = await pool.query(query);
+  static async getNextSequenceNumber(establishmentId: string): Promise<number> {
+    const query =
+      'SELECT COALESCE(MAX(sequence_number), 0) + 1 as next_sequence FROM legal_journal WHERE establishment_id = $1';
+    const result = await pool.query(query, [establishmentId]);
     return result.rows[0].next_sequence;
   }
 
   /**
-   * Get the last journal entry for hash chaining
+   * Get the last journal entry for hash chaining (within one establishment).
    * @returns The last journal entry or null if none exists
    */
-  static async getLastEntry(): Promise<JournalEntry | null> {
+  static async getLastEntry(establishmentId: string): Promise<JournalEntry | null> {
     const query = `
-      SELECT * FROM legal_journal 
-      ORDER BY sequence_number DESC 
+      SELECT * FROM legal_journal
+      WHERE establishment_id = $1
+      ORDER BY sequence_number DESC
       LIMIT 1
     `;
-    const result = await pool.query(query);
+    const result = await pool.query(query, [establishmentId]);
     return result.rows[0] || null;
   }
 
   /**
-   * Get journal entries for a specific period
+   * Get journal entries for a specific period and establishment
    * @param start - Start date
    * @param end - End date
    * @returns Array of journal entries
    */
-  static async getEntriesForPeriod(start: Date, end: Date): Promise<JournalEntry[]> {
+  static async getEntriesForPeriod(establishmentId: string, start: Date, end: Date): Promise<JournalEntry[]> {
     const query = `
-      SELECT * FROM legal_journal 
-      WHERE timestamp >= $1 AND timestamp <= $2 
+      SELECT * FROM legal_journal
+      WHERE establishment_id = $1
+        AND timestamp >= $2 AND timestamp <= $3
       ORDER BY sequence_number ASC
     `;
-    const result = await pool.query(query, [start, end]);
+    const result = await pool.query(query, [establishmentId, start, end]);
     return result.rows;
   }
 
   /**
-   * Get all journal entries with pagination
+   * Get all journal entries with pagination (one establishment)
    * @param limit - Number of entries to return
    * @param offset - Number of entries to skip
    * @returns Array of journal entries
    */
-  static async getEntries(limit?: number, offset?: number): Promise<JournalEntry[]> {
-    let query = 'SELECT * FROM legal_journal ORDER BY sequence_number DESC';
-    const values: number[] = [];
+  static async getEntries(establishmentId: string, limit?: number, offset?: number): Promise<JournalEntry[]> {
+    let query = 'SELECT * FROM legal_journal WHERE establishment_id = $1 ORDER BY sequence_number DESC';
+    const values: Array<string | number> = [establishmentId];
     
     if (limit) {
       query += ` LIMIT $${values.length + 1}`;
@@ -88,6 +91,7 @@ export class JournalQueries {
    * Mirrors the logic previously implemented directly in routes/legal/journal.ts.
    */
   static async getEntriesWithCountForPeriod(params: {
+    establishment_id: string;
     start_date?: string;
     end_date?: string;
     limit: number;
@@ -98,18 +102,20 @@ export class JournalQueries {
     limit: number;
     offset: number;
   }> {
-    const { start_date, end_date, limit, offset } = params;
+    const { establishment_id, start_date, end_date, limit, offset } = params;
 
-    let query = 'SELECT * FROM legal_journal ORDER BY sequence_number DESC';
-    const values: Array<string | number> = [];
+    let query = 'SELECT * FROM legal_journal WHERE establishment_id = $1 ORDER BY sequence_number DESC';
+    const values: Array<string | number> = [establishment_id];
 
     if (start_date && end_date) {
       query = `
         SELECT * FROM legal_journal
-        WHERE timestamp >= $1 AND timestamp <= $2
+        WHERE establishment_id = $1
+          AND timestamp >= $2 AND timestamp <= $3
         ORDER BY sequence_number DESC
       `;
-      values.push(start_date, end_date);
+      values.length = 0;
+      values.push(establishment_id, start_date, end_date);
     }
 
     query += ` LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
@@ -119,10 +125,11 @@ export class JournalQueries {
 
     const countQuery =
       start_date && end_date
-        ? 'SELECT COUNT(*) FROM legal_journal WHERE timestamp >= $1 AND timestamp <= $2'
-        : 'SELECT COUNT(*) FROM legal_journal';
+        ? 'SELECT COUNT(*) FROM legal_journal WHERE establishment_id = $1 AND timestamp >= $2 AND timestamp <= $3'
+        : 'SELECT COUNT(*) FROM legal_journal WHERE establishment_id = $1';
 
-    const countValues = start_date && end_date ? [start_date, end_date] : [];
+    const countValues =
+      start_date && end_date ? [establishment_id, start_date, end_date] : [establishment_id];
     const countResult = await pool.query(countQuery, countValues);
 
     return {
@@ -137,7 +144,7 @@ export class JournalQueries {
    * Summary stats for the legal journal.
    * Mirrors the SQL previously implemented directly in routes/legal/journal.ts.
    */
-  static async getJournalStatsSummary(): Promise<Record<string, unknown>> {
+  static async getJournalStatsSummary(establishmentId: string): Promise<Record<string, unknown>> {
     const statsQuery = `
       SELECT
         COUNT(*) as total_entries,
@@ -151,9 +158,10 @@ export class JournalQueries {
         SUM(CASE WHEN transaction_type = 'CLOSURE' THEN 1 ELSE 0 END) as closures_count,
         SUM(CASE WHEN transaction_type = 'CHANGE' THEN 1 ELSE 0 END) as change_count
       FROM legal_journal
+      WHERE establishment_id = $1
     `;
 
-    const statsResult = await pool.query(statsQuery);
+    const statsResult = await pool.query(statsQuery, [establishmentId]);
     return statsResult.rows[0] ?? {};
   }
 
@@ -161,13 +169,12 @@ export class JournalQueries {
    * Development-only destructive reset.
    * Mirrors the SQL previously implemented directly in routes/legal/journal.ts.
    */
-  static async resetJournalDevOnly(): Promise<void> {
+  static async resetJournalDevOnly(establishmentId: string): Promise<void> {
     if (process.env.NODE_ENV === 'production') {
       throw Object.assign(new Error('Journal reset not allowed in production'), { statusCode: 403 });
     }
 
-    await pool.query('DELETE FROM legal_journal');
-    await pool.query('ALTER SEQUENCE legal_journal_id_seq RESTART WITH 1');
+    await pool.query('DELETE FROM legal_journal WHERE establishment_id = $1', [establishmentId]);
   }
 
   /**
@@ -177,14 +184,16 @@ export class JournalQueries {
    * @returns Array of journal entries
    */
   static async getEntriesByType(
+    establishmentId: string,
     transactionType: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE' | 'CHANGE',
     limit?: number
   ): Promise<JournalEntry[]> {
-    let query = 'SELECT * FROM legal_journal WHERE transaction_type = $1 ORDER BY sequence_number DESC';
-    const values: Array<string | number> = [transactionType];
+    let query =
+      'SELECT * FROM legal_journal WHERE establishment_id = $1 AND transaction_type = $2 ORDER BY sequence_number DESC';
+    const values: Array<string | number> = [establishmentId, transactionType];
     
     if (limit) {
-      query += ` LIMIT $2`;
+      query += ` LIMIT $3`;
       values.push(limit);
     }
     
@@ -193,17 +202,17 @@ export class JournalQueries {
   }
 
   /**
-   * Get journal entries for a specific order
+   * Get journal entries for a specific order (scoped to establishment)
    * @param orderId - The order ID
    * @returns Array of journal entries
    */
-  static async getEntriesForOrder(orderId: number): Promise<JournalEntry[]> {
+  static async getEntriesForOrder(establishmentId: string, orderId: number): Promise<JournalEntry[]> {
     const query = `
-      SELECT * FROM legal_journal 
-      WHERE order_id = $1 
+      SELECT * FROM legal_journal
+      WHERE order_id = $1 AND establishment_id = $2
       ORDER BY sequence_number ASC
     `;
-    const result = await pool.query(query, [orderId]);
+    const result = await pool.query(query, [orderId, establishmentId]);
     return result.rows;
   }
 
@@ -213,6 +222,7 @@ export class JournalQueries {
    * @returns The created journal entry
    */
   static async insertEntry(
+    establishmentId: string,
     sequenceNumber: number,
     transactionType: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE' | 'CHANGE',
     orderId: number | null,
@@ -228,15 +238,16 @@ export class JournalQueries {
   ): Promise<JournalEntry> {
     const query = `
       INSERT INTO legal_journal (
-        sequence_number, transaction_type, order_id, amount, vat_amount, 
-        payment_method, transaction_data, previous_hash, current_hash, 
+        sequence_number, establishment_id, transaction_type, order_id, amount, vat_amount,
+        payment_method, transaction_data, previous_hash, current_hash,
         timestamp, user_id, register_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING *
     `;
 
     const values = [
       sequenceNumber,
+      establishmentId,
       transactionType,
       orderId,
       amount,

@@ -1,33 +1,34 @@
 /**
  * Legal Archive Operations
- * Handles data archiving, retention, and compliance storage
+ * Handles data archiving, retention, and compliance storage.
+ * All read/write paths require an **establishment context** (no cross-tenant list or get-by-id).
+ * Access is aligned with clôture (`access_closure`): fiscal-legal data stays tenant-scoped.
  */
 
 import express from 'express';
 import { ArchiveService } from '../../models/archiveService';
-import { requireAuth, requireAdmin } from '../auth';
+import { P } from '../../permissions/registry';
+import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
 
 const router = express.Router();
 
-// All archive routes require authentication.
-router.use(requireAuth);
+router.use(requireAuth, requirePermission(P.access_closure));
 
 /**
  * POST create archive
  * POST /api/legal/archive/create
  */
-router.post('/create', requireAdmin, async (req, res) => {
+router.post('/create', async (req, res) => {
   try {
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
+
     const { archiveType, startDate, endDate } = req.body;
     
     if (!archiveType || !startDate || !endDate) {
       return res.status(400).json({ error: 'Archive type, start date, and end date are required' });
     }
     
-    const establishmentId = req.user?.establishment_id ?? undefined;
-    if (archiveType === 'DAILY' && !establishmentId) {
-      return res.status(400).json({ error: 'DAILY archive requires an authenticated user with establishment context.' });
-    }
     const archive = await ArchiveService.exportData({
       export_type: archiveType as 'DAILY' | 'MONTHLY' | 'ANNUAL' | 'FULL',
       period_start: new Date(startDate),
@@ -52,11 +53,13 @@ router.post('/create', requireAdmin, async (req, res) => {
  * GET archives list
  * GET /api/legal/archive/list
  */
-router.get('/list', requireAdmin, async (req, res) => {
+router.get('/list', async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
     void req.query;
     
-    const archives = await ArchiveService.getArchiveExports();
+    const archives = await ArchiveService.getArchiveExports(establishmentId);
     
     res.json({
       archives,
@@ -73,14 +76,16 @@ router.get('/list', requireAdmin, async (req, res) => {
  * GET archive details
  * GET /api/legal/archive/:id
  */
-router.get('/:id', requireAdmin, async (req, res) => {
+router.get('/:id', async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
     const archiveId = parseInt(req.params.id);
     if (isNaN(archiveId)) {
       return res.status(400).json({ error: 'Invalid archive ID' });
     }
     
-    const archive = await ArchiveService.getArchiveExportById(archiveId);
+    const archive = await ArchiveService.getArchiveExportById(archiveId, establishmentId);
     if (!archive) {
       return res.status(404).json({ error: 'Archive not found' });
     }
@@ -99,7 +104,9 @@ router.get('/:id', requireAdmin, async (req, res) => {
  * POST export archive
  * POST /api/legal/archive/:id/export
  */
-router.post('/:id/export', requireAdmin, async (req, res) => {
+router.post('/:id/export', async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
     const archiveId = parseInt(req.params.id);
     if (isNaN(archiveId)) {

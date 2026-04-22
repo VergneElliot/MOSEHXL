@@ -25,8 +25,8 @@ export type {
 
 // Legacy compatibility - Main class that maintains the original API
 export class LegalJournalModel {
-  // Journal operations
   static async addEntry(
+    establishmentId: string,
     transactionType: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE' | 'CHANGE',
     orderId: number | null,
     amount: number,
@@ -36,6 +36,7 @@ export class LegalJournalModel {
     userId?: string
   ) {
     return await JournalOperations.addEntry(
+      establishmentId,
       transactionType,
       orderId,
       amount,
@@ -49,6 +50,7 @@ export class LegalJournalModel {
   static async logTransaction(
     order: {
       id: number;
+      establishment_id: string;
       total_amount?: number | string;
       total_tax?: number | string;
       taxAmount?: number | string;
@@ -61,36 +63,34 @@ export class LegalJournalModel {
     return await JournalOperations.logTransaction(order, userId);
   }
 
-  static async logChange(orderId: number, amount: number, userId?: string) {
-    return await JournalOperations.logChange(orderId, amount, userId);
+  static async logChange(establishmentId: string, orderId: number, amount: number, userId?: string) {
+    return await JournalOperations.logChange(establishmentId, orderId, amount, userId);
   }
 
-  // Integrity verification
-  static async verifyJournalIntegrity() {
-    return await JournalSigning.verifyJournalIntegrity();
+  static async verifyJournalIntegrity(establishmentId: string) {
+    return await JournalOperations.verifyIntegrity(establishmentId);
   }
 
-  // Query operations
-  static async getEntries(limit?: number, offset?: number) {
-    return await JournalQueries.getEntries(limit, offset);
+  static async getEntries(establishmentId: string, limit?: number, offset?: number) {
+    return await JournalQueries.getEntries(establishmentId, limit, offset);
   }
 
-  static async getEntriesForPeriod(start: Date, end: Date) {
-    return await JournalQueries.getEntriesForPeriod(start, end);
+  static async getEntriesForPeriod(establishmentId: string, start: Date, end: Date) {
+    return await JournalQueries.getEntriesForPeriod(establishmentId, start, end);
   }
 
   static async getEntriesByType(
+    establishmentId: string,
     transactionType: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE' | 'CHANGE',
     limit?: number
   ) {
-    return await JournalQueries.getEntriesByType(transactionType, limit);
+    return await JournalQueries.getEntriesByType(establishmentId, transactionType, limit);
   }
 
-  static async getEntriesForOrder(orderId: number) {
-    return await JournalQueries.getEntriesForOrder(orderId);
+  static async getEntriesForOrder(establishmentId: string, orderId: number) {
+    return await JournalQueries.getEntriesForOrder(establishmentId, orderId);
   }
 
-  // Closure operations (establishmentId required for multi-tenant data isolation)
   static async createDailyClosure(
     date: Date,
     establishmentId: string,
@@ -130,5 +130,4 @@ export class LegalJournalModel {
   }
 }
 
-// Default export for backward compatibility
 export default LegalJournalModel;

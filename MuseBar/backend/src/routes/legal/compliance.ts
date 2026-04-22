@@ -5,7 +5,7 @@
 
 import express from 'express';
 import LegalJournalModel from '../../models/legalJournal';
-import { requireAuth, requireAdmin } from '../auth';
+import { getEstablishmentId, requireAuth, requireAdmin } from '../auth';
 
 const router = express.Router();
 
@@ -17,11 +17,13 @@ router.use(requireAuth);
  * GET /api/legal/compliance/status
  */
 router.get('/status', requireAdmin, async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
-    const integrity = await LegalJournalModel.verifyJournalIntegrity();
+    const integrity = await LegalJournalModel.verifyJournalIntegrity(establishmentId);
     
     // Get recent closures
-    const recentClosures = await LegalJournalModel.getClosureBulletins('DAILY');
+    const recentClosures = await LegalJournalModel.getClosureBulletins('DAILY', establishmentId);
     const today = new Date();
     const todayClosure = recentClosures.find(bulletin => {
       const bulletinDate = new Date(bulletin.period_start);
@@ -47,6 +49,8 @@ router.get('/status', requireAdmin, async (req, res) => {
  * GET /api/legal/compliance/report
  */
 router.get('/report', requireAdmin, async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
     const { start_date, end_date } = req.query;
     
@@ -62,10 +66,10 @@ router.get('/report', requireAdmin, async (req, res) => {
     }
     
     // Get journal entries for the period
-    const entries = await LegalJournalModel.getEntriesForPeriod(startDate, endDate);
+    const entries = await LegalJournalModel.getEntriesForPeriod(establishmentId, startDate, endDate);
     
     // Get closures for the period
-    const closures = await LegalJournalModel.getClosureBulletins();
+    const closures = await LegalJournalModel.getClosureBulletins(undefined, establishmentId);
     const periodClosures = closures.filter(bulletin => {
       const bulletinDate = new Date(bulletin.period_start);
       return bulletinDate >= startDate && bulletinDate <= endDate;

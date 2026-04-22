@@ -85,7 +85,7 @@ export class ClosureOperations {
     const changeTotal = Math.max(0, netChangeTotal);
 
     // Get legal journal entries for sequence calculation
-    const entries = await JournalQueries.getEntriesForPeriod(start.toDate(), end.toDate());
+    const entries = await JournalQueries.getEntriesForPeriod(establishmentId, start.toDate(), end.toDate());
     const firstSequence = entries.length > 0 ? Math.min(...entries.map((e) => e.sequence_number)) : 0;
     const lastSequence = entries.length > 0 ? Math.max(...entries.map((e) => e.sequence_number)) : 0;
 
@@ -220,7 +220,7 @@ export class ClosureOperations {
     const changeTotal = Math.max(0, orders.reduce((sum: number, order: { change?: string | number }) => sum + parseFloat(String(order.change || '0')), 0));
 
     // Get journal sequence range
-    const entries = await JournalQueries.getEntriesForPeriod(startDate, endDate);
+    const entries = await JournalQueries.getEntriesForPeriod(establishmentId, startDate, endDate);
     const firstSequence = entries.length > 0 ? Math.min(...entries.map(e => e.sequence_number)) : 0;
     const lastSequence = entries.length > 0 ? Math.max(...entries.map(e => e.sequence_number)) : 0;
 

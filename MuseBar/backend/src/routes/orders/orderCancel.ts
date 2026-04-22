@@ -111,7 +111,7 @@ router.post(
         );
 
         try {
-          await LegalJournalModel.logChange(reversalOrder.id, -amount, userId);
+          await LegalJournalModel.logChange(establishmentId, reversalOrder.id, -amount, userId);
         } catch (journalError) {
           logger.error(
             `Legal journal error (change cancellation) for order ${reversalOrder.id}`,
@@ -302,7 +302,7 @@ router.post(
         );
 
         try {
-          await LegalJournalModel.logChange(tipReversalOrder.id, -tipAmountToReverse, userId);
+          await LegalJournalModel.logChange(establishmentId, tipReversalOrder.id, -tipAmountToReverse, userId);
         } catch (journalError) {
           logger.error(
             `Legal journal error (tip reversal) for order ${tipReversalOrder.id}`,
@@ -315,6 +315,7 @@ router.post(
       // Log to legal journal
       try {
         await LegalJournalModel.addEntry(
+          establishmentId,
           'REFUND',
           cancellationOrder.id,
           -cancellationAmount,

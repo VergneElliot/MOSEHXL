@@ -1,6 +1,8 @@
 -- Legal compliance tables for French fiscal requirements
 -- Source of truth: migrations in migrations/files/. Types/precision aligned with post-migration state (audit #42).
 -- These tables implement the ISCA pillars (Inaltérabilité, Sécurisation, Conservation, Archivage)
+-- Multi-tenant: `legal_journal` is scoped with `establishment_id` and sequence uniqueness is per
+-- establishment (see migration `2026_04_23_00_00_00_legal_journal_per_establishment.sql`).
 
 -- Append-only legal journal for transaction immutability
 CREATE TABLE IF NOT EXISTS legal_journal (

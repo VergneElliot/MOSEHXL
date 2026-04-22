@@ -66,6 +66,7 @@ router.post(
           : {};
 
       const journalEntry = await LegalJournalModel.addEntry(
+        establishmentId,
         entryTypeSafe,
         orderIdNum,
         amountNum,
@@ -92,13 +93,15 @@ router.post(
  * GET /api/orders/legal/compliance/:orderId
  */
 router.get('/compliance/:orderId', requireAuth, async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
     const orderId = parseInt(req.params.orderId);
     if (isNaN(orderId)) {
       return res.status(400).json({ error: 'Invalid order ID' });
     }
 
-    const integrity = await LegalJournalModel.verifyJournalIntegrity();
+    const integrity = await LegalJournalModel.verifyJournalIntegrity(establishmentId);
     
     res.json({
       order_id: orderId,
@@ -119,13 +122,15 @@ router.get('/compliance/:orderId', requireAuth, async (req, res) => {
  * GET /api/orders/legal/journal/:orderId
  */
 router.get('/journal/:orderId', requireAuth, async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
     const orderId = parseInt(req.params.orderId);
     if (isNaN(orderId)) {
       return res.status(400).json({ error: 'Invalid order ID' });
     }
 
-    const entries = await LegalJournalModel.getEntriesForOrder(orderId);
+    const entries = await LegalJournalModel.getEntriesForOrder(establishmentId, orderId);
     
     res.json({
       order_id: orderId,
