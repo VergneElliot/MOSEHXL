@@ -44,9 +44,15 @@ const POSContainer: React.FC<POSContainerProps> = ({
 
   const handlePaymentComplete = (message: string, createdOrder?: any) => {
     actions.setSnackbar({ open: true, message, severity: 'success' });
-    const id = createdOrder?.id;
-    if (typeof id === 'number' && Number.isFinite(id)) {
-      setLastOrderId(id);
+    const rawId = createdOrder?.id;
+    const parsedId =
+      typeof rawId === 'number'
+        ? rawId
+        : typeof rawId === 'string'
+          ? parseInt(rawId, 10)
+          : NaN;
+    if (Number.isFinite(parsedId) && parsedId > 0) {
+      setLastOrderId(parsedId);
       setPrintDialogOpen(true);
     }
   };

@@ -90,7 +90,7 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
   const loadCurrentConfiguration = async () => {
     try {
       const response = await fetch(apiConfig.getEndpoint('/api/printing/configuration'), {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
       });
       
       if (response.ok) {
@@ -146,7 +146,7 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         },
         body: JSON.stringify({
           provider: selectedProvider,
@@ -163,7 +163,7 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         }
       });
 
@@ -186,7 +186,7 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
   const loadPrinters = async () => {
     try {
       const response = await fetch(apiConfig.getEndpoint('/api/printing/printers'), {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
       });
       
       if (response.ok) {
@@ -209,7 +209,7 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         },
         body: JSON.stringify({
           provider: selectedProvider,

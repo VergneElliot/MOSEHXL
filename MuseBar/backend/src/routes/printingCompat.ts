@@ -11,19 +11,14 @@ import {
 const router = Router();
 
 /** Ensure establishment context (same as printing router). */
-type PrintingUser = { establishment_id: number; id: number; username?: string };
+type PrintingUser = { establishment_id: string; id: number; username?: string };
 
 function getPrintingUser(req: AuthenticatedRequest): PrintingUser | null {
   const establishmentIdRaw = req.user?.establishment_id;
-  const asNumber =
-    typeof establishmentIdRaw === 'number'
-      ? establishmentIdRaw
-      : typeof establishmentIdRaw === 'string'
-        ? parseInt(establishmentIdRaw, 10)
-        : NaN;
-  if (!Number.isFinite(asNumber) || asNumber <= 0) return null;
+  const establishmentId = typeof establishmentIdRaw === 'string' ? establishmentIdRaw : null;
+  if (!establishmentId) return null;
   if (!req.user) return null;
-  return { establishment_id: asNumber, id: req.user.id, username: (req.user as { username?: string } | undefined)?.username };
+  return { establishment_id: establishmentId, id: req.user.id, username: (req.user as { username?: string } | undefined)?.username };
 }
 
 const ensureEstablishment = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {

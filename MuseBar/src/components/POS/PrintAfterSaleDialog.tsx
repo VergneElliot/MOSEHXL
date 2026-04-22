@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -13,7 +13,7 @@ import {
   Alert,
   TextField,
 } from '@mui/material';
-import { apiConfig } from '../../config/api';
+import { apiCore } from '../../services/api';
 import LegalReceiptContainer from '../Legal/LegalReceipt/LegalReceiptContainer';
 
 type PrintDocType = 'receipt' | 'invoice_detailed' | 'invoice_summary';
@@ -26,6 +26,64 @@ type BusinessInfo = {
   siret?: string;
   taxIdentification?: string;
 };
+
+function normalizeReceiptForPreview(raw: any) {
+  if (!raw || typeof raw !== 'object') return null;
+
+  const toNumber = (v: any) => {
+    const n = typeof v === 'number' ? v : typeof v === 'string' ? parseFloat(v) : NaN;
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const items = Array.isArray(raw.items) ? raw.items : [];
+  const normalizedItems = items.map((it: any) => {
+    const unit = toNumber(it.unit_price);
+    const total = toNumber(it.total_price);
+
+    // Backend tax_rate might be 0.2 or 20 depending on source. UI expects percent number like 20.
+    const rateRaw = toNumber(it.tax_rate);
+    const ratePercent = rateRaw > 0 && rateRaw <= 1 ? rateRaw * 100 : rateRaw;
+    const rate = ratePercent / 100;
+
+    const taxAmount = toNumber(it.tax_amount) || (total * rate) / (1 + rate);
+
+    return {
+      ...it,
+      name: it.name ?? it.product_name ?? '',
+      product_name: it.product_name ?? it.name ?? '',
+      quantity: toNumber(it.quantity) || 1,
+      unit_price: unit,
+      total_price: total,
+      tax_rate: ratePercent,
+      tax_amount: taxAmount,
+      happy_hour_applied: Boolean(it.happy_hour_applied) || false,
+      happy_hour_discount_amount: toNumber(it.happy_hour_discount_amount),
+    };
+  });
+
+  const businessInfoRaw = raw.business_info ?? {};
+
+  return {
+    order: {
+      id: toNumber(raw.order_id ?? raw.id),
+      sequence_number: toNumber(raw.sequence_number ?? 0),
+      total_amount: toNumber(raw.total_amount),
+      total_tax: toNumber(raw.total_tax),
+      payment_method: String(raw.payment_method ?? ''),
+      created_at: String(raw.created_at ?? new Date().toISOString()),
+      items: normalizedItems,
+      vat_breakdown: raw.vat_breakdown ?? [],
+    },
+    businessInfo: {
+      name: String(businessInfoRaw.name ?? ''),
+      address: String(businessInfoRaw.address ?? ''),
+      phone: String(businessInfoRaw.phone ?? ''),
+      email: String(businessInfoRaw.email ?? ''),
+      siret: String(businessInfoRaw.siret ?? ''),
+      taxIdentification: String(businessInfoRaw.tax_identification ?? businessInfoRaw.taxIdentification ?? ''),
+    },
+  };
+}
 
 export interface PrintAfterSaleDialogProps {
   open: boolean;
@@ -46,17 +104,31 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
   const [businessInfo, setBusinessInfo] = useState<BusinessInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
+  const autoCloseTimerRef = useRef<number | null>(null);
 
   const receiptType = useMemo<'detailed' | 'summary'>(() => {
     if (docType === 'invoice_summary') return 'summary';
     return 'detailed';
   }, [docType]);
 
+  const resetAutoClose = useCallback(() => {
+    if (!open) return;
+    if (autoCloseTimerRef.current != null) {
+      window.clearTimeout(autoCloseTimerRef.current);
+    }
+    autoCloseTimerRef.current = window.setTimeout(() => onClose(), autoCloseMs);
+  }, [open, autoCloseMs, onClose]);
+
   useEffect(() => {
     if (!open) return;
-    const t = window.setTimeout(() => onClose(), autoCloseMs);
-    return () => window.clearTimeout(t);
-  }, [open, autoCloseMs, onClose]);
+    resetAutoClose();
+    return () => {
+      if (autoCloseTimerRef.current != null) {
+        window.clearTimeout(autoCloseTimerRef.current);
+      }
+      autoCloseTimerRef.current = null;
+    };
+  }, [open, resetAutoClose]);
 
   useEffect(() => {
     if (!open || !orderId) return;
@@ -66,36 +138,15 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
 
     (async () => {
       try {
-        // Fetch business info for header preview
-        const bizRes = await fetch(apiConfig.getEndpoint('/api/legal/business-info'), {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        });
-        if (bizRes.ok) {
-          const biz = await bizRes.json();
-          setBusinessInfo({
-            name: String(biz?.name ?? ''),
-            address: String(biz?.address ?? ''),
-            phone: String(biz?.phone ?? ''),
-            email: String(biz?.email ?? ''),
-            siret: biz?.siret ? String(biz.siret) : undefined,
-            taxIdentification: biz?.taxIdentification ? String(biz.taxIdentification) : undefined,
-          });
-        }
-
         // Preview-only: does not queue a print job.
-        const res = await fetch(
-          apiConfig.getEndpoint(`/api/printing/receipt/${orderId}/preview?type=${receiptType}`),
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('token')}`,
-            },
-          }
+        const data = await apiCore.request<{ receipt_data: any }>(
+          `/printing/receipt/${orderId}/preview?type=${receiptType}`,
+          { method: 'GET' }
         );
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data?.message || data?.error || 'Failed to generate print preview');
-        }
-        setPreview(data.receipt_data);
+        const normalized = normalizeReceiptForPreview(data.receipt_data);
+        if (!normalized) throw new Error('Invalid preview payload');
+        setPreview(normalized.order);
+        setBusinessInfo(normalized.businessInfo);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load preview');
       } finally {
@@ -109,20 +160,10 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch(
-        apiConfig.getEndpoint(`/api/printing/receipt/${orderId}?type=${receiptType}`),
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        }
+      await apiCore.request(
+        `/printing/receipt/${orderId}?type=${receiptType}`,
+        { method: 'POST' }
       );
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data?.message || data?.error || 'Failed to queue print');
-      }
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to queue print');
@@ -132,7 +173,16 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+      onMouseMove={resetAutoClose}
+      onMouseDown={resetAutoClose}
+      onKeyDown={resetAutoClose}
+      onFocus={resetAutoClose}
+    >
       <DialogTitle>Imprimer / Envoyer</DialogTitle>
       <DialogContent dividers>
         <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
@@ -143,7 +193,10 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
             <ToggleButtonGroup
               value={docType}
               exclusive
-              onChange={(_, v) => v && setDocType(v)}
+              onChange={(_, v) => {
+                resetAutoClose();
+                if (v) setDocType(v);
+              }}
               fullWidth
               size="small"
               sx={{ mb: 2 }}
@@ -166,7 +219,10 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
               size="small"
               label="Email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                resetAutoClose();
+                setEmail(e.target.value);
+              }}
               placeholder="client@example.com"
             />
             <Button

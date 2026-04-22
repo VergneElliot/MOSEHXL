@@ -71,10 +71,10 @@ router.post(
         originalOrder.notes.includes('Faire de la Monnaie');
 
       // Get original order items and sub-bills
-      const originalItems = await OrderItemModel.getByOrderId(orderId);
+      const originalItems = await OrderItemModel.getByOrderId(orderId, establishmentId);
       const originalSubBills =
         originalOrder.payment_method === 'split'
-          ? await SubBillModel.getByOrderId(orderId)
+          ? await SubBillModel.getByOrderId(orderId, establishmentId)
           : [];
 
       // If this is a pure "faire de la monnaie" operation, cancellation is handled as
