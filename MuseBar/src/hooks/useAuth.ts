@@ -63,7 +63,12 @@ export const useAuth = (): AuthState & AuthActions => {
       const data = response.data;
       setUser(data);
       setPermissions(data.permissions || []);
-    } catch {
+    } catch (e) {
+      // Do not log out on 429: keeps session; avoids cascading failures when global rate limit trips.
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/\b429\b/i.test(msg) || /trop de requ[êe]tes/i.test(msg) || /rate limit/i.test(msg)) {
+        return;
+      }
       logout();
     }
   }, [logout]);

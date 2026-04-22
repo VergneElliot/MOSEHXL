@@ -79,8 +79,8 @@ export const useUserActions = ({
       
       onUserAdd(mapApiUser(response.data));
       return true;
-    } catch {
-      onError('Failed to create user');
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Failed to create user');
       return false;
     }
   }, [onUserAdd, onError]);
