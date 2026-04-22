@@ -4,7 +4,6 @@ import { OrderItem, LocalSubBill } from '../types';
 
 export interface POSAPIActions {
   createOrder: (orderData: CreateOrderData) => Promise<any>;
-  processRetour: (retourData: RetourData) => Promise<any>;
   processChange: (changeData: ChangeData) => Promise<any>;
 }
 
@@ -18,12 +17,6 @@ export interface CreateOrderData {
   cashReceived?: number;
   change?: number;
   notes?: string;
-}
-
-export interface RetourData {
-  item: OrderItem;
-  reason: string;
-  paymentMethod: 'cash' | 'card';
 }
 
 export interface ChangeData {
@@ -74,39 +67,6 @@ export const usePOSAPI = (
     [apiService, onSuccess, onError, onDataUpdate]
   );
 
-  const processRetour = useCallback(
-    async (retourData: RetourData) => {
-      try {
-        // Use the dedicated retour endpoint — it validates the payload,
-        // creates the negative order, and writes a REFUND entry to the
-        // legal journal and audit trail.
-        const response = await apiService.post('/orders/payment/retour', {
-          item: {
-            productId: retourData.item.productId,
-            productName: retourData.item.productName,
-            quantity: retourData.item.quantity,
-            unitPrice: retourData.item.unitPrice,
-            totalPrice: retourData.item.totalPrice,
-            taxRate: retourData.item.taxRate,
-          },
-          reason: retourData.reason,
-          paymentMethod: retourData.paymentMethod,
-        });
-
-        onSuccess('Retour traité avec succès');
-        onDataUpdate();
-        return response.data;
-      } catch (error: unknown) {
-        const err = error as { response?: { data?: { error?: string } }; message?: string };
-        const errorMessage =
-          err.response?.data?.error || err.message || 'Erreur lors du traitement du retour';
-        onError(errorMessage);
-        throw error;
-      }
-    },
-    [apiService, onSuccess, onError, onDataUpdate]
-  );
-
   const processChange = useCallback(
     async (changeData: ChangeData) => {
       try {
@@ -131,7 +91,6 @@ export const usePOSAPI = (
 
   return {
     createOrder,
-    processRetour,
     processChange,
   };
 };

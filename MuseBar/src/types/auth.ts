@@ -61,7 +61,7 @@ export const ALL_PERMISSIONS: Permission[] = [
   { key: 'pos_happyhour_manual', label: 'POS — Happy Hour (bouton manuel)' },
   { key: 'pos_apply_offert', label: 'POS — Offert' },
   { key: 'pos_apply_perso', label: 'POS — Perso' },
-  { key: 'orders_cancel', label: 'Annulation / retour (historique & POS retour)' },
+  { key: 'orders_cancel', label: 'Annulation / retour (historique)' },
 ];
 
 export type PermissionKey = (typeof ALL_PERMISSIONS)[number]['key'];
