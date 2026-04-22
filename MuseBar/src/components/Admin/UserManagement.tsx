@@ -32,6 +32,12 @@ import {
 } from '@mui/material';
 
 import { EstablishmentAssignableRole } from '../../types/auth';
+import {
+  useUserState,
+  useUserActions,
+  usePermissions,
+  useUserForm,
+} from './UserManagement/hooks';
 
 function formatEstablishmentRoleLabel(role: string): string {
   switch (role) {
@@ -43,13 +49,6 @@ function formatEstablishmentRoleLabel(role: string): string {
       return role;
   }
 }
-
-import {
-  useUserState,
-  useUserActions,
-  usePermissions,
-  useUserForm,
-} from './UserManagement/hooks';
 
 const UserManagement: React.FC<{ token: string }> = ({ token }) => {
   // Initialize hooks
