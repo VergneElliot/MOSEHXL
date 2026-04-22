@@ -5,10 +5,13 @@ import { BusinessInfoModel } from '../../models/legalJournal/businessInfoModel';
 
 const router = express.Router();
 
-router.use(requireAuth, requirePermission(P.access_settings));
+// Do not `router.use(requirePermission(...))` for the whole router: this file is mounted
+// at `/` next to `businessDayStats` in `legal/index.ts`, and global middleware would run
+// for every `/api/legal/*` path and incorrectly gate `/legal/business-day-stats`.
+const requireSettings = requirePermission(P.access_settings);
 
 // GET /api/legal/business-info
-router.get('/business-info', async (req, res) => {
+router.get('/business-info', requireAuth, requireSettings, async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
 
@@ -23,7 +26,7 @@ router.get('/business-info', async (req, res) => {
 });
 
 // PUT /api/legal/business-info
-router.put('/business-info', async (req, res) => {
+router.put('/business-info', requireAuth, requireSettings, async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
 
