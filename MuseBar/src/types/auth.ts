@@ -29,6 +29,12 @@ export interface EstablishmentMember {
   permissions?: string[];
 }
 
+/**
+ * Roles assignable in "Gestion des utilisateurs" (establishment scope).
+ * System-level accounts use `system_admin` elsewhere, not in this flow.
+ */
+export type EstablishmentAssignableRole = 'establishment_admin' | 'staff';
+
 export interface LoginCredentials {
   email: string;
   password: string;
