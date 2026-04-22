@@ -14,6 +14,9 @@ const canManageUsers = requireEstablishmentAdminOrPermission(P.access_user_manag
 
 const router = express.Router();
 
+/** Roles assignable for establishment users via POST/PUT `/api/auth/users` (not system_admin). */
+const ESTABLISHMENT_USER_ROLES: readonly string[] = ['establishment_admin', 'staff'];
+
 // ---------------------------------------------------------------------------
 // POST /api/auth/register — create a system-level user (system_admin only).
 // Does NOT set establishment_id or role. For creating establishment users,
@@ -158,7 +161,7 @@ router.put('/users/:id/permissions', requireAuth, canManageUsers, async (req, re
 // POST /api/auth/users — create user within the requester's establishment
 // ---------------------------------------------------------------------------
 router.post('/users', requireAuth, canManageUsers, async (req, res) => {
-  const { email, password, role = 'cashier' } = req.body;
+  const { email, password, role = 'staff' } = req.body;
   const establishmentId = req.user!.establishment_id;
 
   if (!email || !password) {
@@ -169,9 +172,8 @@ router.post('/users', requireAuth, canManageUsers, async (req, res) => {
     return res.status(400).json({ error: 'No establishment associated with your account' });
   }
 
-  const allowedRoles = ['staff', 'cashier', 'manager', 'establishment_admin'];
-  if (!allowedRoles.includes(role)) {
-    return res.status(400).json({ error: `Role must be one of: ${allowedRoles.join(', ')}` });
+  if (!ESTABLISHMENT_USER_ROLES.includes(role)) {
+    return res.status(400).json({ error: `Role must be one of: ${ESTABLISHMENT_USER_ROLES.join(', ')}` });
   }
 
   try {
@@ -235,9 +237,8 @@ router.put('/users/:id/role', requireAuth, canManageUsers, async (req, res) => {
   const establishmentId = req.user!.establishment_id!;
   const { role } = req.body;
 
-  const allowedRoles = ['staff', 'cashier', 'manager', 'establishment_admin'];
-  if (!allowedRoles.includes(role)) {
-    return res.status(400).json({ error: `Role must be one of: ${allowedRoles.join(', ')}` });
+  if (!ESTABLISHMENT_USER_ROLES.includes(role)) {
+    return res.status(400).json({ error: `Role must be one of: ${ESTABLISHMENT_USER_ROLES.join(', ')}` });
   }
 
   const owns = await UserModel.userBelongsToEstablishment(userId, establishmentId);
