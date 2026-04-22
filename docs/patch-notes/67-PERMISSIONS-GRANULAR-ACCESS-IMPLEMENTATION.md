@@ -151,7 +151,7 @@ Mounted under `/api/user-management/invitations` (see `src/routes/userManagement
 |------|---------|------|
 | Printing | `/api/printing/...` + `printingCompat` | Plan 66: no new permission; keep **authenticated** + establishment as today |
 | Order audit | `/api/orders/audit/...` | `requireAuth` — confirm product need for a dedicated permission later |
-| Order legal | `/api/orders/legal/journal-entry` | `requireAuth` only — high integrity risk; should be **internal** or **admin-only** in a later hardening pass (not the same as `orders_cancel`) |
+| Order legal | `/api/orders/legal/journal-entry` | **Hardened:** `requireAuth` + **`requireEstablishmentAdmin`**, order must exist in caller’s establishment, `userId` from JWT only; `npm test` includes route-level checks (see `orderLegal.journalEntry.test.ts`). |
 | `GET /api/orders` | list | Stays open to establishment users (no `access_history`) |
 
 ---
@@ -183,7 +183,8 @@ Mounted under `/api/user-management/invitations` (see `src/routes/userManagement
 - **`POST /payment/retour`:** removed; Historique is the only return path (`cancel-unified`). Dead POS hook/state removed.
 - **`DELETE /orders/:id`:** returns **403** for `status === 'completed'` (validated orders); not used by the app.
 
-## 5) Remaining (optional)
+## 5) Optional follow-up (Step E) — **done**
 
-- Backend unit tests for `requirePermission` + cancel (Step E).
-- Harden `POST /api/orders/legal/journal-entry` (integrity).
+- **Unit tests (Vitest):** `MuseBar/backend/src/middleware/auth.permission.test.ts` — `requirePermission` / `requireAnyPermission` (including the `P.orders_cancel` case used by `POST /api/orders/payment/cancel-unified`). Run: `cd MuseBar/backend && npm test`.
+- **Journal entry hardening:** `POST /api/orders/legal/journal-entry` is restricted as above; `MuseBar/backend/src/routes/orders/orderLegal.journalEntry.test.ts` covers 403/404/201 and `userId` from token.
+- **Auth module split:** `MuseBar/backend/src/routes/authSession.ts` mounts login/register/password; `routes/auth.ts` re-exports **middleware only** to avoid circular init when the app tree loads.
