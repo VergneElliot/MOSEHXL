@@ -42,6 +42,7 @@ export const validateEnvironment = (): void => {
   const requiredVars = { ...REQUIRED_ENV_VARS };
   if (process.env.NODE_ENV === 'production') {
     requiredVars.ARCHIVE_SECRET_KEY = 'Archive HMAC key for legal/export signing';
+    requiredVars.SETUP_SECRET = 'Setup secret key (protects one-time bootstrap endpoints)';
   }
 
   // Check required variables
@@ -78,6 +79,12 @@ export const validateEnvironment = (): void => {
         break;
     }
   });
+
+  // Optional-but-security-sensitive variables.
+  // If provided, validate format/length; if omitted, features that depend on them must fail closed.
+  if (process.env.SETUP_SECRET && process.env.SETUP_SECRET.length < 32) {
+    invalid.push('SETUP_SECRET must be at least 32 characters long for security');
+  }
 
   // Report errors
   if (missing.length > 0) {
@@ -128,6 +135,7 @@ export interface EnvironmentConfig {
     jwtSecret: string;
     jwtExpiresIn: string;
     archiveSecretKey: string | undefined; // Required in production, optional in dev
+    setupSecret: string | undefined; // Used to protect bootstrap endpoints (optional; must fail closed if unset)
     bcryptRounds: number;
     rateLimitWindowMs: number;
     rateLimitMaxRequests: number;
@@ -193,6 +201,7 @@ export const getEnvironmentConfig = (): EnvironmentConfig => {
       jwtSecret: process.env.JWT_SECRET!,
       jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
       archiveSecretKey: process.env.ARCHIVE_SECRET_KEY,
+      setupSecret: process.env.SETUP_SECRET,
       bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS || '12'),
       rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
       // Default tuned for POS: menus, history, orders, change ops, refetches — almost all traffic is authenticated

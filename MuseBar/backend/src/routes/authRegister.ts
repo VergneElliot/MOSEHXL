@@ -6,6 +6,7 @@ import {
   requireAuth,
   requireAdmin,
   requireEstablishmentAdmin,
+  requireSetupSecret,
 } from '../middleware/auth';
 
 const router = express.Router();
@@ -258,7 +259,7 @@ router.put('/users/:id/role', requireAuth, requireEstablishmentAdmin, async (req
 // ---------------------------------------------------------------------------
 // POST /api/auth/setup — one-time system bootstrap (only works if no admin exists)
 // ---------------------------------------------------------------------------
-router.post('/setup', async (req, res) => {
+router.post('/setup', requireSetupSecret, async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
