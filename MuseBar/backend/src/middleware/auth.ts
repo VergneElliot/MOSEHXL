@@ -1,7 +1,7 @@
 /**
  * Authentication & authorization middleware.
  * Canonical location — all other files should import from here
- * (or from routes/auth.ts which re-exports these).
+ * (or from `routes/auth.ts` which re-exports these).
  */
 
 import { Request, Response, NextFunction } from 'express';
