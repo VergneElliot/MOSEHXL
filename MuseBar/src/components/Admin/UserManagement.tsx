@@ -119,7 +119,7 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
           <TableHead>
             <TableRow>
               <TableCell>Email</TableCell>
-              <TableCell>Admin</TableCell>
+              <TableCell>Rôle</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -127,7 +127,7 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
             {userState.users.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>{user.email}</TableCell>
-                <TableCell>{user.isAdmin ? 'Oui' : 'Non'}</TableCell>
+                <TableCell>{user.role === 'establishment_admin' ? 'Administrateur établissement' : 'Staff'}</TableCell>
                 <TableCell>
                   <Button
                     onClick={() => permissions.openPermDialog(user)}

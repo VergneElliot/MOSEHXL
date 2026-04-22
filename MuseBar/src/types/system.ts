@@ -4,7 +4,7 @@ export interface SystemUser {
   email: string;
   first_name: string;
   last_name: string;
-  role: 'system_admin' | 'system_operator';
+  role: 'system_admin';
   is_active: boolean;
   last_login?: string;
   created_at: string;
