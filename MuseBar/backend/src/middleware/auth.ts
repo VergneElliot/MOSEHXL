@@ -5,6 +5,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { UserModel } from '../models/user';
 
@@ -112,6 +113,38 @@ export function getEstablishmentId(req: Request, res: Response): string | null {
     return null;
   }
   return id;
+}
+
+/**
+ * Gate: protects one-time bootstrap endpoints (e.g. POST /api/auth/setup).
+ *
+ * Requires:
+ * - SETUP_SECRET env var (validated as required in production by config/environment.ts)
+ * - X-Setup-Secret request header to match SETUP_SECRET
+ */
+export function requireSetupSecret(req: Request, res: Response, next: NextFunction) {
+  const secret = process.env.SETUP_SECRET;
+  if (!secret) {
+    // Fail closed. If SETUP_SECRET is unset, bootstrap endpoints must be unusable.
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const provided = req.header('x-setup-secret') ?? '';
+  if (!provided) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    const a = Buffer.from(secret, 'utf8');
+    const b = Buffer.from(provided, 'utf8');
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+  } catch {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  return next();
 }
 
 /** @deprecated Use requireAuth instead. Kept for printing routes backward compat. */
