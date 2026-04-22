@@ -96,6 +96,16 @@ export class UserModel {
   // Returns explicit permissions from user_permissions, falling back to role-based defaults
   // so newly created establishment users always get the correct access without manual seeding.
   static async getUserPermissions(userId: number): Promise<string[]> {
+    const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [userId]);
+    const role: string = userResult.rows[0]?.role || '';
+
+    // establishment_admin: always the full set of permission *names* in the database,
+    // even if they have rows in user_permissions (avoids lockout and matches product rules).
+    if (role === 'establishment_admin') {
+      const allPerms = await pool.query('SELECT name FROM permissions');
+      return allPerms.rows.map((row) => (row as { name: string }).name);
+    }
+
     const result = await pool.query(
       `SELECT p.name FROM permissions p
        JOIN user_permissions up ON up.permission_id = p.id
@@ -107,18 +117,7 @@ export class UserModel {
       return result.rows.map((row) => (row as { name: string }).name);
     }
 
-    // No explicit permissions — derive from the user's role.
-    const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [userId]);
-    const role: string = userResult.rows[0]?.role || '';
-
-    // Only establishment_admin gets automatic full access.
-    // All other roles (cashier, manager, etc.) must have permissions explicitly granted
-    // by the establishment admin — no assumptions are made on their behalf.
-    if (role === 'establishment_admin') {
-      const allPerms = await pool.query('SELECT name FROM permissions');
-      return allPerms.rows.map((row) => (row as { name: string }).name);
-    }
-
+    // No explicit permissions for non–establishment_admin roles: none granted.
     return [];
   }
 

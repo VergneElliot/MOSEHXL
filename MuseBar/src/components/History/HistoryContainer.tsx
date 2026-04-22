@@ -10,7 +10,12 @@ import OrderDetailsDialog from './OrderDetailsDialog';
 import ReturnDialog from './ReturnDialog';
 import { Order } from '../../types';
 
-const HistoryContainer: React.FC = () => {
+interface HistoryContainerProps {
+  /** Backend permission `orders_cancel` (establishment admin has all permissions from API). */
+  canCancelOrReturn?: boolean;
+}
+
+const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn = true }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -128,6 +133,7 @@ const HistoryContainer: React.FC = () => {
         onViewOrder={handleViewOrder}
         onPrintReceipt={handlePrintReceipt}
         onReturnOrder={handleReturnOrder}
+        canReturnOrCancel={canCancelOrReturn}
         formatCurrency={logic.formatCurrency}
         formatDateTime={logic.formatDateTime}
         getPaymentMethodLabel={logic.getPaymentMethodLabel}

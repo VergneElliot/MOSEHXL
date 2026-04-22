@@ -1,15 +1,19 @@
 import express from 'express';
 import { CategoryModel } from '../models';
 import { AuditTrailModel } from '../models/auditTrail';
-import { getEstablishmentId, requireAuth } from './auth';
+import { getEstablishmentId, requireAuth, requireAnyPermission, requirePermission } from './auth';
+import { P } from '../permissions/registry';
 import { validateBody, validateParams, commonValidations, paramValidations } from '../middleware/validation';
 
 const router = express.Router();
 
+const readCatalog = requireAnyPermission([P.access_pos, P.access_menu]);
+const menuWrite = requirePermission(P.access_menu);
+
 router.use(requireAuth);
 
 // GET /api/categories
-router.get('/', async (req, res) => {
+router.get('/', readCatalog, async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -21,7 +25,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/categories/archived
-router.get('/archived', async (req, res) => {
+router.get('/archived', readCatalog, async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -33,7 +37,7 @@ router.get('/archived', async (req, res) => {
 });
 
 // GET /api/categories/all (active + archived)
-router.get('/all', async (req, res) => {
+router.get('/all', readCatalog, async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -45,7 +49,7 @@ router.get('/all', async (req, res) => {
 });
 
 // GET /api/categories/:id
-router.get('/:id', validateParams([paramValidations.id]), async (req, res) => {
+router.get('/:id', readCatalog, validateParams([paramValidations.id]), async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -59,7 +63,7 @@ router.get('/:id', validateParams([paramValidations.id]), async (req, res) => {
 });
 
 // POST /api/categories
-router.post('/', validateBody(commonValidations.categoryCreate), async (req, res) => {
+router.post('/', menuWrite, validateBody(commonValidations.categoryCreate), async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -81,7 +85,7 @@ router.post('/', validateBody(commonValidations.categoryCreate), async (req, res
 });
 
 // PUT /api/categories/:id
-router.put('/:id', validateParams([paramValidations.id]), async (req, res) => {
+router.put('/:id', menuWrite, validateParams([paramValidations.id]), async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -112,7 +116,7 @@ router.put('/:id', validateParams([paramValidations.id]), async (req, res) => {
 });
 
 // DELETE /api/categories/:id
-router.delete('/:id', validateParams([paramValidations.id]), async (req, res) => {
+router.delete('/:id', menuWrite, validateParams([paramValidations.id]), async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -138,7 +142,7 @@ router.delete('/:id', validateParams([paramValidations.id]), async (req, res) =>
 });
 
 // POST /api/categories/:id/restore
-router.post('/:id/restore', validateParams([paramValidations.id]), async (req, res) => {
+router.post('/:id/restore', menuWrite, validateParams([paramValidations.id]), async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {

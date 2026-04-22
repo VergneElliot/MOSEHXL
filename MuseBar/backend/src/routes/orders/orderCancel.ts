@@ -8,7 +8,8 @@ import { OrderModel, OrderItemModel, SubBillModel } from '../../models';
 import LegalJournalModel from '../../models/legalJournal';
 import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';
-import { getEstablishmentId, requireAuth } from '../auth';
+import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
+import { P } from '../../permissions/registry';
 import { validateBody } from '../../middleware/validation';
 
 const router = express.Router();
@@ -17,6 +18,7 @@ const logger = Logger.getInstance();
 router.post(
   '/cancel-unified',
   requireAuth,
+  requirePermission(P.orders_cancel),
   validateBody([
     { field: 'orderId', required: true },
     { field: 'reason', required: true },
@@ -217,6 +219,7 @@ router.post(
             tax_amount: -item.tax_amount,
             happy_hour_applied: item.happy_hour_applied,
             happy_hour_discount_amount: -item.happy_hour_discount_amount,
+            is_manual_happy_hour: item.is_manual_happy_hour === true,
           });
         })
       );

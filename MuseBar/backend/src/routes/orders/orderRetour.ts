@@ -8,7 +8,8 @@ import { OrderModel, OrderItemModel } from '../../models';
 import LegalJournalModel from '../../models/legalJournal';
 import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';
-import { getEstablishmentId, requireAuth } from '../auth';
+import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
+import { P } from '../../permissions/registry';
 import { validateBody } from '../../middleware/validation';
 
 const router = express.Router();
@@ -17,6 +18,7 @@ const logger = Logger.getInstance();
 router.post(
   '/retour',
   requireAuth,
+  requirePermission(P.orders_cancel),
   validateBody([
     { field: 'item', required: true },
     { field: 'reason', required: true },
@@ -88,6 +90,7 @@ router.post(
         tax_amount: -itemTaxAmount,
         happy_hour_applied: false,
         happy_hour_discount_amount: 0,
+        is_manual_happy_hour: false,
       });
 
       // Log to legal journal

@@ -107,8 +107,8 @@ export const OrderItemModel = {
     const result = await pool.query(
       `INSERT INTO order_items (
          order_id, product_id, product_name, quantity, unit_price, total_price,
-         tax_rate, tax_amount, happy_hour_applied, happy_hour_discount_amount, description
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         tax_rate, tax_amount, happy_hour_applied, happy_hour_discount_amount, is_manual_happy_hour, description
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
         item.order_id,
@@ -121,6 +121,7 @@ export const OrderItemModel = {
         item.tax_amount,
         item.happy_hour_applied,
         item.happy_hour_discount_amount,
+        item.is_manual_happy_hour === true,
         item.description || '',
       ]
     );

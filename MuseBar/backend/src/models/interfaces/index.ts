@@ -34,6 +34,7 @@ export interface OrderItem {
   tax_amount: number;
   happy_hour_applied: boolean;
   happy_hour_discount_amount: number;
+  is_manual_happy_hour?: boolean;
   sub_bill_id?: number;
   description?: string; // Description for special items like Divers
   created_at: Date;

@@ -1,15 +1,19 @@
 import express from 'express';
 import { ProductModel } from '../models';
 import { AuditTrailModel } from '../models/auditTrail';
-import { getEstablishmentId, requireAuth } from './auth';
+import { getEstablishmentId, requireAuth, requireAnyPermission, requirePermission } from './auth';
+import { P } from '../permissions/registry';
 import { validateParams, paramValidations } from '../middleware/validation';
 
 const router = express.Router();
 
+const readCatalog = requireAnyPermission([P.access_pos, P.access_menu]);
+const menuWrite = requirePermission(P.access_menu);
+
 router.use(requireAuth);
 
 // GET /api/products
-router.get('/', async (req, res) => {
+router.get('/', readCatalog, async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -21,7 +25,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/products/archived
-router.get('/archived', async (req, res) => {
+router.get('/archived', readCatalog, async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -33,7 +37,7 @@ router.get('/archived', async (req, res) => {
 });
 
 // GET /api/products/all (active + archived)
-router.get('/all', async (req, res) => {
+router.get('/all', readCatalog, async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -47,6 +51,7 @@ router.get('/all', async (req, res) => {
 // GET /api/products/category/:categoryId
 router.get(
   '/category/:categoryId',
+  readCatalog,
   validateParams([{ param: 'categoryId', validator: (v: string) => !isNaN(parseInt(v)), message: 'Invalid category ID' }]),
   async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
@@ -62,7 +67,7 @@ router.get(
 );
 
 // GET /api/products/:id
-router.get('/:id', validateParams([paramValidations.id]), async (req, res) => {
+router.get('/:id', readCatalog, validateParams([paramValidations.id]), async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -76,7 +81,7 @@ router.get('/:id', validateParams([paramValidations.id]), async (req, res) => {
 });
 
 // POST /api/products
-router.post('/', async (req, res) => {
+router.post('/', menuWrite, async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -107,7 +112,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/products/:id
-router.put('/:id', validateParams([paramValidations.id]), async (req, res) => {
+router.put('/:id', menuWrite, validateParams([paramValidations.id]), async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -142,7 +147,7 @@ router.put('/:id', validateParams([paramValidations.id]), async (req, res) => {
 });
 
 // DELETE /api/products/:id
-router.delete('/:id', validateParams([paramValidations.id]), async (req, res) => {
+router.delete('/:id', menuWrite, validateParams([paramValidations.id]), async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -172,7 +177,7 @@ router.delete('/:id', validateParams([paramValidations.id]), async (req, res) =>
 });
 
 // PUT /api/products/:id/restore
-router.put('/:id/restore', validateParams([paramValidations.id]), async (req, res) => {
+router.put('/:id/restore', menuWrite, validateParams([paramValidations.id]), async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {

@@ -5,7 +5,10 @@
 
 import express from 'express';
 import type { NextFunction, Response } from 'express';
-import { requireAuth, requireAdmin } from '../auth';
+import { requireAuth, requireAdmin, requireEstablishmentAdminOrPermission } from '../auth';
+import { P } from '../../permissions/registry';
+
+const canManageUsers = requireEstablishmentAdminOrPermission(P.access_user_management);
 import { validateBody, validateParams } from '../../middleware/validation';
 import { UserInvitationService } from '../../services/userInvitationService';
 import { EstablishmentModel } from '../../models/establishment';
@@ -108,7 +111,7 @@ router.post('/send-establishment-invitation', requireAuth, requireAdmin, validat
  * POST /send-user-invitation
  * Send user invitation (Establishment Admin only)
  */
-router.post('/send-user-invitation', requireAuth, validateBody([
+router.post('/send-user-invitation', requireAuth, canManageUsers, validateBody([
   { field: 'email', required: true },
   { field: 'firstName', required: true },
   { field: 'lastName', required: true },
@@ -270,7 +273,7 @@ router.post('/accept-invitation', validateBody([
  * GET /pending-invitations
  * Get pending invitations for establishment
  */
-router.get('/pending-invitations', requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+router.get('/pending-invitations', requireAuth, canManageUsers, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const user = req.user!;
     const establishmentId = req.query.establishmentId as string || user.establishment_id;
@@ -317,7 +320,7 @@ router.get('/pending-invitations', requireAuth, async (req: AuthenticatedRequest
  * DELETE /cancel-invitation/:invitationId
  * Cancel invitation (Establishment Admin only)
  */
-router.delete('/cancel-invitation/:invitationId', requireAuth, validateParams([
+router.delete('/cancel-invitation/:invitationId', requireAuth, canManageUsers, validateParams([
   { param: 'invitationId', validator: (v: string) => typeof v === 'string' && v.length > 0 }
 ]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
@@ -365,7 +368,7 @@ router.delete('/cancel-invitation/:invitationId', requireAuth, validateParams([
  * POST /resend-invitation/:invitationId
  * Resend invitation (Establishment Admin only)
  */
-router.post('/resend-invitation/:invitationId', requireAuth, validateParams([
+router.post('/resend-invitation/:invitationId', requireAuth, canManageUsers, validateParams([
   { param: 'invitationId', validator: (v: string) => typeof v === 'string' && v.length > 0 }
 ]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
