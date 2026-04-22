@@ -12,23 +12,25 @@ export interface EpsonQueuedJob {
 
 const queues = new Map<number, EpsonQueuedJob[]>();
 
-export function enqueueEposJob(establishmentId: number, xml: string): string {
+const queuesByEstablishment = new Map<string, EpsonQueuedJob[]>();
+
+export function enqueueEposJob(establishmentId: string, xml: string): string {
   const id = randomUUID();
   const job: EpsonQueuedJob = { id, xml };
-  const q = queues.get(establishmentId) ?? [];
+  const q = queuesByEstablishment.get(establishmentId) ?? [];
   q.push(job);
-  queues.set(establishmentId, q);
+  queuesByEstablishment.set(establishmentId, q);
   return id;
 }
 
-export function dequeueEposJob(establishmentId: number): EpsonQueuedJob | undefined {
-  const q = queues.get(establishmentId);
+export function dequeueEposJob(establishmentId: string): EpsonQueuedJob | undefined {
+  const q = queuesByEstablishment.get(establishmentId);
   if (!q || q.length === 0) return undefined;
   const job = q.shift();
-  if (q.length === 0) queues.delete(establishmentId);
+  if (q.length === 0) queuesByEstablishment.delete(establishmentId);
   return job;
 }
 
-export function queueLength(establishmentId: number): number {
-  return queues.get(establishmentId)?.length ?? 0;
+export function queueLength(establishmentId: string): number {
+  return queuesByEstablishment.get(establishmentId)?.length ?? 0;
 }

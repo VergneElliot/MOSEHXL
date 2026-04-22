@@ -102,7 +102,8 @@ export interface Printer {
 export interface PrintingConfig {
   /** Epson TM-Intelligent Server Direct Print (printer polls HTTPS, ePOS-Print XML). */
   provider: 'epson-server-direct' | 'digital';
-  establishmentId?: number;
+  /** Establishment UUID (matches public.establishments.id and JWT payload). */
+  establishmentId?: string;
   /** Shown in printer lists / status (optional). */
   printerLabel?: string;
   /** Validated on GET /api/printing/epson/poll — stored in printing_configurations.config */

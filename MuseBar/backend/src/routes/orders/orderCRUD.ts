@@ -36,8 +36,8 @@ router.get('/', async (req, res) => {
     const orders = await OrderModel.getAll(establishmentId, shouldPaginate ? { limit, offset } : undefined);
     const ordersWithDetails = await Promise.all(
       orders.map(async (order) => {
-        const items = await OrderItemModel.getByOrderId(order.id);
-        const subBills = order.payment_method === 'split' ? await SubBillModel.getByOrderId(order.id) : [];
+        const items = await OrderItemModel.getByOrderId(order.id, establishmentId);
+        const subBills = order.payment_method === 'split' ? await SubBillModel.getByOrderId(order.id, establishmentId) : [];
         return { ...order, items, sub_bills: subBills, tips: order.tips || 0, change: order.change || 0 };
       })
     );
@@ -68,8 +68,8 @@ router.get('/:id', validateParams([paramValidations.id]), async (req, res) => {
     const id = parseInt(req.params.id);
     const order = await OrderModel.getById(id, establishmentId);
     if (!order) return res.status(404).json({ error: 'Order not found' });
-    const items = await OrderItemModel.getByOrderId(id);
-    const subBills = order.payment_method === 'split' ? await SubBillModel.getByOrderId(id) : [];
+    const items = await OrderItemModel.getByOrderId(id, establishmentId);
+    const subBills = order.payment_method === 'split' ? await SubBillModel.getByOrderId(id, establishmentId) : [];
     res.json({ ...order, items, sub_bills: subBills, tips: order.tips || 0, change: order.change || 0 });
   } catch {
     res.status(500).json({ error: 'Failed to fetch order' });

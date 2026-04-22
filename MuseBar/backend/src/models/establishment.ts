@@ -48,10 +48,13 @@ export interface UpdateEstablishmentData {
 }
 
 /**
- * Schema names are generated as establishment_<uuid> or establishment_<id>.
- * Only this format is safe to interpolate into SQL (no semicolons, quotes, or SQL keywords).
+ * Schema names are used for tenant isolation, and are interpolated into SQL as identifiers
+ * (always wrapped in double quotes elsewhere).
+ *
+ * Historically, some environments used fixed schema names like `muse_bar`. We allow those,
+ * but we still enforce a strict identifier format to prevent SQL injection.
  */
-const SAFE_SCHEMA_NAME_REGEX = /^establishment_[a-zA-Z0-9_]{1,64}$/;
+const SAFE_SCHEMA_NAME_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]{0,63}$/;
 
 function assertValidSchemaName(schemaName: string): void {
   if (!SAFE_SCHEMA_NAME_REGEX.test(schemaName)) {

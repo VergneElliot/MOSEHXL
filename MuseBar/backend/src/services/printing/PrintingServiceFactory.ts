@@ -22,7 +22,7 @@ export class PrintingServiceFactory {
         service = new DigitalReceiptService(config);
         break;
       default:
-        if (!config.establishmentId || config.establishmentId <= 0) {
+        if (!config.establishmentId) {
           throw new Error(
             `Unknown printing provider "${String((config as PrintingConfig).provider)}" and no valid establishmentId for default`
           );
@@ -44,7 +44,7 @@ export class PrintingServiceFactory {
    * Dev / tooling helper. Prefer create() with a real establishmentId from request context.
    */
   static async getDefaultService(): Promise<IPrintingService> {
-    const establishmentId = parseInt(process.env.PRINTING_DEV_ESTABLISHMENT_ID || '1', 10);
+    const establishmentId = process.env.PRINTING_DEV_ESTABLISHMENT_ID || '';
     return this.create({
       provider: 'epson-server-direct',
       establishmentId,

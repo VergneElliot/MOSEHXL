@@ -7,7 +7,7 @@ import type {
 } from '../services/printing/types';
 
 export type PrintingUser = {
-  establishment_id: number;
+  establishment_id: string;
   id: number;
   username?: string;
 };
@@ -57,7 +57,7 @@ export async function buildTestReceiptData(pool: Pool, user: PrintingUser): Prom
 
 export async function buildReceiptDataForOrder(
   pool: Pool,
-  establishmentId: number,
+  establishmentId: string,
   user: PrintingUser,
   orderId: number,
   type: string
@@ -88,10 +88,10 @@ export async function buildReceiptDataForOrder(
       e.email as business_email,
       e.siret,
       e.tax_identification
-    FROM orders o
-    JOIN establishments e ON e.id = $2
-    LEFT JOIN order_items oi ON o.id = oi.order_id
-    LEFT JOIN products p ON oi.product_id = p.id
+    FROM public.orders o
+    JOIN public.establishments e ON e.id = $2
+    LEFT JOIN public.order_items oi ON o.id = oi.order_id
+    LEFT JOIN public.products p ON oi.product_id = p.id
     WHERE o.id = $1 AND o.establishment_id = $2
     GROUP BY o.id, e.id`,
     [orderId, establishmentId]
@@ -224,7 +224,7 @@ export async function buildClosureBulletinData(
 
 export async function logPrintingHistory(
   pool: Pool,
-  establishmentId: number,
+  establishmentId: string,
   printType: 'receipt' | 'closure_bulletin',
   result: PrintResult,
   metadata: Record<string, unknown>

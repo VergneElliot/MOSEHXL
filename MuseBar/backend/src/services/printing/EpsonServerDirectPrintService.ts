@@ -15,12 +15,12 @@ import { closureBulletinToEposPrintXml, receiptToEposPrintXml } from './eposPrin
  * (printer polls GET /api/printing/epson/poll with establishment_id + key).
  */
 export class EpsonServerDirectPrintService extends BasePrintingService {
-  private establishmentId: number;
+  private establishmentId: string;
   private printerLabel: string;
 
   constructor(config: PrintingConfig) {
     super(config);
-    if (!config.establishmentId || config.establishmentId <= 0) {
+    if (!config.establishmentId) {
       throw new Error('Epson Server Direct Print requires establishmentId');
     }
     this.establishmentId = config.establishmentId;

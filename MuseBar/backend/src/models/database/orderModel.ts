@@ -90,10 +90,15 @@ export const OrderModel = {
 // OrderItems and SubBills are always fetched by order_id — they are implicitly scoped
 // because the parent order belongs to a specific establishment.
 export const OrderItemModel = {
-  async getByOrderId(orderId: number): Promise<OrderItem[]> {
+  async getByOrderId(orderId: number, establishmentId: string): Promise<OrderItem[]> {
+    // Tenant-safe: ensure the parent order belongs to this establishment.
     const result = await pool.query(
-      'SELECT * FROM order_items WHERE order_id = $1 ORDER BY created_at',
-      [orderId]
+      `SELECT oi.*
+       FROM order_items oi
+       JOIN orders o ON o.id = oi.order_id
+       WHERE oi.order_id = $1 AND o.establishment_id = $2
+       ORDER BY oi.created_at`,
+      [orderId, establishmentId]
     );
     return result.rows;
   },
@@ -139,10 +144,15 @@ export const OrderItemModel = {
 };
 
 export const SubBillModel = {
-  async getByOrderId(orderId: number): Promise<SubBill[]> {
+  async getByOrderId(orderId: number, establishmentId: string): Promise<SubBill[]> {
+    // Tenant-safe: ensure the parent order belongs to this establishment.
     const result = await pool.query(
-      'SELECT * FROM sub_bills WHERE order_id = $1 ORDER BY created_at',
-      [orderId]
+      `SELECT sb.*
+       FROM sub_bills sb
+       JOIN orders o ON o.id = sb.order_id
+       WHERE sb.order_id = $1 AND o.establishment_id = $2
+       ORDER BY sb.created_at`,
+      [orderId, establishmentId]
     );
     return result.rows;
   },

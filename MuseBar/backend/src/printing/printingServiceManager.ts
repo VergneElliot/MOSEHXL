@@ -10,9 +10,9 @@ import { getActivePrintingConfiguration } from './printingConfigRepo';
  * Caches one initialized printing service per establishment id.
  */
 export function createPrintingServiceManager(pool: Pool, logger: Logger) {
-  const printingServices: Map<number, IPrintingService> = new Map();
+  const printingServices: Map<string, IPrintingService> = new Map();
 
-  async function getPrintingService(establishmentId: number): Promise<IPrintingService> {
+  async function getPrintingService(establishmentId: string): Promise<IPrintingService> {
     if (printingServices.has(establishmentId)) {
       return printingServices.get(establishmentId)!;
     }
@@ -48,7 +48,7 @@ export function createPrintingServiceManager(pool: Pool, logger: Logger) {
     }
   }
 
-  function clearPrintingService(establishmentId: number) {
+  function clearPrintingService(establishmentId: string) {
     printingServices.delete(establishmentId);
   }
 

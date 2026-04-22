@@ -6,10 +6,10 @@ import { parseConfigCell } from './printingConfigRepo';
 
 export async function epsonServerDirectPollHandler(pool: Pool, req: Request, res: Response) {
   const rawId = req.query.establishment_id ?? req.query.eid;
-  const establishmentId = parseInt(String(rawId ?? ''), 10);
+  const establishmentId = String(rawId ?? '');
   const key = String(req.query.key ?? '');
 
-  if (!Number.isFinite(establishmentId) || establishmentId <= 0) {
+  if (!establishmentId) {
     return res.status(400).type('text/plain').send('Missing or invalid establishment_id');
   }
 

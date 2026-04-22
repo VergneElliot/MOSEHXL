@@ -40,13 +40,8 @@ const printingServiceManager = createPrintingServiceManager(pool, getLogger());
 
 function getPrintingUser(req: AuthenticatedRequest): PrintingUser | null {
   const establishmentIdRaw = req.user?.establishment_id;
-  const establishmentId =
-    typeof establishmentIdRaw === 'number'
-      ? establishmentIdRaw
-      : typeof establishmentIdRaw === 'string'
-        ? parseInt(establishmentIdRaw, 10)
-        : NaN;
-  if (!Number.isFinite(establishmentId) || establishmentId <= 0) return null;
+  const establishmentId = typeof establishmentIdRaw === 'string' ? establishmentIdRaw : null;
+  if (!establishmentId) return null;
   if (!req.user) return null;
   return {
     establishment_id: establishmentId,
@@ -58,7 +53,7 @@ function getPrintingUser(req: AuthenticatedRequest): PrintingUser | null {
 /**
  * Get printing service for establishment
  */
-async function getPrintingService(establishmentId: number): Promise<IPrintingService> {
+async function getPrintingService(establishmentId: string): Promise<IPrintingService> {
   // Backwards-compatible wrapper so other code in this file doesn't change shape.
   return await printingServiceManager.getPrintingService(establishmentId);
 }

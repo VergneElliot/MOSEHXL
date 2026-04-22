@@ -22,13 +22,13 @@ export function parseConfigCell(raw: unknown): Record<string, unknown> {
   return {};
 }
 
-export function enrichConfigurationRow(row: Record<string, unknown>, establishmentId: number) {
+export function enrichConfigurationRow(row: Record<string, unknown>, establishmentId: string) {
   const cfg = parseConfigCell(row.config);
   const base = (process.env.APP_URL || process.env.PUBLIC_API_URL || '').replace(/\/$/, '');
   let epson_server_direct_poll_url: string | null = null;
   if (row.provider === 'epson-server-direct' && base && typeof cfg.pollKey === 'string') {
     const q = new URLSearchParams({
-      establishment_id: String(establishmentId),
+      establishment_id: establishmentId,
       key: cfg.pollKey,
     });
     epson_server_direct_poll_url = `${base}/api/printing/epson/poll?${q.toString()}`;
@@ -38,7 +38,7 @@ export function enrichConfigurationRow(row: Record<string, unknown>, establishme
 
 export async function getActivePrintingConfiguration(
   pool: Pool,
-  establishmentId: number
+  establishmentId: string
 ): Promise<{ provider: string; config: Record<string, unknown> } | null> {
   const configResult = await pool.query(
     `SELECT provider, config
@@ -53,7 +53,7 @@ export async function getActivePrintingConfiguration(
   return { provider: row.provider, config: parseConfigCell(row.config) };
 }
 
-export async function listPrintingConfigurations(pool: Pool, establishmentId: number) {
+export async function listPrintingConfigurations(pool: Pool, establishmentId: string) {
   const configResult = await pool.query(
     `SELECT * FROM printing_configurations
      WHERE establishment_id = $1
@@ -68,7 +68,7 @@ export async function listPrintingConfigurations(pool: Pool, establishmentId: nu
 
 export async function savePrintingConfiguration(
   pool: Pool,
-  establishmentId: number,
+  establishmentId: string,
   provider: PrintingConfig['provider'],
   bodyConfig: unknown
 ) {
