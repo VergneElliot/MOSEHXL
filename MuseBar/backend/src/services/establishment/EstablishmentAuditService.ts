@@ -53,8 +53,8 @@ export class EstablishmentAuditService {
       // Use public.audit_trail columns that exist universally in Phase 1
       const auditQuery = `
         INSERT INTO public.audit_trail (
-          user_id, action_type, resource_type, resource_id, action_details, ip_address, user_agent, session_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          user_id, action_type, resource_type, resource_id, action_details, ip_address, user_agent, session_id, establishment_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING id, action_type as action, "timestamp" as created_at
       `;
 
@@ -66,7 +66,8 @@ export class EstablishmentAuditService {
         JSON.stringify(auditData.details || {}),
         auditData.ip_address || null,
         auditData.user_agent || null,
-        null
+        null,
+        auditData.establishment_id
       ];
 
       const result = await client.query(auditQuery, auditValues);

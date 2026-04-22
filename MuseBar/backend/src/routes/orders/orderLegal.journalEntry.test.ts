@@ -115,6 +115,7 @@ describe('POST /legal/journal-entry (hardening)', () => {
 
     expect(res.status).toBe(201);
     expect(mocks.addEntry).toHaveBeenCalledWith(
+      est,
       'SALE',
       1,
       10.5,

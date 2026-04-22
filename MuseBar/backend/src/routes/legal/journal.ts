@@ -7,7 +7,7 @@ import express from 'express';
 import LegalJournalModel from '../../models/legalJournal';
 import { Logger } from '../../utils/logger';
 import { JournalQueries } from '../../models/legalJournal';
-import { requireAuth, requireAdmin } from '../auth';
+import { getEstablishmentId, requireAuth, requireAdmin } from '../auth';
 
 const router = express.Router();
 const logger = Logger.getInstance();
@@ -19,8 +19,10 @@ router.use(requireAuth);
  * GET /api/legal/journal/verify
  */
 router.get('/verify', async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
-    const verification = await LegalJournalModel.verifyJournalIntegrity();
+    const verification = await LegalJournalModel.verifyJournalIntegrity(establishmentId);
     res.json({
       integrity_status: verification.isValid ? 'VALID' : 'COMPROMISED',
       errors: verification.errors,
@@ -38,6 +40,8 @@ router.get('/verify', async (req, res) => {
  * GET /api/legal/journal/entries
  */
 router.get('/entries', async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
     const { start_date, end_date, limit = 100, offset = 0 } = req.query;
 
@@ -45,6 +49,7 @@ router.get('/entries', async (req, res) => {
     const parsedOffset = parseInt(offset as string);
 
     const result = await JournalQueries.getEntriesWithCountForPeriod({
+      establishment_id: establishmentId,
       start_date: start_date as string | undefined,
       end_date: end_date as string | undefined,
       limit: parsedLimit,
@@ -69,9 +74,11 @@ router.get('/entries', async (req, res) => {
  * GET /api/legal/journal/stats
  */
 router.get('/stats', requireAdmin, async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
     res.json({
-      statistics: await JournalQueries.getJournalStatsSummary(),
+      statistics: await JournalQueries.getJournalStatsSummary(establishmentId),
       compliance_note: 'Journal statistics for regulatory reporting'
     });
   } catch (error: unknown) {
@@ -85,8 +92,10 @@ router.get('/stats', requireAdmin, async (req, res) => {
  * POST /api/legal/journal/reset
  */
 router.post('/reset', requireAdmin, async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
-    await JournalQueries.resetJournalDevOnly();
+    await JournalQueries.resetJournalDevOnly(establishmentId);
     
     res.json({
       message: 'Journal reset successfully (development only)',

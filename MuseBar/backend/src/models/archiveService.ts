@@ -6,6 +6,7 @@ import LegalJournalModel from './legalJournal';
 
 export interface ArchiveExport {
   id: number;
+  establishment_id?: string | null;
   export_type: 'DAILY' | 'MONTHLY' | 'ANNUAL' | 'FULL';
   period_start: Date;
   period_end: Date;
@@ -74,9 +75,9 @@ export class ArchiveService {
     // Create archive export record
     const query = `
       INSERT INTO archive_exports (
-        export_type, period_start, period_end, file_path, file_hash, 
-        file_size, format, digital_signature, export_status, created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        export_type, period_start, period_end, file_path, file_hash,
+        file_size, format, digital_signature, export_status, created_by, establishment_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
     `;
 
@@ -91,7 +92,8 @@ export class ArchiveService {
       exportData.format,
       '', // Will be updated after file creation
       'PENDING',
-      exportData.created_by
+      exportData.created_by,
+      exportData.establishment_id ?? null
     ];
 
     const result = await pool.query(query, values);
@@ -163,7 +165,10 @@ export class ArchiveService {
         }
         break;
 
-      case 'MONTHLY':
+      case 'MONTHLY': {
+        if (!exportData.establishment_id) {
+          throw new Error('MONTHLY export requires establishment_id for legal journal scoping.');
+        }
         // Get monthly data
         const monthStart = exportData.period_start || new Date();
         monthStart.setDate(1);
@@ -174,7 +179,11 @@ export class ArchiveService {
         monthEnd.setDate(0);
         monthEnd.setHours(23, 59, 59, 999);
 
-        const monthlyEntries = await LegalJournalModel.getEntriesForPeriod(monthStart, monthEnd);
+        const monthlyEntries = await LegalJournalModel.getEntriesForPeriod(
+          exportData.establishment_id,
+          monthStart,
+          monthEnd
+        );
         const monthlySales = monthlyEntries.filter(e => e.transaction_type === 'SALE');
         
         data = {
@@ -196,11 +205,18 @@ export class ArchiveService {
           }
         };
         break;
+      }
 
-      case 'FULL':
-        // Get all journal entries
-        const allEntries = await pool.query('SELECT * FROM legal_journal ORDER BY sequence_number ASC');
-        const allClosures = await LegalJournalModel.getClosureBulletins();
+      case 'FULL': {
+        if (!exportData.establishment_id) {
+          throw new Error('FULL export requires establishment_id for legal journal scoping.');
+        }
+        const eid = exportData.establishment_id;
+        const allEntries = await pool.query(
+          'SELECT * FROM legal_journal WHERE establishment_id = $1 ORDER BY sequence_number ASC',
+          [eid]
+        );
+        const allClosures = await LegalJournalModel.getClosureBulletins(undefined, eid);
         
         data = {
           export_type: 'FULL',
@@ -211,10 +227,11 @@ export class ArchiveService {
             legal_reference: 'Article 286-I-3 bis du CGI',
             register_id: 'MUSEBAR-REG-001',
             total_entries: allEntries.rows.length,
-            integrity_verification: await LegalJournalModel.verifyJournalIntegrity()
+            integrity_verification: await LegalJournalModel.verifyJournalIntegrity(eid)
           }
         };
         break;
+      }
     }
 
     // Format data according to specified format
@@ -297,23 +314,35 @@ export class ArchiveService {
     return `MuseBar export (${data.export_type ?? 'unknown'}) — PDF generation not implemented.`;
   }
 
-  // Get all archive exports
-  static async getArchiveExports(): Promise<ArchiveExport[]> {
-    const query = 'SELECT * FROM archive_exports ORDER BY created_at DESC';
-    const result = await pool.query(query);
+  /**
+   * List exports for one establishment only. Callers must pass a real tenant id —
+   * no global listing (fiscal / GDPR isolation).
+   */
+  static async getArchiveExports(establishmentId: string): Promise<ArchiveExport[]> {
+    const result = await pool.query(
+      'SELECT * FROM archive_exports WHERE establishment_id = $1 ORDER BY created_at DESC',
+      [establishmentId]
+    );
     return result.rows;
   }
 
-  // Get archive export by ID
-  static async getArchiveExportById(id: number): Promise<ArchiveExport | null> {
-    const query = 'SELECT * FROM archive_exports WHERE id = $1';
-    const result = await pool.query(query, [id]);
+  /**
+   * Fetch a single export only if it belongs to the given establishment.
+   */
+  static async getArchiveExportById(id: number, establishmentId: string): Promise<ArchiveExport | null> {
+    const result = await pool.query(
+      'SELECT * FROM archive_exports WHERE id = $1 AND establishment_id = $2',
+      [id, establishmentId]
+    );
     return result.rows[0] || null;
   }
 
-  // Verify archive export integrity
-  static async verifyArchiveExport(id: number): Promise<{ isValid: boolean; errors: string[] }> {
-    const exportRecord = await this.getArchiveExportById(id);
+  // Verify archive export integrity (tenant-scoped: cannot verify another tenant's file by id alone)
+  static async verifyArchiveExport(
+    id: number,
+    establishmentId: string
+  ): Promise<{ isValid: boolean; errors: string[] }> {
+    const exportRecord = await this.getArchiveExportById(id, establishmentId);
     if (!exportRecord) {
       return { isValid: false, errors: ['Archive export not found'] };
     }
@@ -350,8 +379,8 @@ export class ArchiveService {
       // Update verification timestamp if valid
       if (errors.length === 0) {
         await pool.query(
-          'UPDATE archive_exports SET export_status = $1, verified_at = $2 WHERE id = $3',
-          ['VERIFIED', new Date(), id]
+          'UPDATE archive_exports SET export_status = $1, verified_at = $2 WHERE id = $3 AND establishment_id = $4',
+          ['VERIFIED', new Date(), id, establishmentId]
         );
       }
 
@@ -362,9 +391,12 @@ export class ArchiveService {
     }
   }
 
-  // Download archive export file
-  static async downloadArchiveExport(id: number): Promise<{ filePath: string; fileName: string } | null> {
-    const exportRecord = await this.getArchiveExportById(id);
+  // Download archive export file (tenant-scoped)
+  static async downloadArchiveExport(
+    id: number,
+    establishmentId: string
+  ): Promise<{ filePath: string; fileName: string } | null> {
+    const exportRecord = await this.getArchiveExportById(id, establishmentId);
     if (!exportRecord || !fs.existsSync(exportRecord.file_path)) {
       return null;
     }

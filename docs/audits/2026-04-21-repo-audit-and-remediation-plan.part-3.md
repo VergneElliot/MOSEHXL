@@ -153,6 +153,8 @@ I've ordered by impact and (where practical) sequenced dependencies. This is siz
 6. Update `GET /api/legal/journal/entries`, `/verify`, `/journal/:orderId`, archive list/get to filter by `req.user.establishment_id`.
 7. Keep the DB trigger that blocks UPDATE/DELETE.
 
+**Planned/implemented in repo:** `docs/patch-notes/68-LEGAL-PER-ESTABLISHMENT-A3-PLAN.md` (objectives, checklist, risks) and `docs/patch-notes/69-LEGAL-PER-ESTABLISHMENT-A3-IMPLEMENTATION.md` (what shipped, file map, follow-ups).
+
 After A3 the system is legally coherent for multiple tenants. This is the single most impactful fix for compliance.
 
 **A4. Enforce backend permissions.**

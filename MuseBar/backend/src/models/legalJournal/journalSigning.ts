@@ -26,25 +26,27 @@ export class JournalSigning {
    * This method checks the cryptographic integrity of the legal journal
    * while accounting for documented historical issues
    */
-  static async verifyJournalIntegrity(): Promise<IntegrityCheckResult> {
+  static async verifyJournalIntegrity(establishmentId: string): Promise<IntegrityCheckResult> {
     const errors: string[] = [];
     
     // First, check if there are any documented integrity issues
     const documentedIssuesQuery = `
       SELECT sequence_number, transaction_data 
       FROM legal_journal 
-      WHERE transaction_type = 'CORRECTION' 
-      AND transaction_data->>'correction_type' = 'HASH_CHAIN_INTEGRITY'
+      WHERE establishment_id = $1
+        AND transaction_type = 'CORRECTION' 
+        AND transaction_data->>'correction_type' = 'HASH_CHAIN_INTEGRITY'
     `;
-    const documentedIssuesResult = await pool.query(documentedIssuesQuery);
+    const documentedIssuesResult = await pool.query(documentedIssuesQuery, [establishmentId]);
     const documentedIssues = documentedIssuesResult.rows;
 
-    // Get all entries
+    // Chain is per establishment; sequence numbers start at 1+ per tenant (or 0 bootstrap).
     const query = `
       SELECT * FROM legal_journal 
+      WHERE establishment_id = $1
       ORDER BY sequence_number ASC
     `;
-    const result = await pool.query(query);
+    const result = await pool.query(query, [establishmentId]);
     const entries = result.rows;
 
     if (entries.length === 0) {
@@ -56,9 +58,10 @@ export class JournalSigning {
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i];
       
-      // Check sequence number continuity
-      if (entry.sequence_number !== i + 1) {
-        errors.push(`Sequence break at entry ${entry.sequence_number}: expected ${i + 1}`);
+      if (i > 0 && entry.sequence_number <= entries[i - 1].sequence_number) {
+        errors.push(
+          `Non-monotonic sequence for establishment: ${entry.sequence_number} after ${entries[i - 1].sequence_number}`
+        );
       }
 
       // Check if this is a documented problematic entry or correction entry
