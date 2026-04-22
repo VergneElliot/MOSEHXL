@@ -9,8 +9,9 @@ import LegalJournalModel from '../../models/legalJournal';
 import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';
 import { pool } from '../../app';
-import { getEstablishmentId, requireAuth } from '../auth';
+import { getEstablishmentId, requireAuth, requireEstablishmentAdmin } from '../auth';
 import { validateBody, validateParams, commonValidations, paramValidations } from '../../middleware/validation';
+import { assertPosOrderLinePermissions } from '../../middleware/orderPosLinePermissions';
 
 const router = express.Router();
 const logger = Logger.getInstance();
@@ -81,7 +82,11 @@ router.get('/:id', validateParams([paramValidations.id]), async (req, res) => {
  * total_amount and total_tax are always computed from items (base TTC). Tips are stored
  * separately and are zero-sum for CA; they only affect card/cash breakdown via payment logic.
  */
-router.post('/', validateBody(commonValidations.orderCreate), async (req, res) => {
+router.post(
+  '/',
+  validateBody(commonValidations.orderCreate),
+  assertPosOrderLinePermissions(),
+  async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -98,20 +103,34 @@ router.post('/', validateBody(commonValidations.orderCreate), async (req, res) =
     );
 
     const createdItems = await Promise.all(
-      items.map(async (item: { product_id?: number; product_name: string; quantity: number; unit_price: number; total_price: number; tax_rate: number; tax_amount: number; happy_hour_applied?: boolean; happy_hour_discount_amount?: number; description?: string }) =>
-        OrderItemModel.create({
-          order_id: order.id,
-          product_id: item.product_id,
-          product_name: item.product_name,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          total_price: item.total_price,
-          tax_rate: item.tax_rate,
-          tax_amount: item.tax_amount,
-          happy_hour_applied: item.happy_hour_applied || false,
-          happy_hour_discount_amount: item.happy_hour_discount_amount || 0,
-          description: item.description || '',
-        })
+      items.map(
+        async (item: {
+          product_id?: number;
+          product_name: string;
+          quantity: number;
+          unit_price: number;
+          total_price: number;
+          tax_rate: number;
+          tax_amount: number;
+          happy_hour_applied?: boolean;
+          happy_hour_discount_amount?: number;
+          is_manual_happy_hour?: boolean;
+          description?: string;
+        }) =>
+          OrderItemModel.create({
+            order_id: order.id,
+            product_id: item.product_id,
+            product_name: item.product_name,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            total_price: item.total_price,
+            tax_rate: item.tax_rate,
+            tax_amount: item.tax_amount,
+            happy_hour_applied: item.happy_hour_applied || false,
+            happy_hour_discount_amount: item.happy_hour_discount_amount || 0,
+            is_manual_happy_hour: item.is_manual_happy_hour === true,
+            description: item.description || '',
+          })
       )
     );
 
@@ -173,7 +192,7 @@ router.post('/', validateBody(commonValidations.orderCreate), async (req, res) =
 /**
  * PUT /api/orders/:id
  */
-router.put('/:id', validateParams([paramValidations.id]), async (req, res) => {
+router.put('/:id', requireEstablishmentAdmin, validateParams([paramValidations.id]), async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -190,7 +209,7 @@ router.put('/:id', validateParams([paramValidations.id]), async (req, res) => {
 /**
  * DELETE /api/orders/:id
  */
-router.delete('/:id', validateParams([paramValidations.id]), async (req, res) => {
+router.delete('/:id', requireEstablishmentAdmin, validateParams([paramValidations.id]), async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {

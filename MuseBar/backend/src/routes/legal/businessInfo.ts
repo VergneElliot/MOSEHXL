@@ -1,10 +1,11 @@
 import express from 'express';
-import { requireAuth, getEstablishmentId } from '../auth';
+import { requireAuth, getEstablishmentId, requirePermission } from '../auth';
+import { P } from '../../permissions/registry';
 import { BusinessInfoModel } from '../../models/legalJournal/businessInfoModel';
 
 const router = express.Router();
 
-router.use(requireAuth);
+router.use(requireAuth, requirePermission(P.access_settings));
 
 // GET /api/legal/business-info
 router.get('/business-info', async (req, res) => {

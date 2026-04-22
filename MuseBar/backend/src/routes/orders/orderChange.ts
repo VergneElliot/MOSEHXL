@@ -8,7 +8,8 @@ import { OrderModel } from '../../models';
 import LegalJournalModel from '../../models/legalJournal';
 import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';
-import { getEstablishmentId, requireAuth } from '../auth';
+import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
+import { P } from '../../permissions/registry';
 import { validateBody } from '../../middleware/validation';
 
 const router = express.Router();
@@ -17,6 +18,7 @@ const logger = Logger.getInstance();
 router.post(
   '/change',
   requireAuth,
+  requirePermission(P.access_pos),
   validateBody([{ field: 'amount', required: true }]),
   async (req, res) => {
     const establishmentId = getEstablishmentId(req, res);

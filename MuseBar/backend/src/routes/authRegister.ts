@@ -5,9 +5,12 @@ import { Logger } from '../utils/logger';
 import {
   requireAuth,
   requireAdmin,
-  requireEstablishmentAdmin,
+  requireEstablishmentAdminOrPermission,
   requireSetupSecret,
 } from '../middleware/auth';
+import { P } from '../permissions/registry';
+
+const canManageUsers = requireEstablishmentAdminOrPermission(P.access_user_management);
 
 const router = express.Router();
 
@@ -65,7 +68,7 @@ router.post('/register', requireAuth, requireAdmin, async (req, res) => {
 // ---------------------------------------------------------------------------
 // GET /api/auth/users — list users scoped to the requester's establishment
 // ---------------------------------------------------------------------------
-router.get('/users', requireAuth, requireEstablishmentAdmin, async (req, res) => {
+router.get('/users', requireAuth, canManageUsers, async (req, res) => {
   const establishmentId = req.user!.establishment_id!;
   const rows = await UserModel.listUsersByEstablishment(establishmentId);
   return res.json(rows);
@@ -74,7 +77,7 @@ router.get('/users', requireAuth, requireEstablishmentAdmin, async (req, res) =>
 // ---------------------------------------------------------------------------
 // GET /api/auth/users/:id/permissions — establishment-scoped
 // ---------------------------------------------------------------------------
-router.get('/users/:id/permissions', requireAuth, requireEstablishmentAdmin, async (req, res) => {
+router.get('/users/:id/permissions', requireAuth, canManageUsers, async (req, res) => {
   const userId = parseInt(req.params.id);
   const establishmentId = req.user!.establishment_id!;
 
@@ -90,7 +93,7 @@ router.get('/users/:id/permissions', requireAuth, requireEstablishmentAdmin, asy
 // ---------------------------------------------------------------------------
 // POST /api/auth/users/:id/permissions — establishment-scoped
 // ---------------------------------------------------------------------------
-router.post('/users/:id/permissions', requireAuth, requireEstablishmentAdmin, async (req, res) => {
+router.post('/users/:id/permissions', requireAuth, canManageUsers, async (req, res) => {
   const userId = parseInt(req.params.id);
   const establishmentId = req.user!.establishment_id!;
   const { permissions } = req.body;
@@ -123,7 +126,7 @@ router.post('/users/:id/permissions', requireAuth, requireEstablishmentAdmin, as
 // ---------------------------------------------------------------------------
 // PUT /api/auth/users/:id/permissions — alias used by the frontend
 // ---------------------------------------------------------------------------
-router.put('/users/:id/permissions', requireAuth, requireEstablishmentAdmin, async (req, res) => {
+router.put('/users/:id/permissions', requireAuth, canManageUsers, async (req, res) => {
   const userId = parseInt(req.params.id);
   const establishmentId = req.user!.establishment_id!;
   const { permissions } = req.body;
@@ -154,7 +157,7 @@ router.put('/users/:id/permissions', requireAuth, requireEstablishmentAdmin, asy
 // ---------------------------------------------------------------------------
 // POST /api/auth/users — create user within the requester's establishment
 // ---------------------------------------------------------------------------
-router.post('/users', requireAuth, requireEstablishmentAdmin, async (req, res) => {
+router.post('/users', requireAuth, canManageUsers, async (req, res) => {
   const { email, password, role = 'cashier' } = req.body;
   const establishmentId = req.user!.establishment_id;
 
@@ -197,7 +200,7 @@ router.post('/users', requireAuth, requireEstablishmentAdmin, async (req, res) =
 // ---------------------------------------------------------------------------
 // DELETE /api/auth/users/:id — remove user from the requester's establishment
 // ---------------------------------------------------------------------------
-router.delete('/users/:id', requireAuth, requireEstablishmentAdmin, async (req, res) => {
+router.delete('/users/:id', requireAuth, canManageUsers, async (req, res) => {
   const userId = parseInt(req.params.id);
   const establishmentId = req.user!.establishment_id!;
 
@@ -227,7 +230,7 @@ router.delete('/users/:id', requireAuth, requireEstablishmentAdmin, async (req, 
 // ---------------------------------------------------------------------------
 // PUT /api/auth/users/:id/role — update role within the establishment
 // ---------------------------------------------------------------------------
-router.put('/users/:id/role', requireAuth, requireEstablishmentAdmin, async (req, res) => {
+router.put('/users/:id/role', requireAuth, canManageUsers, async (req, res) => {
   const userId = parseInt(req.params.id);
   const establishmentId = req.user!.establishment_id!;
   const { role } = req.body;

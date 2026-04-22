@@ -5,7 +5,8 @@
 
 import express from 'express';
 import LegalJournalModel from '../../models/legalJournal';
-import { requireAuth } from '../auth';
+import { requireAuth, requirePermission } from '../auth';
+import { P } from '../../permissions/registry';
 
 const router = express.Router();
 
@@ -26,9 +27,9 @@ function parseFondDeCaisse(value: unknown): number | null {
   return n;
 }
 
-// All closure routes require authentication.
+// All closure routes require authentication and clôture access.
 // Closure bulletins are legally binding fiscal documents (NF 525).
-router.use(requireAuth);
+router.use(requireAuth, requirePermission(P.access_closure));
 
 /**
  * POST create daily closure bulletin (scoped to the authenticated user's establishment).

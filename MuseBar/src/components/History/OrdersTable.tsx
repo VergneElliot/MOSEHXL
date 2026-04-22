@@ -34,6 +34,8 @@ interface OrdersTableProps {
   onViewOrder: (order: Order) => void;
   onPrintReceipt: (order: Order, type: 'detailed' | 'summary') => void;
   onReturnOrder: (order: Order) => void;
+  /** When false, retour / cancel actions are hidden (server also enforces orders_cancel). */
+  canReturnOrCancel?: boolean;
   formatCurrency: (amount: number) => string;
   formatDateTime: (date: Date | string) => string;
   getPaymentMethodLabel: (method: string) => string;
@@ -54,6 +56,7 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
   onViewOrder,
   onPrintReceipt,
   onReturnOrder,
+  canReturnOrCancel = true,
   formatCurrency,
   formatDateTime,
   getPaymentMethodLabel,
@@ -186,7 +189,7 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
                     <Print fontSize="small" />
                   </IconButton>
 
-                  {order.status === 'completed' && (
+                  {order.status === 'completed' && canReturnOrCancel && (
                     <IconButton
                       size="small"
                       onClick={() => onReturnOrder(order)}
@@ -210,7 +213,7 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
                       Reçu
                     </Button>
 
-                    {order.status === 'completed' && order.operationType !== 'change' && (
+                    {order.status === 'completed' && canReturnOrCancel && order.operationType !== 'change' && (
                       <Button
                         size="small"
                         variant="outlined"

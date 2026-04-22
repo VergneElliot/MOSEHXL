@@ -98,6 +98,7 @@ export class SchemaManager {
         tax_amount DECIMAL(12,4) NOT NULL,
         happy_hour_applied BOOLEAN DEFAULT FALSE,
         happy_hour_discount_amount DECIMAL(10,2) DEFAULT 0,
+        is_manual_happy_hour BOOLEAN NOT NULL DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);

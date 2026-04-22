@@ -18,6 +18,12 @@ interface POSContainerProps {
   products: Product[];
   isHappyHourActive: boolean;
   onDataUpdate: () => void;
+  /** Server-enforced POS line actions (buttons hidden if false). */
+  posLinePermissions?: {
+    happyHourManual: boolean;
+    offert: boolean;
+    perso: boolean;
+  };
 }
 
 const POSContainer: React.FC<POSContainerProps> = ({
@@ -25,6 +31,11 @@ const POSContainer: React.FC<POSContainerProps> = ({
   products,
   isHappyHourActive,
   onDataUpdate,
+  posLinePermissions = {
+    happyHourManual: true,
+    offert: true,
+    perso: true,
+  },
 }) => {
   // Custom hooks for state management
   const [state, actions] = usePOSState();
@@ -184,9 +195,9 @@ const POSContainer: React.FC<POSContainerProps> = ({
       onQuickCard={() => handleQuickPayment('card')}
       onQuickCash={() => handleQuickPayment('cash')}
       onFaireDeLaMonnaie={handleFaireDeLaMonnaie}
-      onApplyHappyHour={handleApplyHappyHour}
-      onApplyOffert={handleApplyOffert}
-      onApplyPerso={handleApplyPerso}
+      onApplyHappyHour={posLinePermissions.happyHourManual ? handleApplyHappyHour : undefined}
+      onApplyOffert={posLinePermissions.offert ? handleApplyOffert : undefined}
+      onApplyPerso={posLinePermissions.perso ? handleApplyPerso : undefined}
       formatCurrency={logic.formatCurrency}
     />
   );

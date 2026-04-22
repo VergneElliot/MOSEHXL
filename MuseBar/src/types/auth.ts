@@ -54,11 +54,14 @@ export interface Permission {
  */
 export const ALL_PERMISSIONS: Permission[] = [
   { key: 'access_pos', label: 'Caisse' },
-  { key: 'access_menu', label: 'Gestion Menu' },
-  { key: 'access_happy_hour', label: 'Happy Hour' },
-  { key: 'access_history', label: 'Historique' },
+  { key: 'access_menu', label: 'Gestion du menu' },
   { key: 'access_settings', label: 'Paramètres' },
-  { key: 'access_compliance', label: 'Conformité & Clôtures' },
+  { key: 'access_closure', label: 'Clôtures' },
+  { key: 'access_user_management', label: 'Gestion des utilisateurs' },
+  { key: 'pos_happyhour_manual', label: 'POS — Happy Hour (bouton manuel)' },
+  { key: 'pos_apply_offert', label: 'POS — Offert' },
+  { key: 'pos_apply_perso', label: 'POS — Perso' },
+  { key: 'orders_cancel', label: 'Annulation / retour (historique & POS retour)' },
 ];
 
 export type PermissionKey = (typeof ALL_PERMISSIONS)[number]['key'];

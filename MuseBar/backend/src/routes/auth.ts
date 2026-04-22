@@ -10,6 +10,8 @@ export {
   requireAdmin,
   requireEstablishmentAdmin,
   requirePermission,
+  requireAnyPermission,
+  requireEstablishmentAdminOrPermission,
 } from '../middleware/auth';
 export type { JwtPayload } from '../middleware/auth';
 

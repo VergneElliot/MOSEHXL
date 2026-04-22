@@ -103,6 +103,27 @@ export function requirePermission(permission: string) {
   };
 }
 
+/** User must have at least one of the given permissions (system_admin bypasses). */
+export function requireAnyPermission(permissions: string[]) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    if (req.user?.role === 'system_admin') return next();
+    const perms = await UserModel.getUserPermissions(Number(req.user?.id));
+    if (permissions.some((p) => perms.includes(p))) return next();
+    return res.status(403).json({ error: 'Permission denied' });
+  };
+}
+
+/**
+ * establishment_admin always passes; otherwise require the given permission
+ * (used for "Gestion des utilisateurs" so trusted staff can manage users without being admin).
+ */
+export function requireEstablishmentAdminOrPermission(permission: string) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    if (req.user?.role === 'establishment_admin') return next();
+    return requirePermission(permission)(req, res, next);
+  };
+}
+
 /**
  * Extract establishment_id from the authenticated request.
  * Sends 403 and returns null if user has no establishment (e.g. system admin without context).
