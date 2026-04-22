@@ -6,6 +6,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { Pool } from 'pg';
+import jwt from 'jsonwebtoken';
 import { EnvironmentConfig } from '../../config/environment';
 import { Logger } from '../../utils/logger';
 import { RateLimitError } from '../errorHandler';
@@ -47,7 +48,11 @@ export class RateLimitMiddleware {
 
     const key = this.getKey(req);
     const windowMs = this.config.security.rateLimitWindowMs;
-    const maxRequests = this.config.security.rateLimitMaxRequests;
+    // Global middleware runs before route auth — prefer per-user key from JWT (see getKey).
+    // In development, allow more bursts (HMR, React StrictMode, local testing).
+    const baseMax = this.config.security.rateLimitMaxRequests;
+    const maxRequests =
+      this.config.app.environment === 'development' ? baseMax * 10 : baseMax;
 
     const entry = await this.store.incrementAndGet(key, windowMs);
     const now = Date.now();
@@ -102,9 +107,30 @@ export class RateLimitMiddleware {
     res.set(headers);
   }
 
+  /**
+   * Rate limit sharding. Security stack runs before `requireAuth`, so `req.user` is usually empty.
+   * Decode Bearer JWT (same secret as API auth) to bucket by user id; otherwise fall back to IP.
+   * Without this, all tabs / POS traffic from one public IP share one 500/15m budget and hit 429 in normal use.
+   */
   private getKey(req: Request): string {
-    const userId = req.user?.id;
-    return userId ? `user:${userId}` : `ip:${req.ip}`;
+    if (req.user?.id) {
+      return `user:${req.user.id}`;
+    }
+    const auth = req.headers.authorization;
+    if (auth?.startsWith('Bearer ')) {
+      const token = auth.slice(7).trim();
+      if (token) {
+        try {
+          const decoded = jwt.verify(token, this.config.security.jwtSecret) as { id?: number };
+          if (typeof decoded?.id === 'number' && Number.isFinite(decoded.id)) {
+            return `user:${decoded.id}`;
+          }
+        } catch {
+          // Invalid/expired token — use IP
+        }
+      }
+    }
+    return `ip:${req.ip ?? 'unknown'}`;
   }
 
   /**

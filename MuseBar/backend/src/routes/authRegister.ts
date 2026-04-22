@@ -169,7 +169,7 @@ router.post('/users', requireAuth, canManageUsers, async (req, res) => {
     return res.status(400).json({ error: 'No establishment associated with your account' });
   }
 
-  const allowedRoles = ['cashier', 'manager', 'establishment_admin'];
+  const allowedRoles = ['staff', 'cashier', 'manager', 'establishment_admin'];
   if (!allowedRoles.includes(role)) {
     return res.status(400).json({ error: `Role must be one of: ${allowedRoles.join(', ')}` });
   }
@@ -235,7 +235,7 @@ router.put('/users/:id/role', requireAuth, canManageUsers, async (req, res) => {
   const establishmentId = req.user!.establishment_id!;
   const { role } = req.body;
 
-  const allowedRoles = ['cashier', 'manager', 'establishment_admin'];
+  const allowedRoles = ['staff', 'cashier', 'manager', 'establishment_admin'];
   if (!allowedRoles.includes(role)) {
     return res.status(400).json({ error: `Role must be one of: ${allowedRoles.join(', ')}` });
   }
