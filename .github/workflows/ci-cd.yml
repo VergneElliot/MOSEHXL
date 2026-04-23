@@ -137,11 +137,11 @@ jobs:
 
     - name: Run npm audit
       working-directory: MuseBar
-      run: npm audit --audit-level=moderate
+      run: npm audit --audit-level=high
 
     - name: Run npm audit (backend)
       working-directory: MuseBar/backend
-      run: npm audit --audit-level=moderate
+      run: npm audit --audit-level=high
 
   # Build and Deploy (only on main branch)
   build-and-deploy:

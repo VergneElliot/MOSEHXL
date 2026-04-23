@@ -231,6 +231,8 @@ My recommendation is **Option 1**. If you ever need stronger isolation for a hig
 - CI: enable `npm audit` on backend (already enabled per workflow) and fail on high-severity findings.
 - Add a test that writes 100 orders across 3 establishments and asserts `GET /api/orders` returns exactly the caller's establishment's orders.
 
+**Plan/implementation of record:** `docs/patch-notes/88-CODE-HYGIENE-C5-TESTING-PLAN.md` and `docs/patch-notes/89-CODE-HYGIENE-C5-TESTING-IMPLEMENTATION.md`.
+
 ### Phase D — Nice-to-haves (do when the above is done)
 
 - JWT revocation via a `token_blocklist` table (or short-lived access + refresh tokens). Right now a compromised token lives for up to 7 days.
