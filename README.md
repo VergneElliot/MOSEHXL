@@ -24,7 +24,7 @@ MOSEHXL/
 │       └── utils/        # Utilities (currency formatting, performance)
 ├── docs/                 # Documentation (learning course + patch notes)
 │   ├── course/           # 10-chapter progressive learning guide
-│   └── patch-notes/      # 45 fix/improvement documents from code audit
+│   └── patch-notes/      # Audit trail and remediation history (phased patch notes)
 ├── scripts/              # Deployment & setup scripts
 ├── .github/workflows/    # CI/CD pipeline (GitHub Actions)
 └── backups/              # Database backups (not committed)
@@ -62,9 +62,9 @@ The codebase is structured for **professional-grade maintainability** and safe e
 - **Types**: Shared types in `src/types/` (e.g. `User`, `Order`, `Category`); backend types in `models/` and `types/`. Single definition per concept.
 
 ### Separation of concerns
-- **Backend**: Routes only orchestrate; business logic in `services/` and `models/`. No file over ~500 lines; order flows split into `orderCRUD`, `orderPayment`, `orderLegal`, `orderAudit`.
+- **Backend**: Routes only orchestrate; business logic in `services/` and `models/`. Order flows are split into focused modules (`orderCRUD`, `orderPayment`, `orderLegal`, `orderAudit`).
 - **Frontend**: Per-feature hooks (`usePOSState`, `usePOSLogic`, `usePOSAPI`; same pattern for History, Menu, Closure). Containers compose hooks and pass data to presentational components.
-- **No monoliths**: Largest source files are ~560 lines (e.g. printing service, auth routes); most are under 350.
+- **No monoliths**: Large files exist but are modularized and being incrementally reduced as part of the audit remediation phases.
 
 ### Where the rules bend (by design)
 - **PrinterSetup.tsx** uses `fetch(apiConfig.getEndpoint(...))` for printing config/test so the backend URL is correct; auth can be added via headers when printing routes are fully secured.
@@ -134,9 +134,9 @@ Every completed sale writes a `SALE` entry to the legal journal. Every refund/ca
 
 ### Certification Readiness
 
-- **AFNOR NF525** — Ready; critical fixes applied (see `DEVELOPMENT-STATE.md`)
-- **LNE certification** — Ready after the same 7 fixes
-- **Fine risk** — €7,500 per non-compliant register; system is architecturally compliant, fixes needed for runtime correctness
+- **AFNOR NF525** — Not yet certified (implementation aligned to ISCA pillars, certification remains a formal external process)
+- **LNE certification** — Not yet certified (requires dedicated certification campaign)
+- **Fine risk** — €7,500 per non-compliant register; legal controls are implemented but operational discipline and formal certification remain required for production claims
 
 ### Compliance References
 
@@ -177,7 +177,7 @@ Every completed sale writes a `SALE` entry to the legal journal. Every refund/ca
 ### Multi-Tenant Tables
 | Table | Purpose |
 |-------|---------|
-| `establishments` | Tenant establishments with subscription info and schema isolation |
+| `establishments` | Tenant establishments with subscription info (`schema_name` is legacy metadata; runtime isolation is shared-table + `establishment_id`) |
 | `user_invitations` | Pending user invitations with secure tokens |
 | `password_reset_requests` | Password reset tokens |
 | `email_logs` | Email delivery tracking |
@@ -269,7 +269,7 @@ npm run migration:create   # create a new migration file
 |------|-----------|--------|
 | `system_admin` | System Admin UI | Full system — establishments, users, security logs |
 | `establishment_admin` | Business UI | All POS tabs based on permissions |
-| `cashier` | Business UI | POS tabs granted by admin |
+| `staff` | Business UI | POS tabs granted by admin |
 
 Granular permissions (granted per user): `access_pos`, `access_menu`, `access_happy_hour`, `access_history`, `access_settings`, `access_compliance`. Establishment admins receive all permissions by default.
 
@@ -281,7 +281,7 @@ Full documentation lives in the `docs/` folder:
 
 - **[Table of Contents](docs/00-TABLE-OF-CONTENTS.md)** — Start here for navigation
 - **[Course](docs/course/)** — 10-chapter progressive learning guide (beginner-friendly)
-- **[Patch Notes](docs/patch-notes/)** — 45 documented fixes from the code audit
+- **[Patch Notes](docs/patch-notes/)** — Phased remediation history (A/B/C audit work and follow-ups)
 - **[Development State](DEVELOPMENT-STATE.md)** — Current status, 7 critical fixes, known issues
 
 ---
