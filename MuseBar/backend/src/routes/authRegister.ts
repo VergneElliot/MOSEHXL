@@ -2,6 +2,7 @@ import express from 'express';
 import { UserModel } from '../models/user';
 import { AuditTrailModel } from '../models/auditTrail';
 import { Logger } from '../utils/logger';
+import { AppError } from '../middleware/errorHandler';
 import {
   requireAuth,
   requireAdmin,
@@ -13,6 +14,22 @@ import { P } from '../permissions/registry';
 const canManageUsers = requireEstablishmentAdminOrPermission(P.access_user_management);
 
 const router = express.Router();
+
+async function logAuditOrThrow(
+  entry: Parameters<typeof AuditTrailModel.logAction>[0],
+  context: string
+): Promise<void> {
+  try {
+    await AuditTrailModel.logAction(entry);
+  } catch (error) {
+    Logger.getInstance().error(
+      `Audit trail logging failed (${context})`,
+      error as Error,
+      'AUTH_ROUTE'
+    );
+    throw new AppError('Failed to persist audit trail entry', 500, 'AUDIT_LOG_FAILURE', { context });
+  }
+}
 
 /** Roles assignable for establishment users via POST/PUT `/api/auth/users` (not system_admin). */
 const ESTABLISHMENT_USER_ROLES: readonly string[] = ['establishment_admin', 'staff'];
@@ -28,19 +45,19 @@ router.post('/register', requireAuth, requireAdmin, async (req, res) => {
   const userAgent = req.headers['user-agent'];
 
   if (!email || !password) {
-    await AuditTrailModel.logAction({
+    await logAuditOrThrow({
       user_id: String(req.user!.id),
       action_type: 'CREATE_USER_FAILED',
       action_details: { reason: 'Missing email or password', email },
       ip_address: ip,
       user_agent: userAgent,
-    }).catch(() => {});
+    }, 'REGISTER_SYSTEM_USER_MISSING_FIELDS');
     return res.status(400).json({ error: 'Email and password required' });
   }
 
   try {
     const user = await UserModel.createUser(email, password, !!is_admin);
-    await AuditTrailModel.logAction({
+    await logAuditOrThrow({
       user_id: String(req.user!.id),
       action_type: 'CREATE_USER',
       resource_type: 'USER',
@@ -48,22 +65,21 @@ router.post('/register', requireAuth, requireAdmin, async (req, res) => {
       action_details: { email, is_admin },
       ip_address: ip,
       user_agent: userAgent,
-    }).catch(() => {});
+    }, 'REGISTER_SYSTEM_USER_SUCCESS');
     return res.status(201).json({ id: user.id, email: user.email, is_admin: user.is_admin });
   } catch (err) {
-    const logger = Logger.getInstance();
-    logger.error(
+    Logger.getInstance().error(
       'Create user failed',
       { error: err instanceof Error ? err : new Error(String(err)), email },
       'AUTH_ROUTE'
     );
-    await AuditTrailModel.logAction({
+    await logAuditOrThrow({
       user_id: String(req.user!.id),
       action_type: 'CREATE_USER_FAILED',
       action_details: { reason: 'User already exists or invalid data', email },
       ip_address: ip,
       user_agent: userAgent,
-    }).catch(() => {});
+    }, 'REGISTER_SYSTEM_USER_FAILURE');
     return res.status(400).json({ error: 'User already exists or invalid data' });
   }
 });
@@ -113,7 +129,7 @@ router.post('/users/:id/permissions', requireAuth, canManageUsers, async (req, r
   }
 
   await UserModel.setUserPermissions(userId, permissions);
-  await AuditTrailModel.logAction({
+  await logAuditOrThrow({
     user_id: String(req.user!.id),
     action_type: 'SET_PERMISSIONS',
     resource_type: 'USER',
@@ -121,7 +137,7 @@ router.post('/users/:id/permissions', requireAuth, canManageUsers, async (req, r
     action_details: { permissions },
     ip_address: ip,
     user_agent: userAgent,
-  }).catch(() => {});
+  }, 'SET_USER_PERMISSIONS_POST');
 
   return res.json({ userId, permissions });
 });
@@ -144,7 +160,7 @@ router.put('/users/:id/permissions', requireAuth, canManageUsers, async (req, re
   }
 
   await UserModel.setUserPermissions(userId, permissions);
-  await AuditTrailModel.logAction({
+  await logAuditOrThrow({
     user_id: String(req.user!.id),
     action_type: 'SET_PERMISSIONS',
     resource_type: 'USER',
@@ -152,7 +168,7 @@ router.put('/users/:id/permissions', requireAuth, canManageUsers, async (req, re
     action_details: { permissions },
     ip_address: req.ip,
     user_agent: req.headers['user-agent'],
-  }).catch(() => {});
+  }, 'SET_USER_PERMISSIONS_PUT');
 
   return res.json({ userId, permissions });
 });
@@ -178,7 +194,7 @@ router.post('/users', requireAuth, canManageUsers, async (req, res) => {
 
   try {
     const user = await UserModel.createUserForEstablishment(email, password, role, establishmentId);
-    await AuditTrailModel.logAction({
+    await logAuditOrThrow({
       user_id: String(req.user!.id),
       action_type: 'CREATE_USER',
       resource_type: 'USER',
@@ -186,11 +202,10 @@ router.post('/users', requireAuth, canManageUsers, async (req, res) => {
       action_details: { email, role },
       ip_address: req.ip,
       user_agent: req.headers['user-agent'],
-    }).catch(() => {});
+    }, 'REGISTER_ESTABLISHMENT_USER_SUCCESS');
     return res.status(201).json({ id: user.id, email: user.email, role, establishment_id: establishmentId });
   } catch (err) {
-    const logger = Logger.getInstance();
-    logger.error(
+    Logger.getInstance().error(
       'Create establishment user failed',
       { error: err instanceof Error ? err : new Error(String(err)), email, establishmentId },
       'AUTH_ROUTE'
@@ -216,7 +231,7 @@ router.delete('/users/:id', requireAuth, canManageUsers, async (req, res) => {
   }
 
   await UserModel.deleteUserById(userId);
-  await AuditTrailModel.logAction({
+  await logAuditOrThrow({
     user_id: String(req.user!.id),
     action_type: 'DELETE_USER',
     resource_type: 'USER',
@@ -224,7 +239,7 @@ router.delete('/users/:id', requireAuth, canManageUsers, async (req, res) => {
     action_details: {},
     ip_address: req.ip,
     user_agent: req.headers['user-agent'],
-  }).catch(() => {});
+  }, 'DELETE_ESTABLISHMENT_USER');
 
   return res.json({ success: true });
 });
@@ -247,7 +262,7 @@ router.put('/users/:id/role', requireAuth, canManageUsers, async (req, res) => {
   }
 
   await UserModel.updateUserRoleById(userId, role);
-  await AuditTrailModel.logAction({
+  await logAuditOrThrow({
     user_id: String(req.user!.id),
     action_type: 'UPDATE_USER_ROLE',
     resource_type: 'USER',
@@ -255,7 +270,7 @@ router.put('/users/:id/role', requireAuth, canManageUsers, async (req, res) => {
     action_details: { role },
     ip_address: req.ip,
     user_agent: req.headers['user-agent'],
-  }).catch(() => {});
+  }, 'UPDATE_ESTABLISHMENT_USER_ROLE');
 
   return res.json({ userId, role });
 });

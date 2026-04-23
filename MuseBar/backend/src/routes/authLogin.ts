@@ -2,6 +2,7 @@ import express from 'express';
 import { UserModel } from '../models/user';
 import { AuditTrailModel } from '../models/auditTrail';
 import { Logger } from '../utils/logger';
+import { AppError } from '../middleware/errorHandler';
 import {
   generateToken,
   requireAdmin,
@@ -13,6 +14,22 @@ const router = express.Router();
 
 type CanonicalRole = 'system_admin' | 'establishment_admin' | 'staff';
 const MAX_SUPPORT_IMPERSONATION_MINUTES = 120;
+
+async function logAuditOrThrow(
+  entry: Parameters<typeof AuditTrailModel.logAction>[0],
+  context: string
+): Promise<void> {
+  try {
+    await AuditTrailModel.logAction(entry);
+  } catch (error) {
+    Logger.getInstance().error(
+      `Audit trail logging failed (${context})`,
+      error as Error,
+      'AUTH_ROUTE'
+    );
+    throw new AppError('Failed to persist audit trail entry', 500, 'AUDIT_LOG_FAILURE', { context });
+  }
+}
 
 function normalizeRole(raw: unknown): CanonicalRole | null {
   const v = typeof raw === 'string' ? raw.trim() : '';
@@ -48,7 +65,6 @@ function deriveRole(opts: { roleFromDb: unknown; isAdminFlag: boolean; establish
 // POST /api/auth/login
 // ---------------------------------------------------------------------------
 router.post('/login', async (req, res) => {
-  const logger = Logger.getInstance();
   const { email, password, rememberMe } = req.body;
   const ip = req.ip;
   const userAgent = req.headers['user-agent'];
@@ -61,24 +77,24 @@ router.post('/login', async (req, res) => {
     const user = await UserModel.findByEmail(email);
 
     if (!user) {
-      await AuditTrailModel.logAction({
+      await logAuditOrThrow({
         action_type: 'LOGIN_FAILED',
         action_details: { reason: 'User not found', email },
         ip_address: ip,
         user_agent: userAgent,
-      }).catch(() => {});
+      }, 'LOGIN_FAILED_USER_NOT_FOUND');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const valid = await UserModel.verifyPassword(user, password);
     if (!valid) {
-      await AuditTrailModel.logAction({
+      await logAuditOrThrow({
         user_id: String(user.id),
         action_type: 'LOGIN_FAILED',
         action_details: { reason: 'Invalid password', email },
         ip_address: ip,
         user_agent: userAgent,
-      }).catch(() => {});
+      }, 'LOGIN_FAILED_INVALID_PASSWORD');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -94,13 +110,13 @@ router.post('/login', async (req, res) => {
       !!rememberMe
     );
 
-    await AuditTrailModel.logAction({
+    await logAuditOrThrow({
       user_id: String(user.id),
       action_type: 'LOGIN',
       action_details: { email, rememberMe: !!rememberMe },
       ip_address: ip,
       user_agent: userAgent,
-    }).catch(() => {});
+    }, 'LOGIN_SUCCESS');
 
     return res.json({
       token,
@@ -117,7 +133,7 @@ router.post('/login', async (req, res) => {
       expiresIn: !!rememberMe ? '7d' : '12h',
     });
   } catch (error) {
-    logger.error('Login error', error as Error);
+    Logger.getInstance().error('Login error', error as Error);
     return res.status(500).json({ error: 'Internal server error during login' });
   }
 });
@@ -181,13 +197,13 @@ router.post('/refresh', requireAuth, async (req, res) => {
       !!rememberMe
     );
 
-    await AuditTrailModel.logAction({
+    await logAuditOrThrow({
       user_id: String(userId),
       action_type: 'TOKEN_REFRESH',
       action_details: { email: req.user!.email, rememberMe: !!rememberMe },
       ip_address: req.ip,
       user_agent: req.headers['user-agent'],
-    }).catch(() => {});
+    }, 'TOKEN_REFRESH');
 
     return res.json({ token, expiresIn: rememberMe ? '7d' : '12h' });
   } catch {
@@ -249,7 +265,7 @@ router.post('/support/impersonation/start', requireAuth, requireAdmin, async (re
       `${duration_minutes}m`
     );
 
-    await AuditTrailModel.logAction({
+    await logAuditOrThrow({
       user_id: String(actorUserId),
       establishment_id,
       action_type: 'SUPPORT_IMPERSONATION_STARTED',
@@ -263,7 +279,7 @@ router.post('/support/impersonation/start', requireAuth, requireAdmin, async (re
       },
       ip_address: ip,
       user_agent: userAgent,
-    }).catch(() => {});
+    }, 'SUPPORT_IMPERSONATION_STARTED');
 
     return res.json({
       message: 'Support impersonation started',
@@ -311,7 +327,7 @@ router.post('/support/impersonation/stop', requireAuth, requireAdmin, async (req
       false
     );
 
-    await AuditTrailModel.logAction({
+    await logAuditOrThrow({
       user_id: String(actorUserId),
       establishment_id: req.user.establishment_id,
       action_type: 'SUPPORT_IMPERSONATION_ENDED',
@@ -324,7 +340,7 @@ router.post('/support/impersonation/stop', requireAuth, requireAdmin, async (req
       },
       ip_address: ip,
       user_agent: userAgent,
-    }).catch(() => {});
+    }, 'SUPPORT_IMPERSONATION_ENDED');
 
     return res.json({
       message: 'Support impersonation ended',
@@ -343,12 +359,12 @@ router.post('/support/impersonation/stop', requireAuth, requireAdmin, async (req
 // POST /api/auth/logout
 // ---------------------------------------------------------------------------
 router.post('/logout', requireAuth, async (req, res) => {
-  await AuditTrailModel.logAction({
+  await logAuditOrThrow({
     user_id: String(req.user!.id),
     action_type: 'LOGOUT',
     ip_address: req.ip,
     user_agent: req.headers['user-agent'],
-  }).catch(() => {});
+  }, 'LOGOUT');
   return res.json({ message: 'Logged out' });
 });
 
