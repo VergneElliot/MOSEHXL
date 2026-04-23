@@ -1,6 +1,7 @@
 import express from 'express';
 import { UserModel } from '../models/user';
 import { AuditTrailModel } from '../models/auditTrail';
+import { TokenBlocklistModel } from '../models/tokenBlocklist';
 import { Logger } from '../utils/logger';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import {
@@ -28,6 +29,19 @@ async function logAuditOrThrow(
       'AUTH_ROUTE'
     );
     throw new AppError('Failed to persist audit trail entry', 500, 'AUDIT_LOG_FAILURE', { context });
+  }
+}
+
+async function revokeTokenOrThrow(token: string, userId: number, reason: string): Promise<void> {
+  try {
+    await TokenBlocklistModel.revokeToken(token, { userId, reason });
+  } catch (error) {
+    Logger.getInstance().error(
+      `Token revocation failed (${reason})`,
+      error as Error,
+      'AUTH_ROUTE'
+    );
+    throw new AppError('Failed to revoke token', 500, 'TOKEN_REVOCATION_FAILED', { reason });
   }
 }
 
@@ -340,6 +354,12 @@ router.post('/support/impersonation/stop', requireAuth, requireAdmin, asyncHandl
       user_agent: userAgent,
     }, 'SUPPORT_IMPERSONATION_ENDED');
 
+    const authorization = req.headers.authorization;
+    const currentToken = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
+    if (currentToken) {
+      await revokeTokenOrThrow(currentToken, actorUserId, 'SUPPORT_IMPERSONATION_ENDED');
+    }
+
     return res.json({
       message: 'Support impersonation ended',
       token: resetToken,
@@ -355,6 +375,12 @@ router.post('/support/impersonation/stop', requireAuth, requireAdmin, asyncHandl
 // POST /api/auth/logout
 // ---------------------------------------------------------------------------
 router.post('/logout', requireAuth, asyncHandler(async (req, res) => {
+  const authorization = req.headers.authorization;
+  const currentToken = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
+  if (currentToken) {
+    await revokeTokenOrThrow(currentToken, req.user!.id, 'LOGOUT');
+  }
+
   await logAuditOrThrow({
     user_id: String(req.user!.id),
     action_type: 'LOGOUT',

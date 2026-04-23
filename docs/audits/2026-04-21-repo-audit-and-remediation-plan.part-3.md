@@ -235,11 +235,12 @@ My recommendation is **Option 1**. If you ever need stronger isolation for a hig
 
 ### Phase D — Nice-to-haves (do when the above is done)
 
-- JWT revocation via a `token_blocklist` table (or short-lived access + refresh tokens). Right now a compromised token lives for up to 7 days.
-- Re-enable `requirePermission` on routes instead of allowing `is_admin` to bypass everything.
-- Move Epson poll key out of the query string into a header.
-- Adopt a monorepo root `package.json` with workspaces, or delete the root lockfile + `node_modules/`.
-- Unify `Order`/`OrderItem` types in a shared package (`@mosehxl/types`) consumed by both backend and frontend.
+- **D1 — Token lifecycle hardening (auth security):** add JWT revocation via a `token_blocklist` table (`jti`/hash + expiry), wire `requireAuth` to deny revoked tokens, and optionally move toward short-lived access + refresh token rotation. Current risk: compromised token can live up to 7 days.
+- **D2 — Permission model hardening (least privilege):** re-enable strict `requirePermission(...)` checks where broad admin bypasses remain, with explicit route-by-route permission matrices for `system_admin`, `establishment_admin`, and `staff`.
+- **D3 — Epson polling secret transport hardening:** move Epson poll key out of query string and into a dedicated header, keep a short compatibility window, then remove query support to reduce credential leakage in logs/proxies.
+- **D4 — Contract + repository hygiene:** unify `Order`/`OrderItem` API contracts in a shared package (`@mosehxl/types`) consumed by backend/frontend, and then either formalize root workspaces (`package.json`) or remove unused root lockfile + `node_modules/` to avoid dependency drift.
+
+**Plan/implementation of record (D1):** `docs/patch-notes/90-PHASE-D1-JWT-REVOCATION-PLAN.md` and `docs/patch-notes/91-PHASE-D1-JWT-REVOCATION-IMPLEMENTATION.md`.
 
 ---
 

@@ -54,13 +54,19 @@ describe('support impersonation endpoints', () => {
     mocks.logAction.mockReset();
     mocks.logAction.mockResolvedValue({});
     mocks.getAuthRoleState.mockReset();
+    mocks.poolQuery.mockImplementation(async (query: unknown) => {
+      const sql = String(query ?? '');
+      if (sql.includes('FROM token_blocklist')) {
+        return { rows: [] };
+      }
+      if (sql.includes('FROM establishments')) {
+        return { rows: [{ id: 'est-1', name: 'Cafe A' }] };
+      }
+      return { rows: [] };
+    });
   });
 
   it('starts a time-bounded impersonation token and logs audit action', async () => {
-    mocks.poolQuery.mockResolvedValueOnce({
-      rows: [{ id: 'est-1', name: 'Cafe A' }],
-    });
-
     const res = await request(app)
       .post('/auth/support/impersonation/start')
       .set('Authorization', `Bearer ${systemAdminToken()}`)
@@ -125,6 +131,33 @@ describe('support impersonation endpoints', () => {
         establishment_id: 'est-1',
       })
     );
+
+    expect(mocks.poolQuery).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO token_blocklist'),
+      expect.any(Array)
+    );
+  });
+
+  it('rejects a revoked token before route execution', async () => {
+    mocks.poolQuery.mockImplementation(async (query: unknown) => {
+      const sql = String(query ?? '');
+      if (sql.includes('FROM token_blocklist')) {
+        return { rows: [{ '?column?': 1 }] };
+      }
+      return { rows: [] };
+    });
+
+    const res = await request(app)
+      .post('/auth/support/impersonation/start')
+      .set('Authorization', `Bearer ${systemAdminToken()}`)
+      .send({
+        establishment_id: 'est-1',
+        reason: 'Investigating closure mismatch',
+        duration_minutes: 20,
+      });
+
+    expect(res.status).toBe(401);
+    expect(res.body.error).toBe('Token has been revoked');
   });
 });
 
