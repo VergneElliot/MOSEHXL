@@ -36,14 +36,15 @@ export function enrichConfigurationRow(row: Record<string, unknown>, establishme
   const cfg = parseConfigCell(row.config);
   const base = (process.env.APP_URL || process.env.PUBLIC_API_URL || '').replace(/\/$/, '');
   let epson_server_direct_poll_url: string | null = null;
+  let epson_server_direct_poll_key_header: string | null = null;
   if (row.provider === 'epson-server-direct' && base && typeof cfg.pollKey === 'string') {
     const q = new URLSearchParams({
       establishment_id: establishmentId,
-      key: cfg.pollKey,
     });
     epson_server_direct_poll_url = `${base}/api/printing/epson/poll?${q.toString()}`;
+    epson_server_direct_poll_key_header = 'x-epson-poll-key';
   }
-  return { ...row, config: cfg, epson_server_direct_poll_url };
+  return { ...row, config: cfg, epson_server_direct_poll_url, epson_server_direct_poll_key_header };
 }
 
 export async function getActivePrintingConfiguration(

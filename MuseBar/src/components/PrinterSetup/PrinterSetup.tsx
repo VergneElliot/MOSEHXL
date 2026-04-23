@@ -80,7 +80,7 @@ const providerInfo: Record<string, ProviderInfo> = {
     name: 'Epson Server Direct Print',
     icon: <CloudIcon />,
     description:
-      'TM-Intelligent Epson printers poll your MuseBar cloud URL for ePOS-Print jobs. Minimal software on site — configure the poll URL in the printer web settings (TMNet WebConfig).',
+      'TM-Intelligent Epson printers poll your MuseBar cloud URL for ePOS-Print jobs. Configure poll URL + x-epson-poll-key header in TMNet WebConfig.',
     fields: [{ name: 'printerLabel', label: 'Printer display name (optional)', type: 'text', required: false }],
   },
 };
