@@ -190,6 +190,8 @@ My recommendation is **Option 1**. If you ever need stronger isolation for a hig
 
 **B3. Printing schema drift — put `printing_configurations` and `printing_history` into the migration chain.** Create a new migration that `CREATE TABLE IF NOT EXISTS` for both; confirm columns match the code (`printingConfigRepo.ts`, `logPrintingHistory`).
 
+**Plan/implementation of record:** `docs/patch-notes/74-PRINTING-TABLES-MIGRATION-CHAIN-B3-PLAN.md` and `docs/patch-notes/75-PRINTING-TABLES-MIGRATION-CHAIN-B3-IMPLEMENTATION.md`.
+
 **B4. Clarify `orders` columns.** Either migrate `receipt_number` / `receipt_hash` / `tax_amount` into the schema officially, or remove their usage in `printDataRepo.ts` and compute them on demand.
 
 ### Phase C — Code hygiene (do in parallel with B)
