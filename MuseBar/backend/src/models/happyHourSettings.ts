@@ -1,4 +1,13 @@
 import { pool } from '../app';
+import { Logger } from '../utils/logger';
+
+function logParseFailure(message: string, error: unknown): void {
+  try {
+    Logger.getInstance().error(message, error as Error, 'HAPPY_HOUR_SETTINGS');
+  } catch {
+    process.stderr.write(`[HAPPY_HOUR_SETTINGS] ${message}: ${error instanceof Error ? error.message : String(error)}\n`);
+  }
+}
 
 export type ManualOverride = 'auto' | 'on' | 'off';
 
@@ -39,7 +48,8 @@ export class HappyHourSettingsModel {
 
     try {
       value = { ...defaultHappyHour, ...(JSON.parse(row.setting_value) as Partial<HappyHourSettings>) };
-    } catch {
+    } catch (error) {
+      logParseFailure('Failed to parse happy hour settings JSON', error);
       // Invalid JSON -> fall back to defaults.
       value = defaultHappyHour;
     }

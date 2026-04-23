@@ -2,6 +2,15 @@ import { randomUUID } from 'crypto';
 
 import type { PrintingConfig } from '../services/printing/types';
 import type { Pool } from 'pg';
+import { Logger } from '../utils/logger';
+
+function logParseFailure(message: string, error: unknown): void {
+  try {
+    Logger.getInstance().error(message, error as Error, 'PRINTING_CONFIG_REPO');
+  } catch {
+    process.stderr.write(`[PRINTING_CONFIG_REPO] ${message}: ${error instanceof Error ? error.message : String(error)}\n`);
+  }
+}
 
 export const ALLOWED_PRINT_PROVIDERS: PrintingConfig['provider'][] = [
   'epson-server-direct',
@@ -15,7 +24,8 @@ export function parseConfigCell(raw: unknown): Record<string, unknown> {
   if (typeof raw === 'string') {
     try {
       return JSON.parse(raw) as Record<string, unknown>;
-    } catch {
+    } catch (error) {
+      logParseFailure('Failed to parse printing configuration JSON', error);
       return {};
     }
   }

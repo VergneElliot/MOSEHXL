@@ -1,5 +1,19 @@
 import * as QRCode from 'qrcode';
 import { ReceiptData } from '../printing/types';
+import { Logger } from '../../utils/logger';
+
+function logParseWarning(message: string, details: { error: unknown; qrDataPreview: string }): void {
+  try {
+    Logger.getInstance().warn(
+      message,
+      { error: details.error as Error, qrDataPreview: details.qrDataPreview },
+      'QR_RECEIPT'
+    );
+  } catch {
+    const errMsg = details.error instanceof Error ? details.error.message : String(details.error);
+    process.stderr.write(`[QR_RECEIPT] ${message}: ${errMsg}\n`);
+  }
+}
 
 export class QRReceiptService {
   private baseUrl: string;
@@ -123,7 +137,11 @@ export class QRReceiptService {
     try {
       // Try to parse as JSON first
       return JSON.parse(qrData);
-    } catch {
+    } catch (error) {
+      logParseWarning('Failed to parse QR data as JSON; falling back to URL parsing', {
+        error,
+        qrDataPreview: qrData.slice(0, 120),
+      });
       // If not JSON, assume it's a URL
       const urlMatch = qrData.match(/\/receipts\/(\d+)$/);
       if (urlMatch) {

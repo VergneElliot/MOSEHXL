@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import { apiCore } from '../../services/api';
 import LegalReceiptContainer from '../Legal/LegalReceipt/LegalReceiptContainer';
+import type { Order as LegalReceiptOrder, ReceiptItem } from '../Legal/LegalReceipt/types';
 
 type PrintDocType = 'receipt' | 'invoice_detailed' | 'invoice_summary';
 
@@ -27,52 +28,64 @@ type BusinessInfo = {
   taxIdentification?: string;
 };
 
-function normalizeReceiptForPreview(raw: any) {
-  if (!raw || typeof raw !== 'object') return null;
+type PreviewReceiptOrder = LegalReceiptOrder;
 
-  const toNumber = (v: any) => {
+type PreviewPayload = {
+  order: PreviewReceiptOrder;
+  businessInfo: BusinessInfo;
+};
+
+function normalizeReceiptForPreview(raw: unknown): PreviewPayload | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const rawRecord = raw as Record<string, unknown>;
+
+  const toNumber = (v: unknown) => {
     const n = typeof v === 'number' ? v : typeof v === 'string' ? parseFloat(v) : NaN;
     return Number.isFinite(n) ? n : 0;
   };
 
-  const items = Array.isArray(raw.items) ? raw.items : [];
-  const normalizedItems = items.map((it: any) => {
-    const unit = toNumber(it.unit_price);
-    const total = toNumber(it.total_price);
+  const items = Array.isArray(rawRecord.items) ? rawRecord.items : [];
+  const normalizedItems: ReceiptItem[] = items.map((it) => {
+    const item = typeof it === 'object' && it !== null ? (it as Record<string, unknown>) : {};
+    const unit = toNumber(item.unit_price);
+    const total = toNumber(item.total_price);
 
     // Backend tax_rate might be 0.2 or 20 depending on source. UI expects percent number like 20.
-    const rateRaw = toNumber(it.tax_rate);
+    const rateRaw = toNumber(item.tax_rate);
     const ratePercent = rateRaw > 0 && rateRaw <= 1 ? rateRaw * 100 : rateRaw;
     const rate = ratePercent / 100;
 
-    const taxAmount = toNumber(it.tax_amount) || (total * rate) / (1 + rate);
+    const taxAmount = toNumber(item.tax_amount) || (total * rate) / (1 + rate);
 
     return {
-      ...it,
-      name: it.name ?? it.product_name ?? '',
-      product_name: it.product_name ?? it.name ?? '',
-      quantity: toNumber(it.quantity) || 1,
+      ...item,
+      name: String(item.name ?? item.product_name ?? ''),
+      product_name: String(item.product_name ?? item.name ?? ''),
+      quantity: toNumber(item.quantity) || 1,
       unit_price: unit,
       total_price: total,
       tax_rate: ratePercent,
       tax_amount: taxAmount,
-      happy_hour_applied: Boolean(it.happy_hour_applied) || false,
-      happy_hour_discount_amount: toNumber(it.happy_hour_discount_amount),
+      happy_hour_applied: Boolean(item.happy_hour_applied) || false,
+      happy_hour_discount_amount: toNumber(item.happy_hour_discount_amount),
     };
   });
 
-  const businessInfoRaw = raw.business_info ?? {};
+  const businessInfoRaw =
+    typeof rawRecord.business_info === 'object' && rawRecord.business_info !== null
+      ? (rawRecord.business_info as Record<string, unknown>)
+      : {};
 
   return {
     order: {
-      id: toNumber(raw.order_id ?? raw.id),
-      sequence_number: toNumber(raw.sequence_number ?? 0),
-      total_amount: toNumber(raw.total_amount),
-      total_tax: toNumber(raw.total_tax),
-      payment_method: String(raw.payment_method ?? ''),
-      created_at: String(raw.created_at ?? new Date().toISOString()),
+      id: toNumber(rawRecord.order_id ?? rawRecord.id),
+      sequence_number: toNumber(rawRecord.sequence_number ?? 0),
+      total_amount: toNumber(rawRecord.total_amount),
+      total_tax: toNumber(rawRecord.total_tax),
+      payment_method: String(rawRecord.payment_method ?? ''),
+      created_at: String(rawRecord.created_at ?? new Date().toISOString()),
       items: normalizedItems,
-      vat_breakdown: raw.vat_breakdown ?? [],
+      vat_breakdown: Array.isArray(rawRecord.vat_breakdown) ? rawRecord.vat_breakdown : [],
     },
     businessInfo: {
       name: String(businessInfoRaw.name ?? ''),
@@ -100,7 +113,7 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
 }) => {
   const [docType, setDocType] = useState<PrintDocType>('receipt');
   const [loading, setLoading] = useState(false);
-  const [preview, setPreview] = useState<any | null>(null);
+  const [preview, setPreview] = useState<PreviewReceiptOrder | null>(null);
   const [businessInfo, setBusinessInfo] = useState<BusinessInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
@@ -139,7 +152,7 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
     (async () => {
       try {
         // Preview-only: does not queue a print job.
-        const data = await apiCore.request<{ receipt_data: any }>(
+        const data = await apiCore.request<{ receipt_data: unknown }>(
           `/printing/receipt/${orderId}/preview?type=${receiptType}`,
           { method: 'GET' }
         );

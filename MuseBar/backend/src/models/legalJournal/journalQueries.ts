@@ -5,13 +5,23 @@
 
 import { pool } from '../../app';
 import { JournalEntry, ClosureBulletin } from './types';
+import { Logger } from '../../utils/logger';
+
+function logParseFailure(message: string, error: unknown): void {
+  try {
+    Logger.getInstance().error(message, error as Error, 'LEGAL_JOURNAL');
+  } catch {
+    process.stderr.write(`[LEGAL_JOURNAL] ${message}: ${error instanceof Error ? error.message : String(error)}\n`);
+  }
+}
 
 function parseJsonField<T>(value: unknown, fallback: T): T {
   if (value == null) return fallback;
   if (typeof value === 'string') {
     try {
       return JSON.parse(value) as T;
-    } catch {
+    } catch (error) {
+      logParseFailure('Failed to parse legal journal JSON field', error);
       return fallback;
     }
   }
