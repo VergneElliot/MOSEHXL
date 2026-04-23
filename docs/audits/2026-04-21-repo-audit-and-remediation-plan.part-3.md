@@ -194,6 +194,8 @@ My recommendation is **Option 1**. If you ever need stronger isolation for a hig
 
 **B4. Clarify `orders` columns.** Either migrate `receipt_number` / `receipt_hash` / `tax_amount` into the schema officially, or remove their usage in `printDataRepo.ts` and compute them on demand.
 
+**Plan/implementation of record:** `docs/patch-notes/76-ORDERS-RECEIPT-COLUMNS-B4-PLAN.md` and `docs/patch-notes/77-ORDERS-RECEIPT-COLUMNS-B4-IMPLEMENTATION.md`.
+
 ### Phase C — Code hygiene (do in parallel with B)
 
 **C1. Delete dead code:**
