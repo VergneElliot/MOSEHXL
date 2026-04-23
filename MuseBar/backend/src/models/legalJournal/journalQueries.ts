@@ -266,11 +266,11 @@ export class JournalQueries {
   }
 
   /**
-   * Get closure bulletins (optionally filtered by type and/or establishment for multi-tenancy).
+   * Get closure bulletins for one establishment (optionally filtered by type).
    */
   static async getClosureBulletins(
-    type?: 'DAILY' | 'MONTHLY' | 'ANNUAL',
-    establishmentId?: string
+    establishmentId: string,
+    type?: 'DAILY' | 'MONTHLY' | 'ANNUAL'
   ): Promise<ClosureBulletin[]> {
     let query = 'SELECT * FROM closure_bulletins';
     const values: Array<string | number> = [];
@@ -280,10 +280,8 @@ export class JournalQueries {
       conditions.push(`closure_type = $${values.length + 1}`);
       values.push(type);
     }
-    if (establishmentId !== undefined && establishmentId !== null) {
-      conditions.push(`(establishment_id IS NOT DISTINCT FROM $${values.length + 1})`);
-      values.push(establishmentId);
-    }
+    conditions.push(`(establishment_id IS NOT DISTINCT FROM $${values.length + 1})`);
+    values.push(establishmentId);
     if (conditions.length > 0) {
       query += ' WHERE ' + conditions.join(' AND ');
     }
@@ -316,8 +314,8 @@ export class JournalQueries {
    * Returns only the requested page plus the total matching count.
    */
   static async getClosureBulletinsPaginated(
+    establishmentId: string,
     type?: 'DAILY' | 'MONTHLY' | 'ANNUAL',
-    establishmentId?: string,
     opts?: { limit?: number; offset?: number }
   ): Promise<{ bulletins: ClosureBulletin[]; total: number }> {
     const values: Array<string | number> = [];
@@ -328,10 +326,8 @@ export class JournalQueries {
       values.push(type);
     }
 
-    if (establishmentId !== undefined && establishmentId !== null) {
-      conditions.push(`(establishment_id IS NOT DISTINCT FROM $${values.length + 1})`);
-      values.push(establishmentId);
-    }
+    conditions.push(`(establishment_id IS NOT DISTINCT FROM $${values.length + 1})`);
+    values.push(establishmentId);
 
     const whereClause = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
 

@@ -216,7 +216,7 @@ export class ArchiveService {
           'SELECT * FROM legal_journal WHERE establishment_id = $1 ORDER BY sequence_number ASC',
           [eid]
         );
-        const allClosures = await LegalJournalModel.getClosureBulletins(undefined, eid);
+        const allClosures = await LegalJournalModel.getClosureBulletins(eid);
         
         data = {
           export_type: 'FULL',

@@ -366,9 +366,19 @@ For **display**, amounts are rounded to 2 decimal places (e.g., `12.50 €`). Fo
 
 ---
 
-## Schema-Based Multi-Tenancy
+## Multi-Tenancy Model (V2): Shared tables + `establishment_id`
 
-This is an advanced concept, but important to understand. Each establishment (bar/restaurant) gets its own **PostgreSQL schema** — a namespace for tables. Think of it like folders on a computer:
+As of Phase **B1** of the April 2026 audit remediation, V2 uses **shared tables** (single schema) for multi-tenancy.
+
+- Each tenant-owned row carries **`establishment_id`**
+- The application scopes every read/write to the authenticated establishment
+- Legal/fiscal tables are also per-establishment (journal chain, closures, archives)
+
+This model is compatible with French fiscal compliance because what matters is **per legal entity evidence** (no cross-tenant mixing), not the physical schema layout.
+
+### Legacy note (historical)
+
+Earlier versions of the project experimented with **schema-per-tenant** (`establishment_<uuid>` schemas created by `SchemaManager`). The audit found this was **not used at runtime** and created documentation drift. The current (V2) reference model is shared tables with strict tenant isolation.
 
 ```
 Database: mosehxl_development
@@ -393,7 +403,7 @@ Database: mosehxl_development
     └── business_settings
 ```
 
-This isolation means that Bar A's products and orders are completely separate from Bar B's. It's the database-level equivalent of having separate databases, but within one PostgreSQL instance (easier to manage). The `SchemaManager` service creates these schemas automatically when a new establishment is set up.
+This isolation means that Bar A's products and orders are completely separate from Bar B's **by filtering and enforcement** on `establishment_id` (and, once implemented, DB-level guardrails like Row Level Security).
 
 ---
 
@@ -410,4 +420,4 @@ This isolation means that Bar A's products and orders are completely separate fr
 | Connection pool | Reuses DB connections for performance | `new Pool({...})` in `app.ts` |
 | Parameterized query | Prevents SQL injection | `$1`, `$2` in every `pool.query()` |
 | DECIMAL(12,4) | Exact monetary arithmetic (no floating point drift) | All monetary columns |
-| Schema-based multi-tenancy | Each establishment gets its own table namespace | `SchemaManager.ts`, `establishment.ts` |
+| Shared-table multi-tenancy | All tenants share tables; rows are scoped by `establishment_id` | Models + routes; Phase B1 adds DB guardrails |

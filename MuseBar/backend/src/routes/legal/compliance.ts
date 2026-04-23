@@ -23,7 +23,7 @@ router.get('/status', requireAdmin, async (req, res) => {
     const integrity = await LegalJournalModel.verifyJournalIntegrity(establishmentId);
     
     // Get recent closures
-    const recentClosures = await LegalJournalModel.getClosureBulletins('DAILY', establishmentId);
+    const recentClosures = await LegalJournalModel.getClosureBulletins(establishmentId, 'DAILY');
     const today = new Date();
     const todayClosure = recentClosures.find(bulletin => {
       const bulletinDate = new Date(bulletin.period_start);
@@ -69,7 +69,7 @@ router.get('/report', requireAdmin, async (req, res) => {
     const entries = await LegalJournalModel.getEntriesForPeriod(establishmentId, startDate, endDate);
     
     // Get closures for the period
-    const closures = await LegalJournalModel.getClosureBulletins(undefined, establishmentId);
+    const closures = await LegalJournalModel.getClosureBulletins(establishmentId);
     const periodClosures = closures.filter(bulletin => {
       const bulletinDate = new Date(bulletin.period_start);
       return bulletinDate >= startDate && bulletinDate <= endDate;

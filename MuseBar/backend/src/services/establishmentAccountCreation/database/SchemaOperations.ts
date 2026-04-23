@@ -1,6 +1,7 @@
 import { PoolClient } from 'pg';
 import { Logger } from '../../../utils/logger';
-import { SchemaManager } from '../../../services/SchemaManager';
+// Phase B1: shared-table multi-tenancy. This module is kept for backward compatibility
+// with the account-creation flow, but it no longer creates a schema-per-tenant.
 
 export interface SchemaCreationData {
   establishmentId: string;
@@ -21,8 +22,10 @@ export class SchemaOperations {
   }
 
   /**
-   * Create establishment-specific schema for data isolation.
-   * Uses SchemaManager so the same tables exist as in the admin-creation flow (orders, order_items, products, categories, legal_journal, audit_trail).
+   * Legacy API: previously created establishment-specific schemas.
+   *
+   * Phase B1: returns a stub "created schema" record for compatibility,
+   * but does not create schemas/tables — tenant isolation is column-based.
    */
   public async createEstablishmentSchema(
     client: PoolClient,
@@ -35,43 +38,34 @@ export class SchemaOperations {
     const schemaName = `establishment_${establishmentId}`;
 
     try {
-      // 1. Create the schema
-      await client.query(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`);
-      this.logger.info('Establishment schema created', { schemaName, establishmentId });
+      // No schema creation in shared-table multi-tenancy.
+      const tablesCreated: string[] = [];
 
-      // 2. Create tables using SchemaManager (single source of truth — same structure as admin-creation flow)
-      SchemaManager.initialize(this.logger);
-      await SchemaManager.createEstablishmentSchema(client, schemaName);
-      const tablesCreated = ['orders', 'order_items', 'products', 'categories', 'legal_journal', 'audit_trail'];
-
-      // 3. Set up permissions for the schema
-      await this.setupSchemaPermissions(client, schemaName, establishmentId);
-
-      // 4. Log audit trail using transaction client to avoid deadlocks
+      // Log audit trail using transaction client to avoid deadlocks
       await client.query(
         `INSERT INTO audit_trail (
           user_id, action_type, resource_type, resource_id,
-          action_details, ip_address, user_agent, session_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          action_details, ip_address, user_agent, session_id, establishment_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [
           userId,
-          'ESTABLISHMENT_SCHEMA_CREATED',
-          'SCHEMA',
-          schemaName,
+          'ESTABLISHMENT_TENANCY_INITIALIZED',
+          'TENANCY',
+          establishmentId,
           JSON.stringify({
-            schema_name: schemaName,
             establishment_id: establishmentId,
             establishment_name: establishmentName,
             tables_created: tablesCreated,
-            isolation_type: 'schema_based'
+            isolation_type: 'shared_table'
           }),
           ipAddress,
           userAgent,
-          null
+          null,
+          establishmentId
         ]
       );
 
-      this.logger.info('Audit trail logged for schema creation', { schemaName, establishmentId });
+      this.logger.info('Tenant initialization logged (shared-table)', { schemaName, establishmentId });
 
       return {
         schemaName,
@@ -93,17 +87,12 @@ export class SchemaOperations {
     schemaName: string, 
     establishmentId: string
   ): Promise<void> {
+    void client;
+    void schemaName;
+    void establishmentId;
     try {
-      // Grant usage on schema to the application user
-      await client.query(`GRANT USAGE ON SCHEMA "${schemaName}" TO current_user`);
-      
-      // Grant all privileges on all tables in the schema
-      await client.query(`GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA "${schemaName}" TO current_user`);
-      
-      // Grant all privileges on all sequences in the schema
-      await client.query(`GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA "${schemaName}" TO current_user`);
-
-      this.logger.info('Schema permissions set up', { schemaName, establishmentId });
+      // No-op in shared-table tenancy.
+      return;
 
     } catch (error) {
       this.logger.error('Failed to set up schema permissions', error as Error);

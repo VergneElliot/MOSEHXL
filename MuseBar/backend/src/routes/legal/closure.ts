@@ -5,7 +5,7 @@
 
 import express from 'express';
 import LegalJournalModel from '../../models/legalJournal';
-import { requireAuth, requirePermission } from '../auth';
+import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
 import { P } from '../../permissions/registry';
 
 const router = express.Router();
@@ -36,12 +36,9 @@ router.use(requireAuth, requirePermission(P.access_closure));
  * POST /api/legal/closure/daily
  */
 router.post('/daily', async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
-    const establishmentId = req.user?.establishment_id;
-    if (!establishmentId) {
-      return res.status(400).json({ error: 'Closure must be scoped to an establishment. Only establishment users can create closures.' });
-    }
-
     const { date, force, fond_de_caisse } = req.body;
     if (!date) {
       return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
@@ -75,11 +72,9 @@ router.post('/daily', async (req, res) => {
  * POST /api/legal/closure/weekly
  */
 router.post('/weekly', async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
-    const establishmentId = req.user?.establishment_id;
-    if (!establishmentId) {
-      return res.status(400).json({ error: 'Closure must be scoped to an establishment. Only establishment users can create closures.' });
-    }
     const { date, force, fond_de_caisse } = req.body;
     if (!date) {
       return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
@@ -112,11 +107,9 @@ router.post('/weekly', async (req, res) => {
  * POST /api/legal/closure/monthly
  */
 router.post('/monthly', async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
-    const establishmentId = req.user?.establishment_id;
-    if (!establishmentId) {
-      return res.status(400).json({ error: 'Closure must be scoped to an establishment. Only establishment users can create closures.' });
-    }
     const { date, force, fond_de_caisse } = req.body;
     if (!date) {
       return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
@@ -149,11 +142,9 @@ router.post('/monthly', async (req, res) => {
  * POST /api/legal/closure/annual
  */
 router.post('/annual', async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
-    const establishmentId = req.user?.establishment_id;
-    if (!establishmentId) {
-      return res.status(400).json({ error: 'Closure must be scoped to an establishment. Only establishment users can create closures.' });
-    }
     const { date, force, fond_de_caisse } = req.body;
     if (!date) {
       return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
@@ -186,11 +177,9 @@ router.post('/annual', async (req, res) => {
  * POST /api/legal/closure/create
  */
 router.post('/create', async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
-    const establishmentId = req.user?.establishment_id;
-    if (!establishmentId) {
-      return res.status(400).json({ error: 'Closure must be scoped to an establishment. Only establishment users can create closures.' });
-    }
     const { date, type, force, fond_de_caisse } = req.body;
 
     if (!date) {
@@ -250,9 +239,10 @@ router.post('/create', async (req, res) => {
  * GET /api/legal/closure/bulletins
  */
 router.get('/bulletins', async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
     const { type } = req.query;
-    const establishmentId = req.user?.establishment_id ?? undefined;
 
     const limitRaw = req.query.limit;
     const offsetRaw = req.query.offset;
@@ -267,8 +257,8 @@ router.get('/bulletins', async (req, res) => {
 
     if (shouldPaginate) {
       const { bulletins, total } = await LegalJournalModel.getClosureBulletinsPaginated(
-        closureType,
         establishmentId,
+        closureType,
         { limit, offset }
       );
 
@@ -281,8 +271,8 @@ router.get('/bulletins', async (req, res) => {
     }
 
     const bulletins = await LegalJournalModel.getClosureBulletins(
-      closureType,
-      establishmentId
+      establishmentId,
+      closureType
     );
 
     res.json({
@@ -301,10 +291,11 @@ router.get('/bulletins', async (req, res) => {
  * GET /api/legal/closure/today-status
  */
 router.get('/today-status', async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
-    const establishmentId = req.user?.establishment_id ?? undefined;
     const today = new Date();
-    const bulletins = await LegalJournalModel.getClosureBulletins('DAILY', establishmentId);
+    const bulletins = await LegalJournalModel.getClosureBulletins(establishmentId, 'DAILY');
     
     const todayBulletin = bulletins.find(bulletin => {
       const bulletinDate = new Date(bulletin.period_start);
@@ -320,7 +311,7 @@ router.get('/today-status', async (req, res) => {
           })(todayBulletin as unknown as { total_transactions?: number } & Record<string, unknown>)
         : null;
 
-    const lastFondDeCaisse = establishmentId ? await LegalJournalModel.getLastFondDeCaisse(establishmentId) : null;
+    const lastFondDeCaisse = await LegalJournalModel.getLastFondDeCaisse(establishmentId);
 
     res.json({
       date: today.toISOString().split('T')[0],
@@ -341,13 +332,14 @@ router.get('/today-status', async (req, res) => {
  * GET /api/legal/closure/monthly-latest
  */
 router.get('/monthly-latest', async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
-    const establishmentId = req.user?.establishment_id ?? undefined;
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-    const bulletins = await LegalJournalModel.getClosureBulletins('MONTHLY', establishmentId);
+    const bulletins = await LegalJournalModel.getClosureBulletins(establishmentId, 'MONTHLY');
     const currentMonthBulletin = bulletins.find(bulletin => {
       const start = new Date(bulletin.period_start);
       const end = new Date(bulletin.period_end);

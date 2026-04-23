@@ -157,6 +157,7 @@ export class MigrationManager {
         
         try {
           await this.pool.query('BEGIN');
+          await this.pool.query("SELECT set_config('app.bypass_rls', 'on', true)");
           await this.pool.query(migration.up);
           await this.markMigrationExecuted(migration);
           await this.pool.query('COMMIT');
@@ -205,6 +206,7 @@ export class MigrationManager {
 
       try {
         await this.pool.query('BEGIN');
+        await this.pool.query("SELECT set_config('app.bypass_rls', 'on', true)");
         await this.pool.query(migration.down);
         await this.markMigrationNotExecuted(migration.id);
         await this.pool.query('COMMIT');

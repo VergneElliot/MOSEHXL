@@ -8,6 +8,7 @@ import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { UserModel } from '../models/user';
+import { runWithTenantContext } from '../db/tenantContext';
 
 // No fallback: if JWT_SECRET is missing, fail fast so we never run with a default secret.
 const rawSecret = process.env.JWT_SECRET;
@@ -25,10 +26,20 @@ export interface JwtPayload {
   is_admin: boolean;
   role: string;
   establishment_id: string | null;
+  support_impersonation?: {
+    actor_user_id: number;
+    reason: string;
+    started_at: string;
+    expires_at: string;
+  };
 }
 
-export function generateToken(payload: JwtPayload, rememberMe: boolean = false): string {
-  const expiration = rememberMe ? '7d' : '12h';
+export function generateToken(
+  payload: JwtPayload,
+  rememberMe: boolean = false,
+  customExpiresIn?: jwt.SignOptions['expiresIn']
+): string {
+  const expiration: jwt.SignOptions['expiresIn'] = customExpiresIn ?? (rememberMe ? '7d' : '12h');
   return jwt.sign(payload, JWT_SECRET, { expiresIn: expiration });
 }
 
@@ -52,14 +63,21 @@ export async function requireAuth(
 
   try {
     const payload = verifyToken(auth.slice(7));
+    if (payload.support_impersonation?.expires_at) {
+      const expiresAt = new Date(payload.support_impersonation.expires_at);
+      if (!Number.isNaN(expiresAt.getTime()) && Date.now() > expiresAt.getTime()) {
+        return res.status(401).json({ error: 'Support impersonation token expired' });
+      }
+    }
     req.user = {
       id: payload.id,
       email: payload.email,
       is_admin: payload.is_admin,
       role: payload.role,
       establishment_id: payload.establishment_id ?? null,
+      support_impersonation: payload.support_impersonation,
     };
-    next();
+    runWithTenantContext({ establishmentId: req.user.establishment_id ?? null }, () => next());
   } catch {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
