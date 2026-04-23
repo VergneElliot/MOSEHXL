@@ -295,7 +295,10 @@ router.post('/configuration', authenticateToken, ensureEstablishment, async (req
 router.get('/history', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
-    const { limit = 50, offset = 0 } = req.query;
+    const rawLimit = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : 50;
+    const rawOffset = typeof req.query.offset === 'string' ? parseInt(req.query.offset, 10) : 0;
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 500) : 50;
+    const offset = Number.isFinite(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
     
     const historyResult = await pool.query(
       `SELECT * FROM printing_history 
@@ -313,8 +316,8 @@ router.get('/history', authenticateToken, ensureEstablishment, async (req: Authe
     res.json({
       history: historyResult.rows,
       total: parseInt(countResult.rows[0].count),
-      limit: parseInt(limit as string),
-      offset: parseInt(offset as string)
+      limit,
+      offset
     });
   } catch (error) {
     getLogger().error('Error getting printing history', error instanceof Error ? error : undefined);
