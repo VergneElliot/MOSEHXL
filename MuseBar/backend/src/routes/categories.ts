@@ -5,7 +5,7 @@ import { getEstablishmentId, requireAuth, requireAnyPermission, requirePermissio
 import { P } from '../permissions/registry';
 import { validateBody, validateParams, commonValidations, paramValidations } from '../middleware/validation';
 import { Logger } from '../utils/logger';
-import { AppError } from '../middleware/errorHandler';
+import { AppError, asyncHandler } from '../middleware/errorHandler';
 
 const router = express.Router();
 
@@ -31,43 +31,43 @@ async function logAuditOrThrow(
 router.use(requireAuth);
 
 // GET /api/categories
-router.get('/', readCatalog, async (req, res) => {
+router.get('/', readCatalog, asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
     const categories = await CategoryModel.getAll(establishmentId);
     res.json(categories);
   } catch {
-    res.status(500).json({ error: 'Failed to fetch categories' });
+    throw new AppError('Failed to fetch categories', 500, 'CATEGORIES_FETCH_FAILED');
   }
-});
+}));
 
 // GET /api/categories/archived
-router.get('/archived', readCatalog, async (req, res) => {
+router.get('/archived', readCatalog, asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
     const categories = await CategoryModel.getAllArchived(establishmentId);
     res.json(categories);
   } catch {
-    res.status(500).json({ error: 'Failed to fetch archived categories' });
+    throw new AppError('Failed to fetch archived categories', 500, 'CATEGORIES_ARCHIVED_FETCH_FAILED');
   }
-});
+}));
 
 // GET /api/categories/all (active + archived)
-router.get('/all', readCatalog, async (req, res) => {
+router.get('/all', readCatalog, asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
     const categories = await CategoryModel.getAllIncludingArchived(establishmentId);
     res.json(categories);
   } catch {
-    res.status(500).json({ error: 'Failed to fetch all categories' });
+    throw new AppError('Failed to fetch all categories', 500, 'CATEGORIES_ALL_FETCH_FAILED');
   }
-});
+}));
 
 // GET /api/categories/:id
-router.get('/:id', readCatalog, validateParams([paramValidations.id]), async (req, res) => {
+router.get('/:id', readCatalog, validateParams([paramValidations.id]), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -76,12 +76,12 @@ router.get('/:id', readCatalog, validateParams([paramValidations.id]), async (re
     if (!category) return res.status(404).json({ error: 'Category not found' });
     res.json(category);
   } catch {
-    res.status(500).json({ error: 'Failed to fetch category' });
+    throw new AppError('Failed to fetch category', 500, 'CATEGORY_FETCH_FAILED');
   }
-});
+}));
 
 // POST /api/categories
-router.post('/', menuWrite, validateBody(commonValidations.categoryCreate), async (req, res) => {
+router.post('/', menuWrite, validateBody(commonValidations.categoryCreate), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -97,13 +97,14 @@ router.post('/', menuWrite, validateBody(commonValidations.categoryCreate), asyn
       user_agent: req.headers['user-agent'],
     }, 'CREATE_CATEGORY');
     res.status(201).json(category);
-  } catch {
-    res.status(500).json({ error: 'Failed to create category' });
+  } catch (error) {
+    Logger.getInstance().error('Create category failed', error as Error, 'CATEGORIES_ROUTE');
+    throw new AppError('Failed to create category', 500, 'CATEGORY_CREATE_FAILED');
   }
-});
+}));
 
 // PUT /api/categories/:id
-router.put('/:id', menuWrite, validateParams([paramValidations.id]), async (req, res) => {
+router.put('/:id', menuWrite, validateParams([paramValidations.id]), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -128,13 +129,14 @@ router.put('/:id', menuWrite, validateParams([paramValidations.id]), async (req,
       user_agent: req.headers['user-agent'],
     }, 'UPDATE_CATEGORY');
     res.json(category);
-  } catch {
-    res.status(500).json({ error: 'Failed to update category' });
+  } catch (error) {
+    Logger.getInstance().error('Update category failed', error as Error, 'CATEGORIES_ROUTE');
+    throw new AppError('Failed to update category', 500, 'CATEGORY_UPDATE_FAILED');
   }
-});
+}));
 
 // DELETE /api/categories/:id
-router.delete('/:id', menuWrite, validateParams([paramValidations.id]), async (req, res) => {
+router.delete('/:id', menuWrite, validateParams([paramValidations.id]), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -154,13 +156,14 @@ router.delete('/:id', menuWrite, validateParams([paramValidations.id]), async (r
       ? 'Catégorie supprimée définitivement avec succès'
       : 'Catégorie archivée avec succès (préservation légale requise)';
     res.json({ message, action: result.action, reason: result.reason });
-  } catch {
-    res.status(500).json({ error: 'Failed to delete category' });
+  } catch (error) {
+    Logger.getInstance().error('Delete category failed', error as Error, 'CATEGORIES_ROUTE');
+    throw new AppError('Failed to delete category', 500, 'CATEGORY_DELETE_FAILED');
   }
-});
+}));
 
 // POST /api/categories/:id/restore
-router.post('/:id/restore', menuWrite, validateParams([paramValidations.id]), async (req, res) => {
+router.post('/:id/restore', menuWrite, validateParams([paramValidations.id]), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -177,9 +180,10 @@ router.post('/:id/restore', menuWrite, validateParams([paramValidations.id]), as
       user_agent: req.headers['user-agent'],
     }, 'RESTORE_CATEGORY');
     res.json({ message: 'Catégorie restaurée avec succès' });
-  } catch {
-    res.status(500).json({ error: 'Failed to restore category' });
+  } catch (error) {
+    Logger.getInstance().error('Restore category failed', error as Error, 'CATEGORIES_ROUTE');
+    throw new AppError('Failed to restore category', 500, 'CATEGORY_RESTORE_FAILED');
   }
-});
+}));
 
 export default router;

@@ -214,7 +214,7 @@ My recommendation is **Option 1**. If you ever need stronger isolation for a hig
 - Replace every `.catch(() => {})` on audit logging with `logger.error` + `AppError`. Silent audit failures are a pillar-S compliance defect.
 - Replace `console.error` in `routes/legal/businessInfo.ts:17-20` with the logger.
 
-**Plan/implementation of record:** `docs/patch-notes/82-CODE-HYGIENE-C2-ERROR-HANDLING-PLAN.md` and `docs/patch-notes/83-CODE-HYGIENE-C2-ERROR-HANDLING-IMPLEMENTATION.md`.
+**Plan/implementation of record:** `docs/patch-notes/82-CODE-HYGIENE-C2-ERROR-HANDLING-PLAN.md`, `docs/patch-notes/83-CODE-HYGIENE-C2-ERROR-HANDLING-IMPLEMENTATION.md`, `docs/patch-notes/84-CODE-HYGIENE-C2-ERROR-HANDLING-PASS-2-PLAN.md`, and `docs/patch-notes/85-CODE-HYGIENE-C2-ERROR-HANDLING-PASS-2-IMPLEMENTATION.md`.
 
 **C3. Type safety:**
 - Fix frontend `any` in `src/services/api/orders.ts`, `PrintAfterSaleDialog`, `PrinterSetup`.

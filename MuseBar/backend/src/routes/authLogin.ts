@@ -2,7 +2,7 @@ import express from 'express';
 import { UserModel } from '../models/user';
 import { AuditTrailModel } from '../models/auditTrail';
 import { Logger } from '../utils/logger';
-import { AppError } from '../middleware/errorHandler';
+import { AppError, asyncHandler } from '../middleware/errorHandler';
 import {
   generateToken,
   requireAdmin,
@@ -64,7 +64,7 @@ function deriveRole(opts: { roleFromDb: unknown; isAdminFlag: boolean; establish
 // ---------------------------------------------------------------------------
 // POST /api/auth/login
 // ---------------------------------------------------------------------------
-router.post('/login', async (req, res) => {
+router.post('/login', asyncHandler(async (req, res) => {
   const { email, password, rememberMe } = req.body;
   const ip = req.ip;
   const userAgent = req.headers['user-agent'];
@@ -134,15 +134,15 @@ router.post('/login', async (req, res) => {
     });
   } catch (error) {
     Logger.getInstance().error('Login error', error as Error);
-    return res.status(500).json({ error: 'Internal server error during login' });
+    throw new AppError('Internal server error during login', 500, 'LOGIN_FAILED');
   }
-});
+}));
 
 // ---------------------------------------------------------------------------
 // GET /api/auth/me — returns current user info and permissions
 // Two lightweight indexed queries: users by PK + permissions join
 // ---------------------------------------------------------------------------
-router.get('/me', requireAuth, async (req, res) => {
+router.get('/me', requireAuth, asyncHandler(async (req, res) => {
   try {
     const userId = req.user!.id;
 
@@ -166,14 +166,14 @@ router.get('/me', requireAuth, async (req, res) => {
       support_impersonation: req.user!.support_impersonation ?? null,
     });
   } catch {
-    return res.status(500).json({ error: 'Internal server error' });
+    throw new AppError('Internal server error', 500, 'AUTH_ME_FAILED');
   }
-});
+}));
 
 // ---------------------------------------------------------------------------
 // POST /api/auth/refresh — re-issue token with current DB state
 // ---------------------------------------------------------------------------
-router.post('/refresh', requireAuth, async (req, res) => {
+router.post('/refresh', requireAuth, asyncHandler(async (req, res) => {
   try {
     if (req.user?.support_impersonation) {
       return res.status(400).json({
@@ -207,15 +207,15 @@ router.post('/refresh', requireAuth, async (req, res) => {
 
     return res.json({ token, expiresIn: rememberMe ? '7d' : '12h' });
   } catch {
-    return res.status(500).json({ error: 'Internal server error' });
+    throw new AppError('Internal server error', 500, 'TOKEN_REFRESH_FAILED');
   }
-});
+}));
 
 // ---------------------------------------------------------------------------
 // POST /api/auth/support/impersonation/start
 // Time-bounded support impersonation to one establishment (audited).
 // ---------------------------------------------------------------------------
-router.post('/support/impersonation/start', requireAuth, requireAdmin, async (req, res) => {
+router.post('/support/impersonation/start', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
   const actorUserId = req.user!.id;
   const actorEmail = req.user!.email;
   const ip = req.ip;
@@ -289,18 +289,16 @@ router.post('/support/impersonation/start', requireAuth, requireAdmin, async (re
       reason,
     });
   } catch (error) {
-    return res.status(500).json({
-      error: 'Failed to start support impersonation',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
+    Logger.getInstance().error('Failed to start support impersonation', error as Error, 'AUTH_ROUTE');
+    throw new AppError('Failed to start support impersonation', 500, 'SUPPORT_IMPERSONATION_START_FAILED');
   }
-});
+}));
 
 // ---------------------------------------------------------------------------
 // POST /api/auth/support/impersonation/stop
 // End support impersonation and return a standard system_admin token.
 // ---------------------------------------------------------------------------
-router.post('/support/impersonation/stop', requireAuth, requireAdmin, async (req, res) => {
+router.post('/support/impersonation/stop', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
   const actorUserId = req.user!.id;
   const ip = req.ip;
   const userAgent = req.headers['user-agent'];
@@ -348,17 +346,15 @@ router.post('/support/impersonation/stop', requireAuth, requireAdmin, async (req
       expiresIn: '12h',
     });
   } catch (error) {
-    return res.status(500).json({
-      error: 'Failed to stop support impersonation',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
+    Logger.getInstance().error('Failed to stop support impersonation', error as Error, 'AUTH_ROUTE');
+    throw new AppError('Failed to stop support impersonation', 500, 'SUPPORT_IMPERSONATION_STOP_FAILED');
   }
-});
+}));
 
 // ---------------------------------------------------------------------------
 // POST /api/auth/logout
 // ---------------------------------------------------------------------------
-router.post('/logout', requireAuth, async (req, res) => {
+router.post('/logout', requireAuth, asyncHandler(async (req, res) => {
   await logAuditOrThrow({
     user_id: String(req.user!.id),
     action_type: 'LOGOUT',
@@ -366,7 +362,7 @@ router.post('/logout', requireAuth, async (req, res) => {
     user_agent: req.headers['user-agent'],
   }, 'LOGOUT');
   return res.json({ message: 'Logged out' });
-});
+}));
 
 export default router;
 

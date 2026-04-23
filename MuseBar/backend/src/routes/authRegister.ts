@@ -2,7 +2,7 @@ import express from 'express';
 import { UserModel } from '../models/user';
 import { AuditTrailModel } from '../models/auditTrail';
 import { Logger } from '../utils/logger';
-import { AppError } from '../middleware/errorHandler';
+import { AppError, asyncHandler } from '../middleware/errorHandler';
 import {
   requireAuth,
   requireAdmin,
@@ -39,7 +39,7 @@ const ESTABLISHMENT_USER_ROLES: readonly string[] = ['establishment_admin', 'sta
 // Does NOT set establishment_id or role. For creating establishment users,
 // use POST /api/auth/users which is scoped by requireEstablishmentAdmin.
 // ---------------------------------------------------------------------------
-router.post('/register', requireAuth, requireAdmin, async (req, res) => {
+router.post('/register', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
   const { email, password, is_admin } = req.body;
   const ip = req.ip;
   const userAgent = req.headers['user-agent'];
@@ -73,30 +73,23 @@ router.post('/register', requireAuth, requireAdmin, async (req, res) => {
       { error: err instanceof Error ? err : new Error(String(err)), email },
       'AUTH_ROUTE'
     );
-    await logAuditOrThrow({
-      user_id: String(req.user!.id),
-      action_type: 'CREATE_USER_FAILED',
-      action_details: { reason: 'User already exists or invalid data', email },
-      ip_address: ip,
-      user_agent: userAgent,
-    }, 'REGISTER_SYSTEM_USER_FAILURE');
-    return res.status(400).json({ error: 'User already exists or invalid data' });
+    throw new AppError('User already exists or invalid data', 400, 'REGISTER_SYSTEM_USER_FAILED');
   }
-});
+}));
 
 // ---------------------------------------------------------------------------
 // GET /api/auth/users — list users scoped to the requester's establishment
 // ---------------------------------------------------------------------------
-router.get('/users', requireAuth, canManageUsers, async (req, res) => {
+router.get('/users', requireAuth, canManageUsers, asyncHandler(async (req, res) => {
   const establishmentId = req.user!.establishment_id!;
   const rows = await UserModel.listUsersByEstablishment(establishmentId);
   return res.json(rows);
-});
+}));
 
 // ---------------------------------------------------------------------------
 // GET /api/auth/users/:id/permissions — establishment-scoped
 // ---------------------------------------------------------------------------
-router.get('/users/:id/permissions', requireAuth, canManageUsers, async (req, res) => {
+router.get('/users/:id/permissions', requireAuth, canManageUsers, asyncHandler(async (req, res) => {
   const userId = parseInt(req.params.id);
   const establishmentId = req.user!.establishment_id!;
 
@@ -107,12 +100,12 @@ router.get('/users/:id/permissions', requireAuth, canManageUsers, async (req, re
 
   const permissions = await UserModel.getUserPermissions(userId);
   return res.json({ userId, permissions });
-});
+}));
 
 // ---------------------------------------------------------------------------
 // POST /api/auth/users/:id/permissions — establishment-scoped
 // ---------------------------------------------------------------------------
-router.post('/users/:id/permissions', requireAuth, canManageUsers, async (req, res) => {
+router.post('/users/:id/permissions', requireAuth, canManageUsers, asyncHandler(async (req, res) => {
   const userId = parseInt(req.params.id);
   const establishmentId = req.user!.establishment_id!;
   const { permissions } = req.body;
@@ -140,12 +133,12 @@ router.post('/users/:id/permissions', requireAuth, canManageUsers, async (req, r
   }, 'SET_USER_PERMISSIONS_POST');
 
   return res.json({ userId, permissions });
-});
+}));
 
 // ---------------------------------------------------------------------------
 // PUT /api/auth/users/:id/permissions — alias used by the frontend
 // ---------------------------------------------------------------------------
-router.put('/users/:id/permissions', requireAuth, canManageUsers, async (req, res) => {
+router.put('/users/:id/permissions', requireAuth, canManageUsers, asyncHandler(async (req, res) => {
   const userId = parseInt(req.params.id);
   const establishmentId = req.user!.establishment_id!;
   const { permissions } = req.body;
@@ -171,12 +164,12 @@ router.put('/users/:id/permissions', requireAuth, canManageUsers, async (req, re
   }, 'SET_USER_PERMISSIONS_PUT');
 
   return res.json({ userId, permissions });
-});
+}));
 
 // ---------------------------------------------------------------------------
 // POST /api/auth/users — create user within the requester's establishment
 // ---------------------------------------------------------------------------
-router.post('/users', requireAuth, canManageUsers, async (req, res) => {
+router.post('/users', requireAuth, canManageUsers, asyncHandler(async (req, res) => {
   const { email, password, role = 'staff' } = req.body;
   const establishmentId = req.user!.establishment_id;
 
@@ -210,14 +203,14 @@ router.post('/users', requireAuth, canManageUsers, async (req, res) => {
       { error: err instanceof Error ? err : new Error(String(err)), email, establishmentId },
       'AUTH_ROUTE'
     );
-    return res.status(400).json({ error: 'User already exists or invalid data' });
+    throw new AppError('User already exists or invalid data', 400, 'REGISTER_ESTABLISHMENT_USER_FAILED');
   }
-});
+}));
 
 // ---------------------------------------------------------------------------
 // DELETE /api/auth/users/:id — remove user from the requester's establishment
 // ---------------------------------------------------------------------------
-router.delete('/users/:id', requireAuth, canManageUsers, async (req, res) => {
+router.delete('/users/:id', requireAuth, canManageUsers, asyncHandler(async (req, res) => {
   const userId = parseInt(req.params.id);
   const establishmentId = req.user!.establishment_id!;
 
@@ -242,12 +235,12 @@ router.delete('/users/:id', requireAuth, canManageUsers, async (req, res) => {
   }, 'DELETE_ESTABLISHMENT_USER');
 
   return res.json({ success: true });
-});
+}));
 
 // ---------------------------------------------------------------------------
 // PUT /api/auth/users/:id/role — update role within the establishment
 // ---------------------------------------------------------------------------
-router.put('/users/:id/role', requireAuth, canManageUsers, async (req, res) => {
+router.put('/users/:id/role', requireAuth, canManageUsers, asyncHandler(async (req, res) => {
   const userId = parseInt(req.params.id);
   const establishmentId = req.user!.establishment_id!;
   const { role } = req.body;
@@ -273,12 +266,12 @@ router.put('/users/:id/role', requireAuth, canManageUsers, async (req, res) => {
   }, 'UPDATE_ESTABLISHMENT_USER_ROLE');
 
   return res.json({ userId, role });
-});
+}));
 
 // ---------------------------------------------------------------------------
 // POST /api/auth/setup — one-time system bootstrap (only works if no admin exists)
 // ---------------------------------------------------------------------------
-router.post('/setup', requireSetupSecret, async (req, res) => {
+router.post('/setup', requireSetupSecret, asyncHandler(async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -294,11 +287,11 @@ router.post('/setup', requireSetupSecret, async (req, res) => {
   } catch (error) {
     const e = error as { statusCode?: number; message?: string };
     if (e?.statusCode === 400) {
-      return res.status(400).json({ error: e.message || 'Admin user already exists' });
+      throw new AppError(e.message || 'Admin user already exists', 400, 'SETUP_ADMIN_ALREADY_EXISTS');
     }
-    return res.status(500).json({ error: 'Failed to create admin user' });
+    throw new AppError('Failed to create admin user', 500, 'SETUP_ADMIN_CREATE_FAILED');
   }
-});
+}));
 
 export default router;
 
