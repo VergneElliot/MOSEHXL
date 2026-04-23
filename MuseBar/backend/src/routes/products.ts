@@ -5,7 +5,7 @@ import { getEstablishmentId, requireAuth, requireAnyPermission, requirePermissio
 import { P } from '../permissions/registry';
 import { validateParams, paramValidations } from '../middleware/validation';
 import { Logger } from '../utils/logger';
-import { AppError } from '../middleware/errorHandler';
+import { AppError, asyncHandler } from '../middleware/errorHandler';
 
 const router = express.Router();
 
@@ -31,47 +31,47 @@ async function logAuditOrThrow(
 router.use(requireAuth);
 
 // GET /api/products
-router.get('/', readCatalog, async (req, res) => {
+router.get('/', readCatalog, asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
     const products = await ProductModel.getAll(establishmentId);
     res.json(products);
   } catch {
-    res.status(500).json({ error: 'Failed to fetch products' });
+    throw new AppError('Failed to fetch products', 500, 'PRODUCTS_FETCH_FAILED');
   }
-});
+}));
 
 // GET /api/products/archived
-router.get('/archived', readCatalog, async (req, res) => {
+router.get('/archived', readCatalog, asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
     const products = await ProductModel.getAllArchived(establishmentId);
     res.json(products);
   } catch {
-    res.status(500).json({ error: 'Failed to fetch archived products' });
+    throw new AppError('Failed to fetch archived products', 500, 'PRODUCTS_ARCHIVED_FETCH_FAILED');
   }
-});
+}));
 
 // GET /api/products/all (active + archived)
-router.get('/all', readCatalog, async (req, res) => {
+router.get('/all', readCatalog, asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
     const products = await ProductModel.getAllIncludingArchived(establishmentId);
     res.json(products);
   } catch {
-    res.status(500).json({ error: 'Failed to fetch all products' });
+    throw new AppError('Failed to fetch all products', 500, 'PRODUCTS_ALL_FETCH_FAILED');
   }
-});
+}));
 
 // GET /api/products/category/:categoryId
 router.get(
   '/category/:categoryId',
   readCatalog,
   validateParams([{ param: 'categoryId', validator: (v: string) => !isNaN(parseInt(v)), message: 'Invalid category ID' }]),
-  async (req, res) => {
+  asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -79,13 +79,13 @@ router.get(
     const products = await ProductModel.getByCategory(categoryId, establishmentId);
     res.json(products);
   } catch {
-    res.status(500).json({ error: 'Failed to fetch products by category' });
+    throw new AppError('Failed to fetch products by category', 500, 'PRODUCTS_BY_CATEGORY_FETCH_FAILED');
   }
-  }
+  })
 );
 
 // GET /api/products/:id
-router.get('/:id', readCatalog, validateParams([paramValidations.id]), async (req, res) => {
+router.get('/:id', readCatalog, validateParams([paramValidations.id]), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -94,12 +94,12 @@ router.get('/:id', readCatalog, validateParams([paramValidations.id]), async (re
     if (!product) return res.status(404).json({ error: 'Product not found' });
     res.json(product);
   } catch {
-    res.status(500).json({ error: 'Failed to fetch product' });
+    throw new AppError('Failed to fetch product', 500, 'PRODUCT_FETCH_FAILED');
   }
-});
+}));
 
 // POST /api/products
-router.post('/', menuWrite, async (req, res) => {
+router.post('/', menuWrite, asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -124,13 +124,14 @@ router.post('/', menuWrite, async (req, res) => {
       user_agent: req.headers['user-agent'],
     }, 'CREATE_PRODUCT');
     res.status(201).json(product);
-  } catch {
-    res.status(500).json({ error: 'Failed to create product' });
+  } catch (error) {
+    Logger.getInstance().error('Create product failed', error as Error, 'PRODUCTS_ROUTE');
+    throw new AppError('Failed to create product', 500, 'PRODUCT_CREATE_FAILED');
   }
-});
+}));
 
 // PUT /api/products/:id
-router.put('/:id', menuWrite, validateParams([paramValidations.id]), async (req, res) => {
+router.put('/:id', menuWrite, validateParams([paramValidations.id]), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -159,13 +160,14 @@ router.put('/:id', menuWrite, validateParams([paramValidations.id]), async (req,
       user_agent: req.headers['user-agent'],
     }, 'UPDATE_PRODUCT');
     res.json(product);
-  } catch {
-    res.status(500).json({ error: 'Failed to update product' });
+  } catch (error) {
+    Logger.getInstance().error('Update product failed', error as Error, 'PRODUCTS_ROUTE');
+    throw new AppError('Failed to update product', 500, 'PRODUCT_UPDATE_FAILED');
   }
-});
+}));
 
 // DELETE /api/products/:id
-router.delete('/:id', menuWrite, validateParams([paramValidations.id]), async (req, res) => {
+router.delete('/:id', menuWrite, validateParams([paramValidations.id]), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -190,12 +192,12 @@ router.delete('/:id', menuWrite, validateParams([paramValidations.id]), async (r
     const message = e?.code === '23503'
       ? 'Impossible de supprimer le produit : il est référencé dans des commandes existantes.'
       : 'Failed to delete product';
-    res.status(500).json({ error: message });
+    throw new AppError(message, 500, 'PRODUCT_DELETE_FAILED');
   }
-});
+}));
 
 // PUT /api/products/:id/restore
-router.put('/:id/restore', menuWrite, validateParams([paramValidations.id]), async (req, res) => {
+router.put('/:id/restore', menuWrite, validateParams([paramValidations.id]), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -212,9 +214,10 @@ router.put('/:id/restore', menuWrite, validateParams([paramValidations.id]), asy
       user_agent: req.headers['user-agent'],
     }, 'RESTORE_PRODUCT');
     res.json({ message: 'Produit restauré avec succès' });
-  } catch {
-    res.status(500).json({ error: 'Failed to restore product' });
+  } catch (error) {
+    Logger.getInstance().error('Restore product failed', error as Error, 'PRODUCTS_ROUTE');
+    throw new AppError('Failed to restore product', 500, 'PRODUCT_RESTORE_FAILED');
   }
-});
+}));
 
 export default router;
