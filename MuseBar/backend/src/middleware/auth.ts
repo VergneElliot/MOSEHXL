@@ -121,11 +121,9 @@ export function requireEstablishmentAdmin(
   next();
 }
 
-/** Gate: user must hold the named permission (admins bypass). */
+/** Gate: user must hold the named permission. */
 export function requirePermission(permission: string) {
   return async (req: Request, res: Response, next: NextFunction) => {
-    // System admins bypass permission checks.
-    if (req.user?.role === 'system_admin') return next();
     const perms = await UserModel.getUserPermissions(Number(req.user?.id));
     if (!perms.includes(permission)) {
       return res.status(403).json({ error: 'Permission denied' });
@@ -134,10 +132,9 @@ export function requirePermission(permission: string) {
   };
 }
 
-/** User must have at least one of the given permissions (system_admin bypasses). */
+/** User must have at least one of the given permissions. */
 export function requireAnyPermission(permissions: string[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
-    if (req.user?.role === 'system_admin') return next();
     const perms = await UserModel.getUserPermissions(Number(req.user?.id));
     if (permissions.some((p) => perms.includes(p))) return next();
     return res.status(403).json({ error: 'Permission denied' });
