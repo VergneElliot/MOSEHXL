@@ -26,6 +26,7 @@ export interface JwtPayload {
   is_admin: boolean;
   role: string;
   establishment_id: string | null;
+  jti?: string;
   support_impersonation?: {
     actor_user_id: number;
     reason: string;
@@ -40,11 +41,17 @@ export function generateToken(
   customExpiresIn?: jwt.SignOptions['expiresIn']
 ): string {
   const expiration: jwt.SignOptions['expiresIn'] = customExpiresIn ?? (rememberMe ? '7d' : '12h');
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: expiration });
+  const payloadWithJti = payload.jti ? payload : { ...payload, jti: crypto.randomUUID() };
+  return jwt.sign(payloadWithJti, JWT_SECRET, { expiresIn: expiration });
 }
 
 export function verifyToken(token: string): JwtPayload {
   return jwt.verify(token, JWT_SECRET) as JwtPayload;
+}
+
+async function isTokenRevoked(token: string): Promise<boolean> {
+  const { TokenBlocklistModel } = await import('../models/tokenBlocklist');
+  return TokenBlocklistModel.isTokenRevoked(token);
 }
 
 /**
@@ -62,7 +69,13 @@ export async function requireAuth(
   }
 
   try {
-    const payload = verifyToken(auth.slice(7));
+    const rawToken = auth.slice(7);
+    const revoked = await isTokenRevoked(rawToken);
+    if (revoked) {
+      return res.status(401).json({ error: 'Token has been revoked' });
+    }
+
+    const payload = verifyToken(rawToken);
     if (payload.support_impersonation?.expires_at) {
       const expiresAt = new Date(payload.support_impersonation.expires_at);
       if (!Number.isNaN(expiresAt.getTime()) && Date.now() > expiresAt.getTime()) {

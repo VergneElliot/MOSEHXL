@@ -118,7 +118,13 @@ describe('GET /orders establishment isolation', () => {
     );
     mocks.getItems.mockResolvedValue([]);
     mocks.getSubBills.mockResolvedValue([]);
-    mocks.poolQuery.mockResolvedValue({ rows: [{ total: 0 }] });
+    mocks.poolQuery.mockImplementation(async (query: unknown) => {
+      const sql = String(query ?? '');
+      if (sql.includes('FROM token_blocklist')) {
+        return { rows: [] };
+      }
+      return { rows: [{ total: 0 }] };
+    });
   });
 
   it('returns exactly the caller establishment orders from a 100-order 3-tenant dataset', async () => {
