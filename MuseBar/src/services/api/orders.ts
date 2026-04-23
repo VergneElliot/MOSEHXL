@@ -1,43 +1,36 @@
 import { request } from './core';
 import { Order, OrderItem } from '../../types';
 import type { PaymentMethod } from '../../types';
+import type {
+  Order as ApiOrder,
+  OrderItem as ApiOrderItem,
+  SubBill as ApiSubBill,
+} from '@mosehxl/types';
 
-interface RawOrderItem {
-  id?: string | number;
-  product_id?: string | number | null;
-  product_name?: string;
-  quantity?: number | string;
-  unit_price?: number | string;
-  total_price?: number | string;
-  tax_rate?: number | string;
-  tax_amount?: number | string;
-  happy_hour_applied?: boolean;
-  is_manual_happy_hour?: boolean;
-}
-
-interface RawSubBill {
-  id?: string | number;
-  payment_method?: 'cash' | 'card';
-  amount?: number | string;
-  status?: 'pending' | 'paid';
-  created_at?: string | Date;
-}
-
-interface RawOrder {
-  id: string | number;
-  items?: RawOrderItem[];
-  sub_bills?: RawSubBill[];
-  total_amount: number | string;
-  total_tax: number | string;
-  created_at: string | Date;
-  status: 'pending' | 'completed' | 'cancelled';
-  payment_method: PaymentMethod;
-  notes?: string;
-  tips?: number;
-  change?: number;
-  operation_type?: 'sale' | 'change';
-  change_amount?: number | string | null;
-}
+type RawOrderItem = Partial<ApiOrderItem>;
+type RawSubBill = Partial<ApiSubBill>;
+type RawOrder = Partial<ApiOrder> &
+  Omit<Pick<ApiOrder, 'id' | 'total_amount' | 'total_tax' | 'created_at' | 'status' | 'payment_method'>, 'id' | 'total_amount' | 'total_tax' | 'created_at'> & {
+    id: string | number;
+    total_amount: number | string;
+    total_tax: number | string;
+    created_at: string | Date;
+    items?: Array<Partial<ApiOrderItem> & {
+      id?: string | number;
+      product_id?: string | number | null;
+      quantity?: number | string;
+      unit_price?: number | string;
+      total_price?: number | string;
+      tax_rate?: number | string;
+      tax_amount?: number | string;
+    }>;
+    sub_bills?: Array<Partial<ApiSubBill> & {
+      id?: string | number;
+      amount?: number | string;
+      created_at?: string | Date;
+    }>;
+    change_amount?: number | string | null;
+  };
 
 function toNumber(value: unknown, fallback: number = 0): number {
   const parsed =
