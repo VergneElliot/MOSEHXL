@@ -241,6 +241,7 @@ My recommendation is **Option 1**. If you ever need stronger isolation for a hig
 - **D4 — Contract + repository hygiene:** unify `Order`/`OrderItem` API contracts in a shared package (`@mosehxl/types`) consumed by backend/frontend, and then either formalize root workspaces (`package.json`) or remove unused root lockfile + `node_modules/` to avoid dependency drift.
 
 **Plan/implementation of record (D1):** `docs/patch-notes/90-PHASE-D1-JWT-REVOCATION-PLAN.md` and `docs/patch-notes/91-PHASE-D1-JWT-REVOCATION-IMPLEMENTATION.md`.
+**Plan/implementation of record (D2):** `docs/patch-notes/92-PHASE-D2-STRICT-PERMISSION-ENFORCEMENT-PLAN.md` and `docs/patch-notes/93-PHASE-D2-STRICT-PERMISSION-ENFORCEMENT-IMPLEMENTATION.md`.
 
 ---
 

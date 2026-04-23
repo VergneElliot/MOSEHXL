@@ -25,7 +25,8 @@ describe('requirePermission', () => {
     getPerms.mockReset();
   });
 
-  it('calls next() for system_admin without reading permissions from DB', async () => {
+  it('returns 403 for system_admin when permission is not granted in DB', async () => {
+    getPerms.mockResolvedValue([]);
     const next = vi.fn<NextFunction>();
     const res = resStub();
     const req = {
@@ -33,7 +34,21 @@ describe('requirePermission', () => {
     } as unknown as Request;
     const mw = requirePermission('any_key');
     await mw(req, res, next);
-    expect(getPerms).not.toHaveBeenCalled();
+    expect(getPerms).toHaveBeenCalledWith(1);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('calls next() for system_admin when permission is granted in DB', async () => {
+    getPerms.mockResolvedValue(['any_key']);
+    const next = vi.fn<NextFunction>();
+    const res = resStub();
+    const req = {
+      user: { id: 1, email: 'a@a.com', is_admin: false, role: 'system_admin', establishment_id: null },
+    } as unknown as Request;
+    const mw = requirePermission('any_key');
+    await mw(req, res, next);
+    expect(getPerms).toHaveBeenCalledWith(1);
     expect(next).toHaveBeenCalled();
     expect(res.status).not.toHaveBeenCalled();
   });
@@ -80,6 +95,20 @@ describe('requireAnyPermission', () => {
     } as unknown as Request;
     const mw = requireAnyPermission([P.access_settings, P.access_menu]);
     await mw(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('enforces DB permissions for system_admin as well', async () => {
+    getPerms.mockResolvedValue([P.access_pos]);
+    const next = vi.fn<NextFunction>();
+    const res = resStub();
+    const req = {
+      user: { id: 9, email: 'root@a.com', is_admin: true, role: 'system_admin', establishment_id: null },
+    } as unknown as Request;
+    const mw = requireAnyPermission([P.access_settings, P.access_menu]);
+    await mw(req, res, next);
+    expect(getPerms).toHaveBeenCalledWith(9);
     expect(res.status).toHaveBeenCalledWith(403);
     expect(next).not.toHaveBeenCalled();
   });
