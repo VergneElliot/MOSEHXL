@@ -4,12 +4,15 @@ import { AuditTrailModel } from '../models/auditTrail';
 import { Logger } from '../utils/logger';
 import {
   generateToken,
+  requireAdmin,
   requireAuth,
 } from '../middleware/auth';
+import { pool } from '../app';
 
 const router = express.Router();
 
 type CanonicalRole = 'system_admin' | 'establishment_admin' | 'staff';
+const MAX_SUPPORT_IMPERSONATION_MINUTES = 120;
 
 function normalizeRole(raw: unknown): CanonicalRole | null {
   const v = typeof raw === 'string' ? raw.trim() : '';
@@ -144,6 +147,7 @@ router.get('/me', requireAuth, async (req, res) => {
       last_name: userRow?.last_name || '',
       email_verified: userRow?.email_verified ?? false,
       permissions,
+      support_impersonation: req.user!.support_impersonation ?? null,
     });
   } catch {
     return res.status(500).json({ error: 'Internal server error' });
@@ -155,6 +159,11 @@ router.get('/me', requireAuth, async (req, res) => {
 // ---------------------------------------------------------------------------
 router.post('/refresh', requireAuth, async (req, res) => {
   try {
+    if (req.user?.support_impersonation) {
+      return res.status(400).json({
+        error: 'Impersonation tokens cannot be refreshed. Start a new support impersonation session instead.'
+      });
+    }
     const { rememberMe } = req.body;
     const userId = req.user!.id;
 
@@ -183,6 +192,150 @@ router.post('/refresh', requireAuth, async (req, res) => {
     return res.json({ token, expiresIn: rememberMe ? '7d' : '12h' });
   } catch {
     return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/support/impersonation/start
+// Time-bounded support impersonation to one establishment (audited).
+// ---------------------------------------------------------------------------
+router.post('/support/impersonation/start', requireAuth, requireAdmin, async (req, res) => {
+  const actorUserId = req.user!.id;
+  const actorEmail = req.user!.email;
+  const ip = req.ip;
+  const userAgent = req.headers['user-agent'];
+
+  const establishmentIdRaw = req.body?.establishment_id;
+  const reasonRaw = req.body?.reason;
+  const durationRaw = req.body?.duration_minutes;
+
+  const establishment_id = typeof establishmentIdRaw === 'string' ? establishmentIdRaw.trim() : '';
+  const reason = typeof reasonRaw === 'string' ? reasonRaw.trim() : '';
+  const duration_minutes = Number.isFinite(Number(durationRaw))
+    ? Math.max(1, Math.min(MAX_SUPPORT_IMPERSONATION_MINUTES, Math.floor(Number(durationRaw))))
+    : 30;
+
+  if (!establishment_id) {
+    return res.status(400).json({ error: 'establishment_id is required' });
+  }
+  if (!reason || reason.length < 5) {
+    return res.status(400).json({ error: 'reason is required (minimum 5 characters)' });
+  }
+
+  try {
+    const estResult = await pool.query('SELECT id, name FROM establishments WHERE id = $1', [establishment_id]);
+    if (estResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Target establishment not found' });
+    }
+    const estName = String(estResult.rows[0].name ?? '');
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + duration_minutes * 60 * 1000);
+    const supportToken = generateToken(
+      {
+        id: actorUserId,
+        email: actorEmail,
+        is_admin: req.user!.is_admin,
+        role: 'system_admin',
+        establishment_id,
+        support_impersonation: {
+          actor_user_id: actorUserId,
+          reason,
+          started_at: now.toISOString(),
+          expires_at: expiresAt.toISOString(),
+        },
+      },
+      false,
+      `${duration_minutes}m`
+    );
+
+    await AuditTrailModel.logAction({
+      user_id: String(actorUserId),
+      establishment_id,
+      action_type: 'SUPPORT_IMPERSONATION_STARTED',
+      resource_type: 'ESTABLISHMENT',
+      resource_id: establishment_id,
+      action_details: {
+        target_establishment_name: estName,
+        reason,
+        duration_minutes,
+        token_expires_at: expiresAt.toISOString(),
+      },
+      ip_address: ip,
+      user_agent: userAgent,
+    }).catch(() => {});
+
+    return res.json({
+      message: 'Support impersonation started',
+      token: supportToken,
+      expires_at: expiresAt.toISOString(),
+      establishment_id,
+      reason,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: 'Failed to start support impersonation',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/support/impersonation/stop
+// End support impersonation and return a standard system_admin token.
+// ---------------------------------------------------------------------------
+router.post('/support/impersonation/stop', requireAuth, requireAdmin, async (req, res) => {
+  const actorUserId = req.user!.id;
+  const ip = req.ip;
+  const userAgent = req.headers['user-agent'];
+  const currentImpersonation = req.user?.support_impersonation;
+
+  if (!currentImpersonation || !req.user?.establishment_id) {
+    return res.status(400).json({ error: 'No active support impersonation session in this token' });
+  }
+
+  try {
+    const d = await UserModel.getAuthRoleState(actorUserId);
+    if (!d) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const resetToken = generateToken(
+      {
+        id: actorUserId,
+        email: req.user!.email,
+        is_admin: d.is_admin,
+        role: 'system_admin',
+        establishment_id: null,
+      },
+      false
+    );
+
+    await AuditTrailModel.logAction({
+      user_id: String(actorUserId),
+      establishment_id: req.user.establishment_id,
+      action_type: 'SUPPORT_IMPERSONATION_ENDED',
+      resource_type: 'ESTABLISHMENT',
+      resource_id: req.user.establishment_id,
+      action_details: {
+        reason: currentImpersonation.reason,
+        started_at: currentImpersonation.started_at,
+        ended_at: new Date().toISOString(),
+      },
+      ip_address: ip,
+      user_agent: userAgent,
+    }).catch(() => {});
+
+    return res.json({
+      message: 'Support impersonation ended',
+      token: resetToken,
+      expiresIn: '12h',
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: 'Failed to stop support impersonation',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 });
 

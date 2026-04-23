@@ -28,7 +28,7 @@ A comprehensive audit was performed on the codebase in February/March 2026. This
 #### Architecture & Dead Code (14 fixes)
 - Dual error handling systems → consolidated into one (AppError hierarchy + unified handler)
 - Dual database pools → single pool in app.ts
-- Divergent schema creation paths → unified SchemaManager
+- (Legacy) Divergent schema creation paths → unified SchemaManager (the project later commits to shared-table multi-tenancy in Phase B1)
 - Five overlapping setup/invitation flows → documented and consolidated
 - Multiple password validation rules → single shared utility
 - Duplicate standalone and shim files → removed (both backend and frontend)
@@ -246,7 +246,7 @@ Business logic that doesn't fit in a single route or model.
 | `userInvitation/` | Invitation creation, email, acceptance, validation |
 | `printing/` | Multi-method printing via adapter pattern: browser, network, PrintNode, StarCloudPRNT, composite |
 | `receipts/` | Digital, email, QR receipt generation |
-| `SchemaManager.ts` | Creates establishment-specific PostgreSQL schemas with all required tables |
+| `SchemaManager.ts` | (Legacy) Creates establishment-specific PostgreSQL schemas; Phase B1 commits to shared-table multi-tenancy |
 | `SetupService.ts` | Legacy setup service (delegates to setup/ subfolder) |
 
 ---

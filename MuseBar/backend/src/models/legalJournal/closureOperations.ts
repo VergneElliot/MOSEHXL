@@ -251,21 +251,21 @@ export class ClosureOperations {
   }
 
   /**
-   * Get closure bulletins (optionally filtered by type and/or establishment).
+   * Get closure bulletins for one establishment (optionally filtered by type).
    */
   static async getClosureBulletins(
-    type?: 'DAILY' | 'MONTHLY' | 'ANNUAL',
-    establishmentId?: string
+    establishmentId: string,
+    type?: 'DAILY' | 'MONTHLY' | 'ANNUAL'
   ): Promise<ClosureBulletin[]> {
-    return await JournalQueries.getClosureBulletins(type, establishmentId);
+    return await JournalQueries.getClosureBulletins(establishmentId, type);
   }
 
   static async getClosureBulletinsPaginated(
+    establishmentId: string,
     type?: 'DAILY' | 'MONTHLY' | 'ANNUAL',
-    establishmentId?: string,
     opts?: { limit?: number; offset?: number }
   ): Promise<{ bulletins: ClosureBulletin[]; total: number }> {
-    return await JournalQueries.getClosureBulletinsPaginated(type, establishmentId, opts);
+    return await JournalQueries.getClosureBulletinsPaginated(establishmentId, type, opts);
   }
 }
 

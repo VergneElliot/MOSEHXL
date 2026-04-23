@@ -113,16 +113,16 @@ export class LegalJournalModel {
     return await ClosureOperations.createAnnualClosure(date, establishmentId, force ?? false, fondDeCaisse);
   }
 
-  static async getClosureBulletins(type?: 'DAILY' | 'MONTHLY' | 'ANNUAL', establishmentId?: string) {
-    return await ClosureOperations.getClosureBulletins(type, establishmentId);
+  static async getClosureBulletins(establishmentId: string, type?: 'DAILY' | 'MONTHLY' | 'ANNUAL') {
+    return await ClosureOperations.getClosureBulletins(establishmentId, type);
   }
 
   static async getClosureBulletinsPaginated(
+    establishmentId: string,
     type?: 'DAILY' | 'MONTHLY' | 'ANNUAL',
-    establishmentId?: string,
     opts?: { limit?: number; offset?: number }
   ) {
-    return await ClosureOperations.getClosureBulletinsPaginated(type, establishmentId, opts);
+    return await ClosureOperations.getClosureBulletinsPaginated(establishmentId, type, opts);
   }
 
   static async getLastFondDeCaisse(establishmentId: string): Promise<number | null> {

@@ -41,7 +41,7 @@ MOSEHXL/
 
 - **Frontend**: React 18, TypeScript, Material-UI 5, React Router 6
 - **Backend**: Node.js 18+, Express 4, TypeScript 5
-- **Database**: PostgreSQL 13+ with schema-based multi-tenancy
+- **Database**: PostgreSQL 13+ with **shared-table multi-tenancy** (`establishment_id` scoping)
 - **Auth**: JWT (bcrypt passwords, 12h/7d token expiry)
 - **Email**: SendGrid (with Nodemailer fallback)
 - **Security**: PostgreSQL-backed rate limiting, CORS, input sanitization, security headers

@@ -102,27 +102,14 @@ export class EstablishmentDataProcessor {
    * Create establishment schema and tables
    */
   public async createEstablishmentSchema(client: PoolClient, schemaName: string): Promise<void> {
-    try {
-      // Initialize SchemaManager
-      const { SchemaManager } = await import('../SchemaManager');
-      SchemaManager.initialize(this.logger);
-      
-      await SchemaManager.createEstablishmentSchema(client, schemaName);
-
-      this.logger.info(
-        'Establishment schema created successfully',
-        { schemaName },
-        'ESTABLISHMENT_DATA_PROCESSOR'
-      );
-
-    } catch (error) {
-      this.logger.error(
-        'Failed to create establishment schema',
-        { error: error as Error, schemaName },
-        'ESTABLISHMENT_DATA_PROCESSOR'
-      );
-      throw error;
-    }
+    void client;
+    void schemaName;
+    // Phase B1: shared-table multi-tenancy. No per-tenant schema is created.
+    this.logger.info(
+      'Skipping establishment schema creation (shared-table multi-tenancy)',
+      { schemaName },
+      'ESTABLISHMENT_DATA_PROCESSOR'
+    );
   }
 
   /**

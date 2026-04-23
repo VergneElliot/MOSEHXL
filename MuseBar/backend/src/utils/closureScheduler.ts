@@ -3,6 +3,7 @@ import { DEFAULT_APP_TIMEZONE } from '../config/timezone';
 import { LegalJournalModel } from '../models/legalJournal';
 import { AuditTrailModel } from '../models/auditTrail';
 import moment from 'moment-timezone';
+import { runWithTenantContext } from '../db/tenantContext';
 
 export class ClosureScheduler {
   private static interval: NodeJS.Timeout | null = null;
@@ -49,27 +50,40 @@ export class ClosureScheduler {
   // Check if closure should be executed (runs per-establishment for multi-tenancy).
   static async checkAndExecuteClosure() {
     try {
-      const settings = await this.getClosureSettings();
+      const now = new Date();
+      const establishmentsResult = await pool.query('SELECT id FROM establishments');
+      const establishmentIds: string[] = establishmentsResult.rows.map((r: { id: string }) => r.id);
 
-      if (!settings.auto_closure_enabled) {
-        return;
-      }
+      for (const establishmentId of establishmentIds) {
+        await runWithTenantContext({ establishmentId }, async () => {
+          const settings = await this.getClosureSettings(establishmentId);
+          if (!settings.auto_closure_enabled) return;
 
-      const nowParis = moment.tz(new Date(), settings.timezone);
-      const shouldClose = await this.shouldExecuteClosure(settings, nowParis);
+          const nowTz = moment.tz(now, settings.timezone);
+          const shouldClose = await this.shouldExecuteClosure(settings, nowTz);
+          if (!shouldClose) return;
 
-      if (shouldClose) {
-        await this.executeAutomaticClosure(nowParis.toDate());
+          await this.executeAutomaticClosureForEstablishment(establishmentId, now);
+        });
       }
     } catch (error) {
       throw error;
     }
   }
 
-  // Get closure settings from database
-  static async getClosureSettings() {
-    const query = 'SELECT setting_key, setting_value FROM closure_settings';
-    const result = await pool.query(query);
+  // Get closure settings from database.
+  // Supports both legacy global settings and per-establishment settings.
+  static async getClosureSettings(establishmentId: string) {
+    let result;
+    try {
+      result = await pool.query(
+        'SELECT setting_key, setting_value FROM closure_settings WHERE establishment_id = $1',
+        [establishmentId]
+      );
+    } catch {
+      // Legacy closure_settings without establishment_id column.
+      result = await pool.query('SELECT setting_key, setting_value FROM closure_settings');
+    }
     
     const settings: { [key: string]: string } = {};
     result.rows.forEach(row => {
@@ -104,10 +118,10 @@ export class ClosureScheduler {
     return false;
   }
 
-  // Execute automatic closure for each establishment (multi-tenant: one bulletin per establishment).
-  static async executeAutomaticClosure(now: Date) {
+  // Execute automatic closure for one establishment.
+  static async executeAutomaticClosureForEstablishment(establishmentId: string, now: Date) {
     try {
-      const settings = await this.getClosureSettings();
+      const settings = await this.getClosureSettings(establishmentId);
       const closureTime = settings.daily_closure_time || '02:00';
       const timezone = settings.timezone || DEFAULT_APP_TIMEZONE;
 
@@ -120,40 +134,34 @@ export class ClosureScheduler {
       businessDay.set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
       const businessDayDate = businessDay.toDate();
 
-      // Get all establishments so each gets its own daily closure
-      const establishmentsResult = await pool.query('SELECT id FROM establishments');
-      const establishmentIds: string[] = establishmentsResult.rows.map((r: { id: string }) => r.id);
-
-      const closed: Array<{ establishmentId: string; bulletinId: number }> = [];
-      for (const establishmentId of establishmentIds) {
-        try {
-          const closureBulletin = await LegalJournalModel.createDailyClosure(businessDayDate, establishmentId, timezone);
-          closed.push({ establishmentId, bulletinId: closureBulletin.id });
-          await AuditTrailModel.logAction({
-            action_type: 'AUTO_CLOSURE_EXECUTED',
-            resource_type: 'CLOSURE_BULLETIN',
-            resource_id: closureBulletin.id.toString(),
-            action_details: {
-              closure_type: 'DAILY',
-              establishment_id: establishmentId,
-              period_start: businessDay.toISOString(),
-              transaction_count: closureBulletin.total_transactions,
-              total_amount: closureBulletin.total_amount,
-              closure_time: now.toISOString(),
-              trigger: 'AUTOMATIC'
-            },
-            ip_address: 'system',
-            user_agent: 'ClosureScheduler'
-          });
-        } catch (err) {
-          if (err instanceof Error && err.message.includes('already exists')) {
-            continue; // This establishment already closed for this period
-          }
-          throw err;
+      let closureBulletin;
+      try {
+        closureBulletin = await LegalJournalModel.createDailyClosure(businessDayDate, establishmentId, timezone);
+      } catch (err) {
+        if (err instanceof Error && err.message.includes('already exists')) {
+          return null;
         }
+        throw err;
       }
 
-      return closed;
+      await AuditTrailModel.logAction({
+        action_type: 'AUTO_CLOSURE_EXECUTED',
+        resource_type: 'CLOSURE_BULLETIN',
+        resource_id: closureBulletin.id.toString(),
+        action_details: {
+          closure_type: 'DAILY',
+          establishment_id: establishmentId,
+          period_start: businessDay.toISOString(),
+          transaction_count: closureBulletin.total_transactions,
+          total_amount: closureBulletin.total_amount,
+          closure_time: now.toISOString(),
+          trigger: 'AUTOMATIC'
+        },
+        ip_address: 'system',
+        user_agent: 'ClosureScheduler'
+      });
+
+      return { establishmentId, bulletinId: closureBulletin.id };
       
     } catch (error) {
       // Failed to execute automatic closure
@@ -162,6 +170,7 @@ export class ClosureScheduler {
         action_type: 'AUTO_CLOSURE_FAILED',
         action_details: { 
           error: error instanceof Error ? error.message : 'Unknown error',
+          establishment_id: establishmentId,
           closure_time: now.toISOString()
         },
         ip_address: 'system',

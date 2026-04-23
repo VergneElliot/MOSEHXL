@@ -129,7 +129,8 @@ No `establishment_id`; scoping is via `order_id` → `orders.establishment_id`.
 - **establishment_id** UUID REFERENCES establishments(id) (used in establishment delete and scoping)
 - updated_at
 
-**establishments** — as in multi-tenant-schema (id UUID, name, email, schema_name, subscription_plan, subscription_status, etc.).
+**establishments** — as in multi-tenant-schema (id UUID, name, email, subscription_plan, subscription_status, etc.).  
+**Note:** `schema_name` exists in legacy data/models but Phase **B1** commits to shared-table multi-tenancy; `schema_name` is not a runtime isolation mechanism.
 
 **legal_journal, closure_bulletins, audit_trail, archive_exports** — as in legal-schema (no `establishment_id` in current code; legal tables are global).
 

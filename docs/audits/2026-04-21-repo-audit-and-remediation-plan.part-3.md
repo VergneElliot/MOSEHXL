@@ -176,6 +176,8 @@ You have two realistic options:
 - **Option 1 (recommended — least disruption):** stay column-based. **Drop `schema_name` and `SchemaManager` entirely.** Update README to say "shared-table multi-tenancy with `establishment_id`" and delete dead per-tenant schemas with a migration. Low risk, fast, matches what the code already does.
 - **Option 2 (more isolation, much more work):** move to real schema-per-tenant. Every model has to route queries through a per-tenant schema. The migration system has to know about a schema list. `SchemaManager.getSchemaNameForEstablishment` has to actually be used. Months of work; risky.
 
+**Plan/implementation of record:** `docs/patch-notes/70-MULTI-TENANCY-B1-SHARED-TABLES-RLS-PLAN.md` and `docs/patch-notes/71-MULTI-TENANCY-B1-SHARED-TABLES-RLS-IMPLEMENTATION.md`.
+
 My recommendation is **Option 1**. If you ever need stronger isolation for a high-value tenant, you can ship a separate deployment for them.
 
 **B2. Close remaining tenant-leak holes.**
