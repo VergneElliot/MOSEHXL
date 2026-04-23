@@ -5,7 +5,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { Logger } from '../../utils/logger';
-import { UserInvitationService } from '../../services/userInvitationService';
+import { UserInvitationService } from '../../services/userInvitation';
 import { EnvironmentConfig } from '../../config/environment';
 import { AuthenticatedUser } from '../../models/user';
 

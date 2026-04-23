@@ -10,7 +10,7 @@ import { P } from '../../permissions/registry';
 
 const canManageUsers = requireEstablishmentAdminOrPermission(P.access_user_management);
 import { validateBody, validateParams } from '../../middleware/validation';
-import { UserInvitationService } from '../../services/userInvitationService';
+import { UserInvitationService } from '../../services/userInvitation';
 import { EstablishmentModel } from '../../models/establishment';
 import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';

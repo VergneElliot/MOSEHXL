@@ -207,6 +207,8 @@ My recommendation is **Option 1**. If you ever need stronger isolation for a hig
 - `services/setup/userAccountOperations.ts` (once `establishmentAccountCreation` is the sole path)
 - `services/userInvitationService.ts` barrel (import from the directory directly)
 
+**Plan/implementation of record:** `docs/patch-notes/78-CODE-HYGIENE-C1-DEAD-CODE-PLAN.md` and `docs/patch-notes/79-CODE-HYGIENE-C1-DEAD-CODE-IMPLEMENTATION.md`.
+
 **C2. Consolidate error handling:**
 - Convert every route `try/catch + res.status()` into `asyncHandler` + `next(new AppError(...))`. Easy pattern, big consistency win.
 - Replace every `.catch(() => {})` on audit logging with `logger.error` + `AppError`. Silent audit failures are a pillar-S compliance defect.
