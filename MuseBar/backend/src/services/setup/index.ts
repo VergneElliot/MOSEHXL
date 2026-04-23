@@ -12,7 +12,6 @@ export { SetupWizard } from './setupWizard';
 
 // Specialized database operation modules
 export { InvitationOperations } from './invitationOperations';
-export { UserAccountOperations } from './userAccountOperations';
 export { EstablishmentOperations } from './establishmentOperations';
 export { TransactionOperations } from './transactionOperations';
 
