@@ -130,7 +130,7 @@ router.post(
             happy_hour_discount_amount: item.happy_hour_discount_amount || 0,
             is_manual_happy_hour: item.is_manual_happy_hour === true,
             description: item.description || '',
-          })
+          }, establishmentId)
       )
     );
 
@@ -139,7 +139,7 @@ router.post(
       createdSubBills = await Promise.all(
         sub_bills.map(async (sb: { payment_method: string; amount: number }) => {
           const method: 'cash' | 'card' = sb.payment_method === 'card' ? 'card' : 'cash';
-          return SubBillModel.create({ order_id: order.id, payment_method: method, amount: sb.amount, status: 'pending' });
+          return SubBillModel.create({ order_id: order.id, payment_method: method, amount: sb.amount, status: 'pending' }, establishmentId);
         })
       );
     }
