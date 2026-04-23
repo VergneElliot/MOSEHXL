@@ -243,6 +243,7 @@ My recommendation is **Option 1**. If you ever need stronger isolation for a hig
 **Plan/implementation of record (D1):** `docs/patch-notes/90-PHASE-D1-JWT-REVOCATION-PLAN.md` and `docs/patch-notes/91-PHASE-D1-JWT-REVOCATION-IMPLEMENTATION.md`.
 **Plan/implementation of record (D2):** `docs/patch-notes/92-PHASE-D2-STRICT-PERMISSION-ENFORCEMENT-PLAN.md` and `docs/patch-notes/93-PHASE-D2-STRICT-PERMISSION-ENFORCEMENT-IMPLEMENTATION.md`.
 **Plan/implementation of record (D3):** `docs/patch-notes/94-PHASE-D3-EPSON-POLL-KEY-HEADER-PLAN.md` and `docs/patch-notes/95-PHASE-D3-EPSON-POLL-KEY-HEADER-IMPLEMENTATION.md`.
+**Plan/implementation of record (D4):** `docs/patch-notes/96-PHASE-D4-SHARED-TYPES-AND-WORKSPACE-HYGIENE-PLAN.md` and `docs/patch-notes/97-PHASE-D4-SHARED-TYPES-AND-WORKSPACE-HYGIENE-IMPLEMENTATION.md`.
 
 ---
 

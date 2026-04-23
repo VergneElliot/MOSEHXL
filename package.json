@@ -1,0 +1,9 @@
+{
+  "name": "mosehxl-root",
+  "private": true,
+  "workspaces": [
+    "MuseBar",
+    "MuseBar/backend",
+    "MuseBar/packages/*"
+  ]
+}

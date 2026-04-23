@@ -3,53 +3,16 @@
  * Centralized interface definitions for the application
  */
 
+import type {
+  Order as SharedOrder,
+  OrderItem as SharedOrderItem,
+  SubBill as SharedSubBill,
+} from '@mosehxl/types';
+
 // Order-related interfaces
-export interface Order {
-  id: number;
-  establishment_id: string | null;
-  total_amount: number;
-  total_tax: number;
-  payment_method: 'cash' | 'card' | 'split';
-  status: 'pending' | 'completed' | 'cancelled';
-  notes?: string;
-  tips?: number;
-  change?: number;
-  /** 'sale' = normal order; 'change' = faire de la monnaie (card→cash only) */
-  operation_type?: 'sale' | 'change';
-  /** Amount in € for change operations; null for sales */
-  change_amount?: number | null;
-  created_at: Date;
-  updated_at: Date;
-}
-
-export interface OrderItem {
-  id: number;
-  establishment_id?: string | null;
-  order_id: number;
-  product_id?: number;
-  product_name: string;
-  quantity: number;
-  unit_price: number;
-  total_price: number;
-  tax_rate: number;
-  tax_amount: number;
-  happy_hour_applied: boolean;
-  happy_hour_discount_amount: number;
-  is_manual_happy_hour?: boolean;
-  sub_bill_id?: number;
-  description?: string; // Description for special items like Divers
-  created_at: Date;
-}
-
-export interface SubBill {
-  id: number;
-  establishment_id?: string | null;
-  order_id: number;
-  payment_method: 'cash' | 'card';
-  amount: number;
-  status: 'pending' | 'paid';
-  created_at: Date;
-}
+export type Order = SharedOrder;
+export type OrderItem = SharedOrderItem;
+export type SubBill = SharedSubBill;
 
 // Product-related interfaces
 export interface Category {
