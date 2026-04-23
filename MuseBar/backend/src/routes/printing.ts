@@ -24,7 +24,8 @@ import { createPrintingServiceManager } from '../printing/printingServiceManager
 const router = Router();
 
 /**
- * Epson TM-Intelligent — Server Direct Print poll (no JWT; secured with pollKey in query).
+ * Epson TM-Intelligent — Server Direct Print poll (no JWT; secured with x-epson-poll-key header).
+ * Legacy ?key= fallback is temporarily accepted for compatibility.
  * Configure this full URL in the printer TMNet WebConfig.
  */
 router.get('/epson/poll', async (req: Request, res: Response) => {

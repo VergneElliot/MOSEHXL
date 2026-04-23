@@ -12,7 +12,7 @@ import { closureBulletinToEposPrintXml, receiptToEposPrintXml } from './eposPrin
 
 /**
  * Queues ePOS-Print XML jobs for TM-Intelligent printers using Epson Server Direct Print
- * (printer polls GET /api/printing/epson/poll with establishment_id + key).
+ * (printer polls GET /api/printing/epson/poll with establishment_id and x-epson-poll-key header).
  */
 export class EpsonServerDirectPrintService extends BasePrintingService {
   private establishmentId: string;
