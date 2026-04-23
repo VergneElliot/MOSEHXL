@@ -38,7 +38,7 @@ interface Printer {
 
 interface PrintingConfig {
   provider: string;
-  config: any;
+  config: Record<string, unknown>;
   is_active: boolean;
 }
 
@@ -62,6 +62,19 @@ interface PrinterSetupProps {
   embedded?: boolean;
 }
 
+interface PrintingConfigurationsResponse {
+  configurations?: Array<PrintingConfig & { is_active?: boolean }>;
+}
+
+interface PrintingTestResponse {
+  success?: boolean;
+  message?: string;
+}
+
+interface PrintersResponse {
+  printers?: Printer[];
+}
+
 const providerInfo: Record<string, ProviderInfo> = {
   'epson-server-direct': {
     name: 'Epson Server Direct Print',
@@ -75,7 +88,7 @@ const providerInfo: Record<string, ProviderInfo> = {
 export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = false }) => {
   const [activeStep, setActiveStep] = useState(0);
   const [selectedProvider, setSelectedProvider] = useState<string>('epson-server-direct');
-  const [config, setConfig] = useState<any>({});
+  const [config, setConfig] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -94,9 +107,9 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
       });
       
       if (response.ok) {
-        const data = await response.json();
+        const data = (await response.json()) as PrintingConfigurationsResponse;
         if (data.configurations && data.configurations.length > 0) {
-          const active = data.configurations.find((c: any) => c.is_active);
+          const active = data.configurations.find((c) => c.is_active);
           if (active) {
             setCurrentConfig(active);
             setSelectedProvider(active.provider);
@@ -104,8 +117,8 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
           }
         }
       }
-    } catch (error) {
-      console.error('Error loading configuration:', error);
+    } catch {
+      // Non-blocking: setup UI remains usable with default state.
     }
   };
 
@@ -116,7 +129,7 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
     setSuccess(null);
   };
 
-  const handleConfigChange = (field: string, value: any) => {
+  const handleConfigChange = (field: string, value: unknown) => {
     setConfig({ ...config, [field]: value });
   };
 
@@ -167,7 +180,7 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
         }
       });
 
-      const result = await testResponse.json();
+      const result = (await testResponse.json()) as PrintingTestResponse;
       
       if (result.success) {
         setSuccess('Test print successful!');
@@ -190,11 +203,11 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
       });
       
       if (response.ok) {
-        const data = await response.json();
+        const data = (await response.json()) as PrintersResponse;
         setPrinters(data.printers || []);
       }
-    } catch (error) {
-      console.error('Error loading printers:', error);
+    } catch {
+      // Non-blocking: printer list is optional in setup wizard.
     }
   };
 

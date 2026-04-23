@@ -220,6 +220,8 @@ My recommendation is **Option 1**. If you ever need stronger isolation for a hig
 - Fix frontend `any` in `src/services/api/orders.ts`, `PrintAfterSaleDialog`, `PrinterSetup`.
 - Log `JSON.parse` failures in `printingConfigRepo`, `happyHourSettings`, `journalQueries`, `QRReceiptService`.
 
+**Plan/implementation of record:** `docs/patch-notes/86-CODE-HYGIENE-C3-TYPE-SAFETY-PLAN.md` and `docs/patch-notes/87-CODE-HYGIENE-C3-TYPE-SAFETY-IMPLEMENTATION.md`.
+
 **C4. Documentation correction:**
 - Rewrite the README claims: multi-tenancy is column-based; types have minor drift; file sizes; remove NF525 "Ready" for multi-tenant until A3 ships.
 - Delete or merge outdated patch notes (60 is about a plan that's now superseded by this audit).
