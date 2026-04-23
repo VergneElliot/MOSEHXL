@@ -65,14 +65,14 @@ export async function buildReceiptDataForOrder(
   const receiptResult = await pool.query(
     `SELECT 
       o.id as order_id,
-      o.receipt_number as sequence_number,
+      COALESCE(lj.sequence_number, o.id) as sequence_number,
       o.total_amount,
-      o.tax_amount as total_tax,
+      o.total_tax as total_tax,
       o.payment_method,
       o.created_at,
       o.tips,
       o.change AS change,
-      o.receipt_hash,
+      lj.current_hash as receipt_hash,
       json_agg(
         json_build_object(
           'product_name', oi.product_name,
@@ -89,11 +89,20 @@ export async function buildReceiptDataForOrder(
       e.siret,
       e.tax_identification
     FROM public.orders o
+    LEFT JOIN LATERAL (
+      SELECT sequence_number, current_hash
+      FROM public.legal_journal
+      WHERE order_id = o.id
+        AND establishment_id = o.establishment_id
+        AND transaction_type = 'SALE'
+      ORDER BY sequence_number DESC
+      LIMIT 1
+    ) lj ON true
     JOIN public.establishments e ON e.id = $2
     LEFT JOIN public.order_items oi ON o.id = oi.order_id
     LEFT JOIN public.products p ON oi.product_id = p.id
     WHERE o.id = $1 AND o.establishment_id = $2
-    GROUP BY o.id, e.id`,
+    GROUP BY o.id, e.id, lj.sequence_number, lj.current_hash`,
     [orderId, establishmentId]
   );
 
@@ -103,11 +112,19 @@ export async function buildReceiptDataForOrder(
   }
 
   const receiptRow = receiptResult.rows[0];
+  const parsedSequence = Number(receiptRow.sequence_number);
+  const parsedTotalTax =
+    typeof receiptRow.total_tax === 'number'
+      ? receiptRow.total_tax
+      : parseFloat(String(receiptRow.total_tax ?? '0'));
+  const safeSequenceNumber = Number.isFinite(parsedSequence) && parsedSequence > 0 ? parsedSequence : Number(receiptRow.order_id);
+  const safeTotalTax = Number.isFinite(parsedTotalTax) ? parsedTotalTax : 0;
+
   const receiptData: PrintingReceiptData = {
     order_id: Number(receiptRow.order_id),
-    sequence_number: Number(receiptRow.sequence_number),
+    sequence_number: safeSequenceNumber,
     total_amount: parseFloat(receiptRow.total_amount),
-    total_tax: parseFloat(receiptRow.total_tax),
+    total_tax: safeTotalTax,
     payment_method: String(receiptRow.payment_method ?? ''),
     created_at: new Date(receiptRow.created_at).toISOString(),
     items: Array.isArray(receiptRow.items) ? receiptRow.items : [],
