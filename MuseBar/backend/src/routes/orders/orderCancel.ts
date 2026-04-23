@@ -220,7 +220,7 @@ router.post(
             happy_hour_applied: item.happy_hour_applied,
             happy_hour_discount_amount: -item.happy_hour_discount_amount,
             is_manual_happy_hour: item.is_manual_happy_hour === true,
-          });
+          }, establishmentId);
         })
       );
 
@@ -237,7 +237,7 @@ router.post(
                 payment_method: sb.payment_method,
                 amount: -sb.amount,
                 status: sb.status,
-              })
+              }, establishmentId)
             )
           );
         } else if (cancellationAmount > 0) {
@@ -268,7 +268,7 @@ router.post(
                   payment_method: sb.payment_method,
                   amount: -amountToCancel,
                   status: sb.status,
-                });
+                }, establishmentId);
               })
             );
           }

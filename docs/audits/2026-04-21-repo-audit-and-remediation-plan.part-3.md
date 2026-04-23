@@ -186,6 +186,8 @@ My recommendation is **Option 1**. If you ever need stronger isolation for a hig
 - Delete unmounted `routes/userManagement/roleRoutes.ts`, `teamRoutes.ts`, `users/userQueries.ts` — they are a latent leak if ever mounted.
 - Add `establishment_id` to `order_items` as a denormalized column (or at least enforce the parent's tenant in every INSERT). Defense in depth.
 
+**Plan/implementation of record:** `docs/patch-notes/72-MULTI-TENANCY-B2-LEAK-CLOSURE-PLAN.md` and `docs/patch-notes/73-MULTI-TENANCY-B2-LEAK-CLOSURE-IMPLEMENTATION.md`.
+
 **B3. Printing schema drift — put `printing_configurations` and `printing_history` into the migration chain.** Create a new migration that `CREATE TABLE IF NOT EXISTS` for both; confirm columns match the code (`printingConfigRepo.ts`, `logPrintingHistory`).
 
 **B4. Clarify `orders` columns.** Either migrate `receipt_number` / `receipt_hash` / `tax_amount` into the schema officially, or remove their usage in `printDataRepo.ts` and compute them on demand.

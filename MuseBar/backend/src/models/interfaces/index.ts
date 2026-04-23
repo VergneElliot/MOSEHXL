@@ -24,6 +24,7 @@ export interface Order {
 
 export interface OrderItem {
   id: number;
+  establishment_id?: string | null;
   order_id: number;
   product_id?: number;
   product_name: string;
@@ -42,6 +43,7 @@ export interface OrderItem {
 
 export interface SubBill {
   id: number;
+  establishment_id?: string | null;
   order_id: number;
   payment_method: 'cash' | 'card';
   amount: number;

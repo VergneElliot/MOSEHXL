@@ -1,7 +1,7 @@
 /**
  * Order Database Model
  * All queries are scoped to a specific establishment — cross-tenant data access is impossible.
- * order_items and sub_bills are implicitly scoped through their order_id FK.
+ * order_items and sub_bills are scoped through parent orders and explicit establishment attribution.
  */
 
 import { pool } from '../../app';
@@ -103,12 +103,16 @@ export const OrderItemModel = {
     return result.rows;
   },
 
-  async create(item: Omit<OrderItem, 'id' | 'created_at'>): Promise<OrderItem> {
+  async create(item: Omit<OrderItem, 'id' | 'created_at'>, establishmentId: string): Promise<OrderItem> {
     const result = await pool.query(
       `INSERT INTO order_items (
          order_id, product_id, product_name, quantity, unit_price, total_price,
-         tax_rate, tax_amount, happy_hour_applied, happy_hour_discount_amount, is_manual_happy_hour, description
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         tax_rate, tax_amount, happy_hour_applied, happy_hour_discount_amount, is_manual_happy_hour, description, establishment_id
+       )
+       SELECT
+         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, o.establishment_id
+       FROM orders o
+       WHERE o.id = $1 AND o.establishment_id = $13
        RETURNING *`,
       [
         item.order_id,
@@ -123,8 +127,12 @@ export const OrderItemModel = {
         item.happy_hour_discount_amount,
         item.is_manual_happy_hour === true,
         item.description || '',
+        establishmentId
       ]
     );
+    if (result.rows.length === 0) {
+      throw new Error(`Order ${item.order_id} not found for establishment ${establishmentId}`);
+    }
     return result.rows[0];
   },
 
@@ -158,11 +166,18 @@ export const SubBillModel = {
     return result.rows;
   },
 
-  async create(subBill: Omit<SubBill, 'id' | 'created_at'>): Promise<SubBill> {
+  async create(subBill: Omit<SubBill, 'id' | 'created_at'>, establishmentId: string): Promise<SubBill> {
     const result = await pool.query(
-      'INSERT INTO sub_bills (order_id, payment_method, amount, status) VALUES ($1, $2, $3, $4) RETURNING *',
-      [subBill.order_id, subBill.payment_method, subBill.amount, subBill.status]
+      `INSERT INTO sub_bills (order_id, payment_method, amount, status, establishment_id)
+       SELECT $1, $2, $3, $4, o.establishment_id
+       FROM orders o
+       WHERE o.id = $1 AND o.establishment_id = $5
+       RETURNING *`,
+      [subBill.order_id, subBill.payment_method, subBill.amount, subBill.status, establishmentId]
     );
+    if (result.rows.length === 0) {
+      throw new Error(`Order ${subBill.order_id} not found for establishment ${establishmentId}`);
+    }
     return result.rows[0];
   },
 
