@@ -4,11 +4,29 @@ import { AuditTrailModel } from '../models/auditTrail';
 import { getEstablishmentId, requireAuth, requireAnyPermission, requirePermission } from './auth';
 import { P } from '../permissions/registry';
 import { validateParams, paramValidations } from '../middleware/validation';
+import { Logger } from '../utils/logger';
+import { AppError } from '../middleware/errorHandler';
 
 const router = express.Router();
 
 const readCatalog = requireAnyPermission([P.access_pos, P.access_menu]);
 const menuWrite = requirePermission(P.access_menu);
+
+async function logAuditOrThrow(
+  entry: Parameters<typeof AuditTrailModel.logAction>[0],
+  context: string
+): Promise<void> {
+  try {
+    await AuditTrailModel.logAction(entry);
+  } catch (error) {
+    Logger.getInstance().error(
+      `Audit trail logging failed (${context})`,
+      error as Error,
+      'PRODUCTS_ROUTE'
+    );
+    throw new AppError('Failed to persist audit trail entry', 500, 'AUDIT_LOG_FAILURE', { context });
+  }
+}
 
 router.use(requireAuth);
 
@@ -96,7 +114,7 @@ router.post('/', menuWrite, async (req, res) => {
       { name, price, tax_rate, category_id, happy_hour_discount_percent, happy_hour_discount_fixed, is_happy_hour_eligible: is_happy_hour_eligible !== undefined ? is_happy_hour_eligible : true, is_active: true, establishment_id: establishmentId },
       establishmentId
     );
-    await AuditTrailModel.logAction({
+    await logAuditOrThrow({
       user_id: String(req.user!.id),
       action_type: 'CREATE_PRODUCT',
       resource_type: 'PRODUCT',
@@ -104,7 +122,7 @@ router.post('/', menuWrite, async (req, res) => {
       action_details: { name, price, tax_rate, category_id, establishmentId },
       ip_address: req.ip,
       user_agent: req.headers['user-agent'],
-    }).catch(() => {});
+    }, 'CREATE_PRODUCT');
     res.status(201).json(product);
   } catch {
     res.status(500).json({ error: 'Failed to create product' });
@@ -131,7 +149,7 @@ router.put('/:id', menuWrite, validateParams([paramValidations.id]), async (req,
 
     const product = await ProductModel.update(id, updateData, establishmentId);
     if (!product) return res.status(404).json({ error: 'Product not found' });
-    await AuditTrailModel.logAction({
+    await logAuditOrThrow({
       user_id: String(req.user!.id),
       action_type: 'UPDATE_PRODUCT',
       resource_type: 'PRODUCT',
@@ -139,7 +157,7 @@ router.put('/:id', menuWrite, validateParams([paramValidations.id]), async (req,
       action_details: updateData,
       ip_address: req.ip,
       user_agent: req.headers['user-agent'],
-    }).catch(() => {});
+    }, 'UPDATE_PRODUCT');
     res.json(product);
   } catch {
     res.status(500).json({ error: 'Failed to update product' });
@@ -154,7 +172,7 @@ router.delete('/:id', menuWrite, validateParams([paramValidations.id]), async (r
     const id = parseInt(req.params.id);
     const result = await ProductModel.delete(id, establishmentId);
     if (!result.deleted) return res.status(404).json({ error: 'Product not found or could not be deleted.' });
-    await AuditTrailModel.logAction({
+    await logAuditOrThrow({
       user_id: String(req.user!.id),
       action_type: result.action === 'hard' ? 'DELETE_PRODUCT' : 'ARCHIVE_PRODUCT',
       resource_type: 'PRODUCT',
@@ -162,7 +180,7 @@ router.delete('/:id', menuWrite, validateParams([paramValidations.id]), async (r
       action_details: { deletion_type: result.action },
       ip_address: req.ip,
       user_agent: req.headers['user-agent'],
-    }).catch(() => {});
+    }, 'DELETE_OR_ARCHIVE_PRODUCT');
     const message = result.action === 'soft'
       ? 'Produit archivé avec succès (utilisé dans des commandes précédentes)'
       : 'Produit supprimé définitivement avec succès (jamais utilisé)';
@@ -184,7 +202,7 @@ router.put('/:id/restore', menuWrite, validateParams([paramValidations.id]), asy
     const id = parseInt(req.params.id);
     const restored = await ProductModel.restore(id, establishmentId);
     if (!restored) return res.status(404).json({ error: 'Product not found or could not be restored.' });
-    await AuditTrailModel.logAction({
+    await logAuditOrThrow({
       user_id: String(req.user!.id),
       action_type: 'RESTORE_PRODUCT',
       resource_type: 'PRODUCT',
@@ -192,7 +210,7 @@ router.put('/:id/restore', menuWrite, validateParams([paramValidations.id]), asy
       action_details: { product_id: id },
       ip_address: req.ip,
       user_agent: req.headers['user-agent'],
-    }).catch(() => {});
+    }, 'RESTORE_PRODUCT');
     res.json({ message: 'Produit restauré avec succès' });
   } catch {
     res.status(500).json({ error: 'Failed to restore product' });

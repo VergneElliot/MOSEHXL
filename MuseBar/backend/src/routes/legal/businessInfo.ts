@@ -2,6 +2,8 @@ import express from 'express';
 import { requireAuth, getEstablishmentId, requirePermission } from '../auth';
 import { P } from '../../permissions/registry';
 import { BusinessInfoModel } from '../../models/legalJournal/businessInfoModel';
+import { AppError, asyncHandler } from '../../middleware/errorHandler';
+import { Logger } from '../../utils/logger';
 
 const router = express.Router();
 
@@ -11,7 +13,7 @@ const router = express.Router();
 const requireSettings = requirePermission(P.access_settings);
 
 // GET /api/legal/business-info
-router.get('/business-info', requireAuth, requireSettings, async (req, res) => {
+router.get('/business-info', requireAuth, requireSettings, asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
 
@@ -19,14 +21,13 @@ router.get('/business-info', requireAuth, requireSettings, async (req, res) => {
     const data = await BusinessInfoModel.getBusinessInfo(establishmentId);
     return res.json(data);
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Error fetching business info:', error);
-    res.status(500).json({ error: 'Failed to fetch business info' });
+    Logger.getInstance().error('Error fetching business info', error as Error, 'LEGAL_ROUTE');
+    throw new AppError('Failed to fetch business info', 500, 'BUSINESS_INFO_FETCH_FAILED');
   }
-});
+}));
 
 // PUT /api/legal/business-info
-router.put('/business-info', requireAuth, requireSettings, async (req, res) => {
+router.put('/business-info', requireAuth, requireSettings, asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
 
@@ -44,11 +45,10 @@ router.put('/business-info', requireAuth, requireSettings, async (req, res) => {
 
     return res.json(data);
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Error saving business info:', error);
-    res.status(500).json({ error: 'Failed to save business info' });
+    Logger.getInstance().error('Error saving business info', error as Error, 'LEGAL_ROUTE');
+    throw new AppError('Failed to save business info', 500, 'BUSINESS_INFO_SAVE_FAILED');
   }
-});
+}));
 
 export default router;
 

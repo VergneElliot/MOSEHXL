@@ -4,11 +4,29 @@ import { AuditTrailModel } from '../models/auditTrail';
 import { getEstablishmentId, requireAuth, requireAnyPermission, requirePermission } from './auth';
 import { P } from '../permissions/registry';
 import { validateBody, validateParams, commonValidations, paramValidations } from '../middleware/validation';
+import { Logger } from '../utils/logger';
+import { AppError } from '../middleware/errorHandler';
 
 const router = express.Router();
 
 const readCatalog = requireAnyPermission([P.access_pos, P.access_menu]);
 const menuWrite = requirePermission(P.access_menu);
+
+async function logAuditOrThrow(
+  entry: Parameters<typeof AuditTrailModel.logAction>[0],
+  context: string
+): Promise<void> {
+  try {
+    await AuditTrailModel.logAction(entry);
+  } catch (error) {
+    Logger.getInstance().error(
+      `Audit trail logging failed (${context})`,
+      error as Error,
+      'CATEGORIES_ROUTE'
+    );
+    throw new AppError('Failed to persist audit trail entry', 500, 'AUDIT_LOG_FAILURE', { context });
+  }
+}
 
 router.use(requireAuth);
 
@@ -69,7 +87,7 @@ router.post('/', menuWrite, validateBody(commonValidations.categoryCreate), asyn
   try {
     const { name, default_tax_rate, color } = req.body;
     const category = await CategoryModel.create(name, default_tax_rate, color || '#1976d2', establishmentId);
-    await AuditTrailModel.logAction({
+    await logAuditOrThrow({
       user_id: String(req.user!.id),
       action_type: 'CREATE_CATEGORY',
       resource_type: 'CATEGORY',
@@ -77,7 +95,7 @@ router.post('/', menuWrite, validateBody(commonValidations.categoryCreate), asyn
       action_details: { name, default_tax_rate, color, establishmentId },
       ip_address: req.ip,
       user_agent: req.headers['user-agent'],
-    }).catch(() => {});
+    }, 'CREATE_CATEGORY');
     res.status(201).json(category);
   } catch {
     res.status(500).json({ error: 'Failed to create category' });
@@ -100,7 +118,7 @@ router.put('/:id', menuWrite, validateParams([paramValidations.id]), async (req,
       is_active
     );
     if (!category) return res.status(404).json({ error: 'Category not found' });
-    await AuditTrailModel.logAction({
+    await logAuditOrThrow({
       user_id: String(req.user!.id),
       action_type: 'UPDATE_CATEGORY',
       resource_type: 'CATEGORY',
@@ -108,7 +126,7 @@ router.put('/:id', menuWrite, validateParams([paramValidations.id]), async (req,
       action_details: { name, default_tax_rate, color, is_active },
       ip_address: req.ip,
       user_agent: req.headers['user-agent'],
-    }).catch(() => {});
+    }, 'UPDATE_CATEGORY');
     res.json(category);
   } catch {
     res.status(500).json({ error: 'Failed to update category' });
@@ -123,7 +141,7 @@ router.delete('/:id', menuWrite, validateParams([paramValidations.id]), async (r
     const id = parseInt(req.params.id);
     const result = await CategoryModel.delete(id, establishmentId);
     if (!result.deleted) return res.status(404).json({ error: 'Category not found' });
-    await AuditTrailModel.logAction({
+    await logAuditOrThrow({
       user_id: String(req.user!.id),
       action_type: result.action === 'hard' ? 'DELETE_CATEGORY' : 'ARCHIVE_CATEGORY',
       resource_type: 'CATEGORY',
@@ -131,7 +149,7 @@ router.delete('/:id', menuWrite, validateParams([paramValidations.id]), async (r
       action_details: { deletion_type: result.action, reason: result.reason },
       ip_address: req.ip,
       user_agent: req.headers['user-agent'],
-    }).catch(() => {});
+    }, 'DELETE_OR_ARCHIVE_CATEGORY');
     const message = result.action === 'hard'
       ? 'Catégorie supprimée définitivement avec succès'
       : 'Catégorie archivée avec succès (préservation légale requise)';
@@ -149,7 +167,7 @@ router.post('/:id/restore', menuWrite, validateParams([paramValidations.id]), as
     const id = parseInt(req.params.id);
     const restored = await CategoryModel.restore(id, establishmentId);
     if (!restored) return res.status(404).json({ error: 'Category not found or already active' });
-    await AuditTrailModel.logAction({
+    await logAuditOrThrow({
       user_id: String(req.user!.id),
       action_type: 'RESTORE_CATEGORY',
       resource_type: 'CATEGORY',
@@ -157,7 +175,7 @@ router.post('/:id/restore', menuWrite, validateParams([paramValidations.id]), as
       action_details: { category_id: id },
       ip_address: req.ip,
       user_agent: req.headers['user-agent'],
-    }).catch(() => {});
+    }, 'RESTORE_CATEGORY');
     res.json({ message: 'Catégorie restaurée avec succès' });
   } catch {
     res.status(500).json({ error: 'Failed to restore category' });
