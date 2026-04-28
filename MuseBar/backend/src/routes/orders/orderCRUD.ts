@@ -146,25 +146,49 @@ router.post(
 
     // Write to legal journal — every completed sale must be recorded.
     // This is required by French fiscal law (Article 286-I-3 bis du CGI / NF525).
-    // We do this AFTER the order is committed to the DB. If the journal write
-    // fails we log the error but DO NOT block the response — the sale happened
-    // and must not be rolled back just because of a logging issue. The integrity
-    // check endpoint can later flag the missing entry.
+    // Hardening policy: if the SALE journal write fails, we do not return success.
+    // We attempt a compensating order delete to avoid leaving a completed sale
+    // without legal journal trace.
     if (status === 'completed') {
-      LegalJournalModel.logTransaction(
-        {
-          id: order.id,
-          establishment_id: establishmentId,
-          total_amount: order.total_amount,
-          total_tax: order.total_tax,
-          payment_method: order.payment_method,
-          items: createdItems,
-          created_at: order.created_at,
-        },
-        req.user ? String(req.user.id) : undefined
-      ).catch((journalError: unknown) => {
-        logger.error(`Failed to write legal journal entry for order ${order.id}`, journalError instanceof Error ? journalError : new Error(String(journalError)), 'LEGAL_JOURNAL');
-      });
+      try {
+        await LegalJournalModel.logTransaction(
+          {
+            id: order.id,
+            establishment_id: establishmentId,
+            total_amount: order.total_amount,
+            total_tax: order.total_tax,
+            payment_method: order.payment_method,
+            items: createdItems,
+            created_at: order.created_at,
+          },
+          req.user ? String(req.user.id) : undefined
+        );
+      } catch (journalError: unknown) {
+        logger.error(
+          `Failed to write legal journal entry for order ${order.id}`,
+          journalError instanceof Error ? journalError : new Error(String(journalError)),
+          'LEGAL_JOURNAL'
+        );
+        try {
+          const deleted = await OrderModel.delete(order.id, establishmentId);
+          if (!deleted) {
+            logger.error(
+              `Compensating delete failed after legal journal failure for order ${order.id}`,
+              new Error('ORDER_COMPENSATING_DELETE_FAILED'),
+              'LEGAL_JOURNAL'
+            );
+          }
+        } catch (cleanupError: unknown) {
+          logger.error(
+            `Compensating delete threw after legal journal failure for order ${order.id}`,
+            cleanupError instanceof Error ? cleanupError : new Error(String(cleanupError)),
+            'LEGAL_JOURNAL'
+          );
+        }
+        return res.status(500).json({
+          error: 'Failed to persist legal journal entry; order creation aborted for compliance safety'
+        });
+      }
 
       // Write to audit trail — records who created what, when, and from where.
       AuditTrailModel.logAction({
