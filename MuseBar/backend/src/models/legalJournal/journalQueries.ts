@@ -251,7 +251,7 @@ export class JournalQueries {
         sequence_number, establishment_id, transaction_type, order_id, amount, vat_amount,
         payment_method, transaction_data, previous_hash, current_hash,
         timestamp, user_id, register_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *
     `;
 
