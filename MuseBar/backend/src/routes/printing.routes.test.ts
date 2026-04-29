@@ -128,6 +128,42 @@ describe('printing routes', () => {
     expect(mocks.managerGetService).toHaveBeenCalledWith('est-1');
   });
 
+  it('returns printers payload for authenticated establishment user', async () => {
+    const res = await request(app)
+      .get('/printing/printers')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(200);
+    expect(res.body.establishment_id).toBe('est-1');
+    expect(res.body.printers).toEqual([{ id: 'p1', name: 'Printer 1' }]);
+    expect(mocks.managerGetService).toHaveBeenCalledWith('est-1');
+  });
+
+  it('queues test print and returns success message', async () => {
+    mocks.buildTestReceiptData.mockResolvedValue({ sequence_number: 999, items: [] });
+    const printReceipt = vi.fn().mockResolvedValue({ success: true, message: 'ok' });
+    mocks.managerGetService.mockResolvedValue({
+      checkPrinterStatus: vi.fn().mockResolvedValue({ connected: true }),
+      listPrinters: vi.fn().mockResolvedValue([{ id: 'p1', name: 'Printer 1' }]),
+      printReceipt,
+      printClosureBulletin: vi.fn(),
+    });
+
+    const res = await request(app)
+      .post('/printing/test')
+      .set('Authorization', 'Bearer test-token')
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.message).toBe('Test print queued successfully');
+    expect(mocks.buildTestReceiptData).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ establishment_id: 'est-1' })
+    );
+    expect(printReceipt).toHaveBeenCalledWith(expect.objectContaining({ sequence_number: 999 }));
+  });
+
   it('returns 400 for invalid provider on configuration update', async () => {
     mocks.savePrintingConfiguration.mockRejectedValue(
       Object.assign(new Error('Provider must be one of: epson-server-direct, digital'), { statusCode: 400 })
