@@ -218,6 +218,17 @@ describe('legal archive/closure permission gating', () => {
     expect(res.body.error).toBe('Invalid archive ID');
   });
 
+  it('denies /archive/:id/export without access_closure', async () => {
+    mocks.getUserPermissions.mockResolvedValue([]);
+
+    const res = await request(app)
+      .post('/archive/77/export')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`)
+      .send({ format: 'json' });
+
+    expect(res.status).toBe(403);
+  });
+
   it('allows /archive/:id/export with access_closure and returns export payload contract', async () => {
     mocks.getUserPermissions.mockResolvedValue(['access_closure']);
 

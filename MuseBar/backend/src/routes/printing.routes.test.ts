@@ -152,6 +152,19 @@ describe('printing routes', () => {
     expect(mocks.managerGetService).toHaveBeenCalledWith('est-1');
   });
 
+  it('returns 500 when checking printer status fails unexpectedly', async () => {
+    mocks.managerGetService.mockRejectedValue(new Error('status probe failed'));
+
+    const res = await request(app)
+      .get('/printing/status')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(500);
+    expect(res.body.error).toBe('Failed to check printer status');
+    expect(String(res.body.message)).toContain('status probe failed');
+    expect(mocks.loggerError).toHaveBeenCalled();
+  });
+
   it('returns printers payload for authenticated establishment user', async () => {
     const res = await request(app)
       .get('/printing/printers')
@@ -278,6 +291,19 @@ describe('printing routes', () => {
     expect(res.body.establishment_id).toBe('est-1');
     expect(res.body.configurations).toHaveLength(1);
     expect(mocks.listPrintingConfigurations).toHaveBeenCalledWith(expect.anything(), 'est-1');
+  });
+
+  it('returns 500 when fetching printing configuration fails unexpectedly', async () => {
+    mocks.listPrintingConfigurations.mockRejectedValue(new Error('config read failed'));
+
+    const res = await request(app)
+      .get('/printing/configuration')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(500);
+    expect(res.body.error).toBe('Failed to get printing configuration');
+    expect(String(res.body.message)).toContain('config read failed');
+    expect(mocks.loggerError).toHaveBeenCalled();
   });
 
   it('returns tenant-scoped printing history with bounded pagination', async () => {
