@@ -382,28 +382,23 @@ Earlier versions of the project experimented with **schema-per-tenant** (`establ
 
 ```
 Database: mosehxl_development
-├── public schema (shared tables)
-│   ├── users
-│   ├── establishments
-│   ├── permissions
-│   ├── user_permissions
-│   ├── legal_journal
-│   └── rate_limit_store
-│
-├── establishment_abc123 schema (MuseBar's tables)
-│   ├── categories
-│   ├── products
-│   ├── orders
-│   └── business_settings
-│
-└── establishment_def456 schema (another bar's tables)
+└── public schema (shared tables)
+    ├── establishments
+    ├── users
+    ├── permissions
+    ├── user_permissions
     ├── categories
     ├── products
     ├── orders
-    └── business_settings
+    ├── order_items
+    ├── sub_bills
+    ├── legal_journal
+    ├── closure_bulletins
+    ├── audit_trail
+    └── rate_limit_store
 ```
 
-This isolation means that Bar A's products and orders are completely separate from Bar B's **by filtering and enforcement** on `establishment_id` (and, once implemented, DB-level guardrails like Row Level Security).
+This isolation means that Bar A's products and orders are completely separate from Bar B's through strict `establishment_id` scoping and DB guardrails (including RLS policies on tenant-owned tables).
 
 ---
 

@@ -82,7 +82,6 @@ It is the working reference for what is complete, what is broken, and what needs
 - SendGrid email service with templates (invitation, verification, establishment created)
 
 ### Services
-- Thermal printing service (`utils/thermalPrint/`) — modular with queue, formatters, templates
 - Multi-method printing (`services/printing/`) — browser, network, PrintNode, StarCloudPRNT
 - Digital/email/QR receipt services (`services/receipts/`)
 

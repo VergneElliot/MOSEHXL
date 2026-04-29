@@ -80,7 +80,6 @@ MOSEHXL/
 │   │   │   │
 │   │   │   ├── utils/                 ← Shared utilities
 │   │   │   │   ├── logger/            ← Structured logging system
-│   │   │   │   ├── thermalPrint/      ← Thermal printer queue and formatting
 │   │   │   │   └── closureScheduler.ts ← Cron-like daily closure automation
 │   │   │   │
 │   │   │   └── migrations/            ← Database schema version management
