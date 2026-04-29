@@ -1,12 +1,18 @@
 # Database Architecture — Compatibility Report
 
-**Purpose:** Single source of truth for what the application expects from the database, and how it aligns with the reference schemas and migrations.
+**Purpose:** Historical compatibility snapshot plus practical checks for database expectations.
 
-**Last updated:** March 2026 (includes rate_limit_store migration and post-audit alignment)
+**Last updated:** April 2026 (historical March snapshot + current-source pointers)
 
 ---
 
-## 1. How the DB is set up today
+## 1. Historical baseline (March 2026) and current pointers
+
+> This chapter was originally written around the March 2026 audit window.  
+> For live truth, prioritize:
+> - `npm run migration:status` (runtime-applied migration state)
+> - `DEVELOPMENT-STATE.md`
+> - latest patch notes (`98+` onward).
 
 ### 1.1 Migration CLI (what actually runs)
 
@@ -15,12 +21,12 @@ The app uses **only** migrations in `MuseBar/backend/src/migrations/files/` that
 - Match the filename pattern: `YYYY_MM_DD_HH_MM_SS_descriptive_name.sql`
 - Contain exactly two sections: `-- UP` and `-- DOWN`
 
-**Currently in `migrations/files/`:**
+**Baseline migration view at that snapshot:**
 
 | File | Purpose |
 |------|---------|
 | `2025_09_12_07_30_00_remove_email_unique_constraints.sql` | Drops unique constraints on `users.email` and `establishments.email`; adds non-unique indexes. |
-| `2026_02_25_00_00_00_add_pos_columns_and_establishment_isolation.sql` | Adds `tips`, `change`, `establishment_id` to orders; `description` to order_items; `establishment_id` to categories, products, orders, sub_bills, business_settings; creates indexes. **This is the migration that makes the DB compatible with current code.** |
+| `2026_02_25_00_00_00_add_pos_columns_and_establishment_isolation.sql` | Adds `tips`, `change`, `establishment_id` to orders; `description` to order_items; `establishment_id` to categories, products, orders, sub_bills, business_settings; creates indexes. |
 | `2026_02_25_00_15_00_create_setup_progress_tables.sql` | Creates `establishment_setup_progress` and `establishment_setup_steps` (and adds missing columns if tables already existed from older scripts). |
 | `2026_02_25_00_30_00_create_status_transitions_table.sql` | Creates `establishment_status_transitions`. |
 | `2026_02_25_01_00_00_convert_timestamps_to_timestamptz.sql` | Converts timestamp columns to TIMESTAMPTZ (Europe/Paris) for legal journal and closure correctness. |
@@ -37,11 +43,12 @@ These describe the intended shape of the DB but are **not** applied by the migra
 
 | File | Role |
 |------|------|
-| `models/schema.sql` | Base POS: categories, products, orders, order_items, sub_bills, users, permissions, user_permissions, business_settings. **No** `establishment_id`, **no** `tips`/`change` on orders, **no** `description` on order_items. |
+| `models/schema.sql` | Base POS reference schema used for documentation/bootstrap context; migration chain remains the authoritative runtime evolution path. |
 | `models/legal-schema.sql` | Legal tables: legal_journal, closure_bulletins, audit_trail, archive_exports, triggers. |
-| `models/multi-tenant-schema.sql` | Establishments, user extensions (establishment_id, role, first_name, etc.), user_invitations, password_reset_requests, email_logs, roles, user_role_assignments. **Does not** add `establishment_id` to orders, categories, products, or business_settings. |
+| `models/multi-tenant-schema.sql` | Establishments and auth/tenant support structures; runtime compatibility still depends on applying the migration chain. |
 
-So the **running** application assumes a DB that has already been brought to a “V2 multi-tenant” state (e.g. by an older or one-off migration, or by running a combination of these scripts manually). The CLI only applies the email-constraint migration on top of that.
+At that snapshot, the running application assumed a DB already brought to a V2 shared-table state.  
+Current branch has additional migration/hardening work beyond this baseline; rely on `migration:status` for live applied state.
 
 ---
 
@@ -132,9 +139,9 @@ No `establishment_id`; scoping is via `order_id` → `orders.establishment_id`.
 **establishments** — as in multi-tenant-schema (id UUID, name, email, subscription_plan, subscription_status, etc.).  
 **Note:** `schema_name` exists in legacy data/models but Phase **B1** commits to shared-table multi-tenancy; `schema_name` is not a runtime isolation mechanism.
 
-**legal_journal, closure_bulletins, audit_trail, archive_exports** — as in legal-schema (no `establishment_id` in current code; legal tables are global).
+**legal_journal, closure_bulletins, audit_trail, archive_exports** — defined in legal schema and further hardened by later migration passes; current branch uses per-establishment scoping/guards for legal surfaces.
 
-### 2.4 Summary of “must have” columns that are not in base schema.sql
+### 2.4 Summary of historical “must have” contract deltas
 
 - **orders:** `establishment_id`, `tips`, `change`
 - **categories:** `establishment_id`
@@ -146,12 +153,12 @@ Plus the whole **establishments** table and **users** extensions from multi-tena
 
 ---
 
-## 3. Compatibility status
+## 3. Compatibility status (historical snapshot framing)
 
 | Area | Status | Notes |
 |------|--------|------|
-| Migration CLI | ✅ All schema changes in `files/` with correct order. Setup progress and status-transitions tables are in the chain (see doc 24). | Add any new schema changes as migrations in `files/` with `-- UP` / `-- DOWN`. |
-| Reference schemas | ✅ Aligned (audit #42) | schema.sql, legal-schema.sql, multi-tenant-schema.sql document types/precision matching post-migration state. establishment_id and rate_limit_store are added by migrations (documented in schema.sql reference block). |
+| Migration CLI | ✅ | Migration chain is authoritative; confirm live DB state with `npm run migration:status`. |
+| Reference schemas | ✅ | Useful for documentation/bootstrap context, but not a replacement for migration-chain verification. |
 | Code vs DB contract | ✅ Clear | Models and routes consistently assume the columns in §2. If your DB has them, the app is compatible. |
 | Legal tables | ✅ | legal-schema matches what legalJournal/ and auditTrail models expect. |
 | User/role tables | ✅ | user.ts and auth routes expect users.establishment_id and role; multi-tenant-schema defines them. |
@@ -160,11 +167,10 @@ Plus the whole **establishments** table and **users** extensions from multi-tena
 
 ## 4. Ensuring your DB matches the contract
 
-1. **Initial setup (if starting from scratch)**  
-   Run in order:  
-   - `models/schema.sql` (base POS + users/permissions/business_settings)  
-   - `models/legal-schema.sql` (legal tables; ignore or adapt `GRANT musebar_user` if that role doesn’t exist)  
-   - `models/multi-tenant-schema.sql` (establishments + user extensions + invitations, etc.)
+1. **Initial setup**  
+   Prefer migration-driven setup and avoid manual schema drift:
+   - run `npm run migration:migrate` on a clean DB,
+   - use schema SQL files as reference material, not as a competing source of truth.
 
 2. **Apply migrations**  
    Run `npm run migration:migrate`. The migration `2026_02_25_00_00_00_add_pos_columns_and_establishment_isolation.sql` adds, in an idempotent way:
@@ -210,6 +216,6 @@ If any of these return fewer rows than expected, run `npm run migration:migrate`
 
 ## 6. Recommended next steps
 
-1. Run `npm run migration:migrate` in every environment (dev/staging/prod) so all migrations, including `2026_02_25_00_00_00` and `2026_02_25_01_00_00`, are applied.  
-2. Optionally update `models/schema.sql` and `models/multi-tenant-schema.sql` to document `establishment_id`, `tips`, `change`, and `description` so they match this report.  
-3. Keep all future schema changes as migrations in `migrations/files/` with `-- UP` and `-- DOWN`.
+1. Run `npm run migration:status` and `npm run migration:migrate` in every environment (dev/staging/prod).  
+2. Treat the migration chain as the canonical runtime source of truth; keep reference schema docs aligned as secondary artifacts.  
+3. Keep all future schema changes in `migrations/files/` with `-- UP` and `-- DOWN`.
