@@ -163,6 +163,19 @@ describe('printing routes', () => {
     expect(mocks.managerGetService).toHaveBeenCalledWith('est-1');
   });
 
+  it('returns 500 when listing printers fails unexpectedly', async () => {
+    mocks.managerGetService.mockRejectedValue(new Error('printer service unavailable'));
+
+    const res = await request(app)
+      .get('/printing/printers')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(500);
+    expect(res.body.error).toBe('Failed to list printers');
+    expect(String(res.body.message)).toContain('printer service unavailable');
+    expect(mocks.loggerError).toHaveBeenCalled();
+  });
+
   it('queues test print and returns success message', async () => {
     mocks.buildTestReceiptData.mockResolvedValue({ sequence_number: 999, items: [] });
     const printReceipt = vi.fn().mockResolvedValue({ success: true, message: 'ok' });

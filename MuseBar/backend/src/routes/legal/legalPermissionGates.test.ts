@@ -203,6 +203,17 @@ describe('legal route compliance permission gates', () => {
     expect(res.body.daily_closure_status).toBe('COMPLETED');
   });
 
+  it('denies /compliance/status without access_compliance', async () => {
+    mocks.getUserPermissions.mockResolvedValue([]);
+
+    const res = await request(app)
+      .get('/compliance/status')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(403);
+    expect(mocks.verifyJournalIntegrity).not.toHaveBeenCalled();
+  });
+
   it('allows /compliance/requirements with access_compliance', async () => {
     mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
 
@@ -213,6 +224,16 @@ describe('legal route compliance permission gates', () => {
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.requirements)).toBe(true);
     expect(res.body.requirements.length).toBeGreaterThan(0);
+  });
+
+  it('denies /compliance/requirements without access_compliance', async () => {
+    mocks.getUserPermissions.mockResolvedValue([]);
+
+    const res = await request(app)
+      .get('/compliance/requirements')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(403);
   });
 
   it('denies /stats/monthly-live without access_compliance', async () => {
