@@ -161,6 +161,36 @@ describe('legal route compliance permission gates', () => {
     expect(res.body.journal_entries?.total).toBe(2);
   });
 
+  it('allows /compliance/status with access_compliance and returns compliance snapshot', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
+    mocks.verifyJournalIntegrity.mockResolvedValue({ isValid: true, errors: [] });
+    mocks.getClosureBulletins.mockResolvedValue([
+      { closure_type: 'DAILY', period_start: new Date().toISOString() },
+    ]);
+
+    const res = await request(app)
+      .get('/compliance/status')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(200);
+    expect(mocks.verifyJournalIntegrity).toHaveBeenCalledWith(EST);
+    expect(mocks.getClosureBulletins).toHaveBeenCalledWith(EST, 'DAILY');
+    expect(res.body.compliance_status).toBe('COMPLIANT');
+    expect(res.body.daily_closure_status).toBe('COMPLETED');
+  });
+
+  it('allows /compliance/requirements with access_compliance', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
+
+    const res = await request(app)
+      .get('/compliance/requirements')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.requirements)).toBe(true);
+    expect(res.body.requirements.length).toBeGreaterThan(0);
+  });
+
   it('denies /stats/monthly-live without access_compliance', async () => {
     mocks.getUserPermissions.mockResolvedValue([]);
     const res = await request(app)

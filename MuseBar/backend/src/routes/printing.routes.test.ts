@@ -164,6 +164,19 @@ describe('printing routes', () => {
     expect(printReceipt).toHaveBeenCalledWith(expect.objectContaining({ sequence_number: 999 }));
   });
 
+  it('returns 500 when test print fails unexpectedly', async () => {
+    mocks.managerGetService.mockRejectedValue(new Error('service unavailable'));
+
+    const res = await request(app)
+      .post('/printing/test')
+      .set('Authorization', 'Bearer test-token')
+      .send({});
+
+    expect(res.status).toBe(500);
+    expect(res.body.error).toBe('Test print failed');
+    expect(String(res.body.message)).toContain('service unavailable');
+  });
+
   it('returns 400 for invalid provider on configuration update', async () => {
     mocks.savePrintingConfiguration.mockRejectedValue(
       Object.assign(new Error('Provider must be one of: epson-server-direct, digital'), { statusCode: 400 })
