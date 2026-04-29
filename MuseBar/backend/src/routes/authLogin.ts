@@ -219,6 +219,12 @@ router.post('/refresh', requireAuth, asyncHandler(async (req, res) => {
       user_agent: req.headers['user-agent'],
     }, 'TOKEN_REFRESH');
 
+    const authorization = req.headers.authorization;
+    const currentToken = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
+    if (currentToken) {
+      await revokeTokenOrThrow(currentToken, userId, 'TOKEN_REFRESH_ROTATED');
+    }
+
     return res.json({ token, expiresIn: rememberMe ? '7d' : '12h' });
   } catch {
     throw new AppError('Internal server error', 500, 'TOKEN_REFRESH_FAILED');
@@ -294,6 +300,12 @@ router.post('/support/impersonation/start', requireAuth, requireAdmin, asyncHand
       ip_address: ip,
       user_agent: userAgent,
     }, 'SUPPORT_IMPERSONATION_STARTED');
+
+    const authorization = req.headers.authorization;
+    const currentToken = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
+    if (currentToken) {
+      await revokeTokenOrThrow(currentToken, actorUserId, 'SUPPORT_IMPERSONATION_STARTED');
+    }
 
     return res.json({
       message: 'Support impersonation started',
