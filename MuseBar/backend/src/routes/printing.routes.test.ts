@@ -316,6 +316,19 @@ describe('printing routes', () => {
     );
   });
 
+  it('returns 500 for printing history when query fails', async () => {
+    mocks.poolQuery.mockRejectedValue(new Error('db down'));
+
+    const res = await request(app)
+      .get('/printing/history')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(500);
+    expect(res.body.error).toBe('Failed to get printing history');
+    expect(String(res.body.message)).toContain('db down');
+    expect(mocks.loggerError).toHaveBeenCalled();
+  });
+
   it('returns receipt preview and scopes data build to caller establishment', async () => {
     mocks.buildReceiptDataForOrder.mockResolvedValue({
       sequence_number: 456,

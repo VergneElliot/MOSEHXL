@@ -161,6 +161,30 @@ describe('legal route compliance permission gates', () => {
     expect(res.body.journal_entries?.total).toBe(2);
   });
 
+  it('returns 400 on /compliance/report when dates are missing despite access_compliance', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
+
+    const res = await request(app)
+      .get('/compliance/report')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Start date and end date are required');
+    expect(mocks.getEntriesForPeriod).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 on /compliance/report for invalid dates despite access_compliance', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
+
+    const res = await request(app)
+      .get('/compliance/report?start_date=nope&end_date=still-nope')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid date format');
+    expect(mocks.getEntriesForPeriod).not.toHaveBeenCalled();
+  });
+
   it('allows /compliance/status with access_compliance and returns compliance snapshot', async () => {
     mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
     mocks.verifyJournalIntegrity.mockResolvedValue({ isValid: true, errors: [] });
