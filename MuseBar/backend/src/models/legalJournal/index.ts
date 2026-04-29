@@ -67,6 +67,24 @@ export class LegalJournalModel {
     return await JournalOperations.logChange(establishmentId, orderId, amount, userId);
   }
 
+  static async logClosure(
+    establishmentId: string,
+    closureType: string,
+    totalAmount: number,
+    totalVat: number,
+    closureData: Record<string, unknown>,
+    userId?: string
+  ) {
+    return await JournalOperations.logClosure(
+      establishmentId,
+      closureType,
+      totalAmount,
+      totalVat,
+      closureData,
+      userId
+    );
+  }
+
   static async verifyJournalIntegrity(establishmentId: string) {
     return await JournalOperations.verifyIntegrity(establishmentId);
   }
