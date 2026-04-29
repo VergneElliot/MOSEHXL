@@ -425,6 +425,35 @@ describe('printing routes', () => {
     expect(res.body.error).toBe('Receipt not found');
   });
 
+  it('prints receipt successfully and logs printing history metadata', async () => {
+    mocks.buildReceiptDataForOrder.mockResolvedValue({
+      sequence_number: 321,
+      items: [],
+    });
+    const printReceipt = vi.fn().mockResolvedValue({ success: true, message: 'queued' });
+    mocks.managerGetService.mockResolvedValue({
+      checkPrinterStatus: vi.fn().mockResolvedValue({ connected: true }),
+      listPrinters: vi.fn().mockResolvedValue([{ id: 'p1', name: 'Printer 1' }]),
+      printReceipt,
+      printClosureBulletin: vi.fn(),
+    });
+
+    const res = await request(app)
+      .post('/printing/receipt/42')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.receipt_data.sequence_number).toBe(321);
+    expect(mocks.logPrintingHistory).toHaveBeenCalledWith(
+      expect.anything(),
+      'est-1',
+      'receipt',
+      expect.objectContaining({ success: true }),
+      expect.objectContaining({ order_id: 42, receipt_number: 321 })
+    );
+  });
+
   it('returns 400 for invalid receipt print order id and skips receipt data build', async () => {
     const res = await request(app)
       .post('/printing/receipt/not-a-number')
