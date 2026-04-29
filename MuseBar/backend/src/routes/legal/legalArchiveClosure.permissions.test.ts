@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   poolQuery: vi.fn(),
   getUserPermissions: vi.fn(),
   getArchiveExports: vi.fn(),
+  getArchiveExportById: vi.fn(),
   getClosureBulletins: vi.fn(),
   getLastFondDeCaisse: vi.fn(),
 }));
@@ -36,7 +37,7 @@ vi.mock('../../models/user', () => ({
 vi.mock('../../models/archiveService', () => ({
   ArchiveService: {
     getArchiveExports: mocks.getArchiveExports,
-    getArchiveExportById: vi.fn(),
+    getArchiveExportById: mocks.getArchiveExportById,
     exportData: vi.fn(),
   },
 }));
@@ -80,6 +81,7 @@ describe('legal archive/closure permission gating', () => {
     mocks.poolQuery.mockReset();
     mocks.getUserPermissions.mockReset();
     mocks.getArchiveExports.mockReset();
+    mocks.getArchiveExportById.mockReset();
     mocks.getClosureBulletins.mockReset();
     mocks.getLastFondDeCaisse.mockReset();
 
@@ -92,6 +94,7 @@ describe('legal archive/closure permission gating', () => {
     });
 
     mocks.getArchiveExports.mockResolvedValue([]);
+    mocks.getArchiveExportById.mockResolvedValue(null);
     mocks.getClosureBulletins.mockResolvedValue([]);
     mocks.getLastFondDeCaisse.mockResolvedValue(200);
   });
@@ -116,6 +119,36 @@ describe('legal archive/closure permission gating', () => {
 
     expect(res.status).toBe(200);
     expect(mocks.getArchiveExports).toHaveBeenCalledWith(EST);
+  });
+
+  it('allows /archive/:id with access_closure and scopes archive lookup', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    mocks.getArchiveExportById.mockResolvedValue({
+      id: 12,
+      establishment_id: EST,
+      export_type: 'DAILY',
+    });
+
+    const res = await request(app)
+      .get('/archive/12')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(200);
+    expect(mocks.getArchiveExportById).toHaveBeenCalledWith(12, EST);
+    expect(res.body.archive.id).toBe(12);
+  });
+
+  it('returns 404 for /archive/:id when archive is missing despite access_closure', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    mocks.getArchiveExportById.mockResolvedValue(null);
+
+    const res = await request(app)
+      .get('/archive/999')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(404);
+    expect(mocks.getArchiveExportById).toHaveBeenCalledWith(999, EST);
+    expect(res.body.error).toBe('Archive not found');
   });
 
   it('denies /closure/bulletins without access_closure', async () => {
