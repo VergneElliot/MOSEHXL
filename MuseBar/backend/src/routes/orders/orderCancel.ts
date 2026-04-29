@@ -15,6 +15,20 @@ import { validateBody } from '../../middleware/validation';
 const router = express.Router();
 const logger = Logger.getInstance();
 
+async function cleanupCompensatingOrders(establishmentId: string, orderIds: number[]) {
+  for (const orderId of orderIds) {
+    try {
+      await OrderModel.delete(orderId, establishmentId);
+    } catch (cleanupError: unknown) {
+      logger.error(
+        `Compensating delete failed for order ${orderId}`,
+        cleanupError instanceof Error ? cleanupError : new Error(String(cleanupError)),
+        'ORDER_PAYMENT'
+      );
+    }
+  }
+}
+
 router.post(
   '/cancel-unified',
   requireAuth,
@@ -118,6 +132,10 @@ router.post(
             journalError instanceof Error ? journalError : new Error(String(journalError)),
             'LEGAL_JOURNAL'
           );
+          await cleanupCompensatingOrders(establishmentId, [reversalOrder.id]);
+          return res.status(500).json({
+            error: 'Failed to persist legal journal entry for change cancellation',
+          });
         }
 
         AuditTrailModel.logAction({
@@ -204,6 +222,7 @@ router.post(
         },
         establishmentId
       );
+      const createdOrderIds: number[] = [cancellationOrder.id];
 
       // Create cancellation items
       const cancellationOrderItems = await Promise.all(
@@ -300,6 +319,7 @@ router.post(
           },
           establishmentId
         );
+        createdOrderIds.push(tipReversalOrder.id);
 
         try {
           await LegalJournalModel.logChange(establishmentId, tipReversalOrder.id, -tipAmountToReverse, userId);
@@ -309,6 +329,10 @@ router.post(
             journalError instanceof Error ? journalError : new Error(String(journalError)),
             'LEGAL_JOURNAL'
           );
+          await cleanupCompensatingOrders(establishmentId, [...createdOrderIds].reverse());
+          return res.status(500).json({
+            error: 'Failed to persist legal journal entry for tip reversal',
+          });
         }
       }
 
@@ -342,6 +366,10 @@ router.post(
           journalError instanceof Error ? journalError : new Error(String(journalError)),
           'LEGAL_JOURNAL'
         );
+        await cleanupCompensatingOrders(establishmentId, [...createdOrderIds].reverse());
+        return res.status(500).json({
+          error: 'Failed to persist legal journal entry for order cancellation',
+        });
       }
 
       // Log audit trail
