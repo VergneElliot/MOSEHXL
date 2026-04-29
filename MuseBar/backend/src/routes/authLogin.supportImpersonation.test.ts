@@ -67,9 +67,10 @@ describe('support impersonation endpoints', () => {
   });
 
   it('starts a time-bounded impersonation token and logs audit action', async () => {
+    const currentToken = systemAdminToken();
     const res = await request(app)
       .post('/auth/support/impersonation/start')
-      .set('Authorization', `Bearer ${systemAdminToken()}`)
+      .set('Authorization', `Bearer ${currentToken}`)
       .send({
         establishment_id: 'est-1',
         reason: 'Investigating closure mismatch',
@@ -87,6 +88,11 @@ describe('support impersonation endpoints', () => {
         action_type: 'SUPPORT_IMPERSONATION_STARTED',
         establishment_id: 'est-1',
       })
+    );
+
+    expect(mocks.poolQuery).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO token_blocklist'),
+      expect.arrayContaining([1, 'SUPPORT_IMPERSONATION_STARTED'])
     );
   });
 
