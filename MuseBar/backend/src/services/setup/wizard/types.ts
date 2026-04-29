@@ -48,15 +48,14 @@ export interface SetupRetryOptions {
  */
 export interface SetupAuditEntry {
   user_id: number;
-  establishment_id: string;
-  action: string;
-  entity_type: string;
-  entity_id: string;
-  old_values: Record<string, unknown>;
-  new_values: Record<string, unknown>;
+  establishment_id: string | null;
+  action_type: string;
+  resource_type: string;
+  resource_id: string;
+  action_details: Record<string, unknown>;
   ip_address?: string;
   user_agent?: string;
-  metadata: Record<string, unknown>;
+  session_id?: string;
 }
 
 /**
