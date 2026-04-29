@@ -66,6 +66,18 @@ router.post(
           journalError instanceof Error ? journalError : new Error(String(journalError)),
           'LEGAL_JOURNAL'
         );
+        try {
+          await OrderModel.delete(order.id, establishmentId);
+        } catch (cleanupError: unknown) {
+          logger.error(
+            `Compensating delete failed after change journal error for order ${order.id}`,
+            cleanupError instanceof Error ? cleanupError : new Error(String(cleanupError)),
+            'ORDER_PAYMENT'
+          );
+        }
+        return res.status(500).json({
+          error: 'Failed to persist legal journal entry for cash register change',
+        });
       }
 
       AuditTrailModel.logAction({
