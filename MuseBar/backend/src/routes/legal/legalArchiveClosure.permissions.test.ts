@@ -140,4 +140,29 @@ describe('legal archive/closure permission gating', () => {
     expect(mocks.getClosureBulletins).toHaveBeenCalledWith(EST, undefined);
     expect(res.body.total).toBe(1);
   });
+
+  it('allows /closure/monthly-latest with access_closure and uses monthly establishment scope', async () => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
+
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    mocks.getClosureBulletins.mockResolvedValue([
+      {
+        id: 77,
+        closure_type: 'MONTHLY',
+        period_start: monthStart,
+        period_end: monthEnd,
+        establishment_id: EST,
+      },
+    ]);
+
+    const res = await request(app)
+      .get('/closure/monthly-latest')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(200);
+    expect(mocks.getClosureBulletins).toHaveBeenCalledWith(EST, 'MONTHLY');
+    expect(res.body.id).toBe(77);
+  });
 });

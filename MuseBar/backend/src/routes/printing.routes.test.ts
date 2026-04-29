@@ -193,4 +193,38 @@ describe('printing routes', () => {
       ['est-1']
     );
   });
+
+  it('returns receipt preview and scopes data build to caller establishment', async () => {
+    mocks.buildReceiptDataForOrder.mockResolvedValue({
+      sequence_number: 456,
+      items: [],
+    });
+
+    const res = await request(app)
+      .get('/printing/receipt/42/preview?type=simplified')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(200);
+    expect(res.body.receipt_data.sequence_number).toBe(456);
+    expect(mocks.buildReceiptDataForOrder).toHaveBeenCalledWith(
+      expect.anything(),
+      'est-1',
+      expect.objectContaining({ establishment_id: 'est-1' }),
+      42,
+      'simplified'
+    );
+  });
+
+  it('maps preview not-found errors to 404', async () => {
+    mocks.buildReceiptDataForOrder.mockRejectedValue(
+      Object.assign(new Error('Not found'), { statusCode: 404 })
+    );
+
+    const res = await request(app)
+      .get('/printing/receipt/42/preview')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('Receipt not found');
+  });
 });
