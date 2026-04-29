@@ -141,6 +141,17 @@ describe('legal archive/closure permission gating', () => {
     expect(res.body.archive.id).toBe(12);
   });
 
+  it('denies /archive/:id without access_closure', async () => {
+    mocks.getUserPermissions.mockResolvedValue([]);
+
+    const res = await request(app)
+      .get('/archive/12')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(403);
+    expect(mocks.getArchiveExportById).not.toHaveBeenCalled();
+  });
+
   it('returns 404 for /archive/:id when archive is missing despite access_closure', async () => {
     mocks.getUserPermissions.mockResolvedValue(['access_closure']);
     mocks.getArchiveExportById.mockResolvedValue(null);
@@ -204,6 +215,22 @@ describe('legal archive/closure permission gating', () => {
       })
     );
     expect(res.body.archive.id).toBe(41);
+  });
+
+  it('denies /archive/create without access_closure', async () => {
+    mocks.getUserPermissions.mockResolvedValue([]);
+
+    const res = await request(app)
+      .post('/archive/create')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`)
+      .send({
+        archiveType: 'DAILY',
+        startDate: '2026-01-01',
+        endDate: '2026-01-31',
+      });
+
+    expect(res.status).toBe(403);
+    expect(mocks.exportData).not.toHaveBeenCalled();
   });
 
   it('returns 400 for /archive/:id/export when archive id is invalid', async () => {
