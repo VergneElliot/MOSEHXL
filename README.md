@@ -1,6 +1,6 @@
 # MOSEHXL — MuseBar POS System
 
-A point-of-sale and bar management system built for French hospitality businesses, with full legal compliance for French fiscal law (Article 286-I-3 bis du CGI).
+A point-of-sale and bar management system built for French hospitality businesses, currently in advanced pre-certification hardening for French fiscal compliance (Article 286-I-3 bis du CGI).
 
 ## Project Structure
 
@@ -14,7 +14,7 @@ MOSEHXL/
 │   │       ├── models/       # DB models, SQL schemas, legal journal
 │   │       ├── routes/       # Express route handlers (orders/, legal/, etc.)
 │   │       ├── services/     # Business logic (email, printing, setup, establishment)
-│   │       ├── utils/        # Logger, closure scheduler, thermal printing
+│   │       ├── utils/        # Logger, closure scheduler, shared backend utilities
 │   │       └── migrations/   # Database migration CLI and SQL files
 │   └── src/              # React / TypeScript frontend (port 3000)
 │       ├── components/   # UI components (POS, Admin, Settings, Legal, etc.)
@@ -271,7 +271,7 @@ npm run migration:create   # create a new migration file
 | `establishment_admin` | Business UI | All POS tabs based on permissions |
 | `staff` | Business UI | POS tabs granted by admin |
 
-Granular permissions (granted per user): `access_pos`, `access_menu`, `access_happy_hour`, `access_history`, `access_settings`, `access_compliance`. Establishment admins receive all permissions by default.
+Granular permissions (granted per user): `access_pos`, `access_menu`, `access_settings`, `access_closure`, `access_compliance`, `access_user_management`, `pos_happyhour_manual`, `pos_apply_offert`, `pos_apply_perso`, `orders_cancel`. Establishment admins receive all permissions by default.
 
 ---
 
@@ -291,7 +291,7 @@ Full documentation lives in the `docs/` folder:
 After a comprehensive code audit, 45 fixes were applied covering:
 
 - **Security**: Removed hardcoded secrets, fixed SQL injection vectors, secured unauthenticated endpoints, removed server fingerprinting headers, replaced Math.random with crypto.randomUUID
-- **Architecture**: Consolidated error handling into one system, removed dual database pools, unified schema creation, consolidated password validation rules
+- **Architecture**: Consolidated error handling into one system, removed dual database pools, retired legacy schema-per-tenant manager, consolidated password validation rules
 - **Dead Code**: Removed unused controllers, services, shim files, debug console.logs, Mongoose handling remnants
 - **Performance**: Fixed N+1 queries, moved rate limiting to PostgreSQL, fixed infinite React re-render loops, converted per-request service instantiation to singletons
 - **Type Safety**: Replaced `any` types with proper TypeScript types, unified ClosureBulletin type, removed stale type packages

@@ -180,7 +180,7 @@ MOSEHXL/
 | `auth.ts` | **Canonical auth middleware.** `requireAuth` (JWT verify), `requireAdmin`, `requireEstablishmentAdmin`, `requirePermission`, `generateToken`, `verifyToken`. Fails at load time if JWT_SECRET is missing or too short. |
 | `validation.ts` | `validateBody`, `validateParams`, `commonValidations`, `paramValidations`. Reusable rules for request validation. French error messages. |
 | `errorHandler.ts` | **Unified error system.** `AppError` (base), `ValidationError` (400), `AuthenticationError` (401), `AuthorizationError` (403), `NotFoundError` (404), `ConflictError` (409), `RateLimitError` (429), `BusinessLogicError` (422), `DatabaseError` (500). Also: `asyncHandler` (wraps async route handlers), `createErrorHandler` (global error middleware), `notFound` (404 fallback). Normalizes PostgreSQL error codes, JWT errors, and network errors into proper API responses. |
-| `security/` | Rate limiting (PostgreSQL-backed via adapter pattern), CORS configuration, input sanitization (XSS only — no SQL keyword stripping), security headers (CSP, HSTS, X-Frame-Options). Composed in `SecurityMiddlewareFactory.create()`. |
+| `security/` | Rate limiting (PostgreSQL-backed via adapter pattern), input sanitization (XSS only — no SQL keyword stripping), security headers (CSP, HSTS, X-Frame-Options). Composed in `SecurityMiddlewareFactory.create()`. CORS policy is configured in `app.ts`. |
 
 ---
 
@@ -223,8 +223,8 @@ Models wrap SQL in TypeScript. One model per table (roughly).
 | `user.ts` | users, user_permissions | UserRow, AuthenticatedUser, findByEmail, verifyPassword, getUserPermissions (batch INSERT...SELECT), setUserPermissions (transactional) |
 | `database/orderModel.ts` | orders, order_items, sub_bills | OrderModel, OrderItemModel, SubBillModel — all scoped by establishment_id with whitelisted update fields |
 | `database/productModel.ts` | categories, products | CategoryModel, ProductModel — soft/hard delete, archive/restore, establishment-scoped |
-| `index.ts` | business_settings | BusinessSettingsModel, plus barrel re-exports of all other models |
-| `establishment.ts` | establishments | EstablishmentModel — CRUD with PostgreSQL schema-based isolation (each establishment gets its own DB schema) |
+| `index.ts` | model re-exports | Barrel for active DB models used by routes/services |
+| `establishment.ts` | establishments | EstablishmentModel — CRUD and lifecycle operations in shared-table multi-tenant runtime |
 | `auditTrail.ts` | audit_trail | AuditTrailModel.logAction (who, what, when, where) |
 | `legalJournal/` | legal_journal, closure_bulletins | Legal journal operations (hash chain), closure creation (daily/weekly/monthly/annual, per-establishment), integrity verification |
 | `archiveService.ts` | archive_exports | Archive export creation (CSV/XML/JSON), HMAC-SHA256 signing, integrity verification |
@@ -242,11 +242,10 @@ Business logic that doesn't fit in a single route or model.
 | `email/` | SendGrid/Nodemailer integration, email templates (invitation, verification, password reset, etc.), EmailLogger |
 | `setup/` | Setup wizard steps, validation, database seeding, default data (categories, products, payment methods) |
 | `establishment/` | Establishment creation orchestrator, validation, search, status transitions, dashboard data |
-| `establishmentAccountCreation/` | Invitation acceptance flow: validate token, create user account, create establishment schema |
+| `establishmentAccountCreation/` | Invitation acceptance flow: validate token, create user account, create establishment-linked records |
 | `userInvitation/` | Invitation creation, email, acceptance, validation |
 | `printing/` | Multi-method printing via adapter pattern: browser, network, PrintNode, StarCloudPRNT, composite |
 | `receipts/` | Digital, email, QR receipt generation |
-| `SchemaManager.ts` | (Legacy) Creates establishment-specific PostgreSQL schemas; Phase B1 commits to shared-table multi-tenancy |
 | `SetupService.ts` | Legacy setup service (delegates to setup/ subfolder) |
 
 ---
@@ -257,7 +256,6 @@ Business logic that doesn't fit in a single route or model.
 |-------------|---------|
 | `logger/` | Structured logging system with category loggers, request logger middleware, performance monitoring. Replaced all debug console.logs. No circular import issues (re-export cycle was fixed). |
 | `closureScheduler.ts` | Cron-like job: automatic daily closure at configurable time (default 02:00 Paris). Checks every minute. Production only. |
-| `thermalPrint/` | Thermal printer queue, ESC/POS formatters, receipt templates, queue storage |
 | `database/sharedQueries.ts` | Reusable SQL for users, establishments, invitations |
 | `errors/` | Standard error handler utilities |
 | `errorRecovery.ts` | Error recovery system initialization |
