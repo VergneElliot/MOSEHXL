@@ -123,8 +123,8 @@ Our system has three roles:
 | Role | What they see | How it's checked |
 |------|--------------|-----------------|
 | `system_admin` | System Admin interface (establishments, system users) | `user.role === 'system_admin'` in `App.tsx` |
-| `establishment_admin` | All business tabs based on permissions | `user.is_admin` in `requireAdmin` middleware |
-| `cashier` | Only tabs their permissions allow | `user.permissions.includes('access_pos')` in `AppRouter.tsx` |
+| `establishment_admin` | Full establishment business UI scope | `user.role === 'establishment_admin'` and route-level guards |
+| `staff` | Only tabs and actions granted by permissions | `user.permissions.includes(...)` in `AppRouter.tsx` + backend permission middleware |
 
 ### How permissions work
 
@@ -136,18 +136,17 @@ users table:              permissions table:      user_permissions (join table):
 │ id │ email     │       │ id │ name         │    │ user_id │ permission_id │
 ├────┼───────────┤       ├────┼──────────────┤    ├─────────┼───────────────┤
 │  1 │ alice@... │       │  1 │ access_pos   │    │       1 │             1 │  (alice → POS)
-│  2 │ bob@...   │       │  2 │ access_menu  │    │       1 │             4 │  (alice → history)
-│  3 │ elliot@...│       │  3 │ access_happy │    │       2 │             1 │  (bob → POS only)
-└────┴───────────┘       │  4 │ access_history│    └─────────┴───────────────┘
+│  2 │ bob@...   │       │  2 │ access_menu  │    │       1 │             4 │  (alice → compliance)
+│  3 │ elliot@...│       │  3 │ access_settings │ │       2 │             1 │  (bob → POS only)
+└────┴───────────┘       │  4 │ access_compliance │└─────────┴───────────────┘
                          └────┴──────────────┘
 ```
 
-Alice can see POS and History. Bob can only see POS. The `requirePermission` middleware checks this:
+Alice can see POS and compliance surfaces. Bob can only see POS. The `requirePermission` middleware checks this:
 
 ```typescript
 export function requirePermission(permission: string) {
   return async (req, res, next) => {
-    if (req.user?.is_admin) return next();  // admins bypass permission checks
     const perms = await UserModel.getUserPermissions(req.user.id);
     if (!perms.includes(permission)) return res.status(403).json({ error: 'Permission denied' });
     next();
@@ -159,7 +158,7 @@ On the frontend, `AppRouter.tsx` filters which tabs are visible:
 
 ```typescript
 const filteredTabs = TABS.filter(tab => {
-  if (tab.adminOnly) return user?.is_admin;
+  if (tab.adminOnly) return user?.role === 'establishment_admin';
   if (tab.permission) return user?.permissions?.includes(tab.permission);
   return true;
 });
@@ -175,17 +174,16 @@ The frontend runs on `localhost:3000`. The backend runs on `localhost:3001`. The
 
 ```typescript
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    // ... network IPs ...
-    ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : [])
-  ],
-  credentials: true  // allow cookies and auth headers
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // non-browser clients
+    if (isAllowedOrigin(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true
 }));
 ```
 
-In production, `CORS_ORIGIN` would include `https://mosehxl.com`.
+In development, localhost/LAN origins are allowed. In non-development, allowed origins come from configured `CORS_ORIGIN` values (fail-closed by default).
 
 ### How it works technically
 
