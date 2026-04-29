@@ -125,6 +125,43 @@ describe('legal route compliance permission gates', () => {
     expect(mocks.verifyJournalIntegrity).toHaveBeenCalledWith(EST);
   });
 
+  it('denies /journal/entries without access_compliance', async () => {
+    mocks.getUserPermissions.mockResolvedValue([]);
+
+    const res = await request(app)
+      .get('/journal/entries')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(403);
+    expect(mocks.getEntriesWithCountForPeriod).not.toHaveBeenCalled();
+  });
+
+  it('allows /journal/entries with access_compliance and passes scoped query options', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
+    mocks.getEntriesWithCountForPeriod.mockResolvedValue({
+      entries: [{ id: 1, transaction_type: 'SALE' }],
+      total: 1,
+      limit: 50,
+      offset: 10,
+    });
+
+    const res = await request(app)
+      .get('/journal/entries?start_date=2026-02-01&end_date=2026-02-29&limit=50&offset=10')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(200);
+    expect(mocks.getEntriesWithCountForPeriod).toHaveBeenCalledWith({
+      establishment_id: EST,
+      start_date: '2026-02-01',
+      end_date: '2026-02-29',
+      limit: 50,
+      offset: 10,
+    });
+    expect(res.body.total).toBe(1);
+    expect(res.body.limit).toBe(50);
+    expect(res.body.offset).toBe(10);
+  });
+
   it('denies /compliance/report without access_compliance', async () => {
     mocks.getUserPermissions.mockResolvedValue([]);
     const res = await request(app)
