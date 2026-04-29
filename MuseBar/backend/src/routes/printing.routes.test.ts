@@ -163,4 +163,34 @@ describe('printing routes', () => {
     );
     expect(mocks.managerClearService).toHaveBeenCalledWith('est-1');
   });
+
+  it('returns tenant-scoped printing history with bounded pagination', async () => {
+    mocks.poolQuery
+      .mockResolvedValueOnce({
+        rows: [{ id: 1, establishment_id: 'est-1', print_type: 'receipt' }],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ count: '1' }],
+      });
+
+    const res = await request(app)
+      .get('/printing/history?limit=999&offset=2')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(200);
+    expect(res.body.history).toHaveLength(1);
+    expect(res.body.total).toBe(1);
+    expect(res.body.limit).toBe(500);
+    expect(res.body.offset).toBe(2);
+    expect(mocks.poolQuery).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('WHERE establishment_id = $1'),
+      ['est-1', 500, 2]
+    );
+    expect(mocks.poolQuery).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('COUNT(*) FROM printing_history WHERE establishment_id = $1'),
+      ['est-1']
+    );
+  });
 });
