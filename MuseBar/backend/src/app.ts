@@ -14,6 +14,7 @@ import { getCurrentEstablishmentId } from './db/tenantContext';
 dotenv.config();
 
 const app = express();
+app.disable('x-powered-by');
 
 // Initialize environment config and logger
 const config = initializeEnvironment();
@@ -21,23 +22,40 @@ const logger = initializeLogger(config);
 
 // Environment-specific configuration
 const NODE_ENV = process.env.NODE_ENV || 'production';
+const isDevelopment = NODE_ENV === 'development';
+
+const developmentCorsOrigins: Array<string | RegExp> = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  // Allow local network frontend during development only.
+  /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:3000$/,
+  /^http:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}:3000$/,
+  /^http:\/\/172\.1[6-9]\.\d{1,3}\.\d{1,3}:3000$/,
+  /^http:\/\/172\.2[0-9]\.\d{1,3}\.\d{1,3}:3000$/,
+  /^http:\/\/172\.3[0-1]\.\d{1,3}\.\d{1,3}:3000$/,
+];
+
+const configuredCorsOrigins = config.server.corsOrigins.filter(Boolean);
+const allowedCorsOrigins: Array<string | RegExp> = isDevelopment
+  ? [...developmentCorsOrigins, ...configuredCorsOrigins]
+  : [...configuredCorsOrigins];
+
+function isAllowedOrigin(origin: string): boolean {
+  return allowedCorsOrigins.some((entry) =>
+    typeof entry === 'string' ? entry === origin : entry.test(origin)
+  );
+}
 
 // Starting MOSEHXL in production mode
 
 // Middleware
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    // Allow any local network IP
-    /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:3000$/,
-    /^http:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}:3000$/,
-    /^http:\/\/172\.1[6-9]\.\d{1,3}\.\d{1,3}:3000$/,
-    /^http:\/\/172\.2[0-9]\.\d{1,3}\.\d{1,3}:3000$/,
-    /^http:\/\/172\.3[0-1]\.\d{1,3}\.\d{1,3}:3000$/,
-    // Custom origins from environment
-    ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : [])
-  ],
+  origin: (origin, callback) => {
+    // Non-browser requests may not send Origin; allow them.
+    if (!origin) return callback(null, true);
+    if (isAllowedOrigin(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
 app.use(express.json());
@@ -148,27 +166,59 @@ if (NODE_ENV === 'development') {
 }
 
 // API Documentation
-app.use('/api/docs', docsRouter);
+if (config.features.swaggerEnabled) {
+  app.use('/api/docs', docsRouter);
+}
 
 // Client error logging endpoint
 import { asyncHandler, notFound, createErrorHandler } from './middleware/errorHandler';
 import { initializeErrorRecovery as initErrorRecovery } from './utils/errorRecovery';
 
-app.post('/api/client-errors', asyncHandler(async (req: Request, res: Response) => {
-  const errorData = req.body;
+if (isDevelopment) {
+  app.post('/api/client-errors', asyncHandler(async (req: Request, res: Response) => {
+    const errorData = req.body;
 
-  logger.error(
-    `Client Error [${errorData.errorId}]: ${errorData.message}`,
-    new Error(errorData.message),
-    {
-      ...errorData,
-      source: 'CLIENT'
-    },
-    'CLIENT_ERROR_HANDLER'
-  );
+    logger.error(
+      `Client Error [${errorData.errorId}]: ${errorData.message}`,
+      new Error(errorData.message),
+      {
+        ...errorData,
+        source: 'CLIENT'
+      },
+      'CLIENT_ERROR_HANDLER'
+    );
 
-  res.json({ success: true, message: 'Error logged successfully' });
-}));
+    res.json({ success: true, message: 'Error logged successfully' });
+  }));
+} else {
+  const clientErrorReportKey = process.env.CLIENT_ERROR_REPORT_KEY;
+  if (clientErrorReportKey && clientErrorReportKey.length >= 16) {
+    app.post('/api/client-errors', asyncHandler(async (req: Request, res: Response) => {
+      const provided = req.header('x-client-error-key') ?? '';
+      if (provided !== clientErrorReportKey) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+
+      const errorData = req.body;
+      logger.error(
+        `Client Error [${errorData.errorId}]: ${errorData.message}`,
+        new Error(errorData.message),
+        {
+          ...errorData,
+          source: 'CLIENT'
+        },
+        'CLIENT_ERROR_HANDLER'
+      );
+      return res.json({ success: true, message: 'Error logged successfully' });
+    }));
+  } else {
+    logger.warn(
+      'CLIENT_ERROR_REPORT_KEY is not configured; /api/client-errors endpoint disabled in production',
+      undefined,
+      'CLIENT_ERROR_HANDLER'
+    );
+  }
+}
 
 // Error handling: single unified handler (replaces former errorHandler + errorHandling)
 initErrorRecovery(logger);
