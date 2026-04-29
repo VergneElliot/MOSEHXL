@@ -9,8 +9,11 @@ import express from 'express';
 import { ArchiveService } from '../../models/archiveService';
 import { P } from '../../permissions/registry';
 import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
+import { Logger } from '../../utils/logger';
+import { AppError, asyncHandler } from '../../middleware/errorHandler';
 
 const router = express.Router();
+const logger = Logger.getInstance();
 
 router.use(requireAuth, requirePermission(P.access_closure));
 
@@ -18,7 +21,7 @@ router.use(requireAuth, requirePermission(P.access_closure));
  * POST create archive
  * POST /api/legal/archive/create
  */
-router.post('/create', async (req, res) => {
+router.post('/create', asyncHandler(async (req, res) => {
   try {
     const establishmentId = getEstablishmentId(req, res);
     if (!establishmentId) return;
@@ -44,16 +47,20 @@ router.post('/create', async (req, res) => {
       compliance_note: 'Archive created for regulatory retention requirements'
     });
   } catch (error: unknown) {
-    process.stderr.write(`Error creating archive: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to create archive', details: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error(
+      'Error creating archive',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_ARCHIVE'
+    );
+    throw new AppError('Failed to create archive', 500, 'LEGAL_ARCHIVE_CREATE_FAILED');
   }
-});
+}));
 
 /**
  * GET archives list
  * GET /api/legal/archive/list
  */
-router.get('/list', async (req, res) => {
+router.get('/list', asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -67,16 +74,20 @@ router.get('/list', async (req, res) => {
       compliance_note: 'Archive list for regulatory compliance'
     });
   } catch (error: unknown) {
-    process.stderr.write(`Error fetching archives: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to fetch archives', details: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error(
+      'Error fetching archives',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_ARCHIVE'
+    );
+    throw new AppError('Failed to fetch archives', 500, 'LEGAL_ARCHIVE_LIST_FAILED');
   }
-});
+}));
 
 /**
  * GET archive details
  * GET /api/legal/archive/:id
  */
-router.get('/:id', async (req, res) => {
+router.get('/:id', asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -95,16 +106,20 @@ router.get('/:id', async (req, res) => {
       compliance_note: 'Archive details for regulatory compliance'
     });
   } catch (error: unknown) {
-    process.stderr.write(`Error fetching archive details: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to fetch archive details', details: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error(
+      'Error fetching archive details',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_ARCHIVE'
+    );
+    throw new AppError('Failed to fetch archive details', 500, 'LEGAL_ARCHIVE_DETAILS_FAILED');
   }
-});
+}));
 
 /**
  * POST export archive
  * POST /api/legal/archive/:id/export
  */
-router.post('/:id/export', async (req, res) => {
+router.post('/:id/export', asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -126,9 +141,13 @@ router.post('/:id/export', async (req, res) => {
       compliance_note: 'Archive export for regulatory reporting'
     });
   } catch (error: unknown) {
-    process.stderr.write(`Error exporting archive: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to export archive', details: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error(
+      'Error exporting archive',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_ARCHIVE'
+    );
+    throw new AppError('Failed to export archive', 500, 'LEGAL_ARCHIVE_EXPORT_FAILED');
   }
-});
+}));
 
 export default router; 
