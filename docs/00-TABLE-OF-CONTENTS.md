@@ -7,6 +7,8 @@ The documentation is organized into two sections:
 - **Course** — A progressive learning guide that teaches you every aspect of the project, from basic concepts to advanced legal compliance. Start here if you are new.
 - **Patch Notes** — A chronological log of every fix and improvement made to the codebase after the initial audit. Each entry explains what was wrong, why it mattered, and exactly what was changed.
 
+For **current live status**, prioritize `DEVELOPMENT-STATE.md` and the latest `docs/patch-notes/` entries. Some course chapters include historical snapshots for teaching context.
+
 ---
 
 ## Course — Learning Guide
@@ -52,7 +54,7 @@ These are organized chronologically. Each entry corresponds to one specific issu
 
 | # | File | Summary |
 |---|------|---------|
-| 15 | [Schema Creation Divergence](./patch-notes/15-SCHEMA-CREATION-DIVERGENCE-FIX.md) | Unified two schema creation paths into a single SchemaManager |
+| 15 | [Schema Creation Divergence](./patch-notes/15-SCHEMA-CREATION-DIVERGENCE-FIX.md) | Historical fix that unified schema creation paths during the pre-shared-table phase |
 | 20 | [Dual Database Pool](./patch-notes/20-DUAL-DATABASE-POOL-REMOVAL.md) | Removed unused config/database module — single pool in app.ts |
 | 21 | [Triple Error Handling](./patch-notes/21-TRIPLE-ERROR-HANDLING-CONSOLIDATION.md) | Merged three error handling systems into one unified AppError hierarchy |
 | 22 | [Setup Flow Consolidation](./patch-notes/22-ESTABLISHMENT-SETUP-FLOWS-AND-INVITATION-CONSOLIDATION.md) | Documented the five overlapping setup/invitation flows and consolidated the invitation query |
@@ -93,7 +95,7 @@ These are organized chronologically. Each entry corresponds to one specific issu
 | # | File | Summary |
 |---|------|---------|
 | 17 | [Legal Journal Multi-Tenancy](./patch-notes/17-LEGAL-JOURNAL-MULTI-TENANCY-FIX.md) | Closure bulletins now scoped per-establishment; scheduler, archive, and routes updated |
-| 18 | [Printing and Products Schema](./patch-notes/18-PRINTING-PRODUCTS-SCHEMA-FIX.md) | Printing and product queries now use the establishment's schema |
+| 18 | [Printing and Products Schema](./patch-notes/18-PRINTING-PRODUCTS-SCHEMA-FIX.md) | Historical schema-era fix; current runtime uses shared-table establishment scoping |
 | 26 | [Product isActive Hardcoded](./patch-notes/26-PRODUCT-ISACTIVE-HARDCODED-FIX.md) | Products API now uses the real database is_active value instead of hardcoding true |
 | 27 | [Double API Call on Mount](./patch-notes/27-DOUBLE-API-CALL-LEGAL-COMPLIANCE-FIX.md) | Fixed duplicate useEffect causing two identical API calls on component mount |
 | 40 | [Moment Timezone Strategy](./patch-notes/40-MOMENT-TIMEZONE-AND-TIMEZONE-STRATEGY-AUDIT-33.md) | Single DEFAULT_APP_TIMEZONE constant; configurable closure timezone |
@@ -129,4 +131,4 @@ These are organized chronologically. Each entry corresponds to one specific issu
 - **Want the big picture?** Read [Chapter 02 — Architecture Overview](./course/02-ARCHITECTURE.md).
 - **Need to understand a specific fix?** Use the categorized patch notes list above.
 - **Setting up the project?** See the [root README](../README.md) for quick start instructions.
-- **Checking development status?** See [DEVELOPMENT-STATE.md](../DEVELOPMENT-STATE.md) for what's complete and what still needs work.
+- **Checking development status?** See [DEVELOPMENT-STATE.md](../DEVELOPMENT-STATE.md) for current completion state and active priorities.
