@@ -164,6 +164,21 @@ describe('printing routes', () => {
     expect(mocks.managerClearService).toHaveBeenCalledWith('est-1');
   });
 
+  it('returns printing configuration list scoped to caller establishment', async () => {
+    mocks.listPrintingConfigurations.mockResolvedValue([
+      { id: 2, provider: 'epson-server-direct', is_active: true, config: {} },
+    ]);
+
+    const res = await request(app)
+      .get('/printing/configuration')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(200);
+    expect(res.body.establishment_id).toBe('est-1');
+    expect(res.body.configurations).toHaveLength(1);
+    expect(mocks.listPrintingConfigurations).toHaveBeenCalledWith(expect.anything(), 'est-1');
+  });
+
   it('returns tenant-scoped printing history with bounded pagination', async () => {
     mocks.poolQuery
       .mockResolvedValueOnce({
@@ -191,6 +206,25 @@ describe('printing routes', () => {
       2,
       expect.stringContaining('COUNT(*) FROM printing_history WHERE establishment_id = $1'),
       ['est-1']
+    );
+  });
+
+  it('falls back to safe defaults for invalid printing history pagination params', async () => {
+    mocks.poolQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ count: '0' }] });
+
+    const res = await request(app)
+      .get('/printing/history?limit=-10&offset=abc')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(200);
+    expect(res.body.limit).toBe(50);
+    expect(res.body.offset).toBe(0);
+    expect(mocks.poolQuery).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('LIMIT $2 OFFSET $3'),
+      ['est-1', 50, 0]
     );
   });
 
