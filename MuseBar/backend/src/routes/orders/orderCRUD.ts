@@ -12,6 +12,7 @@ import { pool } from '../../app';
 import { getEstablishmentId, requireAuth, requireEstablishmentAdmin } from '../auth';
 import { validateBody, validateParams, commonValidations, paramValidations } from '../../middleware/validation';
 import { assertPosOrderLinePermissions } from '../../middleware/orderPosLinePermissions';
+import { AppError, asyncHandler } from '../../middleware/errorHandler';
 
 const router = express.Router();
 const logger = Logger.getInstance();
@@ -21,7 +22,7 @@ router.use(requireAuth);
 /**
  * GET /api/orders — order history for this establishment
  */
-router.get('/', async (req, res) => {
+router.get('/', asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -54,15 +55,20 @@ router.get('/', async (req, res) => {
     );
 
     res.json({ orders: ordersWithDetails, total: totalResult.rows[0]?.total ?? 0 });
-  } catch {
-    res.status(500).json({ error: 'Failed to fetch orders' });
+  } catch (error) {
+    logger.error(
+      'Failed to fetch orders',
+      error instanceof Error ? error : new Error(String(error)),
+      'ORDERS'
+    );
+    throw new AppError('Failed to fetch orders', 500, 'ORDERS_FETCH_FAILED');
   }
-});
+}));
 
 /**
  * GET /api/orders/:id
  */
-router.get('/:id', validateParams([paramValidations.id]), async (req, res) => {
+router.get('/:id', validateParams([paramValidations.id]), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -72,10 +78,15 @@ router.get('/:id', validateParams([paramValidations.id]), async (req, res) => {
     const items = await OrderItemModel.getByOrderId(id, establishmentId);
     const subBills = order.payment_method === 'split' ? await SubBillModel.getByOrderId(id, establishmentId) : [];
     res.json({ ...order, items, sub_bills: subBills, tips: order.tips || 0, change: order.change || 0 });
-  } catch {
-    res.status(500).json({ error: 'Failed to fetch order' });
+  } catch (error) {
+    logger.error(
+      'Failed to fetch order',
+      error instanceof Error ? error : new Error(String(error)),
+      'ORDERS'
+    );
+    throw new AppError('Failed to fetch order', 500, 'ORDER_FETCH_FAILED');
   }
-});
+}));
 
 /**
  * POST /api/orders — create a new order (cashier action)
@@ -86,7 +97,7 @@ router.post(
   '/',
   validateBody(commonValidations.orderCreate),
   assertPosOrderLinePermissions(),
-  async (req, res) => {
+  asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -209,15 +220,20 @@ router.post(
     }
 
     res.status(201).json({ ...order, items: createdItems, sub_bills: createdSubBills });
-  } catch {
-    res.status(500).json({ error: 'Failed to create order' });
+  } catch (error) {
+    logger.error(
+      'Failed to create order',
+      error instanceof Error ? error : new Error(String(error)),
+      'ORDERS'
+    );
+    throw new AppError('Failed to create order', 500, 'ORDER_CREATE_FAILED');
   }
-});
+}));
 
 /**
  * PUT /api/orders/:id
  */
-router.put('/:id', requireEstablishmentAdmin, validateParams([paramValidations.id]), async (req, res) => {
+router.put('/:id', requireEstablishmentAdmin, validateParams([paramValidations.id]), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -226,17 +242,22 @@ router.put('/:id', requireEstablishmentAdmin, validateParams([paramValidations.i
     if (!order) return res.status(404).json({ error: 'Order not found' });
     const updatedOrder = await OrderModel.update(id, req.body, establishmentId);
     res.json(updatedOrder);
-  } catch {
-    res.status(500).json({ error: 'Failed to update order' });
+  } catch (error) {
+    logger.error(
+      `Failed to update order ${req.params.id}`,
+      error instanceof Error ? error : new Error(String(error)),
+      'ORDERS'
+    );
+    throw new AppError('Failed to update order', 500, 'ORDER_UPDATE_FAILED');
   }
-});
+}));
 
 /**
  * DELETE /api/orders/:id
  * Not used by the current React app. Fiscal rule: a **completed** (validated) order must
  * not be hard-deleted — use annulation in Historique (`POST .../payment/cancel-unified`) instead.
  */
-router.delete('/:id', requireEstablishmentAdmin, validateParams([paramValidations.id]), async (req, res) => {
+router.delete('/:id', requireEstablishmentAdmin, validateParams([paramValidations.id]), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -253,11 +274,17 @@ router.delete('/:id', requireEstablishmentAdmin, validateParams([paramValidation
     if (deleted) {
       res.json({ message: 'Order deleted successfully' });
     } else {
-      res.status(500).json({ error: 'Failed to delete order' });
+      throw new AppError('Failed to delete order', 500, 'ORDER_DELETE_FAILED');
     }
-  } catch {
-    res.status(500).json({ error: 'Failed to delete order' });
+  } catch (error) {
+    logger.error(
+      `Failed to delete order ${req.params.id}`,
+      error instanceof Error ? error : new Error(String(error)),
+      'ORDERS'
+    );
+    if (error instanceof AppError) throw error;
+    throw new AppError('Failed to delete order', 500, 'ORDER_DELETE_FAILED');
   }
-});
+}));
 
 export default router;
