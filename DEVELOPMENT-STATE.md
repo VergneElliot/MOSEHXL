@@ -1,9 +1,9 @@
 # Development Branch — Current State
 
-This document captures the state of the `development` branch as of March 2026.
+This document captures the state of the `development` branch as of April 2026.
 It is the working reference for what is complete, what is broken, and what needs to be fixed before V2 can replace V1 in production.
 
-> **Post-audit update (March 2026):** A comprehensive code audit identified 48 issues across security, architecture, performance, type safety, and code quality. **45 fixes have been applied** (patches 11–55, documented in [docs/patch-notes/](docs/patch-notes/)). A follow-up technical audit resolved all 7 critical functional fixes and cleaned up the codebase for production deployment.
+> **Post-audit update (April 2026):** The March 2026 remediation wave (45 fixes) was followed by additional hardening passes (P0/P1 stabilization and P2 cleanup/doc-truth sweeps). This file reflects the current post-remediation state of the `development` branch.
 
 ---
 
@@ -87,9 +87,9 @@ It is the working reference for what is complete, what is broken, and what needs
 
 ---
 
-## Resolved Critical Fixes
+## Resolved / Decided Critical Fixes
 
-All 7 critical fixes from the initial audit have been resolved:
+The initial audit's 7 critical items have now been resolved or explicitly decided:
 
 | # | Fix | Status | Details |
 |---|-----|--------|---------|
