@@ -151,6 +151,18 @@ describe('legal archive/closure permission gating', () => {
     expect(res.body.error).toBe('Archive not found');
   });
 
+  it('returns 400 for /archive/:id when archive id is invalid and skips lookup', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+
+    const res = await request(app)
+      .get('/archive/not-a-number')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid archive ID');
+    expect(mocks.getArchiveExportById).not.toHaveBeenCalled();
+  });
+
   it('denies /closure/bulletins without access_closure', async () => {
     mocks.getUserPermissions.mockResolvedValue([]);
 

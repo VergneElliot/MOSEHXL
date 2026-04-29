@@ -201,7 +201,10 @@ router.get('/receipt/:orderId/preview', authenticateToken, ensureEstablishment, 
 router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
-    const orderId = parseInt(req.params.orderId);
+    const orderId = parseInt(req.params.orderId, 10);
+    if (!Number.isFinite(orderId) || orderId <= 0) {
+      return res.status(400).json({ error: 'Invalid order id' });
+    }
     const type = (req.query.type as string) || 'detailed';
     const { result, receiptData } = await printReceiptResponse(user, orderId, type);
     res.json({ ...result, receipt_data: receiptData });
@@ -222,7 +225,10 @@ router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, async (
 router.post('/closure/:bulletinId', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
-    const bulletinId = parseInt(req.params.bulletinId);
+    const bulletinId = parseInt(req.params.bulletinId, 10);
+    if (!Number.isFinite(bulletinId) || bulletinId <= 0) {
+      return res.status(400).json({ error: 'Invalid closure bulletin id' });
+    }
     const { result, bulletinData } = await printClosureBulletinResponse(user, bulletinId);
     res.json({ ...result, bulletin_data: bulletinData });
   } catch (error: unknown) {
