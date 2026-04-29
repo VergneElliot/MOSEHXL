@@ -5,9 +5,13 @@
 
 import express from 'express';
 import LegalJournalModel from '../../models/legalJournal';
-import { getEstablishmentId, requireAuth, requireAdmin } from '../auth';
+import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
+import { AppError, asyncHandler } from '../../middleware/errorHandler';
+import { Logger } from '../../utils/logger';
+import { P } from '../../permissions/registry';
 
 const router = express.Router();
+const logger = Logger.getInstance();
 
 // All compliance routes require authentication.
 router.use(requireAuth);
@@ -16,7 +20,7 @@ router.use(requireAuth);
  * GET compliance status
  * GET /api/legal/compliance/status
  */
-router.get('/status', requireAdmin, async (req, res) => {
+router.get('/status', requirePermission(P.access_compliance), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -39,16 +43,20 @@ router.get('/status', requireAdmin, async (req, res) => {
       verified_at: new Date().toISOString()
     });
   } catch (error: unknown) {
-    process.stderr.write(`Error checking compliance status: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to check compliance status', details: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error(
+      'Error checking compliance status',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_COMPLIANCE'
+    );
+    throw new AppError('Failed to check compliance status', 500, 'LEGAL_COMPLIANCE_STATUS_FAILED');
   }
-});
+}));
 
 /**
  * GET compliance report
  * GET /api/legal/compliance/report
  */
-router.get('/report', requireAdmin, async (req, res) => {
+router.get('/report', requirePermission(P.access_compliance), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -105,16 +113,20 @@ router.get('/report', requireAdmin, async (req, res) => {
     
     res.json(report);
   } catch (error: unknown) {
-    process.stderr.write(`Error generating compliance report: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to generate compliance report', details: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error(
+      'Error generating compliance report',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_COMPLIANCE'
+    );
+    throw new AppError('Failed to generate compliance report', 500, 'LEGAL_COMPLIANCE_REPORT_FAILED');
   }
-});
+}));
 
 /**
  * GET regulatory requirements
  * GET /api/legal/compliance/requirements
  */
-router.get('/requirements', async (req, res) => {
+router.get('/requirements', requirePermission(P.access_compliance), asyncHandler(async (_req, res) => {
   try {
     res.json({
       requirements: [
@@ -141,9 +153,13 @@ router.get('/requirements', async (req, res) => {
       compliance_notes: 'Requirements based on French fiscal law'
     });
   } catch (error: unknown) {
-    process.stderr.write(`Error fetching regulatory requirements: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to fetch regulatory requirements', details: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error(
+      'Error fetching regulatory requirements',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_COMPLIANCE'
+    );
+    throw new AppError('Failed to fetch regulatory requirements', 500, 'LEGAL_COMPLIANCE_REQUIREMENTS_FAILED');
   }
-});
+}));
 
 export default router; 
