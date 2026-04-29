@@ -168,4 +168,36 @@ describe('legal route compliance permission gates', () => {
       .set('Authorization', `Bearer ${tokenFor('staff')}`);
     expect(res.status).toBe(403);
   });
+
+  it('allows /stats/monthly-live with access_compliance and returns monthly live metrics', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
+    mocks.getOrdersTotalsForPeriod.mockResolvedValue({
+      total_ttc: 320.5,
+      card_total: 200.25,
+      cash_total: 120.25,
+    });
+    mocks.countDailyClosuresForPeriod.mockResolvedValue({ closure_count: 9 });
+
+    const res = await request(app)
+      .get('/stats/monthly-live')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(200);
+    expect(mocks.getOrdersTotalsForPeriod).toHaveBeenCalledWith(
+      expect.objectContaining({
+        establishmentId: EST,
+        start: expect.any(Date),
+        end: expect.any(Date),
+      })
+    );
+    expect(mocks.countDailyClosuresForPeriod).toHaveBeenCalledWith(
+      expect.objectContaining({
+        establishmentId: EST,
+        start: expect.any(Date),
+        end: expect.any(Date),
+      })
+    );
+    expect(res.body.total_ttc).toBe(320.5);
+    expect(res.body.closure_count).toBe(9);
+  });
 });
