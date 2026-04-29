@@ -64,4 +64,19 @@ export class AuditTrailModel {
       throw err;
     }
   }
+
+  static async getOrderAuditEntries(establishmentId: string, orderId: number): Promise<AuditEntry[]> {
+    const query = `
+      SELECT id, establishment_id, user_id, action_type, resource_type, resource_id,
+             action_details, ip_address, user_agent, session_id, "timestamp"
+      FROM audit_trail
+      WHERE establishment_id = $1
+        AND resource_type = 'ORDER'
+        AND resource_id = $2
+      ORDER BY "timestamp" ASC
+    `;
+    const values = [establishmentId, String(orderId)];
+    const result = await pool.query(query, values);
+    return result.rows as AuditEntry[];
+  }
 }

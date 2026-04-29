@@ -6,7 +6,7 @@
 import express from 'express';
 import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';
-import { requireAuth } from '../auth';
+import { getEstablishmentId, requireAuth } from '../auth';
 
 const router = express.Router();
 const logger = Logger.getInstance();
@@ -56,15 +56,20 @@ router.post('/log', requireAuth, async (req, res) => {
  */
 router.get('/:orderId', requireAuth, async (req, res) => {
   try {
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
+
     const orderId = parseInt(req.params.orderId);
     if (isNaN(orderId)) {
       return res.status(400).json({ error: 'Invalid order ID' });
     }
 
+    const entries = await AuditTrailModel.getOrderAuditEntries(establishmentId, orderId);
+
     res.json({
       order_id: orderId,
-      audit_entries: [],
-      total_entries: 0,
+      audit_entries: entries,
+      total_entries: entries.length,
       compliance_note: 'Audit trail maintained for regulatory compliance',
     });
   } catch (error: unknown) {
@@ -80,19 +85,33 @@ router.get('/:orderId', requireAuth, async (req, res) => {
  */
 router.get('/:orderId/summary', requireAuth, async (req, res) => {
   try {
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
+
     const orderId = parseInt(req.params.orderId);
     if (isNaN(orderId)) {
       return res.status(400).json({ error: 'Invalid order ID' });
     }
 
+    const entries = await AuditTrailModel.getOrderAuditEntries(establishmentId, orderId);
+    const actionTypes = entries.reduce<Record<string, number>>((acc, entry) => {
+      acc[entry.action_type] = (acc[entry.action_type] ?? 0) + 1;
+      return acc;
+    }, {});
+    const userActivity = entries.reduce<Record<string, number>>((acc, entry) => {
+      const userKey = entry.user_id ?? 'unknown';
+      acc[userKey] = (acc[userKey] ?? 0) + 1;
+      return acc;
+    }, {});
+
     res.json({
       order_id: orderId,
       summary: {
-        total_actions: 0,
-        action_types: {},
-        user_activity: {},
-        first_action: null,
-        last_action: null
+        total_actions: entries.length,
+        action_types: actionTypes,
+        user_activity: userActivity,
+        first_action: entries.length > 0 ? entries[0] : null,
+        last_action: entries.length > 0 ? entries[entries.length - 1] : null
       },
       compliance_note: 'Audit summary for regulatory reporting',
     });
