@@ -133,6 +133,34 @@ describe('legal route compliance permission gates', () => {
     expect(res.status).toBe(403);
   });
 
+  it('allows /compliance/report with access_compliance and executes report queries', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
+    mocks.getEntriesForPeriod.mockResolvedValue([
+      { transaction_type: 'SALE' },
+      { transaction_type: 'REFUND' },
+    ]);
+    mocks.getClosureBulletins.mockResolvedValue([
+      {
+        closure_type: 'DAILY',
+        period_start: '2026-01-10T00:00:00.000Z',
+      },
+    ]);
+
+    const res = await request(app)
+      .get('/compliance/report?start_date=2026-01-01&end_date=2026-01-31')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(200);
+    expect(mocks.getEntriesForPeriod).toHaveBeenCalledWith(
+      EST,
+      expect.any(Date),
+      expect.any(Date)
+    );
+    expect(mocks.getClosureBulletins).toHaveBeenCalledWith(EST);
+    expect(res.body.period?.start_date).toBeDefined();
+    expect(res.body.journal_entries?.total).toBe(2);
+  });
+
   it('denies /stats/monthly-live without access_compliance', async () => {
     mocks.getUserPermissions.mockResolvedValue([]);
     const res = await request(app)
