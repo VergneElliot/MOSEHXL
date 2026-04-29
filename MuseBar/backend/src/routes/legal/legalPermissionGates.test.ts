@@ -162,6 +162,26 @@ describe('legal route compliance permission gates', () => {
     expect(res.body.offset).toBe(10);
   });
 
+  it('denies /journal/stats for non-admin users', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
+
+    const res = await request(app)
+      .get('/journal/stats')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(403);
+  });
+
+  it('denies /journal/reset for non-admin users', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
+
+    const res = await request(app)
+      .post('/journal/reset')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(403);
+  });
+
   it('denies /compliance/report without access_compliance', async () => {
     mocks.getUserPermissions.mockResolvedValue([]);
     const res = await request(app)
