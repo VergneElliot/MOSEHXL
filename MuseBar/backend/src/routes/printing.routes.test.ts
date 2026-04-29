@@ -477,6 +477,35 @@ describe('printing routes', () => {
     expect(res.body.error).toBe('Closure bulletin not found');
   });
 
+  it('prints closure bulletin successfully and logs printing history metadata', async () => {
+    mocks.buildClosureBulletinData.mockResolvedValue({
+      closure_type: 'DAILY',
+      bulletin_number: 'BUL-123',
+    });
+    const printClosureBulletin = vi.fn().mockResolvedValue({ success: true, message: 'queued' });
+    mocks.managerGetService.mockResolvedValue({
+      checkPrinterStatus: vi.fn().mockResolvedValue({ connected: true }),
+      listPrinters: vi.fn().mockResolvedValue([{ id: 'p1', name: 'Printer 1' }]),
+      printReceipt: vi.fn(),
+      printClosureBulletin,
+    });
+
+    const res = await request(app)
+      .post('/printing/closure/19')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.bulletin_data.closure_type).toBe('DAILY');
+    expect(mocks.logPrintingHistory).toHaveBeenCalledWith(
+      expect.anything(),
+      'est-1',
+      'closure_bulletin',
+      expect.objectContaining({ success: true }),
+      expect.objectContaining({ bulletin_id: 19, closure_type: 'DAILY' })
+    );
+  });
+
   it('returns 400 for invalid closure print bulletin id and skips bulletin data build', async () => {
     const res = await request(app)
       .post('/printing/closure/not-a-number')
