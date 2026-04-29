@@ -128,17 +128,13 @@ router.post('/:id/export', asyncHandler(async (req, res) => {
       return res.status(400).json({ error: 'Invalid archive ID' });
     }
     
-    const { format = 'json' } = req.body;
-    
-    // For now, we'll return a placeholder since exportArchive doesn't exist
-    // In a full implementation, you'd use the appropriate ArchiveService method
-    const exportData = { archiveId, format, note: 'Export functionality to be implemented' };
-    
-    res.json({
-      message: 'Archive exported successfully',
-      export_data: exportData,
-      format,
-      compliance_note: 'Archive export for regulatory reporting'
+    void archiveId;
+    void req.body;
+
+    res.status(501).json({
+      error: 'Archive export is not implemented yet',
+      code: 'LEGAL_ARCHIVE_EXPORT_NOT_IMPLEMENTED',
+      compliance_note: 'Export endpoint is intentionally disabled until full implementation is available'
     });
   } catch (error: unknown) {
     logger.error(
