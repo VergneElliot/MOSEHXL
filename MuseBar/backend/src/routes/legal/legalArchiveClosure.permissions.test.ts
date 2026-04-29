@@ -256,7 +256,7 @@ describe('legal archive/closure permission gating', () => {
     expect(res.status).toBe(403);
   });
 
-  it('allows /archive/:id/export with access_closure and returns export payload contract', async () => {
+  it('returns 501 for /archive/:id/export with access_closure until export is implemented', async () => {
     mocks.getUserPermissions.mockResolvedValue(['access_closure']);
 
     const res = await request(app)
@@ -264,11 +264,9 @@ describe('legal archive/closure permission gating', () => {
       .set('Authorization', `Bearer ${tokenFor('staff')}`)
       .send({});
 
-    expect(res.status).toBe(200);
-    expect(res.body.message).toBe('Archive exported successfully');
-    expect(res.body.format).toBe('json');
-    expect(res.body.export_data.archiveId).toBe(77);
-    expect(res.body.export_data.format).toBe('json');
+    expect(res.status).toBe(501);
+    expect(res.body.error).toBe('Archive export is not implemented yet');
+    expect(res.body.code).toBe('LEGAL_ARCHIVE_EXPORT_NOT_IMPLEMENTED');
   });
 
   it('denies /closure/bulletins without access_closure', async () => {
