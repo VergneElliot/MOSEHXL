@@ -142,6 +142,17 @@ describe('printing routes', () => {
     expect(String(res.body.error)).toContain('Provider must be one of');
   });
 
+  it('returns 400 when provider is missing on configuration update', async () => {
+    const res = await request(app)
+      .post('/printing/configuration')
+      .set('Authorization', 'Bearer test-token')
+      .send({ config: {} });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Provider is required');
+    expect(mocks.savePrintingConfiguration).not.toHaveBeenCalled();
+  });
+
   it('updates configuration and clears cached service on success', async () => {
     mocks.savePrintingConfiguration.mockResolvedValue({
       configuration: {

@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   getUserPermissions: vi.fn(),
   getArchiveExports: vi.fn(),
   getArchiveExportById: vi.fn(),
+  exportData: vi.fn(),
   getClosureBulletins: vi.fn(),
   getLastFondDeCaisse: vi.fn(),
 }));
@@ -38,7 +39,7 @@ vi.mock('../../models/archiveService', () => ({
   ArchiveService: {
     getArchiveExports: mocks.getArchiveExports,
     getArchiveExportById: mocks.getArchiveExportById,
-    exportData: vi.fn(),
+    exportData: mocks.exportData,
   },
 }));
 
@@ -82,6 +83,7 @@ describe('legal archive/closure permission gating', () => {
     mocks.getUserPermissions.mockReset();
     mocks.getArchiveExports.mockReset();
     mocks.getArchiveExportById.mockReset();
+    mocks.exportData.mockReset();
     mocks.getClosureBulletins.mockReset();
     mocks.getLastFondDeCaisse.mockReset();
 
@@ -95,6 +97,7 @@ describe('legal archive/closure permission gating', () => {
 
     mocks.getArchiveExports.mockResolvedValue([]);
     mocks.getArchiveExportById.mockResolvedValue(null);
+    mocks.exportData.mockResolvedValue({ id: 1 });
     mocks.getClosureBulletins.mockResolvedValue([]);
     mocks.getLastFondDeCaisse.mockResolvedValue(200);
   });
@@ -161,6 +164,46 @@ describe('legal archive/closure permission gating', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Invalid archive ID');
     expect(mocks.getArchiveExportById).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for /archive/create when required fields are missing', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+
+    const res = await request(app)
+      .post('/archive/create')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`)
+      .send({ archiveType: 'DAILY' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Archive type, start date, and end date are required');
+  });
+
+  it('allows /archive/create with access_closure and sends establishment-scoped export payload', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    const archiveRecord = { id: 41, establishment_id: EST, export_type: 'DAILY' };
+    mocks.exportData.mockResolvedValue(archiveRecord);
+
+    const res = await request(app)
+      .post('/archive/create')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`)
+      .send({
+        archiveType: 'DAILY',
+        startDate: '2026-01-01',
+        endDate: '2026-01-31',
+      });
+
+    expect(res.status).toBe(201);
+    expect(mocks.exportData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        export_type: 'DAILY',
+        establishment_id: EST,
+        created_by: '22',
+        format: 'JSON',
+        period_start: expect.any(Date),
+        period_end: expect.any(Date),
+      })
+    );
+    expect(res.body.archive.id).toBe(41);
   });
 
   it('denies /closure/bulletins without access_closure', async () => {
