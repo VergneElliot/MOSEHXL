@@ -2,7 +2,7 @@
 
 **Purpose:** Deep audit of the MOSEHXL MuseBar codebase, architecture assessment, and a complete course for beginner developers to understand every part of the project.
 
-**Last updated:** March 2026 (post-audit — all 45 patch fixes applied)
+**Last updated:** April 2026 (historical audit snapshot + post-remediation corrections)
 
 ---
 
@@ -86,19 +86,10 @@ A comprehensive audit was performed on the codebase in February/March 2026. This
 | **Structured logging** | ✅ | Category loggers, request logging, no debug console.logs in production. |
 | **Security middleware** | ✅ | PostgreSQL-backed rate limiting, CORS, sanitization, security headers. |
 
-#### Remaining Work (7 Critical Fixes in DEVELOPMENT-STATE.md)
+#### Historical note on "7 critical fixes"
 
-These are the items that still need to be completed before V2 can replace V1 in production. They are **functional gaps** (not code quality issues — those have been addressed by the 45 patches):
-
-| # | Fix | Description |
-|---|-----|-------------|
-| 1 | Wire legal journal on order creation | `POST /api/orders` doesn't write to legal_journal yet |
-| 2 | Fix retour/change validation failures | Validation middleware rejects negative totals for refunds |
-| 3 | Route retour/change to correct endpoints | Frontend calls generic CRUD instead of payment endpoints |
-| 4 | Remove hardcoded credentials in auth | Test-login and simple-login debug routes still exist |
-| 5 | Restore permissions query | `/me` returns empty permissions, breaking tab visibility |
-| 6 | Connect retour/change dialogs in POS | State exists but no UI components render |
-| 7 | Connect return dialog in History | Same — state exists, no dialog UI |
+At the time of the March 2026 audit snapshot, 7 functional fixes were tracked as release blockers.  
+Those items are now resolved/decided in current `development` branch state (see `DEVELOPMENT-STATE.md` and patch notes `98+` for subsequent stabilization waves).
 
 #### Enterprise Best Practices Checklist
 
@@ -139,7 +130,7 @@ MOSEHXL/
 ├── backups/           # Database backups (gitignored)
 ├── .github/workflows/ # CI/CD pipeline
 ├── README.md          # Project overview, quick start, legal compliance summary
-└── DEVELOPMENT-STATE.md  # Current state, 7 critical fixes, known issues
+└── DEVELOPMENT-STATE.md  # Current state, resolved/decided critical fixes, known issues
 ```
 
 **Why this structure?** `MuseBar` is the product name. Backend and frontend live inside it because they're deployed together. `docs/` keeps all learning material in one place, split into `course/` (teaching) and `patch-notes/` (change log).
@@ -403,23 +394,22 @@ Custom hooks separate state, logic, and API calls — this is the core architect
 9. **Response** → `res.status(201).json({ ...order, items, sub_bills })`
 10. **Frontend** → `onOrderComplete()` clears cart, shows success snackbar (via useSnackbar)
 
-**What's missing (Fix 1):** After step 7, we should call `LegalJournalModel.logTransaction()` and `AuditTrailModel.logAction()` for legal compliance.
+**Current state:** after order creation, legal/audit write paths are now implemented and hardened (including compliance fail-safe behavior for completed orders in recent remediation passes).
 
 ---
 
-### E. Improvements Still Needed
+### E. Current Improvement Priorities
 
-The 7 critical fixes from DEVELOPMENT-STATE.md remain the priority:
+The original 7-fix blocker list is no longer the active priority set.  
+Current priority follows post-audit stabilization sequencing (P0/P1/P2), especially:
 
-1. **Wire legal journal on order creation** — Fix 1
-2. **Fix retour/change validation** — Fix 2
-3. **Route retour/change to correct endpoints** — Fix 3
-4. **Remove debug auth endpoints** — Fix 4
-5. **Restore permissions query** — Fix 5
-6. **Add Retour/Change dialog components** — Fix 6
-7. **Add Return dialog in History** — Fix 7
+1. legal-chain and permission hardening follow-through,
+2. continued dead/legacy code quarantine,
+3. expanded integration tests for fiscal-critical and tenant-isolation paths.
 
-All code quality, security, performance, and type safety issues from the audit have been addressed (patches 11–55).
+See:
+- `docs/audits/2026-04-23-full-repo-state-audit-hard-copy.md`
+- `docs/patch-notes/98-*` onward for the remediation chain.
 
 ---
 
@@ -456,8 +446,8 @@ All code quality, security, performance, and type safety issues from the audit h
 
 ## Summary
 
-- **Audit:** 48 issues found; 45 fixes applied (security, architecture, performance, types, dead code).
-- **Architecture:** Enterprise-grade patterns; solid after cleanup. Main gaps are the 7 functional fixes in DEVELOPMENT-STATE.md.
+- **Audit:** 48 issues were identified in the March 2026 snapshot; remediation continued beyond that baseline in subsequent patch waves.
+- **Architecture:** Enterprise-grade patterns with ongoing stabilization; use current audit/patch notes for live status instead of this section's historical snapshot language.
 - **Course:** This document + chapters 01–07 explain every major file, concept, and data flow. Use the patch notes for detailed change history.
 
-For the 7 critical fixes and migration plan, see **[DEVELOPMENT-STATE.md](../../DEVELOPMENT-STATE.md)**.
+For current stabilization status and migration context, see **[DEVELOPMENT-STATE.md](../../DEVELOPMENT-STATE.md)** and the latest patch notes.
