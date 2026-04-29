@@ -7,7 +7,9 @@ import express from 'express';
 import LegalJournalModel from '../../models/legalJournal';
 import { OrderModel } from '../../models';
 import { Logger } from '../../utils/logger';
-import { getEstablishmentId, requireAuth, requireEstablishmentAdmin } from '../auth';
+import { getEstablishmentId, requireAuth, requireEstablishmentAdmin, requirePermission } from '../auth';
+import { AppError, asyncHandler } from '../../middleware/errorHandler';
+import { P } from '../../permissions/registry';
 
 const router = express.Router();
 const logger = Logger.getInstance();
@@ -23,7 +25,7 @@ router.post(
   '/journal-entry',
   requireAuth,
   requireEstablishmentAdmin,
-  async (req, res) => {
+  asyncHandler(async (req, res) => {
     const establishmentId = getEstablishmentId(req, res);
     if (!establishmentId) return;
     try {
@@ -81,18 +83,21 @@ router.post(
         entry: journalEntry
       });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('Error creating legal journal entry', error instanceof Error ? error : new Error(message), 'ORDER_LEGAL');
-      res.status(500).json({ error: 'Failed to create legal journal entry', details: message });
+      logger.error(
+        'Error creating legal journal entry',
+        error instanceof Error ? error : new Error(String(error)),
+        'ORDER_LEGAL'
+      );
+      throw new AppError('Failed to create legal journal entry', 500, 'ORDER_LEGAL_JOURNAL_CREATE_FAILED');
     }
-  }
+  })
 );
 
 /**
  * GET verify order compliance
  * GET /api/orders/legal/compliance/:orderId
  */
-router.get('/compliance/:orderId', requireAuth, async (req, res) => {
+router.get('/compliance/:orderId', requireAuth, requirePermission(P.access_compliance), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -111,17 +116,20 @@ router.get('/compliance/:orderId', requireAuth, async (req, res) => {
       fiscal_requirements: 'Article 286-I-3 bis du CGI',
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('Error verifying order compliance', error instanceof Error ? error : new Error(message), 'ORDER_LEGAL');
-    res.status(500).json({ error: 'Failed to verify order compliance', details: message });
+    logger.error(
+      'Error verifying order compliance',
+      error instanceof Error ? error : new Error(String(error)),
+      'ORDER_LEGAL'
+    );
+    throw new AppError('Failed to verify order compliance', 500, 'ORDER_LEGAL_COMPLIANCE_VERIFY_FAILED');
   }
-});
+}));
 
 /**
  * GET order legal journal entries
  * GET /api/orders/legal/journal/:orderId
  */
-router.get('/journal/:orderId', requireAuth, async (req, res) => {
+router.get('/journal/:orderId', requireAuth, requirePermission(P.access_compliance), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -139,10 +147,13 @@ router.get('/journal/:orderId', requireAuth, async (req, res) => {
       compliance_note: 'Journal entries are immutable per French fiscal law',
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('Error fetching order journal entries', error instanceof Error ? error : new Error(message), 'ORDER_LEGAL');
-    res.status(500).json({ error: 'Failed to fetch journal entries', details: message });
+    logger.error(
+      'Error fetching order journal entries',
+      error instanceof Error ? error : new Error(String(error)),
+      'ORDER_LEGAL'
+    );
+    throw new AppError('Failed to fetch journal entries', 500, 'ORDER_LEGAL_JOURNAL_FETCH_FAILED');
   }
-});
+}));
 
 export default router;
