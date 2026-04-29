@@ -125,4 +125,19 @@ describe('legal archive/closure permission gating', () => {
     expect(res.status).toBe(403);
     expect(mocks.getClosureBulletins).not.toHaveBeenCalled();
   });
+
+  it('allows /closure/bulletins with access_closure and scopes to caller establishment', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    mocks.getClosureBulletins.mockResolvedValue([
+      { id: 1, closure_type: 'DAILY', establishment_id: EST },
+    ]);
+
+    const res = await request(app)
+      .get('/closure/bulletins')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(200);
+    expect(mocks.getClosureBulletins).toHaveBeenCalledWith(EST, undefined);
+    expect(res.body.total).toBe(1);
+  });
 });
