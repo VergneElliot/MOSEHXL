@@ -227,4 +227,30 @@ describe('printing routes', () => {
     expect(res.status).toBe(404);
     expect(res.body.error).toBe('Receipt not found');
   });
+
+  it('maps receipt print not-found errors to 404', async () => {
+    mocks.buildReceiptDataForOrder.mockRejectedValue(
+      Object.assign(new Error('Not found'), { statusCode: 404 })
+    );
+
+    const res = await request(app)
+      .post('/printing/receipt/42')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('Receipt not found');
+  });
+
+  it('maps closure print not-found errors to 404', async () => {
+    mocks.buildClosureBulletinData.mockRejectedValue(
+      Object.assign(new Error('Not found'), { statusCode: 404 })
+    );
+
+    const res = await request(app)
+      .post('/printing/closure/19')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('Closure bulletin not found');
+  });
 });

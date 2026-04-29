@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   getUserPermissions: vi.fn(),
   getArchiveExports: vi.fn(),
   getClosureBulletins: vi.fn(),
+  getLastFondDeCaisse: vi.fn(),
 }));
 
 vi.mock('../../app', () => ({
@@ -45,7 +46,7 @@ vi.mock('../../models/legalJournal', () => ({
   default: {
     getClosureBulletins: mocks.getClosureBulletins,
     getClosureBulletinsPaginated: vi.fn(),
-    getLastFondDeCaisse: vi.fn(),
+    getLastFondDeCaisse: mocks.getLastFondDeCaisse,
     createDailyClosure: vi.fn(),
     createWeeklyClosure: vi.fn(),
     createMonthlyClosure: vi.fn(),
@@ -80,6 +81,7 @@ describe('legal archive/closure permission gating', () => {
     mocks.getUserPermissions.mockReset();
     mocks.getArchiveExports.mockReset();
     mocks.getClosureBulletins.mockReset();
+    mocks.getLastFondDeCaisse.mockReset();
 
     mocks.poolQuery.mockImplementation(async (query: unknown) => {
       const sql = String(query ?? '');
@@ -91,6 +93,7 @@ describe('legal archive/closure permission gating', () => {
 
     mocks.getArchiveExports.mockResolvedValue([]);
     mocks.getClosureBulletins.mockResolvedValue([]);
+    mocks.getLastFondDeCaisse.mockResolvedValue(200);
   });
 
   it('denies /archive/list without access_closure', async () => {
@@ -164,5 +167,29 @@ describe('legal archive/closure permission gating', () => {
     expect(res.status).toBe(200);
     expect(mocks.getClosureBulletins).toHaveBeenCalledWith(EST, 'MONTHLY');
     expect(res.body.id).toBe(77);
+  });
+
+  it('allows /closure/today-status with access_closure and strips total_transactions from bulletin', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    mocks.getClosureBulletins.mockResolvedValue([
+      {
+        id: 88,
+        closure_type: 'DAILY',
+        period_start: new Date().toISOString(),
+        total_transactions: 22,
+      },
+    ]);
+    mocks.getLastFondDeCaisse.mockResolvedValue(150);
+
+    const res = await request(app)
+      .get('/closure/today-status')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(200);
+    expect(mocks.getClosureBulletins).toHaveBeenCalledWith(EST, 'DAILY');
+    expect(mocks.getLastFondDeCaisse).toHaveBeenCalledWith(EST);
+    expect(res.body.has_closure).toBe(true);
+    expect(res.body.last_fond_de_caisse).toBe(150);
+    expect(res.body.bulletin.total_transactions).toBeUndefined();
   });
 });
