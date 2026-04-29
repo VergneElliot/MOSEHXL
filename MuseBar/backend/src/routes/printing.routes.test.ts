@@ -293,6 +293,17 @@ describe('printing routes', () => {
     expect(mocks.listPrintingConfigurations).toHaveBeenCalledWith(expect.anything(), 'est-1');
   });
 
+  it('returns 400 for configuration read when establishment context is missing', async () => {
+    const res = await request(app)
+      .get('/printing/configuration')
+      .set('Authorization', 'Bearer test-token')
+      .set('x-test-auth-mode', 'no-est');
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Establishment context required');
+    expect(mocks.listPrintingConfigurations).not.toHaveBeenCalled();
+  });
+
   it('returns 500 when fetching printing configuration fails unexpectedly', async () => {
     mocks.listPrintingConfigurations.mockRejectedValue(new Error('config read failed'));
 
