@@ -289,6 +289,16 @@ describe('printing routes', () => {
     expect(res.body.error).toBe('Receipt not found');
   });
 
+  it('returns 400 for invalid receipt print order id and skips receipt data build', async () => {
+    const res = await request(app)
+      .post('/printing/receipt/not-a-number')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid order id');
+    expect(mocks.buildReceiptDataForOrder).not.toHaveBeenCalled();
+  });
+
   it('maps closure print not-found errors to 404', async () => {
     mocks.buildClosureBulletinData.mockRejectedValue(
       Object.assign(new Error('Not found'), { statusCode: 404 })
@@ -300,5 +310,15 @@ describe('printing routes', () => {
 
     expect(res.status).toBe(404);
     expect(res.body.error).toBe('Closure bulletin not found');
+  });
+
+  it('returns 400 for invalid closure print bulletin id and skips bulletin data build', async () => {
+    const res = await request(app)
+      .post('/printing/closure/not-a-number')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid closure bulletin id');
+    expect(mocks.buildClosureBulletinData).not.toHaveBeenCalled();
   });
 });
