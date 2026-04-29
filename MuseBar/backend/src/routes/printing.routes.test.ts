@@ -93,6 +93,10 @@ describe('printing routes', () => {
     mocks.savePrintingConfiguration.mockReset();
     mocks.managerGetService.mockReset();
     mocks.managerClearService.mockReset();
+    mocks.buildTestReceiptData.mockReset();
+    mocks.buildReceiptDataForOrder.mockReset();
+    mocks.buildClosureBulletinData.mockReset();
+    mocks.logPrintingHistory.mockReset();
 
     mocks.managerGetService.mockResolvedValue({
       checkPrinterStatus: vi.fn().mockResolvedValue({ connected: true }),
@@ -247,6 +251,16 @@ describe('printing routes', () => {
       42,
       'simplified'
     );
+  });
+
+  it('returns 400 for invalid preview order id and skips data building', async () => {
+    const res = await request(app)
+      .get('/printing/receipt/not-a-number/preview')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid order id');
+    expect(mocks.buildReceiptDataForOrder).not.toHaveBeenCalled();
   });
 
   it('maps preview not-found errors to 404', async () => {
