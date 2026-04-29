@@ -12,7 +12,6 @@ export {
   requestSizeLimit 
 } from './InputSanitization';
 export { SecurityHeadersService, securityHeaders } from './SecurityHeaders';
-export { CorsConfigurationService, createCorsOptions } from './CorsConfiguration';
 export * from './types';
 
 // Re-export commonly used functions for backward compatibility
