@@ -162,6 +162,31 @@ describe('legal route compliance permission gates', () => {
     expect(res.body.offset).toBe(10);
   });
 
+  it('uses default pagination for /journal/entries when limit/offset are omitted', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
+    mocks.getEntriesWithCountForPeriod.mockResolvedValue({
+      entries: [],
+      total: 0,
+      limit: 100,
+      offset: 0,
+    });
+
+    const res = await request(app)
+      .get('/journal/entries')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(200);
+    expect(mocks.getEntriesWithCountForPeriod).toHaveBeenCalledWith({
+      establishment_id: EST,
+      start_date: undefined,
+      end_date: undefined,
+      limit: 100,
+      offset: 0,
+    });
+    expect(res.body.limit).toBe(100);
+    expect(res.body.offset).toBe(0);
+  });
+
   it('denies /journal/stats for non-admin users', async () => {
     mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
 
