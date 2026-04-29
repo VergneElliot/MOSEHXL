@@ -1,0 +1,166 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import request from 'supertest';
+import express from 'express';
+
+const mocks = vi.hoisted(() => ({
+  poolQuery: vi.fn(),
+  loggerError: vi.fn(),
+  epsonHandler: vi.fn(),
+  listPrintingConfigurations: vi.fn(),
+  savePrintingConfiguration: vi.fn(),
+  managerGetService: vi.fn(),
+  managerClearService: vi.fn(),
+  buildTestReceiptData: vi.fn(),
+  buildReceiptDataForOrder: vi.fn(),
+  buildClosureBulletinData: vi.fn(),
+  logPrintingHistory: vi.fn(),
+}));
+
+vi.mock('../app', () => ({
+  pool: {
+    query: mocks.poolQuery,
+  },
+}));
+
+vi.mock('../middleware/auth', () => ({
+  authenticateToken: (req: express.Request, _res: express.Response, next: express.NextFunction) => {
+    const mode = req.header('x-test-auth-mode');
+    if (mode === 'no-est') {
+      (req as express.Request & { user?: unknown }).user = {
+        id: 7,
+        email: 'staff@example.com',
+        role: 'staff',
+        is_admin: false,
+        establishment_id: null,
+      };
+      return next();
+    }
+
+    (req as express.Request & { user?: unknown }).user = {
+      id: 8,
+      email: 'staff@example.com',
+      role: 'staff',
+      is_admin: false,
+      establishment_id: 'est-1',
+    };
+    return next();
+  },
+}));
+
+vi.mock('../utils/logger', () => ({
+  getLogger: () => ({
+    error: mocks.loggerError,
+  }),
+}));
+
+vi.mock('../printing/epsonPollHandler', () => ({
+  epsonServerDirectPollHandler: mocks.epsonHandler,
+}));
+
+vi.mock('../printing/printingConfigRepo', () => ({
+  ALLOWED_PRINT_PROVIDERS: ['epson-server-direct', 'digital'],
+  listPrintingConfigurations: mocks.listPrintingConfigurations,
+  savePrintingConfiguration: mocks.savePrintingConfiguration,
+  parseConfigCell: vi.fn(),
+}));
+
+vi.mock('../printing/printDataRepo', () => ({
+  buildTestReceiptData: mocks.buildTestReceiptData,
+  buildReceiptDataForOrder: mocks.buildReceiptDataForOrder,
+  buildClosureBulletinData: mocks.buildClosureBulletinData,
+  logPrintingHistory: mocks.logPrintingHistory,
+}));
+
+vi.mock('../printing/printingServiceManager', () => ({
+  createPrintingServiceManager: () => ({
+    getPrintingService: mocks.managerGetService,
+    clearPrintingService: mocks.managerClearService,
+  }),
+}));
+
+import printingRouter from './printing';
+
+const app = express();
+app.use(express.json());
+app.use('/printing', printingRouter);
+
+describe('printing routes', () => {
+  beforeEach(() => {
+    mocks.poolQuery.mockReset();
+    mocks.loggerError.mockReset();
+    mocks.epsonHandler.mockReset();
+    mocks.listPrintingConfigurations.mockReset();
+    mocks.savePrintingConfiguration.mockReset();
+    mocks.managerGetService.mockReset();
+    mocks.managerClearService.mockReset();
+
+    mocks.managerGetService.mockResolvedValue({
+      checkPrinterStatus: vi.fn().mockResolvedValue({ connected: true }),
+      listPrinters: vi.fn().mockResolvedValue([{ id: 'p1', name: 'Printer 1' }]),
+      printReceipt: vi.fn(),
+      printClosureBulletin: vi.fn(),
+    });
+  });
+
+  it('returns 400 when establishment context is missing', async () => {
+    const res = await request(app)
+      .get('/printing/status')
+      .set('Authorization', 'Bearer test-token')
+      .set('x-test-auth-mode', 'no-est');
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Establishment context required');
+  });
+
+  it('returns status payload for authenticated establishment user', async () => {
+    const res = await request(app)
+      .get('/printing/status')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(200);
+    expect(res.body.establishment_id).toBe('est-1');
+    expect(res.body.status).toEqual({ connected: true });
+    expect(res.body.printers).toEqual([{ id: 'p1', name: 'Printer 1' }]);
+    expect(mocks.managerGetService).toHaveBeenCalledWith('est-1');
+  });
+
+  it('returns 400 for invalid provider on configuration update', async () => {
+    mocks.savePrintingConfiguration.mockRejectedValue(
+      Object.assign(new Error('Provider must be one of: epson-server-direct, digital'), { statusCode: 400 })
+    );
+
+    const res = await request(app)
+      .post('/printing/configuration')
+      .set('Authorization', 'Bearer test-token')
+      .send({ provider: 'invalid-provider', config: {} });
+
+    expect(res.status).toBe(400);
+    expect(String(res.body.error)).toContain('Provider must be one of');
+  });
+
+  it('updates configuration and clears cached service on success', async () => {
+    mocks.savePrintingConfiguration.mockResolvedValue({
+      configuration: {
+        id: 10,
+        provider: 'epson-server-direct',
+        is_active: true,
+        config: { pollKey: 'abc' },
+      },
+    });
+
+    const res = await request(app)
+      .post('/printing/configuration')
+      .set('Authorization', 'Bearer test-token')
+      .send({ provider: 'epson-server-direct', config: {} });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Printing configuration updated successfully');
+    expect(mocks.savePrintingConfiguration).toHaveBeenCalledWith(
+      expect.anything(),
+      'est-1',
+      'epson-server-direct',
+      {}
+    );
+    expect(mocks.managerClearService).toHaveBeenCalledWith('est-1');
+  });
+});
