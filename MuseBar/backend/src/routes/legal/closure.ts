@@ -7,8 +7,11 @@ import express from 'express';
 import LegalJournalModel from '../../models/legalJournal';
 import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
 import { P } from '../../permissions/registry';
+import { Logger } from '../../utils/logger';
+import { AppError, asyncHandler } from '../../middleware/errorHandler';
 
 const router = express.Router();
+const logger = Logger.getInstance();
 
 function parseForceFlag(force: unknown): boolean {
   if (force === true || force === 1) return true;
@@ -35,7 +38,7 @@ router.use(requireAuth, requirePermission(P.access_closure));
  * POST create daily closure bulletin (scoped to the authenticated user's establishment).
  * POST /api/legal/closure/daily
  */
-router.post('/daily', async (req, res) => {
+router.post('/daily', asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -62,16 +65,20 @@ router.post('/daily', async (req, res) => {
         : 'Daily closure bulletin created per French fiscal requirements'
     });
   } catch (error) {
-    process.stderr.write(`Error creating daily closure: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to create daily closure' });
+    logger.error(
+      'Error creating daily closure',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_CLOSURE'
+    );
+    throw new AppError('Failed to create daily closure', 500, 'LEGAL_CLOSURE_DAILY_CREATE_FAILED');
   }
-});
+}));
 
 /**
  * POST create weekly closure bulletin (scoped to the authenticated user's establishment).
  * POST /api/legal/closure/weekly
  */
-router.post('/weekly', async (req, res) => {
+router.post('/weekly', asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -97,16 +104,20 @@ router.post('/weekly', async (req, res) => {
         : 'Weekly closure bulletin created per French fiscal requirements'
     });
   } catch (error) {
-    process.stderr.write(`Error creating weekly closure: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to create weekly closure' });
+    logger.error(
+      'Error creating weekly closure',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_CLOSURE'
+    );
+    throw new AppError('Failed to create weekly closure', 500, 'LEGAL_CLOSURE_WEEKLY_CREATE_FAILED');
   }
-});
+}));
 
 /**
  * POST create monthly closure bulletin (scoped to the authenticated user's establishment).
  * POST /api/legal/closure/monthly
  */
-router.post('/monthly', async (req, res) => {
+router.post('/monthly', asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -132,16 +143,20 @@ router.post('/monthly', async (req, res) => {
         : 'Monthly closure bulletin created per French fiscal requirements'
     });
   } catch (error) {
-    process.stderr.write(`Error creating monthly closure: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to create monthly closure' });
+    logger.error(
+      'Error creating monthly closure',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_CLOSURE'
+    );
+    throw new AppError('Failed to create monthly closure', 500, 'LEGAL_CLOSURE_MONTHLY_CREATE_FAILED');
   }
-});
+}));
 
 /**
  * POST create annual closure bulletin (scoped to the authenticated user's establishment).
  * POST /api/legal/closure/annual
  */
-router.post('/annual', async (req, res) => {
+router.post('/annual', asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -167,16 +182,20 @@ router.post('/annual', async (req, res) => {
         : 'Annual closure bulletin created per French fiscal requirements'
     });
   } catch (error) {
-    process.stderr.write(`Error creating annual closure: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to create annual closure' });
+    logger.error(
+      'Error creating annual closure',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_CLOSURE'
+    );
+    throw new AppError('Failed to create annual closure', 500, 'LEGAL_CLOSURE_ANNUAL_CREATE_FAILED');
   }
-});
+}));
 
 /**
  * POST create closure bulletin (generic)
  * POST /api/legal/closure/create
  */
-router.post('/create', async (req, res) => {
+router.post('/create', asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -229,16 +248,20 @@ router.post('/create', async (req, res) => {
     if (error instanceof Error && error.message.includes('already exists')) {
       return res.status(409).json({ error: error.message });
     }
-    process.stderr.write(`Error creating ${String(req.body.type)} closure: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: `Failed to create ${req.body.type} closure` });
+    logger.error(
+      `Error creating ${String(req.body.type)} closure`,
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_CLOSURE'
+    );
+    throw new AppError(`Failed to create ${String(req.body.type)} closure`, 500, 'LEGAL_CLOSURE_CREATE_FAILED');
   }
-});
+}));
 
 /**
  * GET closure bulletins (scoped to the authenticated user's establishment when applicable).
  * GET /api/legal/closure/bulletins
  */
-router.get('/bulletins', async (req, res) => {
+router.get('/bulletins', asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -281,16 +304,20 @@ router.get('/bulletins', async (req, res) => {
       compliance_note: 'Closure bulletins for regulatory reporting',
     });
   } catch (error) {
-    process.stderr.write(`Error fetching closure bulletins: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to fetch closure bulletins' });
+    logger.error(
+      'Error fetching closure bulletins',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_CLOSURE'
+    );
+    throw new AppError('Failed to fetch closure bulletins', 500, 'LEGAL_CLOSURE_BULLETINS_FETCH_FAILED');
   }
-});
+}));
 
 /**
  * GET today's closure status (scoped to the user's establishment when applicable).
  * GET /api/legal/closure/today-status
  */
-router.get('/today-status', async (req, res) => {
+router.get('/today-status', asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -322,16 +349,20 @@ router.get('/today-status', async (req, res) => {
       compliance_note: 'Daily closure status for regulatory compliance'
     });
   } catch (error) {
-    process.stderr.write(`Error fetching today's closure status: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to fetch today\'s closure status' });
+    logger.error(
+      'Error fetching today closure status',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_CLOSURE'
+    );
+    throw new AppError('Failed to fetch today\'s closure status', 500, 'LEGAL_CLOSURE_TODAY_STATUS_FETCH_FAILED');
   }
-});
+}));
 
 /**
  * GET latest monthly closure bulletin (scoped to the user's establishment when applicable).
  * GET /api/legal/closure/monthly-latest
  */
-router.get('/monthly-latest', async (req, res) => {
+router.get('/monthly-latest', asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -357,9 +388,13 @@ router.get('/monthly-latest', async (req, res) => {
 
     res.json(currentMonthBulletin);
   } catch (error) {
-    process.stderr.write(`Error fetching latest monthly closure: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to fetch latest monthly closure' });
+    logger.error(
+      'Error fetching latest monthly closure',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_CLOSURE'
+    );
+    throw new AppError('Failed to fetch latest monthly closure', 500, 'LEGAL_CLOSURE_MONTHLY_LATEST_FETCH_FAILED');
   }
-});
+}));
 
 export default router; 
