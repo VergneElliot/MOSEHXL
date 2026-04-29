@@ -206,6 +206,33 @@ describe('legal archive/closure permission gating', () => {
     expect(res.body.archive.id).toBe(41);
   });
 
+  it('returns 400 for /archive/:id/export when archive id is invalid', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+
+    const res = await request(app)
+      .post('/archive/not-a-number/export')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`)
+      .send({ format: 'json' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid archive ID');
+  });
+
+  it('allows /archive/:id/export with access_closure and returns export payload contract', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+
+    const res = await request(app)
+      .post('/archive/77/export')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`)
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Archive exported successfully');
+    expect(res.body.format).toBe('json');
+    expect(res.body.export_data.archiveId).toBe(77);
+    expect(res.body.export_data.format).toBe('json');
+  });
+
   it('denies /closure/bulletins without access_closure', async () => {
     mocks.getUserPermissions.mockResolvedValue([]);
 
