@@ -116,6 +116,30 @@ describe('printing routes', () => {
     expect(res.body.error).toBe('Establishment context required');
   });
 
+  it('returns Epson poll payload when handler succeeds', async () => {
+    mocks.epsonHandler.mockImplementation(async (_poolArg, _req, res) =>
+      res.status(200).type('text/plain').send('epson-ok')
+    );
+
+    const res = await request(app)
+      .get('/printing/epson/poll');
+
+    expect(res.status).toBe(200);
+    expect(res.text).toBe('epson-ok');
+    expect(mocks.epsonHandler).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns 500 for Epson poll when handler throws', async () => {
+    mocks.epsonHandler.mockRejectedValue(new Error('poll failure'));
+
+    const res = await request(app)
+      .get('/printing/epson/poll');
+
+    expect(res.status).toBe(500);
+    expect(res.text).toBe('Internal error');
+    expect(mocks.loggerError).toHaveBeenCalled();
+  });
+
   it('returns status payload for authenticated establishment user', async () => {
     const res = await request(app)
       .get('/printing/status')

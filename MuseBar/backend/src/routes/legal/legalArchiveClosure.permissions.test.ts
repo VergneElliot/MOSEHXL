@@ -284,6 +284,26 @@ describe('legal archive/closure permission gating', () => {
     expect(res.body.id).toBe(77);
   });
 
+  it('returns 404 on /closure/monthly-latest when no current-month bulletin exists', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    mocks.getClosureBulletins.mockResolvedValue([
+      {
+        id: 66,
+        closure_type: 'MONTHLY',
+        period_start: '2025-01-01T00:00:00.000Z',
+        period_end: '2025-01-31T23:59:59.999Z',
+      },
+    ]);
+
+    const res = await request(app)
+      .get('/closure/monthly-latest')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(404);
+    expect(mocks.getClosureBulletins).toHaveBeenCalledWith(EST, 'MONTHLY');
+    expect(res.body.error).toBe('No monthly closure bulletin found for the current month.');
+  });
+
   it('allows /closure/today-status with access_closure and strips total_transactions from bulletin', async () => {
     mocks.getUserPermissions.mockResolvedValue(['access_closure']);
     mocks.getClosureBulletins.mockResolvedValue([
