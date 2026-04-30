@@ -11,6 +11,7 @@ import {
 } from '../middleware/auth';
 import { P } from '../permissions/registry';
 import { logSoftwareEventBestEffort } from '../services/legal/softwareEventJournal';
+import { validatePassword } from '../utils/passwordValidation';
 
 const canManageUsers = requireEstablishmentAdminOrPermission(P.access_user_management);
 
@@ -324,6 +325,10 @@ router.post('/setup', requireSetupSecret, asyncHandler(async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password required' });
+    }
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      return res.status(400).json({ error: passwordValidation.error ?? 'Invalid password' });
     }
 
     const user = await UserModel.bootstrapSystemAdmin(email, password);

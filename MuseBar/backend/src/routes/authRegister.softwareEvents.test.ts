@@ -50,6 +50,12 @@ vi.mock('../utils/logger', () => ({
   },
 }));
 
+vi.mock('../permissions/registry', () => ({
+  P: {
+    access_user_management: 'access_user_management',
+  },
+}));
+
 import authRegisterRouter from './authRegister';
 
 const app = express();
