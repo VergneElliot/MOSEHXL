@@ -16,4 +16,3 @@ export function runWithTenantContext<T>(
 export function getCurrentEstablishmentId(): string | null {
   return storage.getStore()?.establishmentId ?? null;
 }
-

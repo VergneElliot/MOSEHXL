@@ -8,7 +8,7 @@ import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { UserModel } from '../models/user';
-import { runWithTenantContext } from '../db/tenantContext';
+import { runWithTenantContext } from '../rls/tenantContext';
 
 // No fallback: if JWT_SECRET is missing, fail fast so we never run with a default secret.
 const rawSecret = process.env.JWT_SECRET;
