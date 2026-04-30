@@ -13,6 +13,7 @@ import {
 import { validateParams, paramValidations } from '../middleware/validation';
 import { Logger } from '../utils/logger';
 import { getEnvironmentConfig } from '../config/environment';
+import { logSoftwareEventBestEffort } from '../services/legal/softwareEventJournal';
 
 const router = express.Router();
 const config = getEnvironmentConfig();
@@ -102,6 +103,14 @@ router.delete('/:id', requireAuth, requireAdmin, validateParams([paramValidation
   try {
     const { id } = req.params;
     await establishmentService.deleteEstablishment(id);
+    await logSoftwareEventBestEffort({
+      establishmentId: id,
+      eventType: 'ESTABLISHMENT_DELETED',
+      userId: String(req.user!.id),
+      eventData: {
+        establishment_id: id,
+      },
+    });
     res.json({ success: true, message: 'Establishment deleted successfully' });
   } catch (error) {
     logger.error(
@@ -132,6 +141,18 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
       req.ip,
       req.headers['user-agent']
     );
+    const createdEstablishment = result?.establishment as { id?: string; name?: string } | undefined;
+    if (createdEstablishment?.id) {
+      await logSoftwareEventBestEffort({
+        establishmentId: createdEstablishment.id,
+        eventType: 'ESTABLISHMENT_CREATED',
+        userId: String(req.user!.id),
+        eventData: {
+          establishment_id: createdEstablishment.id,
+          establishment_name: createdEstablishment.name ?? null,
+        },
+      });
+    }
 
     res.status(201).json(result);
   } catch (error) {
