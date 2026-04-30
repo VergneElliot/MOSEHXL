@@ -188,18 +188,26 @@ router.get('/me', requireAuth, asyncHandler(async (req, res) => {
 // POST /api/auth/refresh — re-issue token with current DB state
 // ---------------------------------------------------------------------------
 router.post('/refresh', requireAuth, asyncHandler(async (req, res) => {
+  const lockClient = await pool.connect();
   try {
+    await lockClient.query('BEGIN');
+
     if (req.user?.support_impersonation) {
+      await lockClient.query('COMMIT');
       return res.status(400).json({
         error: 'Impersonation tokens cannot be refreshed. Start a new support impersonation session instead.'
       });
     }
+
     const { rememberMe } = req.body;
     const userId = req.user!.id;
+
+    await lockClient.query('SELECT pg_advisory_xact_lock($1::bigint)', [userId]);
 
     // Re-fetch role and establishment_id in case they changed since last login
     const d = await UserModel.getAuthRoleState(userId);
     if (!d) {
+      await lockClient.query('COMMIT');
       return res.status(404).json({ error: 'User not found' });
     }
     const is_admin: boolean = d.is_admin;
@@ -225,9 +233,13 @@ router.post('/refresh', requireAuth, asyncHandler(async (req, res) => {
       await revokeTokenOrThrow(currentToken, userId, 'TOKEN_REFRESH_ROTATED');
     }
 
+    await lockClient.query('COMMIT');
     return res.json({ token, expiresIn: rememberMe ? '7d' : '12h' });
   } catch {
+    await lockClient.query('ROLLBACK');
     throw new AppError('Internal server error', 500, 'TOKEN_REFRESH_FAILED');
+  } finally {
+    lockClient.release();
   }
 }));
 

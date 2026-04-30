@@ -5,6 +5,9 @@ import { generateToken } from '../middleware/auth';
 
 const mocks = vi.hoisted(() => ({
   poolQuery: vi.fn(),
+  poolConnect: vi.fn(),
+  lockClientQuery: vi.fn(),
+  lockClientRelease: vi.fn(),
   logAction: vi.fn().mockResolvedValue({}),
   getAuthRoleState: vi.fn(),
 }));
@@ -14,6 +17,7 @@ vi.mock('../app', () => ({
   default: express(),
   pool: {
     query: mocks.poolQuery,
+    connect: mocks.poolConnect,
   },
 }));
 
@@ -51,6 +55,9 @@ function establishmentAdminToken() {
 describe('POST /auth/refresh token rotation', () => {
   beforeEach(() => {
     mocks.poolQuery.mockReset();
+    mocks.poolConnect.mockReset();
+    mocks.lockClientQuery.mockReset();
+    mocks.lockClientRelease.mockReset();
     mocks.logAction.mockReset();
     mocks.getAuthRoleState.mockReset();
 
@@ -60,6 +67,11 @@ describe('POST /auth/refresh token rotation', () => {
       establishment_id: '11111111-1111-4111-8111-111111111111',
       is_admin: false,
     });
+    mocks.poolConnect.mockResolvedValue({
+      query: mocks.lockClientQuery,
+      release: mocks.lockClientRelease,
+    });
+    mocks.lockClientQuery.mockResolvedValue({ rows: [] });
     mocks.poolQuery.mockImplementation(async (query: unknown) => {
       const sql = String(query ?? '');
       if (sql.includes('FROM token_blocklist')) {
@@ -94,5 +106,13 @@ describe('POST /auth/refresh token rotation', () => {
       expect.stringContaining('INSERT INTO token_blocklist'),
       expect.arrayContaining([10, 'TOKEN_REFRESH_ROTATED'])
     );
+    expect(mocks.lockClientQuery).toHaveBeenNthCalledWith(1, 'BEGIN');
+    expect(mocks.lockClientQuery).toHaveBeenNthCalledWith(
+      2,
+      'SELECT pg_advisory_xact_lock($1::bigint)',
+      [10]
+    );
+    expect(mocks.lockClientQuery).toHaveBeenLastCalledWith('COMMIT');
+    expect(mocks.lockClientRelease).toHaveBeenCalled();
   });
 });
