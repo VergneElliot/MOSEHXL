@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 import { generateToken } from '../auth';
+import { errorHandler } from '../../middleware/errorHandler';
 
 const EST = '11111111-1111-4111-8111-111111111111';
 
@@ -43,6 +44,7 @@ import orderAuditRouter from './orderAudit';
 const app = express();
 app.use(express.json());
 app.use('/audit', orderAuditRouter);
+app.use(errorHandler);
 
 function staffToken() {
   return generateToken(
@@ -121,5 +123,25 @@ describe('orderAudit log endpoint permission and identity binding', () => {
         resource_id: '123',
       })
     );
+  });
+
+  it('returns unified 500 payload when audit log persistence fails', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_pos']);
+    mocks.logAction.mockRejectedValue(new Error('db exploded'));
+
+    const res = await request(app)
+      .post('/audit/log')
+      .set('Authorization', `Bearer ${staffToken()}`)
+      .send({
+        actionType: 'ORDER_CREATED',
+        resourceType: 'ORDER',
+        resourceId: 123,
+        actionDetails: { note: 'x' },
+      });
+
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe('ORDER_AUDIT_LOG_FAILED');
+    expect(res.body.error.message).toBe('Failed to create audit entry');
   });
 });
