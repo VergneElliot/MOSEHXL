@@ -13,6 +13,7 @@ import { DEFAULT_APP_TIMEZONE } from '../../config/timezone';
 import { EstablishmentQueries } from '../../utils/database';
 import { initializeEstablishmentSchema } from './db';
 import { logSetupProgress as logProgress } from './db';
+import { logSoftwareEventBestEffort } from '../legal/softwareEventJournal';
 
 /**
  * Establishment database operations
@@ -93,6 +94,16 @@ export class EstablishmentOperations {
       `, [establishmentId]);
 
       this.logger.info(`Activated establishment: ${establishmentId}`);
+
+      await logSoftwareEventBestEffort({
+        establishmentId,
+        eventType: 'ESTABLISHMENT_STATUS_UPDATED',
+        eventData: {
+          new_status: 'active',
+          update_type: 'setup_activation',
+          source: 'setup_service',
+        },
+      });
 
     } catch (error) {
       this.logger.error('Error activating establishment:', error as Error);
