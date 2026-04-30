@@ -80,16 +80,26 @@ export const useAuth = (): AuthState & AuthActions => {
         await apiConfig.initialize();
       }
 
-      const response = await apiService.post<{ token: string }>('/auth/refresh');
+      const rememberMeForRefresh =
+        rememberMe || localStorage.getItem('remember_me') === 'true';
+      const response = await apiService.post<{ token: string; expiresIn?: string }>(
+        '/auth/refresh',
+        { rememberMe: rememberMeForRefresh }
+      );
       const newToken = response.data.token;
+      const refreshedExpiresIn = response.data.expiresIn || (rememberMeForRefresh ? '7d' : '12h');
       
       setToken(newToken);
       localStorage.setItem('auth_token', newToken);
+      setRememberMe(rememberMeForRefresh);
+      setTokenExpiresIn(refreshedExpiresIn);
+      localStorage.setItem('remember_me', rememberMeForRefresh.toString());
+      localStorage.setItem('token_expires_in', refreshedExpiresIn);
     } catch (error) {
       // Refresh failed, logout required
       logout();
     }
-  }, [logout]);
+  }, [logout, rememberMe]);
 
   // Check authentication status when token changes
   useEffect(() => {
