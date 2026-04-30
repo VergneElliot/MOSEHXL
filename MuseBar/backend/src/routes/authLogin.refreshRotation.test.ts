@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import express from 'express';
-import { generateToken } from '../middleware/auth';
+import jwt from 'jsonwebtoken';
+import { generateToken, verifyToken } from '../middleware/auth';
 
 const mocks = vi.hoisted(() => ({
   poolQuery: vi.fn(),
@@ -52,6 +53,22 @@ function establishmentAdminToken() {
   );
 }
 
+function legacyEstablishmentAdminToken() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error('JWT_SECRET is required for legacy token test');
+  return jwt.sign(
+    {
+      id: 10,
+      email: 'admin@est.example.com',
+      is_admin: false,
+      role: 'establishment_admin',
+      establishment_id: '11111111-1111-4111-8111-111111111111',
+    },
+    secret,
+    { expiresIn: '12h' }
+  );
+}
+
 describe('POST /auth/refresh token rotation', () => {
   beforeEach(() => {
     mocks.poolQuery.mockReset();
@@ -94,6 +111,10 @@ describe('POST /auth/refresh token rotation', () => {
     expect(res.status).toBe(200);
     expect(typeof res.body.token).toBe('string');
     expect(res.body.token).not.toBe(currentToken);
+    const decoded = verifyToken(res.body.token);
+    expect(decoded.role).toBe('establishment_admin');
+    expect(decoded.establishment_id).toBe('11111111-1111-4111-8111-111111111111');
+    expect(decoded.is_admin).toBeUndefined();
 
     expect(mocks.logAction).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -114,5 +135,19 @@ describe('POST /auth/refresh token rotation', () => {
     );
     expect(mocks.lockClientQuery).toHaveBeenLastCalledWith('COMMIT');
     expect(mocks.lockClientRelease).toHaveBeenCalled();
+  });
+
+  it('accepts a legacy token carrying is_admin during refresh rollover', async () => {
+    const legacyToken = legacyEstablishmentAdminToken();
+    const res = await request(app)
+      .post('/auth/refresh')
+      .set('Authorization', `Bearer ${legacyToken}`)
+      .send({ rememberMe: false });
+
+    expect(res.status).toBe(200);
+    expect(typeof res.body.token).toBe('string');
+    const refreshedDecoded = verifyToken(res.body.token);
+    expect(refreshedDecoded.is_admin).toBeUndefined();
+    expect(refreshedDecoded.role).toBe('establishment_admin');
   });
 });

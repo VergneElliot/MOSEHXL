@@ -91,7 +91,7 @@ export class UserAccountOperations {
       const token = this.generateJWTToken({
         id: parseInt(user.id),
         email: user.email,
-        is_admin: false,
+        role: user.role,
         establishment_id: user.establishment_id
       });
 
@@ -177,11 +177,11 @@ export class UserAccountOperations {
   /**
    * Generate JWT token for user
    */
-  private generateJWTToken(user: { id: number; email: string; is_admin: boolean; establishment_id?: string }): string {
+  private generateJWTToken(user: { id: number; email: string; role: string; establishment_id?: string }): string {
     const payload = {
       id: user.id,
       email: user.email,
-      is_admin: user.is_admin,
+      role: user.role,
       establishment_id: user.establishment_id
     };
 

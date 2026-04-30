@@ -23,7 +23,7 @@ const JWT_SECRET: string = rawSecret;
 export interface JwtPayload {
   id: number;
   email: string;
-  is_admin: boolean;
+  is_admin?: boolean;
   role: string;
   establishment_id: string | null;
   jti?: string;
@@ -42,7 +42,9 @@ export function generateToken(
 ): string {
   const expiration: jwt.SignOptions['expiresIn'] = customExpiresIn ?? (rememberMe ? '7d' : '12h');
   const payloadWithJti = payload.jti ? payload : { ...payload, jti: crypto.randomUUID() };
-  return jwt.sign(payloadWithJti, JWT_SECRET, { expiresIn: expiration });
+  // One-rollover migration: never emit legacy `is_admin` in new tokens.
+  const { is_admin: _legacyIsAdmin, ...signablePayload } = payloadWithJti;
+  return jwt.sign(signablePayload, JWT_SECRET, { expiresIn: expiration });
 }
 
 export function verifyToken(token: string): JwtPayload {
@@ -76,6 +78,10 @@ export async function requireAuth(
     }
 
     const payload = verifyToken(rawToken);
+    const isAdminFromPayload =
+      typeof payload.is_admin === 'boolean'
+        ? payload.is_admin
+        : payload.role === 'system_admin';
     if (payload.support_impersonation?.expires_at) {
       const expiresAt = new Date(payload.support_impersonation.expires_at);
       if (!Number.isNaN(expiresAt.getTime()) && Date.now() > expiresAt.getTime()) {
@@ -85,7 +91,7 @@ export async function requireAuth(
     req.user = {
       id: payload.id,
       email: payload.email,
-      is_admin: payload.is_admin,
+      is_admin: isAdminFromPayload,
       role: payload.role,
       establishment_id: payload.establishment_id ?? null,
       support_impersonation: payload.support_impersonation,
