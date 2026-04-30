@@ -43,6 +43,12 @@ vi.mock('../../models/legalJournal/paymentBreakdown', () => ({
   computePaymentBreakdownFromOrders: mocks.computePaymentBreakdownFromOrders,
 }));
 
+vi.mock('../../permissions/registry', () => ({
+  P: {
+    access_compliance: 'access_compliance',
+  },
+}));
+
 import businessDayStatsRouter from './businessDayStats';
 
 const app = express();

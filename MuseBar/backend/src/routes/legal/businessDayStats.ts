@@ -10,6 +10,7 @@ import { getCurrentBusinessDayPeriod } from '../../models/legalJournal/businessD
 import { computePaymentBreakdownFromOrders } from '../../models/legalJournal/paymentBreakdown';
 import { BusinessDayStatsRepository } from '../../models/legalJournal/businessDayStatsRepository';
 import { P } from '../../permissions/registry';
+import { logError } from '../../utils/logger';
 
 const router = express.Router();
 const DEFAULT_CLOSURE_TIME = '02:00';
@@ -72,7 +73,7 @@ router.get('/business-day-stats', requirePermission(P.access_compliance), async 
       },
     });
   } catch (error) {
-    process.stderr.write(`Error fetching business day stats: ${error instanceof Error ? error.message : String(error)}\n`);
+    logError('Error fetching business day stats', error instanceof Error ? error : new Error(String(error)));
     res.status(500).json({ error: 'Failed to fetch business day statistics' });
   }
 });
