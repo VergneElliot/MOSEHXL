@@ -238,12 +238,16 @@ Because the production database already has data. You can't DROP and re-CREATE a
 
 ```sql
 -- This is a migration — it modifies the existing table
-ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'cashier';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'staff';
 
 -- This is NOT a migration — it destroys data
 DROP TABLE users;
 CREATE TABLE users ( ... );
 ```
+
+Role note: older samples used `DEFAULT 'cashier'` before the auth-role normalization
+wave. Current canonical establishment role is `staff` (`cashier` is legacy and is
+normalized during auth/migration compatibility flows).
 
 ---
 
