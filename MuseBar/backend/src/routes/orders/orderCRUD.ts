@@ -5,14 +5,13 @@
 
 import express from 'express';
 import { OrderModel, OrderItemModel, SubBillModel } from '../../models';
-import LegalJournalModel from '../../models/legalJournal';
-import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';
 import { pool } from '../../db/pool';
 import { getEstablishmentId, requireAuth, requireEstablishmentAdmin } from '../auth';
 import { validateBody, validateParams, commonValidations, paramValidations } from '../../middleware/validation';
 import { assertPosOrderLinePermissions } from '../../middleware/orderPosLinePermissions';
 import { AppError, asyncHandler } from '../../middleware/errorHandler';
+import { createOrderWithCompliance } from '../../services/orders/orderCreationService';
 
 const router = express.Router();
 const logger = Logger.getInstance();
@@ -98,137 +97,39 @@ router.post(
   validateBody(commonValidations.orderCreate),
   assertPosOrderLinePermissions(),
   asyncHandler(async (req, res) => {
-  const establishmentId = getEstablishmentId(req, res);
-  if (!establishmentId) return;
-  try {
-    const { payment_method, status, notes, items, sub_bills, tips, change } = req.body;
-
-    // Base TTC from items only — never include tips in total_amount (zero-sum for CA).
-    const itemsList = items as Array<{ total_price: number; tax_amount: number }>;
-    const total_amount = itemsList.reduce((sum, i) => sum + Number(i.total_price), 0);
-    const total_tax = itemsList.reduce((sum, i) => sum + Number(i.tax_amount), 0);
-
-    const order = await OrderModel.create(
-      { total_amount, total_tax, payment_method, status, notes: notes || '', tips: tips || 0, change: change || 0, establishment_id: establishmentId },
-      establishmentId
-    );
-
-    const createdItems = await Promise.all(
-      items.map(
-        async (item: {
-          product_id?: number;
-          product_name: string;
-          quantity: number;
-          unit_price: number;
-          total_price: number;
-          tax_rate: number;
-          tax_amount: number;
-          happy_hour_applied?: boolean;
-          happy_hour_discount_amount?: number;
-          is_manual_happy_hour?: boolean;
-          description?: string;
-        }) =>
-          OrderItemModel.create({
-            order_id: order.id,
-            product_id: item.product_id,
-            product_name: item.product_name,
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            total_price: item.total_price,
-            tax_rate: item.tax_rate,
-            tax_amount: item.tax_amount,
-            happy_hour_applied: item.happy_hour_applied || false,
-            happy_hour_discount_amount: item.happy_hour_discount_amount || 0,
-            is_manual_happy_hour: item.is_manual_happy_hour === true,
-            description: item.description || '',
-          }, establishmentId)
-      )
-    );
-
-    let createdSubBills: Array<{ id: number; order_id: number; payment_method: string; amount: number; status: string }> = [];
-    if (payment_method === 'split' && Array.isArray(sub_bills)) {
-      createdSubBills = await Promise.all(
-        sub_bills.map(async (sb: { payment_method: string; amount: number }) => {
-          const method: 'cash' | 'card' = sb.payment_method === 'card' ? 'card' : 'cash';
-          return SubBillModel.create({ order_id: order.id, payment_method: method, amount: sb.amount, status: 'pending' }, establishmentId);
-        })
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
+    try {
+      const creationResult = await createOrderWithCompliance(
+        req.body,
+        {
+          establishmentId,
+          userId: req.user ? String(req.user.id) : undefined,
+          ipAddress: req.ip,
+          userAgent: req.headers['user-agent'],
+        },
+        logger
       );
-    }
 
-    // Write to legal journal — every completed sale must be recorded.
-    // This is required by French fiscal law (Article 286-I-3 bis du CGI / NF525).
-    // Hardening policy: if the SALE journal write fails, we do not return success.
-    // We attempt a compensating order delete to avoid leaving a completed sale
-    // without legal journal trace.
-    if (status === 'completed') {
-      try {
-        await LegalJournalModel.logTransaction(
-          {
-            id: order.id,
-            establishment_id: establishmentId,
-            total_amount: order.total_amount,
-            total_tax: order.total_tax,
-            payment_method: order.payment_method,
-            items: createdItems,
-            created_at: order.created_at,
-          },
-          req.user ? String(req.user.id) : undefined
-        );
-      } catch (journalError: unknown) {
-        logger.error(
-          `Failed to write legal journal entry for order ${order.id}`,
-          journalError instanceof Error ? journalError : new Error(String(journalError)),
-          'LEGAL_JOURNAL'
-        );
-        try {
-          const deleted = await OrderModel.delete(order.id, establishmentId);
-          if (!deleted) {
-            logger.error(
-              `Compensating delete failed after legal journal failure for order ${order.id}`,
-              new Error('ORDER_COMPENSATING_DELETE_FAILED'),
-              'LEGAL_JOURNAL'
-            );
-          }
-        } catch (cleanupError: unknown) {
-          logger.error(
-            `Compensating delete threw after legal journal failure for order ${order.id}`,
-            cleanupError instanceof Error ? cleanupError : new Error(String(cleanupError)),
-            'LEGAL_JOURNAL'
-          );
-        }
-        return res.status(500).json({
-          error: 'Failed to persist legal journal entry; order creation aborted for compliance safety'
-        });
+      if (!creationResult.ok) {
+        return res.status(500).json({ error: creationResult.error });
       }
 
-      // Write to audit trail — records who created what, when, and from where.
-      AuditTrailModel.logAction({
-        user_id: req.user ? String(req.user.id) : undefined,
-        action_type: 'ORDER_CREATED',
-        resource_type: 'ORDER',
-        resource_id: String(order.id),
-        action_details: {
-          total_amount: order.total_amount,
-          payment_method: order.payment_method,
-          item_count: createdItems.length,
-        },
-        ip_address: req.ip,
-        user_agent: req.headers['user-agent'],
-      }).catch((auditError: unknown) => {
-        logger.error(`Failed to write audit trail entry for order ${order.id}`, auditError instanceof Error ? auditError : new Error(String(auditError)), 'AUDIT_TRAIL');
+      res.status(201).json({
+        ...creationResult.order,
+        items: creationResult.items,
+        sub_bills: creationResult.subBills,
       });
+    } catch (error) {
+      logger.error(
+        'Failed to create order',
+        error instanceof Error ? error : new Error(String(error)),
+        'ORDERS'
+      );
+      throw new AppError('Failed to create order', 500, 'ORDER_CREATE_FAILED');
     }
-
-    res.status(201).json({ ...order, items: createdItems, sub_bills: createdSubBills });
-  } catch (error) {
-    logger.error(
-      'Failed to create order',
-      error instanceof Error ? error : new Error(String(error)),
-      'ORDERS'
-    );
-    throw new AppError('Failed to create order', 500, 'ORDER_CREATE_FAILED');
-  }
-}));
+  })
+);
 
 /**
  * PUT /api/orders/:id
