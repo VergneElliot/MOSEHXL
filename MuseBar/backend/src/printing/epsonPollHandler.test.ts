@@ -55,22 +55,33 @@ function makeRes() {
 }
 
 describe('epsonServerDirectPollHandler', () => {
-  const pool = {
+  const client = {
     query: vi.fn(),
+    release: vi.fn(),
+  };
+  const pool = {
+    connect: vi.fn(),
   } as unknown as Pool;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    (pool.connect as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(client);
+    client.query.mockReset();
+    client.release.mockReset();
   });
 
   it('returns 200 and XML when header key is valid', async () => {
-    pool.query = vi.fn().mockResolvedValue({
-      rows: [{ provider: 'epson-server-direct', config: { pollKey: 'secret-key' } }],
-    });
+    client.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // set_config
+      .mockResolvedValueOnce({
+        rows: [{ provider: 'epson-server-direct', config: { pollKey: 'secret-key' } }],
+      }) // config select
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
     mocks.dequeueEposJob.mockReturnValue({ id: 10, xml: '<epos-print />' });
 
     const req = makeReq({
-      query: { establishment_id: 'est-1' },
+      query: { establishment_id: '11111111-1111-4111-8111-111111111111' },
       headers: { 'x-epson-poll-key': 'secret-key' },
     });
     const { res, state } = makeRes();
@@ -80,16 +91,28 @@ describe('epsonServerDirectPollHandler', () => {
     expect(state.statusCode).toBe(200);
     expect(state.body).toBe('<epos-print />');
     expect(state.headers['Content-Type']).toBe('application/xml; charset=utf-8');
+    expect(client.query).toHaveBeenNthCalledWith(1, 'BEGIN');
+    expect(client.query).toHaveBeenNthCalledWith(
+      2,
+      "SELECT set_config('app.establishment_id', $1, true)",
+      ['11111111-1111-4111-8111-111111111111']
+    );
+    expect(client.query).toHaveBeenLastCalledWith('COMMIT');
+    expect(client.release).toHaveBeenCalled();
   });
 
   it('accepts legacy query key fallback when header is missing', async () => {
-    pool.query = vi.fn().mockResolvedValue({
-      rows: [{ provider: 'epson-server-direct', config: { pollKey: 'legacy-key' } }],
-    });
+    client.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ provider: 'epson-server-direct', config: { pollKey: 'legacy-key' } }],
+      })
+      .mockResolvedValueOnce({ rows: [] });
     mocks.dequeueEposJob.mockReturnValue(undefined);
 
     const req = makeReq({
-      query: { establishment_id: 'est-1', key: 'legacy-key' },
+      query: { establishment_id: '11111111-1111-4111-8111-111111111111', key: 'legacy-key' },
     });
     const { res, state } = makeRes();
 
@@ -100,13 +123,17 @@ describe('epsonServerDirectPollHandler', () => {
   });
 
   it('returns 403 when provided key is invalid', async () => {
-    pool.query = vi.fn().mockResolvedValue({
-      rows: [{ provider: 'epson-server-direct', config: { pollKey: 'expected-key' } }],
-    });
+    client.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ provider: 'epson-server-direct', config: { pollKey: 'expected-key' } }],
+      })
+      .mockResolvedValueOnce({ rows: [] });
     mocks.dequeueEposJob.mockReturnValue(undefined);
 
     const req = makeReq({
-      query: { establishment_id: 'est-1', key: 'wrong-key' },
+      query: { establishment_id: '11111111-1111-4111-8111-111111111111', key: 'wrong-key' },
     });
     const { res, state } = makeRes();
 
@@ -114,5 +141,18 @@ describe('epsonServerDirectPollHandler', () => {
 
     expect(state.statusCode).toBe(403);
     expect(state.body).toBe('Forbidden');
+  });
+
+  it('returns 400 for invalid establishment id format', async () => {
+    const req = makeReq({
+      query: { establishment_id: 'est-1', key: 'legacy-key' },
+    });
+    const { res, state } = makeRes();
+
+    await epsonServerDirectPollHandler(pool, req, res);
+
+    expect(state.statusCode).toBe(400);
+    expect(state.body).toBe('Missing or invalid establishment_id');
+    expect(pool.connect).not.toHaveBeenCalled();
   });
 });
