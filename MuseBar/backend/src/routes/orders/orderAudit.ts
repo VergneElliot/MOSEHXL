@@ -8,6 +8,7 @@ import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';
 import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
 import { P } from '../../permissions/registry';
+import { AppError, asyncHandler } from '../../middleware/errorHandler';
 
 const router = express.Router();
 const logger = Logger.getInstance();
@@ -16,7 +17,7 @@ const logger = Logger.getInstance();
  * POST log order action
  * POST /api/orders/audit/log
  */
-router.post('/log', requireAuth, requirePermission(P.access_pos), async (req, res) => {
+router.post('/log', requireAuth, requirePermission(P.access_pos), asyncHandler(async (req, res) => {
   try {
     const {
       actionType,
@@ -44,17 +45,20 @@ router.post('/log', requireAuth, requirePermission(P.access_pos), async (req, re
       entry: auditEntry
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('Error creating audit entry', error instanceof Error ? error : new Error(message), 'ORDER_AUDIT');
-    res.status(500).json({ error: 'Failed to create audit entry', details: message });
+    logger.error(
+      'Error creating audit entry',
+      error instanceof Error ? error : new Error(String(error)),
+      'ORDER_AUDIT'
+    );
+    throw new AppError('Failed to create audit entry', 500, 'ORDER_AUDIT_LOG_FAILED');
   }
-});
+}));
 
 /**
  * GET audit trail for order
  * GET /api/orders/audit/:orderId
  */
-router.get('/:orderId', requireAuth, async (req, res) => {
+router.get('/:orderId', requireAuth, asyncHandler(async (req, res) => {
   try {
     const establishmentId = getEstablishmentId(req, res);
     if (!establishmentId) return;
@@ -73,17 +77,20 @@ router.get('/:orderId', requireAuth, async (req, res) => {
       compliance_note: 'Audit trail maintained for regulatory compliance',
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('Error fetching audit trail', error instanceof Error ? error : new Error(message), 'ORDER_AUDIT');
-    res.status(500).json({ error: 'Failed to fetch audit trail', details: message });
+    logger.error(
+      'Error fetching audit trail',
+      error instanceof Error ? error : new Error(String(error)),
+      'ORDER_AUDIT'
+    );
+    throw new AppError('Failed to fetch audit trail', 500, 'ORDER_AUDIT_READ_FAILED');
   }
-});
+}));
 
 /**
  * GET audit summary for order
  * GET /api/orders/audit/:orderId/summary
  */
-router.get('/:orderId/summary', requireAuth, async (req, res) => {
+router.get('/:orderId/summary', requireAuth, asyncHandler(async (req, res) => {
   try {
     const establishmentId = getEstablishmentId(req, res);
     if (!establishmentId) return;
@@ -116,10 +123,13 @@ router.get('/:orderId/summary', requireAuth, async (req, res) => {
       compliance_note: 'Audit summary for regulatory reporting',
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('Error generating audit summary', error instanceof Error ? error : new Error(message), 'ORDER_AUDIT');
-    res.status(500).json({ error: 'Failed to generate audit summary', details: message });
+    logger.error(
+      'Error generating audit summary',
+      error instanceof Error ? error : new Error(String(error)),
+      'ORDER_AUDIT'
+    );
+    throw new AppError('Failed to generate audit summary', 500, 'ORDER_AUDIT_SUMMARY_FAILED');
   }
-});
+}));
 
 export default router;

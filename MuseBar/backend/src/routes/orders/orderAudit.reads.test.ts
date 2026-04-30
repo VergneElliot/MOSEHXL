@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 import { generateToken } from '../auth';
+import { errorHandler } from '../../middleware/errorHandler';
 
 const EST = '11111111-1111-4111-8111-111111111111';
 
@@ -28,6 +29,7 @@ import orderAuditRouter from './orderAudit';
 const app = express();
 app.use(express.json());
 app.use('/audit', orderAuditRouter);
+app.use(errorHandler);
 
 function staffToken() {
   return generateToken(
