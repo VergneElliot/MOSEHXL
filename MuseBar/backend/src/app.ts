@@ -9,6 +9,7 @@ import { DEFAULT_APP_TIMEZONE } from './config/timezone';
 import { createSecurityMiddleware } from './middleware/security';
 import type { Request, Response } from 'express';
 import { getCurrentEstablishmentId } from './db/tenantContext';
+import { logSoftwareEventForAllEstablishmentsBestEffort } from './services/legal/softwareEventJournal';
 
 // Load environment variables
 dotenv.config();
@@ -229,19 +230,79 @@ app.use(createErrorHandler(logger));
 
 // Route services are already initialized above
 
+let isShuttingDown = false;
+
+async function logRuntimeLifecycleEvent(eventType: 'SERVER_STARTED' | 'SERVER_SHUTDOWN', reason?: string) {
+  await logSoftwareEventForAllEstablishmentsBestEffort(eventType, {
+    node_env: NODE_ENV,
+    port: config.server.port,
+    pid: process.pid,
+    reason: reason ?? null,
+    timestamp: new Date().toISOString(),
+  });
+}
+
 // Start the server on all network interfaces
-app.listen(config.server.port, '0.0.0.0', () => {
+const server = app.listen(config.server.port, '0.0.0.0', async () => {
   // MOSEHXL API Server running
-  
+  await logRuntimeLifecycleEvent('SERVER_STARTED');
+
   // Start the automatic closure scheduler (only in production)
   if (NODE_ENV === 'production') {
-    ClosureScheduler.start().catch(error => {
-      logger.error('Failed to start closure scheduler', error instanceof Error ? error : new Error(String(error)));
-    });
+    ClosureScheduler.start()
+      .then(async () => {
+        await logSoftwareEventForAllEstablishmentsBestEffort(
+          'AUTO_CLOSURE_SCHEDULER_STARTED',
+          {
+            node_env: NODE_ENV,
+            pid: process.pid,
+            timestamp: new Date().toISOString(),
+          }
+        );
+      })
+      .catch(async (error) => {
+        logger.error('Failed to start closure scheduler', error instanceof Error ? error : new Error(String(error)));
+        await logSoftwareEventForAllEstablishmentsBestEffort(
+          'AUTO_CLOSURE_SCHEDULER_START_FAILED',
+          {
+            node_env: NODE_ENV,
+            pid: process.pid,
+            timestamp: new Date().toISOString(),
+            error: error instanceof Error ? error.message : String(error),
+          }
+        );
+      });
     // Automatic closure scheduler started
   } else {
     // Automatic closure scheduler disabled in development mode
   }
+});
+
+async function handleShutdownSignal(signal: NodeJS.Signals) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  try {
+    ClosureScheduler.stop();
+    await logRuntimeLifecycleEvent('SERVER_SHUTDOWN', signal);
+  } catch (error) {
+    logger.error(
+      `Error while handling shutdown signal ${signal}`,
+      error instanceof Error ? error : new Error(String(error))
+    );
+  } finally {
+    server.close(() => {
+      process.exit(0);
+    });
+  }
+}
+
+process.on('SIGINT', () => {
+  void handleShutdownSignal('SIGINT');
+});
+
+process.on('SIGTERM', () => {
+  void handleShutdownSignal('SIGTERM');
 });
 
 export default app;
