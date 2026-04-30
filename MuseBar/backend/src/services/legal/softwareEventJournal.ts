@@ -12,7 +12,9 @@ export type SoftwareEventType =
   | 'ESTABLISHMENT_USER_CREATED'
   | 'ESTABLISHMENT_USER_DELETED'
   | 'USER_PERMISSIONS_UPDATED'
-  | 'USER_ROLE_UPDATED';
+  | 'USER_ROLE_UPDATED'
+  | 'ESTABLISHMENT_CREATED'
+  | 'ESTABLISHMENT_DELETED';
 
 type SoftwareEventInput = {
   establishmentId: string;
