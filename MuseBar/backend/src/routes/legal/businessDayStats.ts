@@ -4,11 +4,12 @@
  */
 
 import express from 'express';
-import { requireAuth, getEstablishmentId } from '../auth';
+import { requireAuth, getEstablishmentId, requirePermission } from '../auth';
 import { DEFAULT_APP_TIMEZONE } from '../../config/timezone';
 import { getCurrentBusinessDayPeriod } from '../../models/legalJournal/businessDayPeriod';
 import { computePaymentBreakdownFromOrders } from '../../models/legalJournal/paymentBreakdown';
 import { BusinessDayStatsRepository } from '../../models/legalJournal/businessDayStatsRepository';
+import { P } from '../../permissions/registry';
 
 const router = express.Router();
 const DEFAULT_CLOSURE_TIME = '02:00';
@@ -20,7 +21,7 @@ router.use(requireAuth);
  * Returns live stats for the current business day: total TTC, transaction count,
  * card/cash breakdown (including tips and "faire de la monnaie"), and top products.
  */
-router.get('/business-day-stats', async (req, res) => {
+router.get('/business-day-stats', requirePermission(P.access_compliance), async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
 
