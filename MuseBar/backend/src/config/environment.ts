@@ -86,6 +86,17 @@ export const validateEnvironment = (): void => {
     invalid.push('SETUP_SECRET must be at least 32 characters long for security');
   }
 
+  const establishmentAdminPermissionMode = process.env.ESTABLISHMENT_ADMIN_PERMISSION_MODE;
+  if (
+    establishmentAdminPermissionMode &&
+    establishmentAdminPermissionMode !== 'implicit_all' &&
+    establishmentAdminPermissionMode !== 'explicit_only'
+  ) {
+    invalid.push(
+      "ESTABLISHMENT_ADMIN_PERMISSION_MODE must be either 'implicit_all' or 'explicit_only'"
+    );
+  }
+
   // Report errors
   if (missing.length > 0) {
     process.stderr.write('❌ Missing required environment variables:\n');
@@ -136,6 +147,7 @@ export interface EnvironmentConfig {
     jwtExpiresIn: string;
     archiveSecretKey: string | undefined; // Required in production, optional in dev
     setupSecret: string | undefined; // Used to protect bootstrap endpoints (optional; must fail closed if unset)
+    establishmentAdminPermissionMode: 'implicit_all' | 'explicit_only';
     bcryptRounds: number;
     rateLimitWindowMs: number;
     rateLimitMaxRequests: number;
@@ -202,6 +214,10 @@ export const getEnvironmentConfig = (): EnvironmentConfig => {
       jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
       archiveSecretKey: process.env.ARCHIVE_SECRET_KEY,
       setupSecret: process.env.SETUP_SECRET,
+      establishmentAdminPermissionMode:
+        process.env.ESTABLISHMENT_ADMIN_PERMISSION_MODE === 'explicit_only'
+          ? 'explicit_only'
+          : 'implicit_all',
       bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS || '12'),
       rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
       // Default tuned for POS: menus, history, orders, change ops, refetches — almost all traffic is authenticated
