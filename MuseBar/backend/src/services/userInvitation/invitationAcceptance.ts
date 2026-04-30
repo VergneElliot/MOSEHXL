@@ -8,6 +8,7 @@ import { pool } from '../../app';
 import { Logger } from '../../utils/logger';
 import { InvitationQueries } from '../../utils/database';
 import { EstablishmentModel, CreateEstablishmentData } from '../../models/establishment';
+import { mapInvitationRoleLabelToCanonicalRole } from '../../auth/roleVocabulary';
 import { 
   InvitationAcceptanceData, 
   InvitationResult,
@@ -166,7 +167,7 @@ export class InvitationAcceptance {
         hashedPassword,
         acceptanceData.firstName || 'User',
         acceptanceData.lastName || 'User',
-        invitationRecord.role === 'establishment_admin' ? 'establishment_admin' : 'staff',
+        mapInvitationRoleLabelToCanonicalRole(invitationRecord.role),
         invitationRecord.establishment_id,
         false,
         true,

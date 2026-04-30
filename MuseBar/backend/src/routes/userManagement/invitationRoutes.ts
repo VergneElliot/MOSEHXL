@@ -14,6 +14,7 @@ import { UserInvitationService } from '../../services/userInvitation';
 import { EstablishmentModel } from '../../models/establishment';
 import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';
+import { INVITATION_ROLE_LABELS, InvitationRoleLabel } from '../../auth/roleVocabulary';
 import {
   AuthenticatedRequest,
   EstablishmentInvitationData,
@@ -157,7 +158,7 @@ router.post('/send-user-invitation', requireAuth, canManageUsers, validateBody([
       });
     }
 
-    if (!['establishment_admin', 'establishment_manager', 'establishment_staff'].includes(role)) {
+    if (!INVITATION_ROLE_LABELS.includes(role as InvitationRoleLabel)) {
       return res.status(400).json({ success: false, message: 'Invalid role' });
     }
 
@@ -166,7 +167,7 @@ router.post('/send-user-invitation', requireAuth, canManageUsers, validateBody([
       email,
       firstName,
       lastName,
-      role: role as 'establishment_admin' | 'establishment_manager' | 'establishment_staff',
+      role: role as InvitationRoleLabel,
       establishmentId,
       establishmentName: establishment.name,
       inviterUserId: String(user.id),

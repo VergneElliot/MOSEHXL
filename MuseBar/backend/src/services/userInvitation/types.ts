@@ -2,6 +2,7 @@
  * User Invitation Service Types
  * Type definitions for user and establishment invitations
  */
+import type { InvitationRoleLabel } from '../../auth/roleVocabulary';
 
 /**
  * Invitation types
@@ -15,14 +16,10 @@ export type InvitationStatus = 'pending' | 'accepted' | 'cancelled' | 'expired';
 
 /**
  * User roles
+ * Note: invitation labels are normalized to canonical auth roles when the user account
+ * is created (see InvitationAcceptance + auth/roleVocabulary).
  */
-export type UserRole =
-  | 'cashier'
-  | 'manager'
-  | 'supervisor'
-  | 'establishment_admin'
-  | 'establishment_manager'
-  | 'establishment_staff';
+export type UserRole = InvitationRoleLabel;
 
 /**
  * Subscription plans
