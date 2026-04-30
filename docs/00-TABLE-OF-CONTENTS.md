@@ -34,6 +34,10 @@ These chapters are designed to be read in order. Each one builds on the previous
 
 These are organized chronologically. Each entry corresponds to one specific issue found during the code audit, explains the problem in depth, and documents the fix. They are grouped by category below for easier navigation, but numbered in the order they were applied.
 
+> **Index scope note:** this table is a curated index, not an exhaustive live
+> listing of every patch note file in `docs/patch-notes/`. For complete history,
+> browse the folder directly and prioritize the most recent entries.
+
 ### Security Fixes
 
 | # | File | Summary |

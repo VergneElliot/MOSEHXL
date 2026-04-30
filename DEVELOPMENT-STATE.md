@@ -128,22 +128,24 @@ These do not prevent the POS from working but should be addressed in a future re
 
 The V2 schema is fully backward-compatible with V1 production data. All schema changes are additive. A V1 data backfill migration is included.
 
-### Migration chain (12 files, lexicographic order)
+### Migration chain status (source of truth)
 
+Do not rely on a hardcoded migration count in this document. The chain is active
+and keeps growing.
+
+Use the CLI as the source of truth:
+
+```bash
+cd MuseBar/backend
+npm run migration:status
 ```
-2025_09_12_07_30_00_remove_email_unique_constraints.sql
-2025_09_15_00_00_00_add_establishment_fields.sql
-2026_02_25_00_00_00_add_pos_columns_and_establishment_isolation.sql
-2026_02_25_00_15_00_create_setup_progress_tables.sql
-2026_02_25_00_30_00_create_status_transitions_table.sql
-2026_02_25_01_00_00_convert_timestamps_to_timestamptz.sql
-2026_02_26_01_00_00_accounting_decimal_precision.sql
-2026_02_26_02_00_00_add_establishment_id_to_closure_bulletins.sql
-2026_02_26_02_30_00_add_closure_tips_change_weekly.sql
-2026_02_26_03_00_00_add_users_is_active.sql
-2026_03_05_12_00_00_rate_limit_store.sql
-2026_03_05_13_00_00_v1_data_backfill.sql       ← auto-creates establishment, links all V1 data
-```
+
+Current chain includes migrations across these categories:
+- tenant/isolation schema evolution,
+- legal journal and closure hardening,
+- auth/session and permission model hardening,
+- security/rate-limit infrastructure,
+- V1-to-V2 compatibility/backfill support.
 
 ### Steps to migrate production DB
 
