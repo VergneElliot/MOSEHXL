@@ -94,4 +94,26 @@ describe('ArchiveService.generateExportContent', () => {
     expect(parsed.summary.total_transactions).toBe(2);
     expect(parsed.compliance_info.legal_reference).toBe('Article 286-I-3 bis du CGI');
   });
+
+  it('generates a real PDF binary when format is PDF', async () => {
+    const pdf = await (ArchiveService as unknown as {
+      generateExportContent: (input: {
+        export_type: 'MONTHLY';
+        period_start: Date;
+        format: 'PDF';
+        created_by: string;
+        establishment_id: string;
+      }) => Promise<Buffer>;
+    }).generateExportContent({
+      export_type: 'MONTHLY',
+      period_start: new Date('2026-06-10T00:00:00.000Z'),
+      format: 'PDF',
+      created_by: '22',
+      establishment_id: '11111111-1111-4111-8111-111111111111',
+    });
+
+    expect(Buffer.isBuffer(pdf)).toBe(true);
+    expect(pdf.subarray(0, 4).toString('utf8')).toBe('%PDF');
+    expect(pdf.length).toBeGreaterThan(400);
+  });
 });

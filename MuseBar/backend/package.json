@@ -36,6 +36,7 @@
     "jsonwebtoken": "^9.0.2",
     "moment-timezone": "^0.5.48",
     "nodemailer": "^8.0.1",
+    "pdfkit": "^0.18.0",
     "pg": "^8.16.3",
     "qrcode": "^1.5.4",
     "swagger-ui-express": "^5.0.1",
