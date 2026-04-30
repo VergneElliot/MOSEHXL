@@ -17,7 +17,33 @@ export class TokenBlocklistModel {
        LIMIT 1`,
       [tokenHash]
     );
-    return result.rows.length > 0;
+    if (result.rows.length > 0) {
+      return true;
+    }
+
+    const decoded = jwt.decode(token);
+    const decodedPayload = decoded && typeof decoded === 'object' ? decoded as jwt.JwtPayload : null;
+    const userId = typeof decodedPayload?.id === 'number' ? decodedPayload.id : null;
+    const iat = typeof decodedPayload?.iat === 'number' ? decodedPayload.iat : null;
+
+    if (userId === null || iat === null) {
+      return false;
+    }
+
+    const cutoffResult = await pool.query(
+      `SELECT revoke_before_iat
+       FROM user_token_revocation_cutoffs
+       WHERE user_id = $1
+       LIMIT 1`,
+      [userId]
+    );
+
+    if (cutoffResult.rows.length === 0) {
+      return false;
+    }
+
+    const revokeBeforeIat = Number(cutoffResult.rows[0].revoke_before_iat);
+    return Number.isFinite(revokeBeforeIat) && iat < revokeBeforeIat;
   }
 
   static async revokeToken(
@@ -49,6 +75,27 @@ export class TokenBlocklistModel {
         options?.reason ?? 'MANUAL',
         expiresAt,
       ]
+    );
+  }
+
+  static async revokeAllUserTokensIssuedBefore(
+    userId: number,
+    revokeBeforeIat: number,
+    reason: string = 'MANUAL_GLOBAL_REVOKE'
+  ): Promise<void> {
+    await pool.query(
+      `INSERT INTO user_token_revocation_cutoffs (user_id, revoke_before_iat, reason, updated_at)
+       VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+       ON CONFLICT (user_id)
+       DO UPDATE
+       SET
+         revoke_before_iat = GREATEST(
+           user_token_revocation_cutoffs.revoke_before_iat,
+           EXCLUDED.revoke_before_iat
+         ),
+         reason = EXCLUDED.reason,
+         updated_at = CURRENT_TIMESTAMP`,
+      [userId, revokeBeforeIat, reason]
     );
   }
 }
