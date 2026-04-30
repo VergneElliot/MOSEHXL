@@ -83,7 +83,7 @@ router.get('/entries', requirePermission(P.access_compliance), asyncHandler(asyn
  * GET journal statistics
  * GET /api/legal/journal/stats
  */
-router.get('/stats', requireAdmin, asyncHandler(async (req, res) => {
+router.get('/stats', requirePermission(P.access_compliance), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
