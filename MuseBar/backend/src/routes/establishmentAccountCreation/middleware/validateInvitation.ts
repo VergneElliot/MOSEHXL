@@ -5,7 +5,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import type { PoolClient } from 'pg';
-import { pool } from '../../../app';
+import { pool } from '../../../db/pool';
 import { InvitationQueries } from '../../../utils/database';
 import { InvitationValidationResult } from '../types';
 import { Logger } from '../../../utils/logger';

@@ -5,7 +5,7 @@
 
 import express from 'express';
 import { requireAuth, requireAdmin } from './auth';
-import { pool } from '../app';
+import { pool } from '../db/pool';
 import {
   EstablishmentCreationOrchestrator,
   EstablishmentService,

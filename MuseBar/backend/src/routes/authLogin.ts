@@ -9,7 +9,7 @@ import {
   requireAdmin,
   requireAuth,
 } from '../middleware/auth';
-import { pool } from '../app';
+import { pool } from '../db/pool';
 import { CanonicalAuthRole, deriveCanonicalRole } from '../auth/roleVocabulary';
 import {
   createAuthRateLimitMiddleware,
