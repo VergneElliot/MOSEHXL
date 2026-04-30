@@ -7,6 +7,12 @@ import { initializeLogger, requestLoggerMiddleware } from './utils/logger';
 import { initializeEnvironment } from './config/environment';
 import { DEFAULT_APP_TIMEZONE } from './config/timezone';
 import { createSecurityMiddleware } from './middleware/security';
+import {
+  getClientErrorPayloadSizeBytes,
+  isClientErrorPayloadTooLarge,
+  MAX_CLIENT_ERROR_REPORT_BYTES,
+  sanitizeClientErrorForLog
+} from './utils/clientErrorReporting';
 import type { Request, Response } from 'express';
 import { getCurrentEstablishmentId } from './db/tenantContext';
 import { logSoftwareEventForAllEstablishmentsBestEffort } from './services/legal/softwareEventJournal';
@@ -179,13 +185,19 @@ import { initializeErrorRecovery as initErrorRecovery } from './utils/errorRecov
 
 if (isDevelopment) {
   app.post('/api/client-errors', asyncHandler(async (req: Request, res: Response) => {
-    const errorData = req.body;
+    const payloadBytes = getClientErrorPayloadSizeBytes(req.body);
+    if (isClientErrorPayloadTooLarge(req.body)) {
+      return res.status(413).json({
+        error: `Payload too large (max ${MAX_CLIENT_ERROR_REPORT_BYTES} bytes)`,
+      });
+    }
+    const errorData = sanitizeClientErrorForLog(req.body);
 
     logger.error(
       `Client Error [${errorData.errorId}]: ${errorData.message}`,
-      new Error(errorData.message),
       {
         ...errorData,
+        payload_size_bytes: payloadBytes,
         source: 'CLIENT'
       },
       'CLIENT_ERROR_HANDLER'
@@ -202,12 +214,18 @@ if (isDevelopment) {
         return res.status(403).json({ error: 'Forbidden' });
       }
 
-      const errorData = req.body;
+      const payloadBytes = getClientErrorPayloadSizeBytes(req.body);
+      if (isClientErrorPayloadTooLarge(req.body)) {
+        return res.status(413).json({
+          error: `Payload too large (max ${MAX_CLIENT_ERROR_REPORT_BYTES} bytes)`,
+        });
+      }
+      const errorData = sanitizeClientErrorForLog(req.body);
       logger.error(
         `Client Error [${errorData.errorId}]: ${errorData.message}`,
-        new Error(errorData.message),
         {
           ...errorData,
+          payload_size_bytes: payloadBytes,
           source: 'CLIENT'
         },
         'CLIENT_ERROR_HANDLER'
