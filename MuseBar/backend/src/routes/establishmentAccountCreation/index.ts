@@ -9,7 +9,7 @@ import { validateInvitation } from './middleware/validateInvitation';
 import { validateBusinessInfo } from './middleware/validateBusinessInfo';
 import { Logger } from '../../utils/logger';
 import { validatePassword } from '../../utils/passwordValidation';
-import { pool } from '../../app';
+import { pool } from '../../db/pool';
 import { EstablishmentAccountService } from '../../services/establishmentAccountCreation/EstablishmentAccountService';
 import { 
   EstablishmentAccountCreationRequest,

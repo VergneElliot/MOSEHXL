@@ -1,4 +1,4 @@
-import { pool } from '../../../app';
+import { pool } from '../../../db/pool';
 import { Role } from '../types';
 import { DEFAULT_ROLES } from './rolePermissions';
 

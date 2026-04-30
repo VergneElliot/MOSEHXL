@@ -1,7 +1,7 @@
 import { Router, Response, NextFunction, Request } from 'express';
 import type { PrintingConfig, IPrintingService } from '../services/printing';
 import type { PrintResult, ReceiptData as PrintingReceiptData, ClosureBulletinData as PrintingClosureBulletinData } from '../services/printing/types';
-import { pool } from '../app';
+import { pool } from '../db/pool';
 import { authenticateToken } from '../middleware/auth';
 import { getLogger } from '../utils/logger';
 import type { AuthenticatedRequest } from './userManagement/types';
