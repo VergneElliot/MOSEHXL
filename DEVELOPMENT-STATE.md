@@ -111,13 +111,13 @@ These do not prevent the POS from working but should be addressed in a future re
 
 | # | Issue | File | Notes |
 |---|-------|------|-------|
-| 9 | `orderAudit.ts` GET stubs return empty arrays | `routes/orders/orderAudit.ts` | GET audit trail endpoints return `{ audit_entries: [] }`. Wire to actual `audit_trail` table queries when reporting is needed. |
 | 11 | CORS missing explicit `mosehxl.com` | `app.ts` | The `CORS_ORIGIN` env var covers it in production if set correctly, but it's not explicit in code. |
 | 14 | Settings printer tab not connected | `components/Settings/PrinterSettings.tsx` | UI exists but is not wired to the new `services/printing/` backend services. |
 | 15 | History dialogs for order details and receipts missing | `components/History/HistoryContainer.tsx` | View and print receipt flows exist in V1 but not yet ported. |
 
 > **Previously known issues, now resolved:**
 > - ~~#8: `orderService.ts` dead code~~ → Removed (patch #32)
+> - ~~#9: `orderAudit.ts` GET stubs return empty arrays~~ → Wired to real `audit_trail` reads via `AuditTrailModel.getOrderAuditEntries` (Non-Blocking #9 implementation)
 > - ~~#10: Audit trail not written on order creation~~ → Now written in `orderCRUD.ts`
 > - ~~#12: Debug logging in `useAuth.ts`~~ → Replaced with structured logger (patch #33)
 > - ~~#13: `usePOSAPI.processChange` notes mismatch~~ → Fixed with dedicated `/orders/payment/change` endpoint
