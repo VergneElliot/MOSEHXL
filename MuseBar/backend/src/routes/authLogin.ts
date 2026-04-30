@@ -80,6 +80,7 @@ function deriveRole(opts: { roleFromDb: unknown; isAdminFlag: boolean; establish
 // ---------------------------------------------------------------------------
 router.post('/login', asyncHandler(async (req, res) => {
   const { email, password, rememberMe } = req.body;
+  const kickPriorSessions = req.body?.kickPriorSessions === true;
   const ip = req.ip;
   const userAgent = req.headers['user-agent'];
 
@@ -119,6 +120,15 @@ router.post('/login', asyncHandler(async (req, res) => {
     const establishment_id: string | null = d?.establishment_id || null;
     const role: CanonicalRole = deriveRole({ roleFromDb: d?.role, isAdminFlag: is_admin, establishmentId: establishment_id });
 
+    if (kickPriorSessions) {
+      const revokeBeforeIat = Math.floor(Date.now() / 1000);
+      await TokenBlocklistModel.revokeAllUserTokensIssuedBefore(
+        user.id,
+        revokeBeforeIat,
+        'LOGIN_KICK_PRIOR_SESSIONS'
+      );
+    }
+
     const token = generateToken(
       { id: user.id, email: user.email, is_admin, role, establishment_id },
       !!rememberMe
@@ -127,7 +137,7 @@ router.post('/login', asyncHandler(async (req, res) => {
     await logAuditOrThrow({
       user_id: String(user.id),
       action_type: 'LOGIN',
-      action_details: { email, rememberMe: !!rememberMe },
+      action_details: { email, rememberMe: !!rememberMe, kickPriorSessions },
       ip_address: ip,
       user_agent: userAgent,
     }, 'LOGIN_SUCCESS');
