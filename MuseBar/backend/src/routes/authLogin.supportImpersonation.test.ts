@@ -82,6 +82,7 @@ describe('support impersonation endpoints', () => {
     const decoded = verifyToken(res.body.token);
     expect(decoded.establishment_id).toBe('est-1');
     expect(decoded.support_impersonation?.reason).toBe('Investigating closure mismatch');
+    expect(decoded.is_admin).toBeUndefined();
 
     expect(mocks.logAction).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -130,6 +131,7 @@ describe('support impersonation endpoints', () => {
     const decoded = verifyToken(res.body.token);
     expect(decoded.establishment_id).toBeNull();
     expect(decoded.support_impersonation).toBeUndefined();
+    expect(decoded.is_admin).toBeUndefined();
 
     expect(mocks.logAction).toHaveBeenCalledWith(
       expect.objectContaining({

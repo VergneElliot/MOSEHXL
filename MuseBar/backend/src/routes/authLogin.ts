@@ -104,7 +104,7 @@ router.post('/login', asyncHandler(async (req, res) => {
     }
 
     const token = generateToken(
-      { id: user.id, email: user.email, is_admin, role, establishment_id },
+      { id: user.id, email: user.email, role, establishment_id },
       !!rememberMe
     );
 
@@ -203,7 +203,7 @@ router.post('/refresh', requireAuth, asyncHandler(async (req, res) => {
     });
 
     const token = generateToken(
-      { id: userId, email: req.user!.email, is_admin, role, establishment_id },
+      { id: userId, email: req.user!.email, role, establishment_id },
       !!rememberMe
     );
 
@@ -271,7 +271,6 @@ router.post('/support/impersonation/start', requireAuth, requireAdmin, asyncHand
       {
         id: actorUserId,
         email: actorEmail,
-        is_admin: req.user!.is_admin,
         role: 'system_admin',
         establishment_id,
         support_impersonation: {
@@ -344,7 +343,6 @@ router.post('/support/impersonation/stop', requireAuth, requireAdmin, asyncHandl
       {
         id: actorUserId,
         email: req.user!.email,
-        is_admin: d.is_admin,
         role: 'system_admin',
         establishment_id: null,
       },
