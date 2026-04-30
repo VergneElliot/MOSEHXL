@@ -57,6 +57,13 @@ vi.mock('../../models/legalJournal/monthlyLiveStatsRepository', () => ({
   },
 }));
 
+vi.mock('../../permissions/registry', () => ({
+  P: {
+    access_compliance: 'access_compliance',
+    access_closure: 'access_closure',
+  },
+}));
+
 import journalRouter from './journal';
 import complianceRouter from './compliance';
 import statsRouter from './stats';

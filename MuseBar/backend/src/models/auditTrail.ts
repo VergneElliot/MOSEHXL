@@ -1,4 +1,5 @@
 import { pool } from '../app';
+import { logError } from '../utils/logger';
 
 export interface AuditEntry {
   id: number;
@@ -60,7 +61,7 @@ export class AuditTrailModel {
       
       return result.rows[0];
     } catch (err) {
-      process.stderr.write(`[AUDIT LOG] Error logging action: ${err instanceof Error ? err.message : String(err)}\n`);
+      logError('[AUDIT LOG] Error logging action', err instanceof Error ? err : new Error(String(err)));
       throw err;
     }
   }
