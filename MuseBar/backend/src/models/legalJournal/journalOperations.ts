@@ -187,6 +187,29 @@ export class JournalOperations {
     );
   }
 
+  static async logSoftwareEvent(
+    establishmentId: string,
+    eventType: string,
+    eventData: Record<string, unknown>,
+    userId?: string
+  ): Promise<JournalEntry> {
+    return await this.addEntry(
+      establishmentId,
+      'CORRECTION',
+      null,
+      0,
+      0,
+      'system',
+      {
+        correction_type: 'SOFTWARE_EVENT',
+        software_event_type: eventType,
+        event_data: eventData,
+        register_id: JournalSigning.getRegisterKey(),
+      },
+      userId
+    );
+  }
+
   static async getEntries(establishmentId: string, limit?: number, offset?: number): Promise<JournalEntry[]> {
     return await JournalQueries.getEntries(establishmentId, limit, offset);
   }

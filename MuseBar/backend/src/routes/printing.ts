@@ -20,6 +20,7 @@ import {
   PrintingUser,
 } from '../printing/printDataRepo';
 import { createPrintingServiceManager } from '../printing/printingServiceManager';
+import { logSoftwareEventBestEffort } from '../services/legal/softwareEventJournal';
 
 const router = Router();
 
@@ -280,6 +281,15 @@ router.post('/configuration', authenticateToken, ensureEstablishment, async (req
       bodyConfig
     );
     printingServiceManager.clearPrintingService(user.establishment_id);
+    await logSoftwareEventBestEffort({
+      establishmentId: user.establishment_id,
+      eventType: 'PRINTING_CONFIGURATION_UPDATED',
+      userId: String(user.id),
+      eventData: {
+        provider,
+        has_config_payload: bodyConfig != null,
+      },
+    });
 
     res.json({
       configuration,

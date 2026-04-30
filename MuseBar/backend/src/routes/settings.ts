@@ -8,6 +8,7 @@ import express from 'express';
 import { requireAuth, getEstablishmentId, requireAnyPermission, requirePermission } from './auth';
 import { P } from '../permissions/registry';
 import { HappyHourSettingsModel, defaultHappyHour } from '../models/happyHourSettings';
+import { logSoftwareEventBestEffort } from '../services/legal/softwareEventJournal';
 
 const router = express.Router();
 
@@ -58,6 +59,19 @@ router.put('/happy-hour', requirePermission(P.access_settings), async (req, res)
     };
 
     await HappyHourSettingsModel.upsertHappyHourSettings(establishmentId, settings);
+    await logSoftwareEventBestEffort({
+      establishmentId,
+      eventType: 'HAPPY_HOUR_SETTINGS_UPDATED',
+      userId: req.user ? String(req.user.id) : undefined,
+      eventData: {
+        isEnabled: settings.isEnabled,
+        startTime: settings.startTime,
+        endTime: settings.endTime,
+        manualOverride: settings.manualOverride,
+        discountType: settings.discountType,
+        discountValue: settings.discountValue,
+      },
+    });
 
     res.json(settings);
   } catch (error) {
