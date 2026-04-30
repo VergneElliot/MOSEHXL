@@ -159,6 +159,8 @@ export abstract class BasePrintingService implements IPrintingService {
     }
     
     // Footer
+    content += ESC_POS.LEFT;
+    content += `Ref. legale: Article 286-I-3 bis du CGI\n`;
     content += ESC_POS.CENTER;
     content += '\nMerci de votre visite!\n\n';
     
