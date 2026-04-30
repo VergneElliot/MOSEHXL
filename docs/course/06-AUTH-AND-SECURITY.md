@@ -74,19 +74,31 @@ eyJhbGciOiJIUzI1NiJ9.eyJpZCI6MywiZW1haWwiOiJlbGxpb3QudmVyZ25lQGdtYWlsLmNvbSIsIml
 {
   "id": 3,
   "email": "elliot.vergne@gmail.com",
-  "is_admin": true,
+  "role": "establishment_admin",
+  "establishment_id": "7e6f6d39-4db8-4f27-b31d-5f6d3c8c8b12",
+  "jti": "b9e5fdb8-5f2a-4f0f-8f28-1be25d53b9cc",
+  "is_admin": false,
   "iat": 1709000000,       // issued at (timestamp)
   "exp": 1709043200        // expires at (12 hours later)
 }
 ```
 
-**Signature**: A cryptographic signature created using the payload + a secret key (`JWT_SECRET`). If anyone modifies the payload (e.g., changes `is_admin` to `true`), the signature won't match and the token is rejected.
+`is_admin` may still appear for backward compatibility, but runtime authorization
+is role/permission-driven (`role` + permission checks).
+
+**Signature**: A cryptographic signature created using the payload + a secret key (`JWT_SECRET`). If anyone modifies the payload (e.g., changes `role` to `system_admin`), the signature won't match and the token is rejected.
 
 ### Creating a token
 
 ```typescript
 const token = jwt.sign(
-  { id: user.id, email: user.email, is_admin: user.is_admin },  // payload
+  {
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    establishment_id: user.establishment_id,
+    jti: generatedJti,
+  },                                                              // payload
   JWT_SECRET,                                                       // secret key
   { expiresIn: '12h' }                                              // expiration
 );
@@ -97,7 +109,7 @@ const token = jwt.sign(
 ```typescript
 const payload = jwt.verify(token, JWT_SECRET);
 // If the token is expired or the signature doesn't match → throws an error
-// If valid → returns the payload { id, email, is_admin }
+// If valid → returns the payload { id, email, role, establishment_id, ... }
 ```
 
 ### Why localStorage?
@@ -304,7 +316,8 @@ The `X-Powered-By` header (which Express adds by default, revealing "Express" to
      │                                      │    user.password_hash)       │
      │                                      │                              │
      │                                      │  jwt.sign({ id, email,      │
-     │                                      │    is_admin }, SECRET)       │
+     │                                      │    role, establishment_id }, │
+     │                                      │    SECRET)                    │
      │                                      │                              │
      │  { token, user, expiresIn } ◄────   │                              │
      │                                      │                              │
@@ -316,7 +329,8 @@ The `X-Powered-By` header (which Express adds by default, revealing "Express" to
      │  GET /api/products                  │                              │
      │  Authorization: Bearer <token>──►   │                              │
      │                                      │  jwt.verify(token, SECRET)   │
-     │                                      │  req.user = { id, email }    │
+     │                                      │  req.user = { id, email,     │
+     │                                      │    role, establishment_id }   │
      │                                      │                              │
      │                                      │  SELECT * FROM products ──►  │
      │  products[] ◄───────────────────    │                     ◄──────  │
