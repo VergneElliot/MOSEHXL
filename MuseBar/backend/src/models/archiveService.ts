@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import PDFDocument from 'pdfkit';
 import { pool } from '../app';
 import LegalJournalModel from './legalJournal';
 
@@ -43,7 +44,7 @@ export class ArchiveService {
   }
 
   // Create HMAC signature for file integrity
-  private static createDigitalSignature(data: string): string {
+  private static createDigitalSignature(data: string | Buffer): string {
     const key = process.env.ARCHIVE_SECRET_KEY;
     if (!key || key.length < 32) {
       throw new Error(
@@ -55,7 +56,7 @@ export class ArchiveService {
   }
 
   // Verify HMAC signature (throws if ARCHIVE_SECRET_KEY is not set)
-  static verifyDigitalSignature(data: string, signature: string): boolean {
+  static verifyDigitalSignature(data: string | Buffer, signature: string): boolean {
     const expectedSignature = this.createDigitalSignature(data);
     return crypto.timingSafeEqual(
       Buffer.from(signature, 'hex'),
@@ -64,7 +65,7 @@ export class ArchiveService {
   }
 
   // Generate file hash for integrity verification
-  private static generateFileHash(data: string): string {
+  private static generateFileHash(data: string | Buffer): string {
     return crypto.createHash('sha256').update(data).digest('hex');
   }
 
@@ -139,7 +140,7 @@ export class ArchiveService {
   }
 
   // Generate export content based on format and type
-  private static async generateExportContent(exportData: ExportData): Promise<string> {
+  private static async generateExportContent(exportData: ExportData): Promise<string | Buffer> {
     let data: Record<string, unknown> = {};
 
     switch (exportData.export_type) {
@@ -314,7 +315,7 @@ export class ArchiveService {
         return this.convertToCSV(data);
       
       case 'PDF':
-        return this.convertToPDF(data);
+        return await this.convertToPDF(data);
       
       default:
         return JSON.stringify(data, null, 2);
@@ -379,9 +380,57 @@ export class ArchiveService {
     return csvContent;
   }
 
-  /** PDF export: placeholder until a real PDF library is integrated. */
-  private static convertToPDF(data: { export_type?: string }): string {
-    return `MuseBar export (${data.export_type ?? 'unknown'}) — PDF generation not implemented.`;
+  /** Generate a real PDF binary for legal archive exports. */
+  private static async convertToPDF(data: Record<string, unknown>): Promise<Buffer> {
+    return await new Promise<Buffer>((resolve, reject) => {
+      const doc = new PDFDocument({
+        size: 'A4',
+        margin: 48,
+        info: {
+          Title: `MuseBar ${String(data.export_type ?? 'UNKNOWN')} archive export`,
+          Author: 'MuseBar',
+          Subject: 'Fiscal legal archive export',
+          Creator: 'MOSEHXL backend',
+        },
+      });
+      const chunks: Buffer[] = [];
+
+      doc.on('data', (chunk: Buffer | string) => {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      });
+      doc.on('error', reject);
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+
+      const compliance = data.compliance_info && typeof data.compliance_info === 'object'
+        ? data.compliance_info as Record<string, unknown>
+        : null;
+      const period = data.period && typeof data.period === 'object'
+        ? data.period as Record<string, unknown>
+        : null;
+
+      doc.fontSize(18).text('MuseBar Legal Archive Export', { align: 'center' });
+      doc.moveDown(0.7);
+      doc.fontSize(12).text(`Export type: ${String(data.export_type ?? 'UNKNOWN')}`);
+      doc.text(`Generated at: ${String(compliance?.export_timestamp ?? new Date().toISOString())}`);
+      doc.text(`Legal reference: ${String(compliance?.legal_reference ?? 'Article 286-I-3 bis du CGI')}`);
+      if (period?.start && period?.end) {
+        doc.text(`Period: ${String(period.start)} -> ${String(period.end)}`);
+      }
+
+      doc.moveDown();
+      doc.fontSize(11).text('Serialized payload', { underline: true });
+      doc.moveDown(0.4);
+      doc.font('Courier').fontSize(8);
+
+      const serialized = JSON.stringify(data, null, 2);
+      for (const line of serialized.split('\n')) {
+        doc.text(line, {
+          width: 500,
+        });
+      }
+
+      doc.end();
+    });
   }
 
   /**
@@ -427,7 +476,7 @@ export class ArchiveService {
       }
 
       // Read file content
-      const fileContent = fs.readFileSync(exportRecord.file_path, 'utf8');
+      const fileContent = fs.readFileSync(exportRecord.file_path);
       
       // Verify file hash
       const currentHash = this.generateFileHash(fileContent);
