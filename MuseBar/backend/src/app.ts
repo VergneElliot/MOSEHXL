@@ -10,6 +10,7 @@ import { createSecurityMiddleware } from './middleware/security';
 import type { Request, Response } from 'express';
 import { getCurrentEstablishmentId } from './db/tenantContext';
 import { logSoftwareEventForAllEstablishmentsBestEffort } from './services/legal/softwareEventJournal';
+import { TimeChangeMonitor } from './services/legal/timeChangeMonitor';
 
 // Load environment variables
 dotenv.config();
@@ -24,6 +25,7 @@ const logger = initializeLogger(config);
 // Environment-specific configuration
 const NODE_ENV = process.env.NODE_ENV || 'production';
 const isDevelopment = NODE_ENV === 'development';
+const APP_VERSION = process.env.APP_VERSION || process.env.npm_package_version || 'unknown';
 
 const developmentCorsOrigins: Array<string | RegExp> = [
   'http://localhost:3000',
@@ -235,6 +237,7 @@ let isShuttingDown = false;
 async function logRuntimeLifecycleEvent(eventType: 'SERVER_STARTED' | 'SERVER_SHUTDOWN', reason?: string) {
   await logSoftwareEventForAllEstablishmentsBestEffort(eventType, {
     node_env: NODE_ENV,
+    app_version: APP_VERSION,
     port: config.server.port,
     pid: process.pid,
     reason: reason ?? null,
@@ -246,6 +249,13 @@ async function logRuntimeLifecycleEvent(eventType: 'SERVER_STARTED' | 'SERVER_SH
 const server = app.listen(config.server.port, '0.0.0.0', async () => {
   // MOSEHXL API Server running
   await logRuntimeLifecycleEvent('SERVER_STARTED');
+  await logSoftwareEventForAllEstablishmentsBestEffort('SOFTWARE_VERSION_REPORTED', {
+    app_version: APP_VERSION,
+    node_env: NODE_ENV,
+    pid: process.pid,
+    timestamp: new Date().toISOString(),
+  });
+  TimeChangeMonitor.start();
 
   // Start the automatic closure scheduler (only in production)
   if (NODE_ENV === 'production') {
@@ -284,6 +294,7 @@ async function handleShutdownSignal(signal: NodeJS.Signals) {
 
   try {
     ClosureScheduler.stop();
+    TimeChangeMonitor.stop();
     await logRuntimeLifecycleEvent('SERVER_SHUTDOWN', signal);
   } catch (error) {
     logger.error(
