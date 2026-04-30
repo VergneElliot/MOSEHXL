@@ -3,6 +3,12 @@
 Date: 2026-04-29  
 Source: `DEVELOPMENT-STATE.md` (Known Non-Blocking Issues #9)
 
+> **HISTORICAL PLAN — ALREADY IMPLEMENTED**
+>
+> The state described below ("GET endpoints still stubbed") was true when this
+> plan was written. It has since been implemented and closed by follow-up work
+> (`docs/patch-notes/171-...` and later development-state updates).
+
 ## Why this patch exists
 
 `routes/orders/orderAudit.ts` still returns stubbed empty payloads for:

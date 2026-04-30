@@ -56,7 +56,7 @@ The codebase is structured for **professional-grade maintainability** and safe e
 
 ### Single source of truth
 - **Auth & establishment context**: `middleware/auth.ts` defines `requireAuth`, `getEstablishmentId`, and role gates; all route files import from `routes/auth.ts` (re-exports). No duplicated auth helpers.
-- **API layer**: Frontend calls go through `services/api/core.ts` (base URL, auth header, timeout). `ApiService` is the main facade; domain modules (`categoriesApi`, `ordersApi`, `legalApi`, etc.) live under `services/api/`. Establishment-account creation uses the same `request()` from `api/core` via `establishmentAccountApi.ts`.
+- **API layer**: Frontend request plumbing lives in `services/api/core.ts` (base URL, auth header, timeout). Domain modules (`categoriesApi`, `ordersApi`, `legalApi`, etc.) compose this core request layer, and `ApiService` acts as a convenience facade for aggregated calls. Establishment-account creation also uses the same `request()` from `api/core` via `establishmentAccountApi.ts`.
 - **Formatting**: `utils/formatCurrency.ts` for EUR (fr-FR); `utils/formatDate.ts` for date/time and date-only. Components use these instead of inline formatters.
 - **Validation**: Backend uses `middleware/validation.ts` (`validateBody`, `validateParams`, `commonValidations`). No ad-hoc validation in route handlers for shared rules.
 - **Types**: Shared types in `src/types/` (e.g. `User`, `Order`, `Category`); backend types in `models/` and `types/`. Single definition per concept.
@@ -115,16 +115,21 @@ Foundation for future SaaS multi-tenant expansion.
 
 ## Legal Compliance — French Law
 
-This system implements the four **ISCA pillars** required by Article 286-I-3 bis du CGI (French fiscal certification for cashier software).
+This system targets the four **ISCA pillars** required by Article 286-I-3 bis du CGI, with implementation in progress and ongoing hardening.
+
+> **Important scope note:** this repository does **not** claim NF525/LNE certification yet.
+> For current compliance posture and open items, use
+> `docs/audits/2026-04-29-full-repo-state-audit-hard-copy.md` and `DEVELOPMENT-STATE.md`
+> as the source of truth.
 
 ### Certification Requirements
 
 | Pillar | French | Implementation | Status |
 |--------|--------|----------------|--------|
-| **I** — Inaltérabilité | Immutability | Append-only `legal_journal` table with cryptographic SHA-256 hash chain. Each entry's hash includes the previous entry's hash, making the chain tamper-evident. DB trigger prevents UPDATE/DELETE on the table. | ✅ Implemented |
-| **S** — Sécurisation | Security | Audit trail in `audit_trail` table. All logins, logouts, user creation, permission changes, and order operations are logged with IP, user-agent, user ID, and timestamp. | ✅ Implemented |
-| **C** — Conservation | Preservation | Closure bulletins (`closure_bulletins` table) — daily, weekly, monthly, annual. Each bulletin captures total transactions, amounts, VAT breakdown by rate, and payment method breakdown for the period. Automatic daily closure scheduler runs at 02:00 Paris time in production. Bulletins are scoped per-establishment for multi-tenant isolation. | ✅ Implemented |
-| **A** — Archivage | Archiving | Archive export system (`archive_exports` table) with HMAC-SHA256 digital signatures. Export in CSV, XML, JSON formats. Each export has a file hash for integrity verification. Archive secret key is required in production (no hardcoded fallbacks). | ✅ Implemented |
+| **I** — Inaltérabilité | Immutability | Append-only `legal_journal` table with cryptographic SHA-256 hash chain. Each entry's hash includes the previous entry's hash, making the chain tamper-evident. DB trigger prevents UPDATE/DELETE on the table. | Implemented baseline (see audits for remaining hardening) |
+| **S** — Sécurisation | Security | Audit trail in `audit_trail` table. All logins, logouts, user creation, permission changes, and order operations are logged with IP, user-agent, user ID, and timestamp. | Implemented baseline (see audits for remaining hardening) |
+| **C** — Conservation | Preservation | Closure bulletins (`closure_bulletins` table) — daily, weekly, monthly, annual. Each bulletin captures total transactions, amounts, VAT breakdown by rate, and payment method breakdown for the period. Automatic daily closure scheduler runs at 02:00 Paris time in production. Bulletins are scoped per-establishment for multi-tenant isolation. | Implemented baseline (see audits for remaining hardening) |
+| **A** — Archivage | Archiving | Archive export system (`archive_exports` table) with HMAC-SHA256 digital signatures. Export in CSV, XML, JSON formats. Each export has a file hash for integrity verification. Archive secret key is required in production (no hardcoded fallbacks). | Implemented baseline (see audits for remaining hardening) |
 
 ### What Is Logged
 

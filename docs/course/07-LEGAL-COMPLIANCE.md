@@ -2,6 +2,15 @@
 
 This chapter explains the French legal requirements for cashier software and exactly how our system implements them technically. This is the most complex part of the project, so we'll go step by step.
 
+> **Current compliance scope (important):**
+> MOSEHXL implements an architecture aligned with French fiscal Article 286-I-3
+> bis du CGI (per-establishment hash-chained legal journal, closure bulletins,
+> audit trail, tenant isolation, signed archives), but does **not** claim NF525
+> or LNE certification at this stage.
+>
+> For the current hard-truth gap list and remediation status, always check:
+> `docs/audits/2026-04-29-full-repo-state-audit-hard-copy.md`.
+
 ---
 
 ## Why Does This Exist?
