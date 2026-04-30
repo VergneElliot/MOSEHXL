@@ -112,7 +112,7 @@ These do not prevent the POS from working but should be addressed in a future re
 | # | Issue | File | Notes |
 |---|-------|------|-------|
 | 11 | CORS missing explicit `mosehxl.com` | `app.ts` | The `CORS_ORIGIN` env var covers it in production if set correctly, but it's not explicit in code. |
-| 14 | Settings printer tab not connected | `components/Settings/PrinterSettings.tsx` | UI exists but is not wired to the new `services/printing/` backend services. |
+| 14 | Settings printer tab not connected | `components/Settings/Settings/PrinterSettings.tsx` | UI exists but is not wired to the new `services/printing/` backend services. |
 | 15 | History dialogs for order details and receipts missing | `components/History/HistoryContainer.tsx` | View and print receipt flows exist in V1 but not yet ported. |
 
 > **Previously known issues, now resolved:**
