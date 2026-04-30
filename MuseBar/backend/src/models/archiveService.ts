@@ -144,18 +144,43 @@ export class ArchiveService {
 
     switch (exportData.export_type) {
       case 'DAILY':
-        if (exportData.period_start) {
-          if (!exportData.establishment_id) {
-            throw new Error('DAILY export requires establishment_id for multi-tenant legal journal.');
-          }
-          const closure = await LegalJournalModel.createDailyClosure(exportData.period_start, exportData.establishment_id);
+        if (!exportData.establishment_id) {
+          throw new Error('DAILY export requires establishment_id for multi-tenant legal journal.');
+        }
+        if (!exportData.period_start) {
+          throw new Error('DAILY export requires period_start.');
+        }
+        {
+          const dayStart = new Date(exportData.period_start);
+          dayStart.setUTCHours(0, 0, 0, 0);
+          const dayEnd = exportData.period_end ? new Date(exportData.period_end) : new Date(dayStart);
+          dayEnd.setUTCHours(23, 59, 59, 999);
+
+          const dailyEntries = await LegalJournalModel.getEntriesForPeriod(
+            exportData.establishment_id,
+            dayStart,
+            dayEnd
+          );
+          const dailySales = dailyEntries.filter(e => e.transaction_type === 'SALE');
+          const dailyClosures = await LegalJournalModel.getClosureBulletins(exportData.establishment_id, 'DAILY');
+          const matchingClosure = dailyClosures.find((closure) =>
+            new Date(closure.period_start).getTime() === dayStart.getTime() &&
+            new Date(closure.period_end).getTime() === dayEnd.getTime()
+          ) ?? null;
+
           data = {
             export_type: 'DAILY',
             period: {
-              start: exportData.period_start.toISOString(),
-              end: exportData.period_end?.toISOString()
+              start: dayStart.toISOString(),
+              end: dayEnd.toISOString()
             },
-            closure_data: closure,
+            summary: {
+              total_transactions: dailySales.length,
+              total_amount: dailySales.reduce((sum, e) => sum + parseFloat(e.amount.toString()), 0),
+              total_vat: dailySales.reduce((sum, e) => sum + parseFloat(e.vat_amount.toString()), 0)
+            },
+            transactions: dailySales,
+            closure_data: matchingClosure,
             compliance_info: {
               legal_reference: 'Article 286-I-3 bis du CGI',
               export_timestamp: new Date().toISOString(),
@@ -171,13 +196,13 @@ export class ArchiveService {
         }
         // Get monthly data
         const monthStart = exportData.period_start || new Date();
-        monthStart.setDate(1);
-        monthStart.setHours(0, 0, 0, 0);
+        monthStart.setUTCDate(1);
+        monthStart.setUTCHours(0, 0, 0, 0);
         
         const monthEnd = new Date(monthStart);
-        monthEnd.setMonth(monthEnd.getMonth() + 1);
-        monthEnd.setDate(0);
-        monthEnd.setHours(23, 59, 59, 999);
+        monthEnd.setUTCMonth(monthEnd.getUTCMonth() + 1);
+        monthEnd.setUTCDate(0);
+        monthEnd.setUTCHours(23, 59, 59, 999);
 
         const monthlyEntries = await LegalJournalModel.getEntriesForPeriod(
           exportData.establishment_id,
@@ -198,6 +223,49 @@ export class ArchiveService {
             total_vat: monthlySales.reduce((sum, e) => sum + parseFloat(e.vat_amount.toString()), 0)
           },
           transactions: monthlySales,
+          compliance_info: {
+            legal_reference: 'Article 286-I-3 bis du CGI',
+            export_timestamp: new Date().toISOString(),
+            register_id: 'MUSEBAR-REG-001'
+          }
+        };
+        break;
+      }
+
+      case 'ANNUAL': {
+        if (!exportData.establishment_id) {
+          throw new Error('ANNUAL export requires establishment_id for legal journal scoping.');
+        }
+        const annualStart = exportData.period_start || new Date();
+        const year = annualStart.getUTCFullYear();
+        const yearStart = new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0));
+        const yearEnd = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
+
+        const annualEntries = await LegalJournalModel.getEntriesForPeriod(
+          exportData.establishment_id,
+          yearStart,
+          yearEnd
+        );
+        const annualSales = annualEntries.filter(e => e.transaction_type === 'SALE');
+        const annualClosures = await LegalJournalModel.getClosureBulletins(exportData.establishment_id, 'ANNUAL');
+        const matchingAnnualClosure = annualClosures.find((closure) =>
+          new Date(closure.period_start).getTime() === yearStart.getTime() &&
+          new Date(closure.period_end).getTime() === yearEnd.getTime()
+        ) ?? null;
+
+        data = {
+          export_type: 'ANNUAL',
+          period: {
+            start: yearStart.toISOString(),
+            end: yearEnd.toISOString()
+          },
+          summary: {
+            total_transactions: annualSales.length,
+            total_amount: annualSales.reduce((sum, e) => sum + parseFloat(e.amount.toString()), 0),
+            total_vat: annualSales.reduce((sum, e) => sum + parseFloat(e.vat_amount.toString()), 0)
+          },
+          transactions: annualSales,
+          closure_data: matchingAnnualClosure,
           compliance_info: {
             legal_reference: 'Article 286-I-3 bis du CGI',
             export_timestamp: new Date().toISOString(),
@@ -303,6 +371,8 @@ export class ArchiveService {
     if (data.export_type === 'DAILY' && data.closure_data) {
       csvContent += `${data.export_type},${data.closure_data.period_start},${data.closure_data.period_end},${data.closure_data.total_transactions},${data.closure_data.total_amount},${data.closure_data.total_vat},${exportTimestamp}\n`;
     } else if (data.export_type === 'MONTHLY') {
+      csvContent += `${data.export_type},${data.period?.start ?? ''},${data.period?.end ?? ''},${data.summary?.total_transactions ?? ''},${data.summary?.total_amount ?? ''},${data.summary?.total_vat ?? ''},${exportTimestamp}\n`;
+    } else if (data.export_type === 'ANNUAL') {
       csvContent += `${data.export_type},${data.period?.start ?? ''},${data.period?.end ?? ''},${data.summary?.total_transactions ?? ''},${data.summary?.total_amount ?? ''},${data.summary?.total_vat ?? ''},${exportTimestamp}\n`;
     }
     
