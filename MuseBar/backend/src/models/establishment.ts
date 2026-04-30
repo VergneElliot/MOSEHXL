@@ -8,6 +8,7 @@
 import { pool } from '../app';
 import { randomUUID } from 'crypto';
 import { Logger } from '../utils/logger';
+import { logSoftwareEventBestEffort } from '../services/legal/softwareEventJournal';
 
 /**
  * Establishment interface
@@ -281,6 +282,18 @@ export class EstablishmentModel {
         { establishmentId: id, updatedFields: Object.keys(data) },
         'ESTABLISHMENT_MODEL'
       );
+
+      if (data.subscription_plan !== undefined || data.subscription_status !== undefined) {
+        await logSoftwareEventBestEffort({
+          establishmentId: id,
+          eventType: 'ESTABLISHMENT_SUBSCRIPTION_UPDATED',
+          eventData: {
+            update_type: 'subscription_change',
+            subscription_plan: data.subscription_plan,
+            subscription_status: data.subscription_status,
+          },
+        });
+      }
 
       return result.rows[0];
     } catch (error) {
