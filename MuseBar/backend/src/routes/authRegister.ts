@@ -10,6 +10,7 @@ import {
   requireSetupSecret,
 } from '../middleware/auth';
 import { P } from '../permissions/registry';
+import { logSoftwareEventBestEffort } from '../services/legal/softwareEventJournal';
 
 const canManageUsers = requireEstablishmentAdminOrPermission(P.access_user_management);
 
@@ -131,6 +132,16 @@ router.post('/users/:id/permissions', requireAuth, canManageUsers, asyncHandler(
     ip_address: ip,
     user_agent: userAgent,
   }, 'SET_USER_PERMISSIONS_POST');
+  await logSoftwareEventBestEffort({
+    establishmentId,
+    eventType: 'USER_PERMISSIONS_UPDATED',
+    userId: String(req.user!.id),
+    eventData: {
+      target_user_id: userId,
+      permissions_count: permissions.length,
+      method: 'POST',
+    },
+  });
 
   return res.json({ userId, permissions });
 }));
@@ -162,6 +173,16 @@ router.put('/users/:id/permissions', requireAuth, canManageUsers, asyncHandler(a
     ip_address: req.ip,
     user_agent: req.headers['user-agent'],
   }, 'SET_USER_PERMISSIONS_PUT');
+  await logSoftwareEventBestEffort({
+    establishmentId,
+    eventType: 'USER_PERMISSIONS_UPDATED',
+    userId: String(req.user!.id),
+    eventData: {
+      target_user_id: userId,
+      permissions_count: permissions.length,
+      method: 'PUT',
+    },
+  });
 
   return res.json({ userId, permissions });
 }));
@@ -196,6 +217,16 @@ router.post('/users', requireAuth, canManageUsers, asyncHandler(async (req, res)
       ip_address: req.ip,
       user_agent: req.headers['user-agent'],
     }, 'REGISTER_ESTABLISHMENT_USER_SUCCESS');
+    await logSoftwareEventBestEffort({
+      establishmentId,
+      eventType: 'ESTABLISHMENT_USER_CREATED',
+      userId: String(req.user!.id),
+      eventData: {
+        target_user_id: user.id,
+        email,
+        role,
+      },
+    });
     return res.status(201).json({ id: user.id, email: user.email, role, establishment_id: establishmentId });
   } catch (err) {
     Logger.getInstance().error(
@@ -233,6 +264,14 @@ router.delete('/users/:id', requireAuth, canManageUsers, asyncHandler(async (req
     ip_address: req.ip,
     user_agent: req.headers['user-agent'],
   }, 'DELETE_ESTABLISHMENT_USER');
+  await logSoftwareEventBestEffort({
+    establishmentId,
+    eventType: 'ESTABLISHMENT_USER_DELETED',
+    userId: String(req.user!.id),
+    eventData: {
+      target_user_id: userId,
+    },
+  });
 
   return res.json({ success: true });
 }));
@@ -264,6 +303,15 @@ router.put('/users/:id/role', requireAuth, canManageUsers, asyncHandler(async (r
     ip_address: req.ip,
     user_agent: req.headers['user-agent'],
   }, 'UPDATE_ESTABLISHMENT_USER_ROLE');
+  await logSoftwareEventBestEffort({
+    establishmentId,
+    eventType: 'USER_ROLE_UPDATED',
+    userId: String(req.user!.id),
+    eventData: {
+      target_user_id: userId,
+      role,
+    },
+  });
 
   return res.json({ userId, role });
 }));
