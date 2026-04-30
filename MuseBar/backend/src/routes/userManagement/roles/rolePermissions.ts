@@ -1,7 +1,9 @@
 import { Role, RolePermissions } from '../types';
+import { UserManagementTemplateRoleId } from '../../../auth/roleVocabulary';
 
-// System role definitions used across the application
-export const DEFAULT_ROLES: Record<string, Role> = {
+// Legacy user-management role templates used by role-management UI endpoints.
+// These are not JWT/runtime auth roles (see auth/roleVocabulary.ts for canonical roles).
+export const DEFAULT_ROLES: Record<UserManagementTemplateRoleId, Role> = {
   admin: {
     id: 'admin',
     name: 'Administrator',
@@ -60,12 +62,16 @@ export const DEFAULT_ROLES: Record<string, Role> = {
   }
 };
 
+
 export function getSystemRoles(): Role[] {
   return Object.values(DEFAULT_ROLES);
 }
 
 export function getSystemRoleById(roleId: string): Role | null {
-  return DEFAULT_ROLES[roleId] || null;
+  if (roleId in DEFAULT_ROLES) {
+    return DEFAULT_ROLES[roleId as UserManagementTemplateRoleId];
+  }
+  return null;
 }
 
 export function getRolePermissionsForRoleId(roleId: string): RolePermissions | null {

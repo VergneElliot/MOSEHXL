@@ -8,6 +8,7 @@ import { Logger } from '../../utils/logger';
 import { InvitationQueries } from '../../utils/database';
 import { validatePassword as validatePasswordShared } from '../../utils/passwordValidation';
 import { ValidationError, DatabaseError } from '../../middleware/errorHandler';
+import { INVITATION_ROLE_LABELS, InvitationRoleLabel } from '../../auth/roleVocabulary';
 import { 
   EstablishmentInvitationData, 
   UserInvitationData, 
@@ -104,8 +105,7 @@ export class InvitationValidator {
       }
 
       // Role validation
-      const validRoles = ['cashier', 'manager', 'supervisor', 'establishment_admin'];
-      if (!validRoles.includes(data.role)) {
+      if (!INVITATION_ROLE_LABELS.includes(data.role as InvitationRoleLabel)) {
         return {
           isValid: false,
           message: 'Invalid role specified'

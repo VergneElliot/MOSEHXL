@@ -126,6 +126,32 @@ Our system has three roles:
 | `establishment_admin` | Full establishment business UI scope | `user.role === 'establishment_admin'` and route-level guards |
 | `staff` | Only tabs and actions granted by permissions | `user.permissions.includes(...)` in `AppRouter.tsx` + backend permission middleware |
 
+### Important: two role vocabularies exist on purpose
+
+There are **two separate role vocabularies** in this codebase. They do different jobs:
+
+1. **Canonical auth/runtime roles** (JWT + middleware decisions):
+   - `system_admin`
+   - `establishment_admin`
+   - `staff`
+
+2. **User-management template role ids** (used by role-editor UI and legacy management endpoints):
+   - `admin`
+   - `manager`
+   - `staff`
+   - `cashier`
+
+And invitation flows use invitation labels:
+- `establishment_admin`, `establishment_manager`, `establishment_staff`
+
+These invitation labels are normalized to canonical runtime roles when user
+accounts are created (`establishment_admin` stays `establishment_admin`, the
+others become `staff`).
+
+Canonical role mapping logic lives in:
+- `backend/src/auth/roleVocabulary.ts`
+- consumed by `routes/authLogin.ts` and invitation acceptance/validation flows.
+
 ### How permissions work
 
 Permissions are stored in the database:
