@@ -111,7 +111,9 @@ export class RequestLogger {
       'x-api-key',
       'x-auth-token',
       'x-access-token',
-      'x-csrf-token'
+      'x-csrf-token',
+      'x-setup-secret',
+      'x-client-error-key'
     ];
     
     sensitiveHeaders.forEach(header => {
