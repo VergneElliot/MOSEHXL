@@ -314,6 +314,44 @@ If the API changes, you only touch `usePOSAPI`. If the calculation logic changes
 
 ---
 
+## Order DTO Boundary (Wire vs View Model)
+
+Order data intentionally has two shapes:
+
+1. **Wire DTO (API contract)** — snake_case fields, shared with backend via `@mosehxl/types`.
+2. **Frontend view model** — camelCase fields optimized for UI components.
+
+Boundary location:
+- `MuseBar/src/services/api/orders.ts`
+  - `mapRawOrder(...)` and `mapRawItem(...)` convert wire DTO -> view model.
+
+Examples:
+
+| Wire DTO field | Frontend view-model field |
+|---|---|
+| `total_amount` | `totalAmount` |
+| `total_tax` | `taxAmount` |
+| `created_at` | `createdAt` |
+| `payment_method` | `paymentMethod` |
+| `operation_type` | `operationType` |
+| `change_amount` | `changeAmount` |
+| `sub_bills` | `subBills` |
+| `product_id` | `productId` |
+| `product_name` | `productName` |
+| `total_price` | `totalPrice` |
+| `tax_rate` (percent, e.g. `20`) | `taxRate` (ratio, e.g. `0.2`) |
+| `happy_hour_applied` | `isHappyHourApplied` |
+
+Rules:
+- UI components/hooks should consume only `src/types/orders.ts` shapes.
+- API modules own all snake_case/camelCase conversion.
+- If backend payload changes, update mapper + mapper tests first.
+
+Regression coverage:
+- `MuseBar/src/services/api/orders.mapper.test.ts` locks this mapping boundary.
+
+---
+
 ## Data Flow Diagram
 
 Here's how data flows through the entire system for a typical POS workflow:
