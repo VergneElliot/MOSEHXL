@@ -1,8 +1,7 @@
 /**
  * Unified Error Handling
- * Single source of truth for error classes, asyncHandler, and the global error middleware.
- * Replaces the previous split between errorHandler.ts (AppError, French) and
- * errorHandling.ts (native Error extensions, English, createEnhancedErrorHandler).
+ * Single source of truth for error classes, asyncHandler, and global
+ * error middleware behavior in the current backend architecture.
  */
 
 import { Request, Response, NextFunction } from 'express';
@@ -98,7 +97,7 @@ export class ExternalServiceError extends AppError {
 }
 
 // ---------------------------------------------------------------------------
-// Async wrapper (single definition; was duplicated in errorHandler and errorHandling)
+// Async wrapper (single canonical definition)
 // ---------------------------------------------------------------------------
 
 export const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>) => {
