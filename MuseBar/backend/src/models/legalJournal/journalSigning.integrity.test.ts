@@ -60,17 +60,15 @@ describe('JournalSigning.verifyJournalIntegrity', () => {
     const first = buildEntry({ sequence: 1, previousHash: ZERO_HASH });
     const second = buildEntry({ sequence: 2, previousHash: first.current_hash, timestamp: '2026-04-29T12:01:00.000Z' });
 
-    mocks.poolQuery
-      .mockResolvedValueOnce({ rows: [] }) // documented issues query
-      .mockResolvedValueOnce({ rows: [first, second] }); // chain query
+    mocks.poolQuery.mockResolvedValueOnce({ rows: [first, second] });
 
     const result = await JournalSigning.verifyJournalIntegrity(EST);
 
     expect(result.isValid).toBe(true);
     expect(result.errors).toEqual([]);
-    expect(mocks.poolQuery).toHaveBeenCalledTimes(2);
+    expect(mocks.poolQuery).toHaveBeenCalledTimes(1);
     expect(mocks.poolQuery).toHaveBeenNthCalledWith(
-      2,
+      1,
       expect.stringContaining('WHERE establishment_id = $1'),
       [EST]
     );
@@ -81,13 +79,33 @@ describe('JournalSigning.verifyJournalIntegrity', () => {
     const wrongPrev = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     const second = buildEntry({ sequence: 2, previousHash: wrongPrev, timestamp: '2026-04-29T12:01:00.000Z' });
 
-    mocks.poolQuery
-      .mockResolvedValueOnce({ rows: [] }) // documented issues query
-      .mockResolvedValueOnce({ rows: [first, second] }); // chain query
+    mocks.poolQuery.mockResolvedValueOnce({ rows: [first, second] });
 
     const result = await JournalSigning.verifyJournalIntegrity(EST);
 
     expect(result.isValid).toBe(false);
     expect(result.errors.some((e) => e.includes('Hash chain broken at sequence 2'))).toBe(true);
+  });
+
+  it('returns invalid for correction rows when chain continuity is broken', async () => {
+    const first = buildEntry({ sequence: 127, previousHash: ZERO_HASH });
+    const wrongPrev = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const correction = buildEntry({
+      sequence: 128,
+      previousHash: wrongPrev,
+      transactionType: 'CORRECTION',
+      orderId: null,
+      amount: '0.00',
+      vatAmount: '0.00',
+      paymentMethod: 'correction',
+      timestamp: '2026-04-29T12:02:00.000Z',
+    });
+
+    mocks.poolQuery.mockResolvedValueOnce({ rows: [first, correction] });
+
+    const result = await JournalSigning.verifyJournalIntegrity(EST);
+
+    expect(result.isValid).toBe(false);
+    expect(result.errors.some((e) => e.includes('Hash chain broken at sequence 128'))).toBe(true);
   });
 });
