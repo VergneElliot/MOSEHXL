@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   getUserPermissions: vi.fn(),
   verifyJournalIntegrity: vi.fn(),
   getEntriesWithCountForPeriod: vi.fn(),
+  getJournalStatsSummary: vi.fn(),
   getClosureBulletins: vi.fn(),
   getEntriesForPeriod: vi.fn(),
   getOrdersTotalsForPeriod: vi.fn(),
@@ -45,7 +46,7 @@ vi.mock('../../models/legalJournal', () => ({
   },
   JournalQueries: {
     getEntriesWithCountForPeriod: mocks.getEntriesWithCountForPeriod,
-    getJournalStatsSummary: vi.fn().mockResolvedValue({}),
+    getJournalStatsSummary: mocks.getJournalStatsSummary,
     resetJournalDevOnly: vi.fn().mockResolvedValue(undefined),
   },
 }));
@@ -74,14 +75,14 @@ app.use('/journal', journalRouter);
 app.use('/compliance', complianceRouter);
 app.use('/stats', statsRouter);
 
-function tokenFor(role: 'establishment_admin' | 'staff') {
+function tokenFor(role: 'system_admin' | 'establishment_admin' | 'staff', establishmentId: string | null = EST) {
   return generateToken(
     {
-      id: role === 'staff' ? 12 : 7,
+      id: role === 'staff' ? 12 : role === 'system_admin' ? 1 : 7,
       email: `${role}@example.com`,
       is_admin: false,
       role,
-      establishment_id: EST,
+      establishment_id: establishmentId,
     },
     false
   );
@@ -93,6 +94,7 @@ describe('legal route compliance permission gates', () => {
     mocks.getUserPermissions.mockReset();
     mocks.verifyJournalIntegrity.mockReset();
     mocks.getEntriesWithCountForPeriod.mockReset();
+    mocks.getJournalStatsSummary.mockReset();
     mocks.getClosureBulletins.mockReset();
     mocks.getEntriesForPeriod.mockReset();
     mocks.getOrdersTotalsForPeriod.mockReset();
@@ -108,6 +110,7 @@ describe('legal route compliance permission gates', () => {
 
     mocks.verifyJournalIntegrity.mockResolvedValue({ isValid: true, errors: [] });
     mocks.getEntriesWithCountForPeriod.mockResolvedValue({ entries: [], total: 0, limit: 100, offset: 0 });
+    mocks.getJournalStatsSummary.mockResolvedValue({});
     mocks.getClosureBulletins.mockResolvedValue([]);
     mocks.getEntriesForPeriod.mockResolvedValue([]);
     mocks.getOrdersTotalsForPeriod.mockResolvedValue({ total_ttc: 0, card_total: 0, cash_total: 0 });
@@ -212,6 +215,29 @@ describe('legal route compliance permission gates', () => {
       .set('Authorization', `Bearer ${tokenFor('staff')}`);
 
     expect(res.status).toBe(200);
+  });
+
+  it('allows /journal/stats for establishment_admin with access_compliance', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
+
+    const res = await request(app)
+      .get('/journal/stats')
+      .set('Authorization', `Bearer ${tokenFor('establishment_admin')}`);
+
+    expect(res.status).toBe(200);
+    expect(mocks.getJournalStatsSummary).toHaveBeenCalledWith(EST);
+  });
+
+  it('returns 403 on /journal/stats when system_admin has no establishment context', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
+
+    const res = await request(app)
+      .get('/journal/stats')
+      .set('Authorization', `Bearer ${tokenFor('system_admin', null)}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('No establishment associated with this account');
+    expect(mocks.getJournalStatsSummary).not.toHaveBeenCalled();
   });
 
   it('denies /journal/reset for non-admin users', async () => {
