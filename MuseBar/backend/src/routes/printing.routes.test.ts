@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   buildReceiptDataForOrder: vi.fn(),
   buildClosureBulletinData: vi.fn(),
   logPrintingHistory: vi.fn(),
+  logSoftwareEventBestEffort: vi.fn(),
 }));
 
 vi.mock('../app', () => ({
@@ -78,6 +79,10 @@ vi.mock('../printing/printingServiceManager', () => ({
   }),
 }));
 
+vi.mock('../services/legal/softwareEventJournal', () => ({
+  logSoftwareEventBestEffort: mocks.logSoftwareEventBestEffort,
+}));
+
 import printingRouter from './printing';
 
 const app = express();
@@ -97,6 +102,7 @@ describe('printing routes', () => {
     mocks.buildReceiptDataForOrder.mockReset();
     mocks.buildClosureBulletinData.mockReset();
     mocks.logPrintingHistory.mockReset();
+    mocks.logSoftwareEventBestEffort.mockReset();
 
     mocks.managerGetService.mockResolvedValue({
       checkPrinterStatus: vi.fn().mockResolvedValue({ connected: true }),
@@ -276,6 +282,13 @@ describe('printing routes', () => {
       {}
     );
     expect(mocks.managerClearService).toHaveBeenCalledWith('est-1');
+    expect(mocks.logSoftwareEventBestEffort).toHaveBeenCalledWith(
+      expect.objectContaining({
+        establishmentId: 'est-1',
+        eventType: 'PRINTING_CONFIGURATION_UPDATED',
+        userId: '8',
+      })
+    );
   });
 
   it('returns printing configuration list scoped to caller establishment', async () => {

@@ -85,6 +85,15 @@ export class LegalJournalModel {
     );
   }
 
+  static async logSoftwareEvent(
+    establishmentId: string,
+    eventType: string,
+    eventData: Record<string, unknown>,
+    userId?: string
+  ) {
+    return await JournalOperations.logSoftwareEvent(establishmentId, eventType, eventData, userId);
+  }
+
   static async verifyJournalIntegrity(establishmentId: string) {
     return await JournalOperations.verifyIntegrity(establishmentId);
   }
