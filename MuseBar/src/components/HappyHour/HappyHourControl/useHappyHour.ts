@@ -13,7 +13,7 @@ import { useHappyHourState, useHappyHourSettings, useHappyHourProducts } from '.
 
 import { Product } from '../../../types';
 
-export const useHappyHour = (
+export const useHappyHourControl = (
   onStatusUpdate: () => void,
   products: Product[] = []
 ): UseHappyHourReturn => {

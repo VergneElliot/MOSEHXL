@@ -9,7 +9,7 @@ export { HappyHourForm } from './HappyHourForm';
 export { HappyHourSchedule } from './HappyHourSchedule';
 
 // Hook
-export { useHappyHour } from './useHappyHour';
+export { useHappyHourControl } from './useHappyHour';
 
 // Types
 export type {
