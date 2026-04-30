@@ -39,6 +39,11 @@ export interface AuthenticatedUser {
 export type User = UserRow;
 
 export class UserModel {
+  private static getEstablishmentAdminPermissionMode(): 'implicit_all' | 'explicit_only' {
+    const raw = process.env.ESTABLISHMENT_ADMIN_PERMISSION_MODE?.trim().toLowerCase();
+    return raw === 'explicit_only' ? 'explicit_only' : 'implicit_all';
+  }
+
   static async createUser(email: string, password: string, is_admin: boolean = false): Promise<UserRow> {
     const password_hash = await bcrypt.hash(password, 12);
     const result = await pool.query(
@@ -98,10 +103,11 @@ export class UserModel {
   static async getUserPermissions(userId: number): Promise<string[]> {
     const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [userId]);
     const role: string = userResult.rows[0]?.role || '';
+    const establishmentAdminPermissionMode = this.getEstablishmentAdminPermissionMode();
 
-    // establishment_admin: always the full set of permission *names* in the database,
-    // even if they have rows in user_permissions (avoids lockout and matches product rules).
-    if (role === 'establishment_admin') {
+    // Default mode (`implicit_all`): establishment_admin gets full permission names to avoid lockout.
+    // Least-privilege mode (`explicit_only`): establishment_admin must have explicit rows.
+    if (role === 'establishment_admin' && establishmentAdminPermissionMode === 'implicit_all') {
       const allPerms = await pool.query('SELECT name FROM permissions');
       return allPerms.rows.map((row) => (row as { name: string }).name);
     }
