@@ -6,7 +6,8 @@
 import express from 'express';
 import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';
-import { getEstablishmentId, requireAuth } from '../auth';
+import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
+import { P } from '../../permissions/registry';
 
 const router = express.Router();
 const logger = Logger.getInstance();
@@ -15,14 +16,13 @@ const logger = Logger.getInstance();
  * POST log order action
  * POST /api/orders/audit/log
  */
-router.post('/log', requireAuth, async (req, res) => {
+router.post('/log', requireAuth, requirePermission(P.access_pos), async (req, res) => {
   try {
     const {
       actionType,
       resourceType,
       resourceId,
-      actionDetails,
-      userId
+      actionDetails
     } = req.body;
 
     if (!actionType || !resourceType || !resourceId) {
@@ -30,7 +30,7 @@ router.post('/log', requireAuth, async (req, res) => {
     }
 
     const auditEntry = await AuditTrailModel.logAction({
-      user_id: userId,
+      user_id: String(req.user!.id),
       action_type: actionType,
       resource_type: resourceType,
       resource_id: String(resourceId),
