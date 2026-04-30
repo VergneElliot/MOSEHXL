@@ -11,10 +11,52 @@ import {
 } from '../middleware/auth';
 import { pool } from '../app';
 import { CanonicalAuthRole, deriveCanonicalRole } from '../auth/roleVocabulary';
+import {
+  createAuthRateLimitMiddleware,
+  createRefreshRateLimitKeyResolver,
+  resolveLoginRateLimitKey
+} from '../middleware/security/AuthEndpointRateLimit';
 
 const router = express.Router();
 
 const MAX_SUPPORT_IMPERSONATION_MINUTES = 120;
+const authRateLimitBase = process.env.NODE_ENV === 'development' ? 5 : 1;
+const authLimiterPool = process.env.NODE_ENV === 'test' ? undefined : pool;
+const authRateLimitLogger = {
+  security: (
+    event: string,
+    severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL',
+    metadata?: Record<string, unknown>,
+    requestId?: string,
+    userId?: number
+  ) => {
+    try {
+      Logger.getInstance().security(event, severity, metadata, requestId, userId);
+    } catch {
+      // In isolated tests the logger may not be initialized; skip side-effect logging.
+    }
+  },
+};
+
+const loginRateLimit = createAuthRateLimitMiddleware({
+  logger: authRateLimitLogger,
+  pool: authLimiterPool,
+  keyPrefix: 'auth_login',
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 10 * authRateLimitBase,
+  keyResolver: resolveLoginRateLimitKey,
+  errorMessage: 'Too many login attempts. Please retry later.',
+});
+
+const refreshRateLimit = createAuthRateLimitMiddleware({
+  logger: authRateLimitLogger,
+  pool: authLimiterPool,
+  keyPrefix: 'auth_refresh',
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 30 * authRateLimitBase,
+  keyResolver: createRefreshRateLimitKeyResolver(process.env.JWT_SECRET ?? ''),
+  errorMessage: 'Too many token refresh attempts. Please retry later.',
+});
 
 async function logAuditOrThrow(
   entry: Parameters<typeof AuditTrailModel.logAction>[0],
@@ -48,7 +90,7 @@ async function revokeTokenOrThrow(token: string, userId: number, reason: string)
 // ---------------------------------------------------------------------------
 // POST /api/auth/login
 // ---------------------------------------------------------------------------
-router.post('/login', asyncHandler(async (req, res) => {
+router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
   const { email, password, rememberMe } = req.body;
   const kickPriorSessions = req.body?.kickPriorSessions === true;
   const ip = req.ip;
@@ -171,7 +213,7 @@ router.get('/me', requireAuth, asyncHandler(async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/auth/refresh — re-issue token with current DB state
 // ---------------------------------------------------------------------------
-router.post('/refresh', requireAuth, asyncHandler(async (req, res) => {
+router.post('/refresh', refreshRateLimit, requireAuth, asyncHandler(async (req, res) => {
   const lockClient = await pool.connect();
   try {
     await lockClient.query('BEGIN');
