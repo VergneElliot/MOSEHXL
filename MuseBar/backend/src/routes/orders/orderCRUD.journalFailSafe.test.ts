@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 import { generateToken } from '../auth';
+import { errorHandler } from '../../middleware/errorHandler';
 
 const EST = '11111111-1111-1111-1111-111111111111';
 
@@ -69,6 +70,7 @@ import orderCRUDRouter from './orderCRUD';
 const app = express();
 app.use(express.json());
 app.use('/orders', orderCRUDRouter);
+app.use(errorHandler);
 
 function tokenFor(establishmentId: string) {
   return generateToken(
@@ -162,7 +164,7 @@ describe('POST /orders legal journal fail-safe', () => {
       .send(createBody);
 
     expect(res.status).toBe(500);
-    expect(String(res.body?.error ?? '')).toContain('Failed to persist legal journal entry');
+    expect(String(res.body?.error?.message ?? '')).toContain('Failed to persist legal journal entry');
     expect(mocks.orderDelete).toHaveBeenCalledWith(500, EST);
     expect(mocks.auditLogAction).not.toHaveBeenCalled();
   });
