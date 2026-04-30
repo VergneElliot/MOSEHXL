@@ -2,6 +2,19 @@ export type PaymentMethod = 'cash' | 'card' | 'split';
 export type OrderStatus = 'pending' | 'completed' | 'cancelled';
 export type SubBillStatus = 'pending' | 'paid';
 export type OperationType = 'sale' | 'change';
+export declare const PERMISSIONS: {
+  readonly access_pos: 'access_pos';
+  readonly access_menu: 'access_menu';
+  readonly access_settings: 'access_settings';
+  readonly access_closure: 'access_closure';
+  readonly access_compliance: 'access_compliance';
+  readonly access_user_management: 'access_user_management';
+  readonly pos_happyhour_manual: 'pos_happyhour_manual';
+  readonly pos_apply_offert: 'pos_apply_offert';
+  readonly pos_apply_perso: 'pos_apply_perso';
+  readonly orders_cancel: 'orders_cancel';
+};
+export type PermissionName = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
 export interface Order {
   id: number;
