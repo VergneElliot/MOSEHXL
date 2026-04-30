@@ -35,6 +35,13 @@ vi.mock('../services/legal/softwareEventJournal', () => ({
   logSoftwareEventBestEffort: mocks.logSoftwareEventBestEffort,
 }));
 
+vi.mock('../permissions/registry', () => ({
+  P: {
+    access_pos: 'access_pos',
+    access_settings: 'access_settings',
+  },
+}));
+
 import settingsRouter from './settings';
 
 const app = express();

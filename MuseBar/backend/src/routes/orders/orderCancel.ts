@@ -11,6 +11,7 @@ import { Logger } from '../../utils/logger';
 import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
 import { P } from '../../permissions/registry';
 import { validateBody } from '../../middleware/validation';
+import { AppError, asyncHandler } from '../../middleware/errorHandler';
 
 const router = express.Router();
 const logger = Logger.getInstance();
@@ -37,7 +38,7 @@ router.post(
     { field: 'orderId', required: true },
     { field: 'reason', required: true },
   ]),
-  async (req, res) => {
+  asyncHandler(async (req, res) => {
     const establishmentId = getEstablishmentId(req, res);
     if (!establishmentId) return;
     try {
@@ -133,9 +134,11 @@ router.post(
             'LEGAL_JOURNAL'
           );
           await cleanupCompensatingOrders(establishmentId, [reversalOrder.id]);
-          return res.status(500).json({
-            error: 'Failed to persist legal journal entry for change cancellation',
-          });
+          throw new AppError(
+            'Failed to persist legal journal entry for change cancellation',
+            500,
+            'ORDER_CANCEL_CHANGE_JOURNAL_FAILED'
+          );
         }
 
         AuditTrailModel.logAction({
@@ -330,9 +333,11 @@ router.post(
             'LEGAL_JOURNAL'
           );
           await cleanupCompensatingOrders(establishmentId, [...createdOrderIds].reverse());
-          return res.status(500).json({
-            error: 'Failed to persist legal journal entry for tip reversal',
-          });
+          throw new AppError(
+            'Failed to persist legal journal entry for tip reversal',
+            500,
+            'ORDER_CANCEL_TIP_REVERSAL_JOURNAL_FAILED'
+          );
         }
       }
 
@@ -367,9 +372,11 @@ router.post(
           'LEGAL_JOURNAL'
         );
         await cleanupCompensatingOrders(establishmentId, [...createdOrderIds].reverse());
-        return res.status(500).json({
-          error: 'Failed to persist legal journal entry for order cancellation',
-        });
+        throw new AppError(
+          'Failed to persist legal journal entry for order cancellation',
+          500,
+          'ORDER_CANCEL_JOURNAL_FAILED'
+        );
       }
 
       // Log audit trail
@@ -413,11 +420,12 @@ router.post(
         error instanceof Error ? error : new Error(message),
         'ORDER_PAYMENT'
       );
-      res
-        .status(500)
-        .json({ error: "Erreur lors de l'annulation", details: message });
+      if (error instanceof AppError) throw error;
+      throw new AppError("Erreur lors de l'annulation", 500, 'ORDER_CANCEL_UNIFIED_FAILED', {
+        details: message,
+      });
     }
-  }
+  })
 );
 
 export default router;

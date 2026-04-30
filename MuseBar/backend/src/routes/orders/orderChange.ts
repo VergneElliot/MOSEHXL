@@ -11,6 +11,7 @@ import { Logger } from '../../utils/logger';
 import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
 import { P } from '../../permissions/registry';
 import { validateBody } from '../../middleware/validation';
+import { AppError, asyncHandler } from '../../middleware/errorHandler';
 
 const router = express.Router();
 const logger = Logger.getInstance();
@@ -20,7 +21,7 @@ router.post(
   requireAuth,
   requirePermission(P.access_pos),
   validateBody([{ field: 'amount', required: true }]),
-  async (req, res) => {
+  asyncHandler(async (req, res) => {
     const establishmentId = getEstablishmentId(req, res);
     if (!establishmentId) return;
     try {
@@ -75,9 +76,11 @@ router.post(
             'ORDER_PAYMENT'
           );
         }
-        return res.status(500).json({
-          error: 'Failed to persist legal journal entry for cash register change',
-        });
+        throw new AppError(
+          'Failed to persist legal journal entry for cash register change',
+          500,
+          'ORDER_CHANGE_JOURNAL_FAILED'
+        );
       }
 
       AuditTrailModel.logAction({
@@ -99,11 +102,15 @@ router.post(
       res.status(201).json({ message: 'Changement de caisse enregistré', order });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      res
-        .status(500)
-        .json({ error: 'Erreur lors du changement de caisse', details: message });
+      if (error instanceof AppError) throw error;
+      throw new AppError(
+        'Erreur lors du changement de caisse',
+        500,
+        'ORDER_CHANGE_FAILED',
+        { details: message }
+      );
     }
-  }
+  })
 );
 
 export default router;

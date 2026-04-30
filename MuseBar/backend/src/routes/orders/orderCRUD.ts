@@ -112,7 +112,7 @@ router.post(
       );
 
       if (!creationResult.ok) {
-        return res.status(500).json({ error: creationResult.error });
+        throw new AppError(creationResult.error, 500, 'ORDER_CREATE_COMPLIANCE_FAILED');
       }
 
       res.status(201).json({
@@ -126,6 +126,7 @@ router.post(
         error instanceof Error ? error : new Error(String(error)),
         'ORDERS'
       );
+      if (error instanceof AppError) throw error;
       throw new AppError('Failed to create order', 500, 'ORDER_CREATE_FAILED');
     }
   })
