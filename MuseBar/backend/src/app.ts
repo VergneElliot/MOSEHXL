@@ -14,7 +14,7 @@ import {
   sanitizeClientErrorForLog
 } from './utils/clientErrorReporting';
 import type { Request, Response } from 'express';
-import { getCurrentEstablishmentId } from './db/tenantContext';
+import { getCurrentEstablishmentId } from './rls/tenantContext';
 import { logSoftwareEventForAllEstablishmentsBestEffort } from './services/legal/softwareEventJournal';
 import { TimeChangeMonitor } from './services/legal/timeChangeMonitor';
 

@@ -3,7 +3,7 @@ import { DEFAULT_APP_TIMEZONE } from '../config/timezone';
 import { LegalJournalModel } from '../models/legalJournal';
 import { AuditTrailModel } from '../models/auditTrail';
 import moment from 'moment-timezone';
-import { runWithTenantContext } from '../db/tenantContext';
+import { runWithTenantContext } from '../rls/tenantContext';
 
 export class ClosureScheduler {
   private static interval: NodeJS.Timeout | null = null;
