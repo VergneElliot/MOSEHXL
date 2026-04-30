@@ -1,5 +1,5 @@
 import LegalJournalModel from '../../models/legalJournal';
-import { Logger } from '../../utils/logger';
+import { logError } from '../../utils/logger';
 import { pool } from '../../app';
 
 export type SoftwareEventType =
@@ -28,8 +28,6 @@ type SoftwareEventInput = {
   userId?: string;
 };
 
-const logger = Logger.getInstance();
-
 export async function logSoftwareEventBestEffort(input: SoftwareEventInput): Promise<void> {
   try {
     await LegalJournalModel.logSoftwareEvent(
@@ -39,7 +37,7 @@ export async function logSoftwareEventBestEffort(input: SoftwareEventInput): Pro
       input.userId
     );
   } catch (error: unknown) {
-    logger.error(
+    logError(
       `Software event journal append failed (${input.eventType}) for establishment ${input.establishmentId}`,
       error instanceof Error ? error : new Error(String(error)),
       'LEGAL_JOURNAL'
@@ -71,7 +69,7 @@ export async function logSoftwareEventForAllEstablishmentsBestEffort(
       });
     }
   } catch (error: unknown) {
-    logger.error(
+    logError(
       `Failed to enumerate establishments for software event ${eventType}`,
       error instanceof Error ? error : new Error(String(error)),
       'LEGAL_JOURNAL'
