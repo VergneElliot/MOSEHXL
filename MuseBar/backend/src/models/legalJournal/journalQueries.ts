@@ -6,6 +6,7 @@
 import { pool } from '../../app';
 import { JournalEntry, ClosureBulletin } from './types';
 import { Logger } from '../../utils/logger';
+import { JournalSigning } from './journalSigning';
 
 function logParseFailure(message: string, error: unknown): void {
   try {
@@ -29,6 +30,15 @@ function parseJsonField<T>(value: unknown, fallback: T): T {
 }
 
 export class JournalQueries {
+  private static readonly ZERO_HASH =
+    '0000000000000000000000000000000000000000000000000000000000000000';
+  private static readonly APPEND_MAX_RETRIES = 3;
+
+  private static isRetryableTransactionError(error: unknown): boolean {
+    const code = (error as { code?: unknown })?.code;
+    return code === '40001' || code === '40P01';
+  }
+
   /**
    * Get the next sequence number for a new journal entry
    * @returns The next sequence number
@@ -273,6 +283,104 @@ export class JournalQueries {
 
     const result = await pool.query(query, values);
     return result.rows[0];
+  }
+
+  /**
+   * Append one journal entry inside a SERIALIZABLE transaction with retry.
+   * This protects sequence/hash chain construction under concurrent writers.
+   */
+  static async appendEntryTransactional(
+    establishmentId: string,
+    transactionType: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE' | 'CHANGE',
+    orderId: number | null,
+    amount: number,
+    vatAmount: number,
+    paymentMethod: string,
+    transactionData: Record<string, unknown>,
+    userId?: string,
+    registerId?: string
+  ): Promise<JournalEntry> {
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= JournalQueries.APPEND_MAX_RETRIES; attempt++) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+
+        const sequenceResult = await client.query(
+          'SELECT COALESCE(MAX(sequence_number), 0) AS last_sequence FROM legal_journal WHERE establishment_id = $1',
+          [establishmentId]
+        );
+        const lastSequence = Number(sequenceResult.rows[0]?.last_sequence ?? 0);
+        const sequenceNumber = Number.isFinite(lastSequence) ? lastSequence + 1 : 1;
+
+        const lastEntryResult = await client.query(
+          `
+            SELECT current_hash
+            FROM legal_journal
+            WHERE establishment_id = $1
+            ORDER BY sequence_number DESC
+            LIMIT 1
+          `,
+          [establishmentId]
+        );
+        const previousHash =
+          (lastEntryResult.rows[0]?.current_hash as string | undefined) ?? JournalQueries.ZERO_HASH;
+
+        const timestamp = new Date();
+        const orderIdForHash = orderId === null ? 'null' : (orderId || '');
+        const dataString = `${sequenceNumber}|${transactionType}|${orderIdForHash}|${amount}|${vatAmount}|${paymentMethod}|${timestamp.toISOString()}|${registerId ?? JournalSigning.getRegisterKey()}`;
+        const currentHash = JournalSigning.generateHash(dataString, previousHash);
+
+        const insertResult = await client.query(
+          `
+            INSERT INTO legal_journal (
+              sequence_number, establishment_id, transaction_type, order_id, amount, vat_amount,
+              payment_method, transaction_data, previous_hash, current_hash,
+              timestamp, user_id, register_id
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            RETURNING *
+          `,
+          [
+            sequenceNumber,
+            establishmentId,
+            transactionType,
+            orderId,
+            amount,
+            vatAmount,
+            paymentMethod,
+            JSON.stringify(transactionData),
+            previousHash,
+            currentHash,
+            timestamp,
+            userId,
+            registerId ?? JournalSigning.getRegisterKey(),
+          ]
+        );
+
+        await client.query('COMMIT');
+        return insertResult.rows[0];
+      } catch (error: unknown) {
+        lastError = error;
+        try {
+          await client.query('ROLLBACK');
+        } catch {
+          // Ignore rollback failure and continue failure path.
+        }
+        if (
+          JournalQueries.isRetryableTransactionError(error) &&
+          attempt < JournalQueries.APPEND_MAX_RETRIES
+        ) {
+          continue;
+        }
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error('Journal append failed');
   }
 
   /**

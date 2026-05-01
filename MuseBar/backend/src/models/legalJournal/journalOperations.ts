@@ -21,32 +21,14 @@ export class JournalOperations {
     transactionData: Record<string, unknown>,
     userId?: string
   ): Promise<JournalEntry> {
-    const sequenceNumber = await JournalQueries.getNextSequenceNumber(establishmentId);
-
-    const lastEntry = await JournalQueries.getLastEntry(establishmentId);
-    const previousHash = lastEntry
-      ? lastEntry.current_hash
-      : '0000000000000000000000000000000000000000000000000000000000000000';
-
-    const timestamp = new Date();
-
-    const orderIdForHash = orderId === null ? 'null' : (orderId || '');
-    const dataString = `${sequenceNumber}|${transactionType}|${orderIdForHash}|${amount}|${vatAmount}|${paymentMethod}|${timestamp.toISOString()}|${JournalSigning.getRegisterKey()}`;
-
-    const currentHash = JournalSigning.generateHash(dataString, previousHash);
-
-    return await JournalQueries.insertEntry(
+    return await JournalQueries.appendEntryTransactional(
       establishmentId,
-      sequenceNumber,
       transactionType,
       orderId,
       amount,
       vatAmount,
       paymentMethod,
       transactionData,
-      previousHash,
-      currentHash,
-      timestamp,
       userId,
       JournalSigning.getRegisterKey()
     );
