@@ -7,6 +7,7 @@ import {
   printReceiptResponse,
   printClosureBulletinResponse
 } from './printing';
+import { AppError, asyncHandler } from '../middleware/errorHandler';
 
 const router = Router();
 
@@ -35,7 +36,7 @@ const ensureEstablishment = (req: AuthenticatedRequest, res: Response, next: Nex
  */
 
 // POST /api/legal/receipt/:orderId/thermal-print
-router.post('/api/legal/receipt/:orderId/thermal-print', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/api/legal/receipt/:orderId/thermal-print', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const orderId = parseInt(req.params.orderId);
@@ -52,14 +53,15 @@ router.post('/api/legal/receipt/:orderId/thermal-print', authenticateToken, ensu
     });
   } catch (error: unknown) {
     const e = error as { statusCode?: number; message?: string };
-    const status = e?.statusCode === 404 ? 404 : 500;
-    const data = status === 404 ? { error: 'Receipt not found' } : { error: e?.message || 'Printing failed' };
-    res.status(status).json(data);
+    if (e?.statusCode === 404) {
+      return res.status(404).json({ error: 'Receipt not found' });
+    }
+    throw new AppError(e?.message || 'Printing failed', 500, 'PRINTING_COMPAT_RECEIPT_FAILED');
   }
-});
+}));
 
 // POST /api/legal/closure/:bulletinId/thermal-print
-router.post('/api/legal/closure/:bulletinId/thermal-print', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/api/legal/closure/:bulletinId/thermal-print', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const bulletinId = parseInt(req.params.bulletinId);
@@ -74,14 +76,15 @@ router.post('/api/legal/closure/:bulletinId/thermal-print', authenticateToken, e
     });
   } catch (error: unknown) {
     const e = error as { statusCode?: number; message?: string };
-    const status = e?.statusCode === 404 ? 404 : 500;
-    const data = status === 404 ? { error: 'Closure bulletin not found' } : { error: e?.message || 'Printing failed' };
-    res.status(status).json(data);
+    if (e?.statusCode === 404) {
+      return res.status(404).json({ error: 'Closure bulletin not found' });
+    }
+    throw new AppError(e?.message || 'Printing failed', 500, 'PRINTING_COMPAT_CLOSURE_FAILED');
   }
-});
+}));
 
 // GET /api/legal/thermal-printer/status
-router.get('/api/legal/thermal-printer/status', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
+router.get('/api/legal/thermal-printer/status', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const data = await getStatusResponse(user);
@@ -90,25 +93,27 @@ router.get('/api/legal/thermal-printer/status', authenticateToken, ensureEstabli
       status: data.status?.status ?? 'Unknown'
     });
   } catch (error: unknown) {
-    res.status(500).json({
-      available: false,
-      status: error instanceof Error ? error.message : 'Error checking printer'
-    });
+    throw new AppError(
+      error instanceof Error ? error.message : 'Error checking printer',
+      500,
+      'PRINTING_COMPAT_STATUS_FAILED'
+    );
   }
-});
+}));
 
 // POST /api/legal/thermal-printer/test
-router.post('/api/legal/thermal-printer/test', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/api/legal/thermal-printer/test', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const result = await testPrintResponse(user, req.body?.printerId);
     res.json(result);
   } catch (error: unknown) {
-    res.status(500).json({
-      success: false,
-      message: error instanceof Error ? error.message : 'Test print failed'
-    });
+    throw new AppError(
+      error instanceof Error ? error.message : 'Test print failed',
+      500,
+      'PRINTING_COMPAT_TEST_FAILED'
+    );
   }
-});
+}));
 
 export default router;

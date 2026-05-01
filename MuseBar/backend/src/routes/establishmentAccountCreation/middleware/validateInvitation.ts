@@ -9,6 +9,7 @@ import { pool } from '../../../db/pool';
 import { InvitationQueries } from '../../../utils/database';
 import { InvitationValidationResult } from '../types';
 import { Logger } from '../../../utils/logger';
+import { AppError } from '../../../middleware/errorHandler';
 
 /**
  * Validate invitation token middleware
@@ -62,10 +63,11 @@ export const validateInvitation = async (
   } catch (error) {
     const logger = Logger.getInstance();
     logger.error('Invitation validation error', error as Error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error during invitation validation'
-    });
+    next(new AppError(
+      'Internal server error during invitation validation',
+      500,
+      'ESTABLISHMENT_INVITATION_VALIDATION_FAILED'
+    ));
   }
 };
 
