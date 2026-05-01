@@ -21,6 +21,7 @@ import {
 } from '../printing/printDataRepo';
 import { createPrintingServiceManager } from '../printing/printingServiceManager';
 import { logSoftwareEventBestEffort } from '../services/legal/softwareEventJournal';
+import { AppError, asyncHandler } from '../middleware/errorHandler';
 
 const router = Router();
 
@@ -29,14 +30,14 @@ const router = Router();
  * Legacy ?key= fallback is temporarily accepted for compatibility.
  * Configure this full URL in the printer TMNet WebConfig.
  */
-router.get('/epson/poll', async (req: Request, res: Response) => {
+router.get('/epson/poll', asyncHandler(async (req: Request, res: Response) => {
   try {
     return await epsonServerDirectPollHandler(pool, req, res);
   } catch (error) {
     getLogger().error('Epson Server Direct poll error', error instanceof Error ? error : undefined);
-    return res.status(500).type('text/plain').send('Internal error');
+    throw new AppError('Internal error', 500, 'EPSON_POLL_FAILED');
   }
-});
+}));
 
 const printingServiceManager = createPrintingServiceManager(pool, getLogger());
 
@@ -91,22 +92,23 @@ export async function testPrintResponse(user: PrintingUser, printerId?: string) 
 }
 
 // GET /api/printing/status
-router.get('/status', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
+router.get('/status', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const data = await getStatusResponse(user);
     res.json(data);
   } catch (error) {
     getLogger().error('Error checking printer status', error instanceof Error ? error : undefined);
-    res.status(500).json({ 
-      error: 'Failed to check printer status',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+    throw new AppError(
+      error instanceof Error ? error.message : 'Unknown error',
+      500,
+      'PRINTING_STATUS_FAILED'
+    );
   }
-});
+}));
 
 // GET /api/printing/printers
-router.get('/printers', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
+router.get('/printers', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const service = await getPrintingService(user.establishment_id);
@@ -119,27 +121,29 @@ router.get('/printers', authenticateToken, ensureEstablishment, async (req: Auth
     });
   } catch (error) {
     getLogger().error('Error listing printers', error instanceof Error ? error : undefined);
-    res.status(500).json({ 
-      error: 'Failed to list printers',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+    throw new AppError(
+      error instanceof Error ? error.message : 'Unknown error',
+      500,
+      'PRINTING_PRINTERS_FAILED'
+    );
   }
-});
+}));
 
 // POST /api/printing/test
-router.post('/test', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/test', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const result = await testPrintResponse(user, req.body?.printerId);
     res.json(result);
   } catch (error) {
     getLogger().error('Error test printing', error instanceof Error ? error : undefined);
-    res.status(500).json({ 
-      error: 'Test print failed',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+    throw new AppError(
+      error instanceof Error ? error.message : 'Unknown error',
+      500,
+      'PRINTING_TEST_FAILED'
+    );
   }
-});
+}));
 
 /** In-process handler: print receipt. Used by routes and by printingCompat. */
 export async function printReceiptResponse(
@@ -175,7 +179,7 @@ export async function printClosureBulletinResponse(
 
 // GET /api/printing/receipt/:orderId/preview
 // Preview-only: returns receipt_data but DOES NOT queue a print job.
-router.get('/receipt/:orderId/preview', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
+router.get('/receipt/:orderId/preview', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const orderId = parseInt(req.params.orderId, 10);
@@ -191,15 +195,16 @@ router.get('/receipt/:orderId/preview', authenticateToken, ensureEstablishment, 
       return res.status(404).json({ error: 'Receipt not found' });
     }
     getLogger().error('Error generating receipt preview', error instanceof Error ? error : undefined);
-    res.status(500).json({
-      error: 'Failed to generate receipt preview',
-      message: e?.message ?? (error instanceof Error ? error.message : 'Unknown error'),
-    });
+    throw new AppError(
+      e?.message ?? (error instanceof Error ? error.message : 'Unknown error'),
+      500,
+      'PRINTING_RECEIPT_PREVIEW_FAILED'
+    );
   }
-});
+}));
 
 // POST /api/printing/receipt/:orderId
-router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const orderId = parseInt(req.params.orderId, 10);
@@ -215,15 +220,16 @@ router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, async (
       return res.status(404).json({ error: 'Receipt not found' });
     }
     getLogger().error('Error printing receipt', error instanceof Error ? error : undefined);
-    res.status(500).json({ 
-      error: 'Failed to print receipt',
-      message: e?.message ?? (error instanceof Error ? error.message : 'Unknown error')
-    });
+    throw new AppError(
+      e?.message ?? (error instanceof Error ? error.message : 'Unknown error'),
+      500,
+      'PRINTING_RECEIPT_FAILED'
+    );
   }
-});
+}));
 
 // POST /api/printing/closure/:bulletinId
-router.post('/closure/:bulletinId', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/closure/:bulletinId', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const bulletinId = parseInt(req.params.bulletinId, 10);
@@ -238,15 +244,16 @@ router.post('/closure/:bulletinId', authenticateToken, ensureEstablishment, asyn
       return res.status(404).json({ error: 'Closure bulletin not found' });
     }
     getLogger().error('Error printing closure bulletin', error instanceof Error ? error : undefined);
-    res.status(500).json({ 
-      error: 'Failed to print closure bulletin',
-      message: e?.message ?? (error instanceof Error ? error.message : 'Unknown error')
-    });
+    throw new AppError(
+      e?.message ?? (error instanceof Error ? error.message : 'Unknown error'),
+      500,
+      'PRINTING_CLOSURE_FAILED'
+    );
   }
-});
+}));
 
 // GET /api/printing/configuration
-router.get('/configuration', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
+router.get('/configuration', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
 
@@ -257,15 +264,16 @@ router.get('/configuration', authenticateToken, ensureEstablishment, async (req:
     });
   } catch (error) {
     getLogger().error('Error getting printing configuration', error instanceof Error ? error : undefined);
-    res.status(500).json({ 
-      error: 'Failed to get printing configuration',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+    throw new AppError(
+      error instanceof Error ? error.message : 'Unknown error',
+      500,
+      'PRINTING_CONFIG_FETCH_FAILED'
+    );
   }
-});
+}));
 
 // POST /api/printing/configuration
-router.post('/configuration', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/configuration', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const { provider, config: bodyConfig } = req.body;
@@ -301,15 +309,16 @@ router.post('/configuration', authenticateToken, ensureEstablishment, async (req
       return res.status(400).json({ error: e.message });
     }
     getLogger().error('Error updating printing configuration', error instanceof Error ? error : undefined);
-    res.status(500).json({ 
-      error: 'Failed to update printing configuration',
-      message: e?.message ?? (error instanceof Error ? error.message : 'Unknown error')
-    });
+    throw new AppError(
+      e?.message ?? (error instanceof Error ? error.message : 'Unknown error'),
+      500,
+      'PRINTING_CONFIG_UPDATE_FAILED'
+    );
   }
-});
+}));
 
 // GET /api/printing/history
-router.get('/history', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
+router.get('/history', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const rawLimit = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : 50;
@@ -338,12 +347,13 @@ router.get('/history', authenticateToken, ensureEstablishment, async (req: Authe
     });
   } catch (error) {
     getLogger().error('Error getting printing history', error instanceof Error ? error : undefined);
-    res.status(500).json({ 
-      error: 'Failed to get printing history',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+    throw new AppError(
+      error instanceof Error ? error.message : 'Unknown error',
+      500,
+      'PRINTING_HISTORY_FETCH_FAILED'
+    );
   }
-});
+}));
 
 // Export router
 export default router;
