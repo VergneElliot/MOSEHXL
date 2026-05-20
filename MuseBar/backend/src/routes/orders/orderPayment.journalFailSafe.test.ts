@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 import { generateToken } from '../auth';
+import { errorHandler } from '../../middleware/errorHandler';
 
 const EST = '11111111-1111-1111-1111-111111111111';
 
@@ -70,6 +71,7 @@ import orderPaymentRouter from './orderPayment';
 const app = express();
 app.use(express.json());
 app.use('/orders/payment', orderPaymentRouter);
+app.use(errorHandler);
 
 function tokenFor(establishmentId: string) {
   return generateToken(
@@ -147,7 +149,7 @@ describe('POST /orders/payment legal journal fail-safe parity', () => {
       .send({ amount: 10 });
 
     expect(res.status).toBe(500);
-    expect(String(res.body?.error ?? '')).toContain(
+    expect(String(res.body?.error?.message ?? '')).toContain(
       'Failed to persist legal journal entry for cash register change'
     );
     expect(mocks.orderDelete).toHaveBeenCalledWith(700, EST);
@@ -190,7 +192,7 @@ describe('POST /orders/payment legal journal fail-safe parity', () => {
       .send({ orderId: 10, reason: 'mistake' });
 
     expect(res.status).toBe(500);
-    expect(String(res.body?.error ?? '')).toContain(
+    expect(String(res.body?.error?.message ?? '')).toContain(
       'Failed to persist legal journal entry for change cancellation'
     );
     expect(mocks.orderDelete).toHaveBeenCalledWith(701, EST);
@@ -242,7 +244,7 @@ describe('POST /orders/payment legal journal fail-safe parity', () => {
       .send({ orderId: 11, reason: 'customer request', cancellationType: 'full' });
 
     expect(res.status).toBe(500);
-    expect(String(res.body?.error ?? '')).toContain(
+    expect(String(res.body?.error?.message ?? '')).toContain(
       'Failed to persist legal journal entry for order cancellation'
     );
     expect(mocks.orderDelete).toHaveBeenCalledWith(702, EST);
@@ -314,7 +316,7 @@ describe('POST /orders/payment legal journal fail-safe parity', () => {
       });
 
     expect(res.status).toBe(500);
-    expect(String(res.body?.error ?? '')).toContain(
+    expect(String(res.body?.error?.message ?? '')).toContain(
       'Failed to persist legal journal entry for tip reversal'
     );
     expect(mocks.orderDelete).toHaveBeenNthCalledWith(1, 704, EST);

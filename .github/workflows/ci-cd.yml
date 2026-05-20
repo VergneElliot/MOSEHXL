@@ -82,7 +82,7 @@ jobs:
 
     - name: Install backend dependencies
       working-directory: MuseBar/backend
-      run: npm ci
+      run: npm ci --workspaces=false --include-workspace-root=false
 
     - name: Run backend linting
       working-directory: MuseBar/backend
@@ -169,7 +169,7 @@ jobs:
     - name: Build backend
       working-directory: MuseBar/backend
       run: |
-        npm ci
+        npm ci --workspaces=false --include-workspace-root=false
         npm run build
 
     - name: Create deployment package
@@ -228,7 +228,7 @@ jobs:
 
     - name: Install backend dependencies
       working-directory: MuseBar/backend
-      run: npm ci
+      run: npm ci --workspaces=false --include-workspace-root=false
 
     - name: Build frontend
       working-directory: MuseBar
@@ -293,7 +293,7 @@ jobs:
 
     - name: Install dependencies
       working-directory: MuseBar/backend
-      run: npm ci
+      run: npm ci --workspaces=false --include-workspace-root=false
 
     - name: Generate API documentation
       working-directory: MuseBar/backend

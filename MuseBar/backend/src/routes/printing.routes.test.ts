@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import express from 'express';
+import { errorHandler } from '../middleware/errorHandler';
 
 const mocks = vi.hoisted(() => ({
   poolQuery: vi.fn(),
@@ -88,6 +89,7 @@ import printingRouter from './printing';
 const app = express();
 app.use(express.json());
 app.use('/printing', printingRouter);
+app.use(errorHandler);
 
 describe('printing routes', () => {
   beforeEach(() => {
@@ -142,7 +144,7 @@ describe('printing routes', () => {
       .get('/printing/epson/poll');
 
     expect(res.status).toBe(500);
-    expect(res.text).toBe('Internal error');
+    expect(res.body?.error?.message).toBe('Internal error');
     expect(mocks.loggerError).toHaveBeenCalled();
   });
 
@@ -166,8 +168,7 @@ describe('printing routes', () => {
       .set('Authorization', 'Bearer test-token');
 
     expect(res.status).toBe(500);
-    expect(res.body.error).toBe('Failed to check printer status');
-    expect(String(res.body.message)).toContain('status probe failed');
+    expect(res.body?.error?.message).toBe('Failed to check printer status');
     expect(mocks.loggerError).toHaveBeenCalled();
   });
 
@@ -190,8 +191,7 @@ describe('printing routes', () => {
       .set('Authorization', 'Bearer test-token');
 
     expect(res.status).toBe(500);
-    expect(res.body.error).toBe('Failed to list printers');
-    expect(String(res.body.message)).toContain('printer service unavailable');
+    expect(res.body?.error?.message).toBe('Failed to list printers');
     expect(mocks.loggerError).toHaveBeenCalled();
   });
 
@@ -229,8 +229,7 @@ describe('printing routes', () => {
       .send({});
 
     expect(res.status).toBe(500);
-    expect(res.body.error).toBe('Test print failed');
-    expect(String(res.body.message)).toContain('service unavailable');
+    expect(res.body?.error?.message).toBe('Test print failed');
   });
 
   it('returns 400 for invalid provider on configuration update', async () => {
@@ -325,8 +324,7 @@ describe('printing routes', () => {
       .set('Authorization', 'Bearer test-token');
 
     expect(res.status).toBe(500);
-    expect(res.body.error).toBe('Failed to get printing configuration');
-    expect(String(res.body.message)).toContain('config read failed');
+    expect(res.body?.error?.message).toBe('Failed to get printing configuration');
     expect(mocks.loggerError).toHaveBeenCalled();
   });
 
@@ -387,8 +385,7 @@ describe('printing routes', () => {
       .set('Authorization', 'Bearer test-token');
 
     expect(res.status).toBe(500);
-    expect(res.body.error).toBe('Failed to get printing history');
-    expect(String(res.body.message)).toContain('db down');
+    expect(res.body?.error?.message).toBe('Failed to get printing history');
     expect(mocks.loggerError).toHaveBeenCalled();
   });
 

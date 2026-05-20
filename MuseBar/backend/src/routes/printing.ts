@@ -99,11 +99,7 @@ router.get('/status', authenticateToken, ensureEstablishment, asyncHandler(async
     res.json(data);
   } catch (error) {
     getLogger().error('Error checking printer status', error instanceof Error ? error : undefined);
-    throw new AppError(
-      error instanceof Error ? error.message : 'Unknown error',
-      500,
-      'PRINTING_STATUS_FAILED'
-    );
+    throw new AppError('Failed to check printer status', 500, 'PRINTING_STATUS_FAILED');
   }
 }));
 
@@ -121,11 +117,7 @@ router.get('/printers', authenticateToken, ensureEstablishment, asyncHandler(asy
     });
   } catch (error) {
     getLogger().error('Error listing printers', error instanceof Error ? error : undefined);
-    throw new AppError(
-      error instanceof Error ? error.message : 'Unknown error',
-      500,
-      'PRINTING_PRINTERS_FAILED'
-    );
+    throw new AppError('Failed to list printers', 500, 'PRINTING_PRINTERS_FAILED');
   }
 }));
 
@@ -137,11 +129,7 @@ router.post('/test', authenticateToken, ensureEstablishment, asyncHandler(async 
     res.json(result);
   } catch (error) {
     getLogger().error('Error test printing', error instanceof Error ? error : undefined);
-    throw new AppError(
-      error instanceof Error ? error.message : 'Unknown error',
-      500,
-      'PRINTING_TEST_FAILED'
-    );
+    throw new AppError('Test print failed', 500, 'PRINTING_TEST_FAILED');
   }
 }));
 
@@ -265,7 +253,7 @@ router.get('/configuration', authenticateToken, ensureEstablishment, asyncHandle
   } catch (error) {
     getLogger().error('Error getting printing configuration', error instanceof Error ? error : undefined);
     throw new AppError(
-      error instanceof Error ? error.message : 'Unknown error',
+      'Failed to get printing configuration',
       500,
       'PRINTING_CONFIG_FETCH_FAILED'
     );
@@ -347,11 +335,7 @@ router.get('/history', authenticateToken, ensureEstablishment, asyncHandler(asyn
     });
   } catch (error) {
     getLogger().error('Error getting printing history', error instanceof Error ? error : undefined);
-    throw new AppError(
-      error instanceof Error ? error.message : 'Unknown error',
-      500,
-      'PRINTING_HISTORY_FETCH_FAILED'
-    );
+    throw new AppError('Failed to get printing history', 500, 'PRINTING_HISTORY_FETCH_FAILED');
   }
 }));
 
