@@ -37,6 +37,7 @@ const REQUIRED_ENV_VARS: Record<string, string> = {
 export const validateEnvironment = (): void => {
   const missing: string[] = [];
   const invalid: string[] = [];
+  const isBooleanString = (value: string): boolean => ['true', 'false'].includes(value.trim().toLowerCase());
 
   // In production, archive signing requires a secret key (no hardcoded fallback)
   const requiredVars = { ...REQUIRED_ENV_VARS };
@@ -86,6 +87,20 @@ export const validateEnvironment = (): void => {
     invalid.push('SETUP_SECRET must be at least 32 characters long for security');
   }
 
+  if (
+    process.env.DB_SSL_REJECT_UNAUTHORIZED &&
+    !isBooleanString(process.env.DB_SSL_REJECT_UNAUTHORIZED)
+  ) {
+    invalid.push("DB_SSL_REJECT_UNAUTHORIZED must be either 'true' or 'false'");
+  }
+
+  if (
+    process.env.DB_SSL_ALLOW_SELF_SIGNED &&
+    !isBooleanString(process.env.DB_SSL_ALLOW_SELF_SIGNED)
+  ) {
+    invalid.push("DB_SSL_ALLOW_SELF_SIGNED must be either 'true' or 'false'");
+  }
+
   const establishmentAdminPermissionMode = process.env.ESTABLISHMENT_ADMIN_PERMISSION_MODE;
   if (
     establishmentAdminPermissionMode &&
@@ -131,7 +146,7 @@ export interface EnvironmentConfig {
     ssl: boolean;
     /**
      * When ssl is enabled, controls certificate chain verification.
-     * Some managed Postgres providers use a self-signed chain; in that case set to false.
+     * Production defaults to true; use explicit env overrides for self-signed chains.
      */
     sslRejectUnauthorized: boolean;
     maxConnections: number;
@@ -189,10 +204,18 @@ export const getEnvironmentConfig = (): EnvironmentConfig => {
   const isProduction = nodeEnv === 'production';
   const isDevelopment = nodeEnv === 'development';
 
-  const sslRejectUnauthorized =
+  const allowSelfSigned =
+    process.env.DB_SSL_ALLOW_SELF_SIGNED != null
+      ? process.env.DB_SSL_ALLOW_SELF_SIGNED.trim().toLowerCase() === 'true'
+      : false;
+
+  const explicitSslRejectUnauthorized =
     process.env.DB_SSL_REJECT_UNAUTHORIZED != null
       ? process.env.DB_SSL_REJECT_UNAUTHORIZED.trim().toLowerCase() === 'true'
-      : false;
+      : null;
+
+  const resolvedProductionSslRejectUnauthorized =
+    explicitSslRejectUnauthorized !== null ? explicitSslRejectUnauthorized : !allowSelfSigned;
 
   return {
     database: {
@@ -203,7 +226,7 @@ export const getEnvironmentConfig = (): EnvironmentConfig => {
       // No fallback: validateEnvironment() ensures DB_PASSWORD is set before we get here
       password: process.env.DB_PASSWORD!,
       ssl: isProduction,
-      sslRejectUnauthorized: isProduction ? sslRejectUnauthorized : true,
+      sslRejectUnauthorized: isProduction ? resolvedProductionSslRejectUnauthorized : true,
       maxConnections: parseInt(process.env.DB_MAX_CONNECTIONS || '20'),
       idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '30000'),
     },
