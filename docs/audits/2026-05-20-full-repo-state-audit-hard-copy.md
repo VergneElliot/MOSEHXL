@@ -130,9 +130,9 @@ This list is for posterity — verified during this audit, do not re-open.
 |------------------|---------------|
 | Refund/change journal fail-safe | **Fixed** (`orderCancel.ts:327-378`, `orderChange.ts:62-83`) |
 | Archive export endpoint lying about success | **Fixed** — now an honest `501` until P3-L6 lands; create path is real |
-| `logClosure` dead on manual route | **Fixed** for manual routes; **still a gap on the auto scheduler (P3-L1)** |
+| `logClosure` dead on manual route | **Fixed** for manual routes and auto scheduler (P3-L1) |
 | Integrity verifier silently skipped seq 128 / CORRECTION | **Fixed** (P0-L5) |
-| Software events missing | **Wired** (P0-L3.1–L3.6), but **best-effort (P3-L3)** |
+| Software events missing | **Fixed** with fail-safe critical-event journaling + retries (P3-L3) |
 | Thermal receipt missing statutory legal mention | **Fixed** (P1-L6) |
 | Archive PDF / ANNUAL / DAILY side-effect | **Fixed** (P1-L7, P1-L8) |
 | Journal append not serializable / no retry | **Fixed** (P2-L9) |
@@ -144,6 +144,7 @@ This list is for posterity — verified during this audit, do not re-open.
 | `orderAudit` POST actor from body | **Fixed** (now `req.user.id`) |
 | `send-user-invitation` accessible to any authed user | **Fixed** (`canManageUsers` + establishment check) |
 | Auth endpoint rate limits | **Fixed** (P2-S12 with Postgres-backed store in prod) |
+| Production DB TLS verification default | **Fixed** (P3-S1; `sslRejectUnauthorized=true` by default in production) |
 | Logger redaction of setup / client-error headers (S13/S14) | **Fixed** |
 | `tenantContext` namespace clarity | **Fixed** (now under `rls/`, P2-Q5) |
 | Empty `controllers/` directory | **Fixed** (removed in patch 244) |
