@@ -551,7 +551,8 @@ export class JournalQueries {
     firstSequence: number,
     lastSequence: number,
     closureHash: string,
-    establishmentId: string
+    establishmentId: string,
+    isClosed = true
   ): Promise<ClosureBulletin> {
     const query = `
       INSERT INTO closure_bulletins (
@@ -577,13 +578,47 @@ export class JournalQueries {
       firstSequence,
       lastSequence,
       closureHash,
-      true,
-      new Date(),
+      isClosed,
+      isClosed ? new Date() : null,
       establishmentId
     ];
 
     const result = await pool.query(query, values);
     return result.rows[0];
+  }
+
+  static async closeOpenClosureBulletin(
+    closureBulletinId: number,
+    establishmentId: string
+  ): Promise<ClosureBulletin | null> {
+    const result = await pool.query(
+      `
+        UPDATE closure_bulletins
+        SET is_closed = true, closed_at = NOW()
+        WHERE id = $1
+          AND establishment_id = $2
+          AND is_closed = false
+        RETURNING *
+      `,
+      [closureBulletinId, establishmentId]
+    );
+    return result.rows[0] ?? null;
+  }
+
+  static async deleteOpenClosureBulletin(
+    closureBulletinId: number,
+    establishmentId: string
+  ): Promise<boolean> {
+    const result = await pool.query(
+      `
+        DELETE FROM closure_bulletins
+        WHERE id = $1
+          AND establishment_id = $2
+          AND is_closed = false
+      `,
+      [closureBulletinId, establishmentId]
+    );
+    return (result.rowCount ?? 0) > 0;
   }
 
   /**
