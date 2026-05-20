@@ -166,8 +166,9 @@ export class JournalQueries {
       throw Object.assign(new Error('Journal reset not allowed in production'), { statusCode: 403 });
     }
 
-    await pool.query('DELETE FROM legal_journal');
-    await pool.query('ALTER SEQUENCE legal_journal_id_seq RESTART WITH 1');
+    // Use TRUNCATE instead of DELETE so dev reset remains compatible with
+    // legal immutability triggers that block row-level DELETE operations.
+    await pool.query('TRUNCATE TABLE legal_journal RESTART IDENTITY');
   }
 
   /**
