@@ -64,6 +64,7 @@ The IDs follow the existing audit convention: **P0/P1/P2** = priority, **L/S/Q/D
 | **P3-Q5** | Finish the `db/pool.ts` decoupling | Currently a 7-line re-export of `app.ts`'s pool, and ~22 models/services still `import { pool } from '../app'`. Migrate them all and make `db/pool.ts` the actual owner. | **M** |
 | **P3-Q6** | Wrap `userManagement/invitationRoutes.ts` and `establishmentAccountCreation/index.ts` in `asyncHandler` | Live routes still using manual `try/catch/next` + raw `res.status(...).json({ error })`. Last gap from the P2-Q13 sweep. | **S** |
 | **P3-Q7** | Add a real-DB Vitest project for compliance assertions | Today the immutability trigger and RLS deny-cross-tenant are only proven by SQL string assertions / mocks. Run actual Postgres in CI and verify trigger blocks `UPDATE` and that `SELECT` from a tenant context cannot see another tenant's rows. | **L** |
+| **P3-T1** | Restore backend test suite (workspace dep + mock drift + AppError envelope drift) | Discovered during P3-L1 regression checks: 10 backend test files failed on a clean checkout due to (a) `@mosehxl/types` not declared as a backend dep so per-package `npm ci` skipped it, (b) `softwareEventJournal.runtime.test.ts` mock missing `logError`, (c) two test files still asserting the pre-P2-Q13 error envelope. Also surfaced a P2-Q13 leak where 5 `printing.ts` AppError throws exposed inner error messages to clients instead of user-facing labels. Fixed under patch notes 266 / 267. | **S** |
 
 ### P2 — Hardening / code quality (improves grade, not certification-blocking)
 
@@ -117,6 +118,11 @@ You explicitly requested this as a to-do for this audit. It is now **P3-S4 (P1)*
 ---
 
 ## 4. What is already fixed since the April 29 audit (so we don't re-do it)
+
+> **Update (2026-05-20):** Items marked **DONE** below were closed in this remediation round. Cherry-picks + audit landed under commits `ee37d25..1838995` on `development`; subsequent items are committed in chronological order.
+>
+> - **P3-L1** (auto-closure CLOSURE journal append) — **DONE** (commit `1838995`, patch notes 264 / 265).
+> - **P3-T1** (restore broken backend test suite) — **DONE** (this round, patch notes 266 / 267).
 
 This list is for posterity — verified during this audit, do not re-open.
 

@@ -25,6 +25,7 @@ vi.mock('../../utils/logger', () => ({
       error: mocks.loggerError,
     }),
   },
+  logError: mocks.loggerError,
 }));
 
 import {
