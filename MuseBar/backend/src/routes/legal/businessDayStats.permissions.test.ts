@@ -46,6 +46,7 @@ vi.mock('../../models/legalJournal/paymentBreakdown', () => ({
 vi.mock('../../permissions/registry', () => ({
   P: {
     access_compliance: 'access_compliance',
+    access_pos: 'access_pos',
   },
 }));
 
@@ -96,7 +97,7 @@ describe('legal business-day-stats permission gate', () => {
     mocks.getTopProductsForOrders.mockResolvedValue([]);
   });
 
-  it('denies access without access_compliance', async () => {
+  it('denies access without access_compliance or access_pos', async () => {
     mocks.getUserPermissions.mockResolvedValue([]);
 
     const res = await request(app)
@@ -109,6 +110,17 @@ describe('legal business-day-stats permission gate', () => {
 
   it('allows access with access_compliance', async () => {
     mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
+
+    const res = await request(app)
+      .get('/legal/business-day-stats')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(200);
+    expect(mocks.getOrdersAndSubBillsForPeriod).toHaveBeenCalled();
+  });
+
+  it('allows access with access_pos', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_pos']);
 
     const res = await request(app)
       .get('/legal/business-day-stats')
