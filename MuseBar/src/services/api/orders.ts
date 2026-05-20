@@ -1,6 +1,5 @@
 import { request } from './core';
 import { Order, OrderItem } from '../../types';
-import type { PaymentMethod } from '../../types';
 import type {
   Order as ApiOrder,
   OrderItem as ApiOrderItem,
@@ -8,7 +7,6 @@ import type {
 } from '@mosehxl/types';
 
 type RawOrderItem = Partial<ApiOrderItem>;
-type RawSubBill = Partial<ApiSubBill>;
 type RawOrder = Partial<ApiOrder> &
   Omit<Pick<ApiOrder, 'id' | 'total_amount' | 'total_tax' | 'created_at' | 'status' | 'payment_method'>, 'id' | 'total_amount' | 'total_tax' | 'created_at'> & {
     id: string | number;

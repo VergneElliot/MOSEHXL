@@ -1,6 +1,16 @@
 {
   "name": "mosehxl-root",
   "private": true,
+  "scripts": {
+    "start": "npm run start --workspace MuseBar",
+    "dev": "npm run start --workspace MuseBar",
+    "start:frontend": "npm run start --workspace MuseBar",
+    "start:backend": "npm run start --workspace MuseBar/backend",
+    "dev:backend": "npm run dev --workspace MuseBar/backend",
+    "build": "npm run build --workspace MuseBar && npm run build --workspace MuseBar/backend",
+    "build:frontend": "npm run build --workspace MuseBar",
+    "build:backend": "npm run build --workspace MuseBar/backend"
+  },
   "workspaces": [
     "MuseBar",
     "MuseBar/backend",
