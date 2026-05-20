@@ -29,7 +29,9 @@ vi.mock('../../utils/logger', () => ({
 }));
 
 import {
+  logSoftwareEventFailSafe,
   logSoftwareEventBestEffort,
+  logSoftwareEventForAllEstablishmentsFailSafe,
   logSoftwareEventForAllEstablishmentsBestEffort,
 } from './softwareEventJournal';
 
@@ -67,14 +69,14 @@ describe('softwareEventJournal runtime helpers', () => {
     );
   });
 
-  it('does not throw when establishment enumeration query fails', async () => {
+  it('throws for critical all-establishments events when enumeration fails', async () => {
     mocks.poolQuery.mockRejectedValue(new Error('db down'));
 
     await expect(
       logSoftwareEventForAllEstablishmentsBestEffort('SERVER_SHUTDOWN', {
         reason: 'SIGTERM',
       })
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow('db down');
 
     expect(mocks.loggerError).toHaveBeenCalled();
     expect(mocks.logSoftwareEvent).not.toHaveBeenCalled();
@@ -93,5 +95,37 @@ describe('softwareEventJournal runtime helpers', () => {
     ).resolves.toBeUndefined();
 
     expect(mocks.loggerError).toHaveBeenCalled();
+  });
+
+  it('retries and throws in fail-safe mode when append keeps failing', async () => {
+    mocks.logSoftwareEvent.mockRejectedValue(new Error('journal insert failed'));
+
+    await expect(
+      logSoftwareEventFailSafe({
+        establishmentId: 'est-1',
+        eventType: 'SERVER_STARTED',
+        eventData: { node_env: 'production' },
+      })
+    ).rejects.toThrow('journal insert failed');
+
+    expect(mocks.logSoftwareEvent).toHaveBeenCalledTimes(3);
+  });
+
+  it('aggregates failures in fail-safe all-establishments mode', async () => {
+    mocks.poolQuery.mockResolvedValue({
+      rows: [{ id: 'est-1' }, { id: 'est-2' }],
+    });
+    mocks.logSoftwareEvent
+      .mockRejectedValueOnce(new Error('fail-1'))
+      .mockRejectedValueOnce(new Error('fail-1'))
+      .mockRejectedValueOnce(new Error('fail-1'))
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({});
+
+    await expect(
+      logSoftwareEventForAllEstablishmentsFailSafe('SERVER_STARTED', {
+        node_env: 'production',
+      })
+    ).rejects.toThrow('failed for 1/2 establishments');
   });
 });

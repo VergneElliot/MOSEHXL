@@ -265,44 +265,59 @@ async function logRuntimeLifecycleEvent(eventType: 'SERVER_STARTED' | 'SERVER_SH
 
 // Start the server on all network interfaces
 const server = app.listen(config.server.port, '0.0.0.0', async () => {
-  // MOSEHXL API Server running
-  await logRuntimeLifecycleEvent('SERVER_STARTED');
-  await logSoftwareEventForAllEstablishmentsBestEffort('SOFTWARE_VERSION_REPORTED', {
-    app_version: APP_VERSION,
-    node_env: NODE_ENV,
-    pid: process.pid,
-    timestamp: new Date().toISOString(),
-  });
-  TimeChangeMonitor.start();
+  try {
+    // MOSEHXL API Server running
+    await logRuntimeLifecycleEvent('SERVER_STARTED');
+    await logSoftwareEventForAllEstablishmentsBestEffort('SOFTWARE_VERSION_REPORTED', {
+      app_version: APP_VERSION,
+      node_env: NODE_ENV,
+      pid: process.pid,
+      timestamp: new Date().toISOString(),
+    });
+    TimeChangeMonitor.start();
 
-  // Start the automatic closure scheduler (only in production)
-  if (NODE_ENV === 'production') {
-    ClosureScheduler.start()
-      .then(async () => {
-        await logSoftwareEventForAllEstablishmentsBestEffort(
-          'AUTO_CLOSURE_SCHEDULER_STARTED',
-          {
-            node_env: NODE_ENV,
-            pid: process.pid,
-            timestamp: new Date().toISOString(),
-          }
-        );
-      })
-      .catch(async (error) => {
-        logger.error('Failed to start closure scheduler', error instanceof Error ? error : new Error(String(error)));
-        await logSoftwareEventForAllEstablishmentsBestEffort(
-          'AUTO_CLOSURE_SCHEDULER_START_FAILED',
-          {
-            node_env: NODE_ENV,
-            pid: process.pid,
-            timestamp: new Date().toISOString(),
-            error: error instanceof Error ? error.message : String(error),
-          }
-        );
-      });
-    // Automatic closure scheduler started
-  } else {
-    // Automatic closure scheduler disabled in development mode
+    // Start the automatic closure scheduler (only in production)
+    if (NODE_ENV === 'production') {
+      ClosureScheduler.start()
+        .then(async () => {
+          await logSoftwareEventForAllEstablishmentsBestEffort(
+            'AUTO_CLOSURE_SCHEDULER_STARTED',
+            {
+              node_env: NODE_ENV,
+              pid: process.pid,
+              timestamp: new Date().toISOString(),
+            }
+          );
+        })
+        .catch(async (error) => {
+          logger.error(
+            'Failed to start closure scheduler',
+            error instanceof Error ? error : new Error(String(error))
+          );
+          await logSoftwareEventForAllEstablishmentsBestEffort(
+            'AUTO_CLOSURE_SCHEDULER_START_FAILED',
+            {
+              node_env: NODE_ENV,
+              pid: process.pid,
+              timestamp: new Date().toISOString(),
+              error: error instanceof Error ? error.message : String(error),
+            }
+          );
+        });
+      // Automatic closure scheduler started
+    } else {
+      // Automatic closure scheduler disabled in development mode
+    }
+  } catch (error) {
+    logger.error(
+      'Critical runtime software-event journaling failed during startup',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_JOURNAL'
+    );
+
+    server.close(() => {
+      process.exit(1);
+    });
   }
 });
 
