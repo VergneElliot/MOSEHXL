@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 import { generateToken } from '../auth';
+import { errorHandler } from '../../middleware/errorHandler';
 
 const EST = '11111111-1111-4111-8111-111111111111';
 
@@ -13,10 +14,12 @@ const mocks = vi.hoisted(() => ({
   exportData: vi.fn(),
   getClosureBulletins: vi.fn(),
   getLastFondDeCaisse: vi.fn(),
-  createDailyClosure: vi.fn(),
-  createWeeklyClosure: vi.fn(),
-  createMonthlyClosure: vi.fn(),
-  createAnnualClosure: vi.fn(),
+  createDailyClosureOpen: vi.fn(),
+  createWeeklyClosureOpen: vi.fn(),
+  createMonthlyClosureOpen: vi.fn(),
+  createAnnualClosureOpen: vi.fn(),
+  closeOpenClosureBulletin: vi.fn(),
+  deleteOpenClosureBulletin: vi.fn(),
   logClosure: vi.fn(),
 }));
 
@@ -54,10 +57,12 @@ vi.mock('../../models/legalJournal', () => ({
     getClosureBulletins: mocks.getClosureBulletins,
     getClosureBulletinsPaginated: vi.fn(),
     getLastFondDeCaisse: mocks.getLastFondDeCaisse,
-    createDailyClosure: mocks.createDailyClosure,
-    createWeeklyClosure: mocks.createWeeklyClosure,
-    createMonthlyClosure: mocks.createMonthlyClosure,
-    createAnnualClosure: mocks.createAnnualClosure,
+    createDailyClosureOpen: mocks.createDailyClosureOpen,
+    createWeeklyClosureOpen: mocks.createWeeklyClosureOpen,
+    createMonthlyClosureOpen: mocks.createMonthlyClosureOpen,
+    createAnnualClosureOpen: mocks.createAnnualClosureOpen,
+    closeOpenClosureBulletin: mocks.closeOpenClosureBulletin,
+    deleteOpenClosureBulletin: mocks.deleteOpenClosureBulletin,
     logClosure: mocks.logClosure,
   },
 }));
@@ -69,6 +74,7 @@ const app = express();
 app.use(express.json());
 app.use('/archive', archiveRouter);
 app.use('/closure', closureRouter);
+app.use(errorHandler);
 
 function tokenFor(role: 'establishment_admin' | 'staff') {
   return generateToken(
@@ -92,10 +98,12 @@ describe('legal archive/closure permission gating', () => {
     mocks.exportData.mockReset();
     mocks.getClosureBulletins.mockReset();
     mocks.getLastFondDeCaisse.mockReset();
-    mocks.createDailyClosure.mockReset();
-    mocks.createWeeklyClosure.mockReset();
-    mocks.createMonthlyClosure.mockReset();
-    mocks.createAnnualClosure.mockReset();
+    mocks.createDailyClosureOpen.mockReset();
+    mocks.createWeeklyClosureOpen.mockReset();
+    mocks.createMonthlyClosureOpen.mockReset();
+    mocks.createAnnualClosureOpen.mockReset();
+    mocks.closeOpenClosureBulletin.mockReset();
+    mocks.deleteOpenClosureBulletin.mockReset();
     mocks.logClosure.mockReset();
 
     mocks.poolQuery.mockImplementation(async (query: unknown) => {
@@ -111,7 +119,7 @@ describe('legal archive/closure permission gating', () => {
     mocks.exportData.mockResolvedValue({ id: 1 });
     mocks.getClosureBulletins.mockResolvedValue([]);
     mocks.getLastFondDeCaisse.mockResolvedValue(200);
-    mocks.createDailyClosure.mockResolvedValue({
+    mocks.createDailyClosureOpen.mockResolvedValue({
       id: 91,
       closure_type: 'DAILY',
       period_start: '2026-04-29T00:00:00.000Z',
@@ -122,7 +130,7 @@ describe('legal archive/closure permission gating', () => {
       first_sequence: 1,
       last_sequence: 44,
     });
-    mocks.createWeeklyClosure.mockResolvedValue({
+    mocks.createWeeklyClosureOpen.mockResolvedValue({
       id: 92,
       closure_type: 'WEEKLY',
       period_start: '2026-04-21T00:00:00.000Z',
@@ -133,7 +141,7 @@ describe('legal archive/closure permission gating', () => {
       first_sequence: 1,
       last_sequence: 60,
     });
-    mocks.createMonthlyClosure.mockResolvedValue({
+    mocks.createMonthlyClosureOpen.mockResolvedValue({
       id: 93,
       closure_type: 'MONTHLY',
       period_start: '2026-04-01T00:00:00.000Z',
@@ -144,7 +152,7 @@ describe('legal archive/closure permission gating', () => {
       first_sequence: 1,
       last_sequence: 180,
     });
-    mocks.createAnnualClosure.mockResolvedValue({
+    mocks.createAnnualClosureOpen.mockResolvedValue({
       id: 94,
       closure_type: 'ANNUAL',
       period_start: '2026-01-01T00:00:00.000Z',
@@ -156,6 +164,12 @@ describe('legal archive/closure permission gating', () => {
       last_sequence: 1400,
     });
     mocks.logClosure.mockResolvedValue({});
+    mocks.closeOpenClosureBulletin.mockImplementation(async (closureId: number) => ({
+      id: closureId,
+      is_closed: true,
+      closed_at: new Date().toISOString(),
+    }));
+    mocks.deleteOpenClosureBulletin.mockResolvedValue(true);
   });
 
   it('denies /archive/list without access_closure', async () => {
@@ -433,7 +447,7 @@ describe('legal archive/closure permission gating', () => {
       });
 
     expect(res.status).toBe(201);
-    expect(mocks.createDailyClosure).toHaveBeenCalledWith(
+    expect(mocks.createDailyClosureOpen).toHaveBeenCalledWith(
       new Date('2026-04-29'),
       EST,
       undefined,
@@ -455,5 +469,40 @@ describe('legal archive/closure permission gating', () => {
       }),
       '22'
     );
+    expect(mocks.closeOpenClosureBulletin).toHaveBeenCalledWith(91, EST);
+    expect(mocks.deleteOpenClosureBulletin).not.toHaveBeenCalled();
+  });
+
+  it('fails closed on /closure/create when journal append fails and rolls back open bulletin', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    mocks.createDailyClosureOpen.mockResolvedValue({
+      id: 222,
+      closure_type: 'DAILY',
+      period_start: '2026-04-29T00:00:00.000Z',
+      period_end: '2026-04-29T23:59:59.999Z',
+      total_amount: 250,
+      total_vat: 50,
+      closure_hash: 'hash-daily',
+      first_sequence: 1,
+      last_sequence: 44,
+      is_closed: false,
+    });
+    mocks.logClosure.mockRejectedValue(new Error('journal fail'));
+
+    const res = await request(app)
+      .post('/closure/create')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`)
+      .send({
+        date: '2026-04-29',
+        type: 'DAILY',
+        fond_de_caisse: 100,
+      });
+
+    expect(res.status).toBe(500);
+    expect(String(res.body?.error?.message ?? '')).toContain(
+      'Failed to persist legal journal entry for closure bulletin'
+    );
+    expect(mocks.deleteOpenClosureBulletin).toHaveBeenCalledWith(222, EST);
+    expect(mocks.closeOpenClosureBulletin).not.toHaveBeenCalled();
   });
 });

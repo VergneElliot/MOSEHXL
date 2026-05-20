@@ -23,6 +23,7 @@ type ClosureJournalPayload = {
   closure_hash?: string;
   first_sequence?: number;
   last_sequence?: number;
+  is_closed?: boolean;
 };
 
 async function appendClosureJournalEntry(
@@ -44,31 +45,69 @@ async function appendClosureJournalEntry(
   const totalAmount = Number.isFinite(rawAmount) ? rawAmount : 0;
   const totalVat = Number.isFinite(rawVat) ? rawVat : 0;
 
+  return await LegalJournalModel.logClosure(
+    establishmentId,
+    closureType,
+    totalAmount,
+    totalVat,
+    {
+      closure_bulletin_id: closure.id ?? null,
+      closure_type: closureType,
+      period_start: closure.period_start ?? null,
+      period_end: closure.period_end ?? null,
+      closure_hash: closure.closure_hash ?? null,
+      first_sequence: closure.first_sequence ?? null,
+      last_sequence: closure.last_sequence ?? null,
+      force: forceCreate,
+    },
+    userId
+  );
+}
+
+async function createClosureWithFailClosedJournal(
+  establishmentId: string,
+  closureType: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL',
+  forceCreate: boolean,
+  userId: string | undefined,
+  createOpenClosure: () => Promise<ClosureJournalPayload>
+): Promise<ClosureJournalPayload> {
+  const closure = await createOpenClosure();
+  const closureId = Number(closure.id);
+  if (!Number.isFinite(closureId)) {
+    throw new AppError('Failed to create closure bulletin', 500, 'LEGAL_CLOSURE_BULLETIN_CREATE_FAILED');
+  }
+
   try {
-    await LegalJournalModel.logClosure(
-      establishmentId,
-      closureType,
-      totalAmount,
-      totalVat,
-      {
-        closure_bulletin_id: closure.id ?? null,
-        closure_type: closureType,
-        period_start: closure.period_start ?? null,
-        period_end: closure.period_end ?? null,
-        closure_hash: closure.closure_hash ?? null,
-        first_sequence: closure.first_sequence ?? null,
-        last_sequence: closure.last_sequence ?? null,
-        force: forceCreate,
-      },
-      userId
-    );
-  } catch (error: unknown) {
+    await appendClosureJournalEntry(establishmentId, closureType, closure, forceCreate, userId);
+  } catch (error) {
     logger.error(
       `Legal journal closure append failed (${closureType}) for bulletin ${String(closure.id ?? 'unknown')}`,
       error instanceof Error ? error : new Error(String(error)),
       'LEGAL_JOURNAL'
     );
+
+    const rolledBack = await LegalJournalModel.deleteOpenClosureBulletin(closureId, establishmentId);
+    if (!rolledBack) {
+      logger.error(
+        `Failed to rollback open closure bulletin ${closureId} after journal append failure`,
+        new Error('Open closure bulletin rollback affected 0 rows'),
+        'LEGAL_CLOSURE'
+      );
+    }
+
+    throw new AppError(
+      'Failed to persist legal journal entry for closure bulletin',
+      500,
+      'LEGAL_CLOSURE_JOURNAL_APPEND_FAILED'
+    );
   }
+
+  const finalized = await LegalJournalModel.closeOpenClosureBulletin(closureId, establishmentId);
+  if (!finalized) {
+    throw new AppError('Failed to finalize closure bulletin', 500, 'LEGAL_CLOSURE_FINALIZE_FAILED');
+  }
+
+  return finalized as unknown as ClosureJournalPayload;
 }
 
 function parseForceFlag(force: unknown): boolean {
@@ -114,9 +153,21 @@ router.post('/daily', asyncHandler(async (req, res) => {
     }
 
     const forceCreate = parseForceFlag(force);
-    const closure = await LegalJournalModel.createDailyClosure(closureDate, establishmentId, undefined, forceCreate, fondDeCaisse);
     const userId = req.user ? String(req.user.id) : undefined;
-    await appendClosureJournalEntry(establishmentId, 'DAILY', closure as ClosureJournalPayload, forceCreate, userId);
+    const closure = await createClosureWithFailClosedJournal(
+      establishmentId,
+      'DAILY',
+      forceCreate,
+      userId,
+      () =>
+        LegalJournalModel.createDailyClosureOpen(
+          closureDate,
+          establishmentId,
+          undefined,
+          forceCreate,
+          fondDeCaisse
+        ) as Promise<ClosureJournalPayload>
+    );
 
     res.status(201).json({
       ...closure,
@@ -130,6 +181,7 @@ router.post('/daily', asyncHandler(async (req, res) => {
       error instanceof Error ? error : new Error(String(error)),
       'LEGAL_CLOSURE'
     );
+    if (error instanceof AppError) throw error;
     throw new AppError('Failed to create daily closure', 500, 'LEGAL_CLOSURE_DAILY_CREATE_FAILED');
   }
 }));
@@ -155,9 +207,20 @@ router.post('/weekly', asyncHandler(async (req, res) => {
       return res.status(400).json({ error: 'Invalid date format' });
     }
     const forceCreate = parseForceFlag(force);
-    const closure = await LegalJournalModel.createWeeklyClosure(closureDate, establishmentId, forceCreate, fondDeCaisse);
     const userId = req.user ? String(req.user.id) : undefined;
-    await appendClosureJournalEntry(establishmentId, 'WEEKLY', closure as ClosureJournalPayload, forceCreate, userId);
+    const closure = await createClosureWithFailClosedJournal(
+      establishmentId,
+      'WEEKLY',
+      forceCreate,
+      userId,
+      () =>
+        LegalJournalModel.createWeeklyClosureOpen(
+          closureDate,
+          establishmentId,
+          forceCreate,
+          fondDeCaisse
+        ) as Promise<ClosureJournalPayload>
+    );
     
     res.status(201).json({
       ...closure,
@@ -171,6 +234,7 @@ router.post('/weekly', asyncHandler(async (req, res) => {
       error instanceof Error ? error : new Error(String(error)),
       'LEGAL_CLOSURE'
     );
+    if (error instanceof AppError) throw error;
     throw new AppError('Failed to create weekly closure', 500, 'LEGAL_CLOSURE_WEEKLY_CREATE_FAILED');
   }
 }));
@@ -196,9 +260,20 @@ router.post('/monthly', asyncHandler(async (req, res) => {
       return res.status(400).json({ error: 'Invalid date format' });
     }
     const forceCreate = parseForceFlag(force);
-    const closure = await LegalJournalModel.createMonthlyClosure(closureDate, establishmentId, forceCreate, fondDeCaisse);
     const userId = req.user ? String(req.user.id) : undefined;
-    await appendClosureJournalEntry(establishmentId, 'MONTHLY', closure as ClosureJournalPayload, forceCreate, userId);
+    const closure = await createClosureWithFailClosedJournal(
+      establishmentId,
+      'MONTHLY',
+      forceCreate,
+      userId,
+      () =>
+        LegalJournalModel.createMonthlyClosureOpen(
+          closureDate,
+          establishmentId,
+          forceCreate,
+          fondDeCaisse
+        ) as Promise<ClosureJournalPayload>
+    );
     
     res.status(201).json({
       ...closure,
@@ -212,6 +287,7 @@ router.post('/monthly', asyncHandler(async (req, res) => {
       error instanceof Error ? error : new Error(String(error)),
       'LEGAL_CLOSURE'
     );
+    if (error instanceof AppError) throw error;
     throw new AppError('Failed to create monthly closure', 500, 'LEGAL_CLOSURE_MONTHLY_CREATE_FAILED');
   }
 }));
@@ -237,9 +313,20 @@ router.post('/annual', asyncHandler(async (req, res) => {
       return res.status(400).json({ error: 'Invalid date format' });
     }
     const forceCreate = parseForceFlag(force);
-    const closure = await LegalJournalModel.createAnnualClosure(closureDate, establishmentId, forceCreate, fondDeCaisse);
     const userId = req.user ? String(req.user.id) : undefined;
-    await appendClosureJournalEntry(establishmentId, 'ANNUAL', closure as ClosureJournalPayload, forceCreate, userId);
+    const closure = await createClosureWithFailClosedJournal(
+      establishmentId,
+      'ANNUAL',
+      forceCreate,
+      userId,
+      () =>
+        LegalJournalModel.createAnnualClosureOpen(
+          closureDate,
+          establishmentId,
+          forceCreate,
+          fondDeCaisse
+        ) as Promise<ClosureJournalPayload>
+    );
     
     res.status(201).json({
       ...closure,
@@ -253,6 +340,7 @@ router.post('/annual', asyncHandler(async (req, res) => {
       error instanceof Error ? error : new Error(String(error)),
       'LEGAL_CLOSURE'
     );
+    if (error instanceof AppError) throw error;
     throw new AppError('Failed to create annual closure', 500, 'LEGAL_CLOSURE_ANNUAL_CREATE_FAILED');
   }
 }));
@@ -286,30 +374,55 @@ router.post('/create', asyncHandler(async (req, res) => {
       return res.status(400).json({ error: 'fond_de_caisse is required and must be a number >= 0' });
     }
 
-    let closure;
+    let closureCreator!: () => Promise<ClosureJournalPayload>;
     switch (type) {
       case 'DAILY':
-        closure = await LegalJournalModel.createDailyClosure(closureDate, establishmentId, undefined, forceCreate, fondDeCaisse);
+        closureCreator = () =>
+          LegalJournalModel.createDailyClosureOpen(
+            closureDate,
+            establishmentId,
+            undefined,
+            forceCreate,
+            fondDeCaisse
+          ) as Promise<ClosureJournalPayload>;
         break;
       case 'WEEKLY':
-        closure = await LegalJournalModel.createWeeklyClosure(closureDate, establishmentId, forceCreate, fondDeCaisse);
+        closureCreator = () =>
+          LegalJournalModel.createWeeklyClosureOpen(
+            closureDate,
+            establishmentId,
+            forceCreate,
+            fondDeCaisse
+          ) as Promise<ClosureJournalPayload>;
         break;
       case 'MONTHLY':
-        closure = await LegalJournalModel.createMonthlyClosure(closureDate, establishmentId, forceCreate, fondDeCaisse);
+        closureCreator = () =>
+          LegalJournalModel.createMonthlyClosureOpen(
+            closureDate,
+            establishmentId,
+            forceCreate,
+            fondDeCaisse
+          ) as Promise<ClosureJournalPayload>;
         break;
       case 'ANNUAL':
-        closure = await LegalJournalModel.createAnnualClosure(closureDate, establishmentId, forceCreate, fondDeCaisse);
+        closureCreator = () =>
+          LegalJournalModel.createAnnualClosureOpen(
+            closureDate,
+            establishmentId,
+            forceCreate,
+            fondDeCaisse
+          ) as Promise<ClosureJournalPayload>;
         break;
       default:
         return res.status(400).json({ error: 'Invalid closure type' });
     }
     const userId = req.user ? String(req.user.id) : undefined;
-    await appendClosureJournalEntry(
+    const closure = await createClosureWithFailClosedJournal(
       establishmentId,
       type as 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL',
-      closure as ClosureJournalPayload,
       forceCreate,
-      userId
+      userId,
+      closureCreator
     );
 
     res.status(201).json({
@@ -327,6 +440,7 @@ router.post('/create', asyncHandler(async (req, res) => {
       error instanceof Error ? error : new Error(String(error)),
       'LEGAL_CLOSURE'
     );
+    if (error instanceof AppError) throw error;
     throw new AppError(`Failed to create ${String(req.body.type)} closure`, 500, 'LEGAL_CLOSURE_CREATE_FAILED');
   }
 }));

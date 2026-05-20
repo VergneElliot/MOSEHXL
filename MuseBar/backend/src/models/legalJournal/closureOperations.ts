@@ -40,7 +40,8 @@ export class ClosureOperations {
     establishmentId: string,
     timezone: string = DEFAULT_APP_TIMEZONE,
     force = false,
-    fondDeCaisse?: number
+    fondDeCaisse?: number,
+    closeImmediately = true
   ): Promise<ClosureBulletin> {
     // Business day period uses configurable timezone (Paris for France)
     const { start, end } = getBusinessDayPeriod(date, '02:00', timezone);
@@ -112,7 +113,8 @@ export class ClosureOperations {
       firstSequence,
       lastSequence,
       closureHash,
-      establishmentId
+      establishmentId,
+      closeImmediately
     );
   }
 
@@ -123,7 +125,8 @@ export class ClosureOperations {
     date: Date,
     establishmentId: string,
     force = false,
-    fondDeCaisse?: number
+    fondDeCaisse?: number,
+    closeImmediately = true
   ): Promise<ClosureBulletin> {
     // Get the start of the week (Monday) and end of the week (Sunday)
     const startOfWeek = new Date(date);
@@ -136,7 +139,16 @@ export class ClosureOperations {
     endOfWeek.setDate(endOfWeek.getDate() + 6);
     endOfWeek.setHours(23, 59, 59, 999);
 
-    return await this.createPeriodClosure('WEEKLY', startOfWeek, endOfWeek, date, establishmentId, force, fondDeCaisse);
+    return await this.createPeriodClosure(
+      'WEEKLY',
+      startOfWeek,
+      endOfWeek,
+      date,
+      establishmentId,
+      force,
+      fondDeCaisse,
+      closeImmediately
+    );
   }
 
   /**
@@ -146,13 +158,23 @@ export class ClosureOperations {
     date: Date,
     establishmentId: string,
     force = false,
-    fondDeCaisse?: number
+    fondDeCaisse?: number,
+    closeImmediately = true
   ): Promise<ClosureBulletin> {
     // Get the start and end of the month
     const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
     const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
 
-    return await this.createPeriodClosure('MONTHLY', startOfMonth, endOfMonth, date, establishmentId, force, fondDeCaisse);
+    return await this.createPeriodClosure(
+      'MONTHLY',
+      startOfMonth,
+      endOfMonth,
+      date,
+      establishmentId,
+      force,
+      fondDeCaisse,
+      closeImmediately
+    );
   }
 
   /**
@@ -162,13 +184,23 @@ export class ClosureOperations {
     date: Date,
     establishmentId: string,
     force = false,
-    fondDeCaisse?: number
+    fondDeCaisse?: number,
+    closeImmediately = true
   ): Promise<ClosureBulletin> {
     // Get the start and end of the year
     const startOfYear = new Date(date.getFullYear(), 0, 1);
     const endOfYear = new Date(date.getFullYear(), 11, 31, 23, 59, 59, 999);
 
-    return await this.createPeriodClosure('ANNUAL', startOfYear, endOfYear, date, establishmentId, force, fondDeCaisse);
+    return await this.createPeriodClosure(
+      'ANNUAL',
+      startOfYear,
+      endOfYear,
+      date,
+      establishmentId,
+      force,
+      fondDeCaisse,
+      closeImmediately
+    );
   }
 
   /**
@@ -181,7 +213,8 @@ export class ClosureOperations {
     referenceDate: Date,
     establishmentId: string,
     force = false,
-    fondDeCaisse?: number
+    fondDeCaisse?: number,
+    closeImmediately = true
   ): Promise<ClosureBulletin> {
     // Check if closure already exists for this establishment
     const exists = await JournalQueries.closureBulletinExists(closureType, startDate, endDate, establishmentId);
@@ -246,8 +279,23 @@ export class ClosureOperations {
       firstSequence,
       lastSequence,
       closureHash,
-      establishmentId
+      establishmentId,
+      closeImmediately
     );
+  }
+
+  static async closeOpenClosureBulletin(
+    closureBulletinId: number,
+    establishmentId: string
+  ): Promise<ClosureBulletin | null> {
+    return await JournalQueries.closeOpenClosureBulletin(closureBulletinId, establishmentId);
+  }
+
+  static async deleteOpenClosureBulletin(
+    closureBulletinId: number,
+    establishmentId: string
+  ): Promise<boolean> {
+    return await JournalQueries.deleteOpenClosureBulletin(closureBulletinId, establishmentId);
   }
 
   /**

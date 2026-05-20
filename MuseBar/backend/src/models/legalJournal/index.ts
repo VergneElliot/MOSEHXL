@@ -128,16 +128,60 @@ export class LegalJournalModel {
     return await ClosureOperations.createDailyClosure(date, establishmentId, timezone, force, fondDeCaisse);
   }
 
+  static async createDailyClosureOpen(
+    date: Date,
+    establishmentId: string,
+    timezone?: string,
+    force?: boolean,
+    fondDeCaisse?: number
+  ) {
+    return await ClosureOperations.createDailyClosure(
+      date,
+      establishmentId,
+      timezone,
+      force,
+      fondDeCaisse,
+      false
+    );
+  }
+
   static async createWeeklyClosure(date: Date, establishmentId: string, force?: boolean, fondDeCaisse?: number) {
     return await ClosureOperations.createWeeklyClosure(date, establishmentId, force ?? false, fondDeCaisse);
+  }
+
+  static async createWeeklyClosureOpen(
+    date: Date,
+    establishmentId: string,
+    force?: boolean,
+    fondDeCaisse?: number
+  ) {
+    return await ClosureOperations.createWeeklyClosure(date, establishmentId, force ?? false, fondDeCaisse, false);
   }
 
   static async createMonthlyClosure(date: Date, establishmentId: string, force?: boolean, fondDeCaisse?: number) {
     return await ClosureOperations.createMonthlyClosure(date, establishmentId, force ?? false, fondDeCaisse);
   }
 
+  static async createMonthlyClosureOpen(
+    date: Date,
+    establishmentId: string,
+    force?: boolean,
+    fondDeCaisse?: number
+  ) {
+    return await ClosureOperations.createMonthlyClosure(date, establishmentId, force ?? false, fondDeCaisse, false);
+  }
+
   static async createAnnualClosure(date: Date, establishmentId: string, force?: boolean, fondDeCaisse?: number) {
     return await ClosureOperations.createAnnualClosure(date, establishmentId, force ?? false, fondDeCaisse);
+  }
+
+  static async createAnnualClosureOpen(
+    date: Date,
+    establishmentId: string,
+    force?: boolean,
+    fondDeCaisse?: number
+  ) {
+    return await ClosureOperations.createAnnualClosure(date, establishmentId, force ?? false, fondDeCaisse, false);
   }
 
   static async getClosureBulletins(establishmentId: string, type?: 'DAILY' | 'MONTHLY' | 'ANNUAL') {
@@ -150,6 +194,14 @@ export class LegalJournalModel {
     opts?: { limit?: number; offset?: number }
   ) {
     return await ClosureOperations.getClosureBulletinsPaginated(establishmentId, type, opts);
+  }
+
+  static async closeOpenClosureBulletin(closureBulletinId: number, establishmentId: string) {
+    return await ClosureOperations.closeOpenClosureBulletin(closureBulletinId, establishmentId);
+  }
+
+  static async deleteOpenClosureBulletin(closureBulletinId: number, establishmentId: string) {
+    return await ClosureOperations.deleteOpenClosureBulletin(closureBulletinId, establishmentId);
   }
 
   static async getLastFondDeCaisse(establishmentId: string): Promise<number | null> {
