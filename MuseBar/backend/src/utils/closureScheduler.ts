@@ -4,6 +4,13 @@ import { LegalJournalModel } from '../models/legalJournal';
 import { AuditTrailModel } from '../models/auditTrail';
 import moment from 'moment-timezone';
 import { runWithTenantContext } from '../rls/tenantContext';
+import { Logger } from './logger';
+
+function toFiniteNumber(value: unknown): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const parsed = parseFloat(String(value ?? 0));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
 export class ClosureScheduler {
   private static interval: NodeJS.Timeout | null = null;
@@ -144,6 +151,53 @@ export class ClosureScheduler {
         throw err;
       }
 
+      // Append the matching CLOSURE entry to the legal journal so the
+      // auto-closure shows up in the immutable hash chain (P3-L1).
+      // Strict bulletin+journal atomicity is handled separately under P3-L2.
+      const totalAmount = toFiniteNumber(closureBulletin.total_amount);
+      const totalVat = toFiniteNumber(closureBulletin.total_vat);
+      let journalSequenceNumber: number | null = null;
+      try {
+        const journalEntry = await LegalJournalModel.logClosure(
+          establishmentId,
+          'DAILY',
+          totalAmount,
+          totalVat,
+          {
+            closure_bulletin_id: closureBulletin.id ?? null,
+            closure_type: 'DAILY',
+            period_start: closureBulletin.period_start ?? null,
+            period_end: closureBulletin.period_end ?? null,
+            closure_hash: closureBulletin.closure_hash ?? null,
+            first_sequence: closureBulletin.first_sequence ?? null,
+            last_sequence: closureBulletin.last_sequence ?? null,
+            force: false,
+            trigger: 'AUTOMATIC',
+          }
+        );
+        journalSequenceNumber = journalEntry?.sequence_number ?? null;
+      } catch (journalError) {
+        Logger.getInstance().error(
+          `Auto closure journal append failed for bulletin ${String(closureBulletin.id ?? 'unknown')}`,
+          journalError instanceof Error ? journalError : new Error(String(journalError)),
+          'LEGAL_JOURNAL'
+        );
+        await AuditTrailModel.logAction({
+          action_type: 'AUTO_CLOSURE_JOURNAL_APPEND_FAILED',
+          resource_type: 'CLOSURE_BULLETIN',
+          resource_id: closureBulletin.id?.toString(),
+          action_details: {
+            closure_type: 'DAILY',
+            establishment_id: establishmentId,
+            bulletin_id: closureBulletin.id ?? null,
+            closure_time: now.toISOString(),
+            error: journalError instanceof Error ? journalError.message : 'Unknown error',
+          },
+          ip_address: 'system',
+          user_agent: 'ClosureScheduler'
+        });
+      }
+
       await AuditTrailModel.logAction({
         action_type: 'AUTO_CLOSURE_EXECUTED',
         resource_type: 'CLOSURE_BULLETIN',
@@ -155,7 +209,8 @@ export class ClosureScheduler {
           transaction_count: closureBulletin.total_transactions,
           total_amount: closureBulletin.total_amount,
           closure_time: now.toISOString(),
-          trigger: 'AUTOMATIC'
+          trigger: 'AUTOMATIC',
+          journal_sequence_number: journalSequenceNumber,
         },
         ip_address: 'system',
         user_agent: 'ClosureScheduler'
