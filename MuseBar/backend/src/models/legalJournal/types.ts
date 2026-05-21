@@ -39,6 +39,11 @@ export interface ClosureBulletin {
   payment_methods_breakdown: Record<string, number>;
   tips_total?: number; // Total pourboires
   change_total?: number; // Total monnaie rendue
+  journal_sales_count?: number;
+  journal_sales_amount?: number;
+  journal_sales_vat?: number;
+  reconciliation_ok?: boolean;
+  reconciliation_details?: Record<string, unknown>;
   first_sequence: number;
   last_sequence: number;
   closure_hash: string;

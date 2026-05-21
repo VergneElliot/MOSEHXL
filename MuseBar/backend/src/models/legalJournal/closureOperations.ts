@@ -27,6 +27,32 @@ function vatFromTtc(ttc: number, rate: 0.1 | 0.2): number {
   return roundTo4(ttc / denom);
 }
 
+function computeReconciliation(
+  closureTotals: { transactions: number; amount: number; vat: number },
+  journalTotals: { count: number; amount: number; vat: number }
+): { ok: boolean; details: Record<string, unknown> } {
+  const txDelta = closureTotals.transactions - journalTotals.count;
+  const amountDelta = roundTo4(closureTotals.amount - journalTotals.amount);
+  const vatDelta = roundTo4(closureTotals.vat - journalTotals.vat);
+  const ok = txDelta === 0 && Math.abs(amountDelta) < 0.0001 && Math.abs(vatDelta) < 0.0001;
+
+  return {
+    ok,
+    details: {
+      closure_transactions: closureTotals.transactions,
+      journal_sale_transactions: journalTotals.count,
+      transaction_delta: txDelta,
+      closure_total_amount: roundTo4(closureTotals.amount),
+      journal_sale_amount: roundTo4(journalTotals.amount),
+      amount_delta: amountDelta,
+      closure_total_vat: roundTo4(closureTotals.vat),
+      journal_sale_vat: roundTo4(journalTotals.vat),
+      vat_delta: vatDelta,
+      compared_at: new Date().toISOString(),
+    },
+  };
+}
+
 export class ClosureOperations {
   /**
    * Create daily closure bulletin for one establishment (multi-tenant: only that establishment's orders).
@@ -89,6 +115,15 @@ export class ClosureOperations {
     const entries = await JournalQueries.getEntriesForPeriod(establishmentId, start.toDate(), end.toDate());
     const firstSequence = entries.length > 0 ? Math.min(...entries.map((e) => e.sequence_number)) : 0;
     const lastSequence = entries.length > 0 ? Math.max(...entries.map((e) => e.sequence_number)) : 0;
+    const journalSaleSummary = await JournalQueries.getSaleSummaryForPeriod(
+      establishmentId,
+      start.toDate(),
+      end.toDate()
+    );
+    const reconciliation = computeReconciliation(
+      { transactions: totalTransactions, amount: computedTotalAmount, vat: computedTotalVat },
+      journalSaleSummary
+    );
 
     // Generate closure hash
     const closureData = `DAILY|${date.toISOString().split('T')[0]}|${totalTransactions}|${computedTotalAmount}|${computedTotalVat}|${firstSequence}|${lastSequence}`;
@@ -110,6 +145,11 @@ export class ClosureOperations {
       paymentBreakdown,
       tipsTotal,
       changeTotal,
+      journalSaleSummary.count,
+      journalSaleSummary.amount,
+      journalSaleSummary.vat,
+      reconciliation.ok,
+      reconciliation.details,
       firstSequence,
       lastSequence,
       closureHash,
@@ -256,6 +296,15 @@ export class ClosureOperations {
     const entries = await JournalQueries.getEntriesForPeriod(establishmentId, startDate, endDate);
     const firstSequence = entries.length > 0 ? Math.min(...entries.map(e => e.sequence_number)) : 0;
     const lastSequence = entries.length > 0 ? Math.max(...entries.map(e => e.sequence_number)) : 0;
+    const journalSaleSummary = await JournalQueries.getSaleSummaryForPeriod(
+      establishmentId,
+      startDate,
+      endDate
+    );
+    const reconciliation = computeReconciliation(
+      { transactions: totalTransactions, amount: computedTotalAmount, vat: computedTotalVat },
+      journalSaleSummary
+    );
 
     // Generate closure hash
     const closureData = `${closureType}|${startDate.toISOString()}|${endDate.toISOString()}|${totalTransactions}|${computedTotalAmount}|${computedTotalVat}|${firstSequence}|${lastSequence}`;
@@ -276,6 +325,11 @@ export class ClosureOperations {
       paymentBreakdown,
       tipsTotal,
       changeTotal,
+      journalSaleSummary.count,
+      journalSaleSummary.amount,
+      journalSaleSummary.vat,
+      reconciliation.ok,
+      reconciliation.details,
       firstSequence,
       lastSequence,
       closureHash,

@@ -41,6 +41,11 @@ CREATE TABLE IF NOT EXISTS closure_bulletins (
     payment_methods_breakdown JSONB NOT NULL, -- Totals by payment method
     tips_total DECIMAL(12,4) NOT NULL DEFAULT 0, -- Aggregate tips in closure period
     change_total DECIMAL(12,4) NOT NULL DEFAULT 0, -- Aggregate change in closure period
+    journal_sales_count INTEGER NOT NULL DEFAULT 0, -- SALE entries found in legal journal for this period
+    journal_sales_amount DECIMAL(12,4) NOT NULL DEFAULT 0, -- SUM(legal_journal.amount) for SALE entries
+    journal_sales_vat DECIMAL(12,4) NOT NULL DEFAULT 0, -- SUM(legal_journal.vat_amount) for SALE entries
+    reconciliation_ok BOOLEAN NOT NULL DEFAULT TRUE, -- Whether closure totals reconcile against legal journal
+    reconciliation_details JSONB NOT NULL DEFAULT '{}'::jsonb, -- Delta details when reconciliation fails
     first_sequence INTEGER, -- First transaction sequence in period
     last_sequence INTEGER, -- Last transaction sequence in period
     closure_hash VARCHAR(64) NOT NULL, -- Closure integrity hash

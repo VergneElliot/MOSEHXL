@@ -89,6 +89,38 @@ export class JournalQueries {
     return result.rows;
   }
 
+  static async getSaleSummaryForPeriod(
+    establishmentId: string,
+    start: Date,
+    end: Date
+  ): Promise<{ count: number; amount: number; vat: number }> {
+    const result = await pool.query(
+      `
+        SELECT
+          COUNT(*)::int AS sale_count,
+          COALESCE(SUM(amount), 0)::numeric AS sale_amount,
+          COALESCE(SUM(vat_amount), 0)::numeric AS sale_vat
+        FROM legal_journal
+        WHERE establishment_id = $1
+          AND timestamp >= $2
+          AND timestamp <= $3
+          AND transaction_type = 'SALE'
+      `,
+      [establishmentId, start, end]
+    );
+
+    const row = result.rows[0] as {
+      sale_count?: number | string;
+      sale_amount?: number | string;
+      sale_vat?: number | string;
+    } | undefined;
+    return {
+      count: Number(row?.sale_count ?? 0),
+      amount: Number(row?.sale_amount ?? 0),
+      vat: Number(row?.sale_vat ?? 0),
+    };
+  }
+
   /**
    * Get all journal entries with pagination (one establishment)
    * @param limit - Number of entries to return
@@ -558,6 +590,11 @@ export class JournalQueries {
     paymentBreakdown: Record<string, number>,
     tipsTotal: number,
     changeTotal: number,
+    journalSalesCount: number,
+    journalSalesAmount: number,
+    journalSalesVat: number,
+    reconciliationOk: boolean,
+    reconciliationDetails: Record<string, unknown>,
     firstSequence: number,
     lastSequence: number,
     closureHash: string,
@@ -567,9 +604,14 @@ export class JournalQueries {
     const query = `
       INSERT INTO closure_bulletins (
         closure_type, period_start, period_end, total_transactions, fond_de_caisse, total_amount, 
-        total_vat, vat_breakdown, payment_methods_breakdown, tips_total, change_total, first_sequence, 
-        last_sequence, closure_hash, is_closed, closed_at, establishment_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+        total_vat, vat_breakdown, payment_methods_breakdown, tips_total, change_total,
+        journal_sales_count, journal_sales_amount, journal_sales_vat, reconciliation_ok, reconciliation_details,
+        first_sequence, last_sequence, closure_hash, is_closed, closed_at, establishment_id
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+        $12, $13, $14, $15, $16,
+        $17, $18, $19, $20, $21, $22
+      )
       RETURNING *
     `;
 
@@ -585,6 +627,11 @@ export class JournalQueries {
       JSON.stringify(paymentBreakdown),
       tipsTotal,
       changeTotal,
+      journalSalesCount,
+      journalSalesAmount,
+      journalSalesVat,
+      reconciliationOk,
+      JSON.stringify(reconciliationDetails),
       firstSequence,
       lastSequence,
       closureHash,
