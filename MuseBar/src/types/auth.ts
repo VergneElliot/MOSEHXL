@@ -43,7 +43,6 @@ export interface LoginCredentials {
 
 export interface AuthResponse {
   token: string;
-  refreshToken: string;
   user: User;
   expiresIn: string;
   refreshExpiresIn?: string;

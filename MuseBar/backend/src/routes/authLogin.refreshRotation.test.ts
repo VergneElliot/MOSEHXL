@@ -99,11 +99,14 @@ describe('POST /auth/refresh token rotation', () => {
   it('reissues access+refresh tokens and rotates refresh session', async () => {
     const res = await request(app)
       .post('/auth/refresh')
-      .send({ rememberMe: false, refreshToken: 'refresh-1' });
+      .set('Cookie', ['musebar_refresh_token=refresh-1'])
+      .send({ rememberMe: false });
 
     expect(res.status).toBe(200);
     expect(typeof res.body.token).toBe('string');
-    expect(typeof res.body.refreshToken).toBe('string');
+    expect(res.body.refreshToken).toBeUndefined();
+    const setCookieHeader = res.headers['set-cookie'] ?? [];
+    expect(String(setCookieHeader[0] ?? '')).toContain('musebar_refresh_token=');
     const decoded = verifyToken(res.body.token);
     expect(decoded.role).toBe('establishment_admin');
     expect(decoded.establishment_id).toBe('11111111-1111-4111-8111-111111111111');
@@ -148,7 +151,8 @@ describe('POST /auth/refresh token rotation', () => {
 
     const res = await request(app)
       .post('/auth/refresh')
-      .send({ rememberMe: false, refreshToken: 'missing-token' });
+      .set('Cookie', ['musebar_refresh_token=missing-token'])
+      .send({ rememberMe: false });
 
     expect(res.status).toBe(401);
     expect(String(res.body.error)).toContain('Invalid or expired refresh token');

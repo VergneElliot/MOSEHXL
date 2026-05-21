@@ -70,7 +70,7 @@ The IDs follow the existing audit convention: **P0/P1/P2** = priority, **L/S/Q/D
 
 | ID | Title | Rationale | Effort |
 |----|-------|-----------|--------|
-| **P3-S5** | Move tokens from `localStorage` to httpOnly cookie or BFF (part of P2-S16) | Reduces XSS blast radius even before opaque-refresh migration. | **L** |
+| **P3-S5** | Move tokens from `localStorage` to httpOnly cookie or BFF (part of P2-S16) | **Fixed (2026-05-21):** refresh token transport moved to httpOnly cookie and frontend token persistence removed from localStorage; BFF and CSRF follow-up tracked separately. | **L** |
 | **P3-S6** | Account lockout after N failed logins + admin unlock | Today only rate limit; no progressive lock; no audit `ACCOUNT_LOCKED`. | **M** |
 | **P3-S7** | Optional HIBP k-anonymity check on set-password paths | Cheap to integrate; widely expected control. | **S** |
 | **P3-S8** | 2FA (TOTP) for `system_admin` and `establishment_admin` | Step-up auth for admin paths. | **L** |
@@ -113,7 +113,7 @@ You explicitly requested this as a to-do for this audit. It is now **P3-S4 (P1)*
 | 8 | **Anomaly signals** (geo/IP/UA delta) for admin endpoints, paired with 2FA | Operational detection. |
 | 9 | **Retire legacy `is_admin` JWT claim** after max TTL elapses (7d) + metrics | Completes the P2-S3 rollover (`auth.ts` L81-84). |
 
-**Current state to be honest about (updated):** phase 1 is now in place (15m access JWT + DB-backed opaque rotating refresh tokens + refresh revoke on password reset/change). Remaining roadmap items are cookie/BFF transport, CSRF, algorithm pinning/migration to asymmetric signing, and session/device anomaly controls.
+**Current state to be honest about (updated):** phase 1 and cookie transport are in place (15m access JWT + DB-backed opaque rotating refresh tokens + refresh revoke on password reset/change + httpOnly refresh cookie, no localStorage token persistence). Remaining roadmap items are CSRF double-submit coverage, algorithm pinning/migration to asymmetric signing, and session/device anomaly controls.
 
 ---
 

@@ -68,6 +68,46 @@ function computeRefreshExpiry(rememberMe: boolean): { expiresAt: Date; refreshEx
   };
 }
 
+function getRefreshCookieName(): string {
+  return 'musebar_refresh_token';
+}
+
+function getRefreshTokenFromRequest(req: express.Request): string | null {
+  const rawCookieHeader = req.headers.cookie;
+  if (typeof rawCookieHeader === 'string' && rawCookieHeader.length > 0) {
+    const cookiePair = rawCookieHeader
+      .split(';')
+      .map((part) => part.trim())
+      .find((part) => part.startsWith(`${getRefreshCookieName()}=`));
+    if (cookiePair) {
+      const value = cookiePair.slice(getRefreshCookieName().length + 1).trim();
+      if (value.length > 0) return decodeURIComponent(value);
+    }
+  }
+  const bodyToken = req.body?.refreshToken;
+  return typeof bodyToken === 'string' && bodyToken.trim().length > 0 ? bodyToken.trim() : null;
+}
+
+function setRefreshTokenCookie(res: express.Response, refreshToken: string, rememberMe: boolean): void {
+  const maxAgeMs = rememberMe ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+  res.cookie(getRefreshCookieName(), refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/api/auth',
+    maxAge: maxAgeMs,
+  });
+}
+
+function clearRefreshTokenCookie(res: express.Response): void {
+  res.clearCookie(getRefreshCookieName(), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/api/auth',
+  });
+}
+
 async function logAuditOrThrow(
   entry: Parameters<typeof AuditTrailModel.logAction>[0],
   context: string
@@ -168,6 +208,7 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
     });
+    setRefreshTokenCookie(res, refreshToken, !!rememberMe);
 
     await logAuditOrThrow({
       user_id: String(user.id),
@@ -179,7 +220,6 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
 
     return res.json({
       token,
-      refreshToken,
       user: {
         id: user.id,
         email: user.email,
@@ -238,7 +278,7 @@ router.post('/refresh', refreshRateLimit, asyncHandler(async (req, res) => {
   const lockClient = await pool.connect();
   try {
     await lockClient.query('BEGIN');
-    const refreshTokenRaw = req.body?.refreshToken;
+    const refreshTokenRaw = getRefreshTokenFromRequest(req);
     const rememberMe = req.body?.rememberMe === true;
     if (!refreshTokenRaw || typeof refreshTokenRaw !== 'string') {
       await lockClient.query('COMMIT');
@@ -248,6 +288,7 @@ router.post('/refresh', refreshRateLimit, asyncHandler(async (req, res) => {
     const refreshSession = await RefreshTokenModel.findActiveByRawToken(refreshTokenRaw);
     if (!refreshSession) {
       await lockClient.query('COMMIT');
+      clearRefreshTokenCookie(res);
       return res.status(401).json({ error: 'Invalid or expired refresh token' });
     }
     const userId = refreshSession.user_id;
@@ -296,15 +337,16 @@ router.post('/refresh', refreshRateLimit, asyncHandler(async (req, res) => {
     }, 'TOKEN_REFRESH');
 
     await lockClient.query('COMMIT');
+    setRefreshTokenCookie(res, nextRefreshToken, !!rememberMe);
     return res.json({
       token,
-      refreshToken: nextRefreshToken,
       expiresIn: '15m',
       refreshExpiresIn,
     });
   } catch (error) {
     await lockClient.query('ROLLBACK');
     if (error instanceof Error && error.message === 'REFRESH_TOKEN_ALREADY_USED_OR_EXPIRED') {
+      clearRefreshTokenCookie(res);
       return res.status(401).json({ error: 'Invalid or expired refresh token' });
     }
     throw new AppError('Internal server error', 500, 'TOKEN_REFRESH_FAILED');
@@ -467,7 +509,7 @@ router.post('/support/impersonation/stop', requireAuth, requireAdmin, asyncHandl
 // POST /api/auth/logout
 // ---------------------------------------------------------------------------
 router.post('/logout', requireAuth, asyncHandler(async (req, res) => {
-  const refreshToken = typeof req.body?.refreshToken === 'string' ? req.body.refreshToken : null;
+  const refreshToken = getRefreshTokenFromRequest(req);
   const authorization = req.headers.authorization;
   const currentToken = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
   if (currentToken) {
@@ -476,6 +518,7 @@ router.post('/logout', requireAuth, asyncHandler(async (req, res) => {
   if (refreshToken) {
     await RefreshTokenModel.revokeByRawToken(refreshToken, 'LOGOUT');
   }
+  clearRefreshTokenCookie(res);
 
   await logAuditOrThrow({
     user_id: String(req.user!.id),

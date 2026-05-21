@@ -16,7 +16,6 @@ import type { User } from '../../types';
 interface LoginProps {
   onLogin: (
     token: string,
-    refreshToken: string,
     user: User,
     rememberMe: boolean,
     expiresIn: string,
@@ -52,7 +51,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       // Use apiService to automatically handle network configuration
       const response = await apiService.post<{
         token: string;
-        refreshToken: string;
         user: User;
         expiresIn: string;
         refreshExpiresIn?: string;
@@ -64,7 +62,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       const data = response.data;
       onLogin(
         data.token,
-        data.refreshToken,
         data.user,
         rememberMe,
         data.expiresIn,

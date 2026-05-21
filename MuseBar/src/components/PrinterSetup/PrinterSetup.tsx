@@ -25,6 +25,7 @@ import {
   Cloud as CloudIcon,
 } from '@mui/icons-material';
 import { apiConfig } from '../../config/api';
+import { apiCore } from '../../services/api';
 
 interface Printer {
   id: string;
@@ -102,8 +103,10 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
 
   const loadCurrentConfiguration = async () => {
     try {
+      const token = apiCore.getToken();
       const response = await fetch(apiConfig.getEndpoint('/api/printing/configuration'), {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+        credentials: 'include',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       
       if (response.ok) {
@@ -154,12 +157,14 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
     setError(null);
 
     try {
+      const token = apiCore.getToken();
       // First save the configuration
       const saveResponse = await fetch(apiConfig.getEndpoint('/api/printing/configuration'), {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
           provider: selectedProvider,
@@ -174,9 +179,10 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
       // Then test print
       const testResponse = await fetch(apiConfig.getEndpoint('/api/printing/test'), {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         }
       });
 
@@ -198,8 +204,10 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
 
   const loadPrinters = async () => {
     try {
+      const token = apiCore.getToken();
       const response = await fetch(apiConfig.getEndpoint('/api/printing/printers'), {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+        credentials: 'include',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       
       if (response.ok) {
@@ -218,11 +226,13 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
     setError(null);
 
     try {
+      const token = apiCore.getToken();
       const response = await fetch(apiConfig.getEndpoint('/api/printing/configuration'), {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
           provider: selectedProvider,

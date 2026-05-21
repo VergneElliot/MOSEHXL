@@ -88,7 +88,16 @@ export function createRefreshRateLimitKeyResolver(jwtSecret: string) {
 
 export function resolveOpaqueRefreshRateLimitKey(req: Request): string {
   const ip = req.ip ?? 'unknown';
-  const rawRefreshToken = typeof req.body?.refreshToken === 'string' ? req.body.refreshToken.trim() : '';
+  const cookieHeader = typeof req.headers.cookie === 'string' ? req.headers.cookie : '';
+  const refreshCookiePart = cookieHeader
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith('musebar_refresh_token='));
+  const refreshFromCookie = refreshCookiePart
+    ? decodeURIComponent(refreshCookiePart.slice('musebar_refresh_token='.length).trim())
+    : '';
+  const refreshFromBody = typeof req.body?.refreshToken === 'string' ? req.body.refreshToken.trim() : '';
+  const rawRefreshToken = refreshFromCookie || refreshFromBody;
   if (!rawRefreshToken) {
     return `ip:${ip}:refresh:anon`;
   }
