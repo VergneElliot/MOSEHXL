@@ -116,7 +116,69 @@ router.get('/:id', asyncHandler(async (req, res) => {
 }));
 
 /**
- * POST export archive
+ * POST verify archive integrity/signature
+ * POST /api/legal/archive/:id/verify
+ */
+router.post('/:id/verify', asyncHandler(async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
+  try {
+    const archiveId = parseInt(req.params.id);
+    if (isNaN(archiveId)) {
+      return res.status(400).json({ error: 'Invalid archive ID' });
+    }
+
+    const verification = await ArchiveService.verifyArchiveExport(archiveId, establishmentId);
+    if (!verification.isValid && verification.errors.includes('Archive export not found')) {
+      return res.status(404).json({ error: 'Archive not found' });
+    }
+
+    res.json({
+      archive_id: archiveId,
+      ...verification,
+      compliance_note: 'Archive integrity and signature verification result'
+    });
+  } catch (error: unknown) {
+    logger.error(
+      'Error verifying archive',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_ARCHIVE'
+    );
+    throw new AppError('Failed to verify archive', 500, 'LEGAL_ARCHIVE_VERIFY_FAILED');
+  }
+}));
+
+/**
+ * GET download archive file
+ * GET /api/legal/archive/:id/download
+ */
+router.get('/:id/download', asyncHandler(async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
+  try {
+    const archiveId = parseInt(req.params.id);
+    if (isNaN(archiveId)) {
+      return res.status(400).json({ error: 'Invalid archive ID' });
+    }
+
+    const download = await ArchiveService.downloadArchiveExport(archiveId, establishmentId);
+    if (!download) {
+      return res.status(404).json({ error: 'Archive file not found' });
+    }
+
+    return res.download(download.filePath, download.fileName);
+  } catch (error: unknown) {
+    logger.error(
+      'Error downloading archive',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_ARCHIVE'
+    );
+    throw new AppError('Failed to download archive', 500, 'LEGAL_ARCHIVE_DOWNLOAD_FAILED');
+  }
+}));
+
+/**
+ * POST export archive (legacy alias to download route)
  * POST /api/legal/archive/:id/export
  */
 router.post('/:id/export', asyncHandler(async (req, res) => {
@@ -127,15 +189,14 @@ router.post('/:id/export', asyncHandler(async (req, res) => {
     if (isNaN(archiveId)) {
       return res.status(400).json({ error: 'Invalid archive ID' });
     }
-    
-    void archiveId;
-    void req.body;
 
-    res.status(501).json({
-      error: 'Archive export is not implemented yet',
-      code: 'LEGAL_ARCHIVE_EXPORT_NOT_IMPLEMENTED',
-      compliance_note: 'Export endpoint is intentionally disabled until full implementation is available'
-    });
+    const download = await ArchiveService.downloadArchiveExport(archiveId, establishmentId);
+    if (!download) {
+      return res.status(404).json({ error: 'Archive file not found' });
+    }
+
+    res.setHeader('Deprecation', 'true');
+    return res.download(download.filePath, download.fileName);
   } catch (error: unknown) {
     logger.error(
       'Error exporting archive',
