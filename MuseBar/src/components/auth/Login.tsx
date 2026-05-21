@@ -14,7 +14,14 @@ import { apiService } from '../../services/apiService';
 import type { User } from '../../types';
 
 interface LoginProps {
-  onLogin: (token: string, user: User, rememberMe: boolean, expiresIn: string) => void;
+  onLogin: (
+    token: string,
+    refreshToken: string,
+    user: User,
+    rememberMe: boolean,
+    expiresIn: string,
+    refreshExpiresIn?: string
+  ) => void;
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
@@ -45,15 +52,24 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       // Use apiService to automatically handle network configuration
       const response = await apiService.post<{
         token: string;
+        refreshToken: string;
         user: User;
         expiresIn: string;
+        refreshExpiresIn?: string;
       }>('/auth/login', {
         email,
         password,
         rememberMe,
       });
       const data = response.data;
-      onLogin(data.token, data.user, rememberMe, data.expiresIn);
+      onLogin(
+        data.token,
+        data.refreshToken,
+        data.user,
+        rememberMe,
+        data.expiresIn,
+        data.refreshExpiresIn
+      );
     } catch (err: unknown) {
       console.error('Login error:', err);
       setError(err instanceof Error ? err.message : 'Erreur réseau ou serveur');

@@ -1,7 +1,9 @@
 import express from 'express';
+import crypto from 'crypto';
 import { UserModel } from '../models/user';
 import { AuditTrailModel } from '../models/auditTrail';
 import { TokenBlocklistModel } from '../models/tokenBlocklist';
+import { RefreshTokenModel } from '../models/refreshToken';
 import { Logger } from '../utils/logger';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import {
@@ -13,7 +15,7 @@ import { pool } from '../db/pool';
 import { CanonicalAuthRole, deriveCanonicalRole } from '../auth/roleVocabulary';
 import {
   createAuthRateLimitMiddleware,
-  createRefreshRateLimitKeyResolver,
+  resolveOpaqueRefreshRateLimitKey,
   resolveLoginRateLimitKey
 } from '../middleware/security/AuthEndpointRateLimit';
 
@@ -54,9 +56,17 @@ const refreshRateLimit = createAuthRateLimitMiddleware({
   keyPrefix: 'auth_refresh',
   windowMs: 15 * 60 * 1000,
   maxRequests: 30 * authRateLimitBase,
-  keyResolver: createRefreshRateLimitKeyResolver(process.env.JWT_SECRET ?? ''),
+  keyResolver: resolveOpaqueRefreshRateLimitKey,
   errorMessage: 'Too many token refresh attempts. Please retry later.',
 });
+
+function computeRefreshExpiry(rememberMe: boolean): { expiresAt: Date; refreshExpiresIn: string } {
+  const days = rememberMe ? 7 : 1;
+  return {
+    expiresAt: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
+    refreshExpiresIn: rememberMe ? '7d' : '1d',
+  };
+}
 
 async function logAuditOrThrow(
   entry: Parameters<typeof AuditTrailModel.logAction>[0],
@@ -149,6 +159,15 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
       { id: user.id, email: user.email, role, establishment_id },
       !!rememberMe
     );
+    const refreshToken = crypto.randomBytes(32).toString('hex');
+    const { expiresAt, refreshExpiresIn } = computeRefreshExpiry(!!rememberMe);
+    await RefreshTokenModel.create({
+      userId: user.id,
+      token: refreshToken,
+      expiresAt,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
 
     await logAuditOrThrow({
       user_id: String(user.id),
@@ -160,6 +179,7 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
 
     return res.json({
       token,
+      refreshToken,
       user: {
         id: user.id,
         email: user.email,
@@ -170,7 +190,8 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
         establishment_id,
         permissions: [],
       },
-      expiresIn: !!rememberMe ? '7d' : '12h',
+      expiresIn: '15m',
+      refreshExpiresIn,
     });
   } catch (error) {
     Logger.getInstance().error('Login error', error as Error);
@@ -213,26 +234,34 @@ router.get('/me', requireAuth, asyncHandler(async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/auth/refresh — re-issue token with current DB state
 // ---------------------------------------------------------------------------
-router.post('/refresh', refreshRateLimit, requireAuth, asyncHandler(async (req, res) => {
+router.post('/refresh', refreshRateLimit, asyncHandler(async (req, res) => {
   const lockClient = await pool.connect();
   try {
     await lockClient.query('BEGIN');
-
-    if (req.user?.support_impersonation) {
+    const refreshTokenRaw = req.body?.refreshToken;
+    const rememberMe = req.body?.rememberMe === true;
+    if (!refreshTokenRaw || typeof refreshTokenRaw !== 'string') {
       await lockClient.query('COMMIT');
-      return res.status(400).json({
-        error: 'Impersonation tokens cannot be refreshed. Start a new support impersonation session instead.'
-      });
+      return res.status(400).json({ error: 'refreshToken is required' });
     }
 
-    const { rememberMe } = req.body;
-    const userId = req.user!.id;
+    const refreshSession = await RefreshTokenModel.findActiveByRawToken(refreshTokenRaw);
+    if (!refreshSession) {
+      await lockClient.query('COMMIT');
+      return res.status(401).json({ error: 'Invalid or expired refresh token' });
+    }
+    const userId = refreshSession.user_id;
 
     await lockClient.query('SELECT pg_advisory_xact_lock($1::bigint)', [userId]);
 
     // Re-fetch role and establishment_id in case they changed since last login
     const d = await UserModel.getAuthRoleState(userId);
     if (!d) {
+      await lockClient.query('COMMIT');
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const userRow = await UserModel.findById(userId);
+    if (!userRow) {
       await lockClient.query('COMMIT');
       return res.status(404).json({ error: 'User not found' });
     }
@@ -245,28 +274,39 @@ router.post('/refresh', refreshRateLimit, requireAuth, asyncHandler(async (req, 
     });
 
     const token = generateToken(
-      { id: userId, email: req.user!.email, role, establishment_id },
+      { id: userId, email: userRow.email, role, establishment_id },
       !!rememberMe
     );
+    const nextRefreshToken = crypto.randomBytes(32).toString('hex');
+    const { expiresAt, refreshExpiresIn } = computeRefreshExpiry(!!rememberMe);
+    await RefreshTokenModel.rotate(refreshTokenRaw, nextRefreshToken, {
+      userId,
+      familyId: refreshSession.family_id,
+      expiresAt,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
 
     await logAuditOrThrow({
       user_id: String(userId),
       action_type: 'TOKEN_REFRESH',
-      action_details: { email: req.user!.email, rememberMe: !!rememberMe },
+      action_details: { rememberMe: !!rememberMe },
       ip_address: req.ip,
       user_agent: req.headers['user-agent'],
     }, 'TOKEN_REFRESH');
 
-    const authorization = req.headers.authorization;
-    const currentToken = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
-    if (currentToken) {
-      await revokeTokenOrThrow(currentToken, userId, 'TOKEN_REFRESH_ROTATED');
-    }
-
     await lockClient.query('COMMIT');
-    return res.json({ token, expiresIn: rememberMe ? '7d' : '12h' });
-  } catch {
+    return res.json({
+      token,
+      refreshToken: nextRefreshToken,
+      expiresIn: '15m',
+      refreshExpiresIn,
+    });
+  } catch (error) {
     await lockClient.query('ROLLBACK');
+    if (error instanceof Error && error.message === 'REFRESH_TOKEN_ALREADY_USED_OR_EXPIRED') {
+      return res.status(401).json({ error: 'Invalid or expired refresh token' });
+    }
     throw new AppError('Internal server error', 500, 'TOKEN_REFRESH_FAILED');
   } finally {
     lockClient.release();
@@ -415,7 +455,7 @@ router.post('/support/impersonation/stop', requireAuth, requireAdmin, asyncHandl
     return res.json({
       message: 'Support impersonation ended',
       token: resetToken,
-      expiresIn: '12h',
+      expiresIn: '15m',
     });
   } catch (error) {
     Logger.getInstance().error('Failed to stop support impersonation', error as Error, 'AUTH_ROUTE');
@@ -427,10 +467,14 @@ router.post('/support/impersonation/stop', requireAuth, requireAdmin, asyncHandl
 // POST /api/auth/logout
 // ---------------------------------------------------------------------------
 router.post('/logout', requireAuth, asyncHandler(async (req, res) => {
+  const refreshToken = typeof req.body?.refreshToken === 'string' ? req.body.refreshToken : null;
   const authorization = req.headers.authorization;
   const currentToken = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
   if (currentToken) {
     await revokeTokenOrThrow(currentToken, req.user!.id, 'LOGOUT');
+  }
+  if (refreshToken) {
+    await RefreshTokenModel.revokeByRawToken(refreshToken, 'LOGOUT');
   }
 
   await logAuditOrThrow({

@@ -40,7 +40,7 @@ export function generateToken(
   rememberMe: boolean = false,
   customExpiresIn?: jwt.SignOptions['expiresIn']
 ): string {
-  const expiration: jwt.SignOptions['expiresIn'] = customExpiresIn ?? (rememberMe ? '7d' : '12h');
+  const expiration: jwt.SignOptions['expiresIn'] = customExpiresIn ?? '15m';
   const payloadWithJti = payload.jti ? payload : { ...payload, jti: crypto.randomUUID() };
   // One-rollover migration: never emit legacy `is_admin` in new tokens.
   const { is_admin: _legacyIsAdmin, ...signablePayload } = payloadWithJti;

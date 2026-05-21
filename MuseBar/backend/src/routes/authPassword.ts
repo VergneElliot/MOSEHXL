@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { UserModel } from '../models/user';
 import { PasswordResetRequestModel } from '../models/passwordResetRequest';
 import { TokenBlocklistModel } from '../models/tokenBlocklist';
+import { RefreshTokenModel } from '../models/refreshToken';
 import { AuditTrailModel } from '../models/auditTrail';
 import { Logger } from '../utils/logger';
 import { EmailService } from '../services/email/EmailService';
@@ -128,6 +129,7 @@ router.post('/password/reset', asyncHandler(async (req, res) => {
     Math.floor(Date.now() / 1000),
     'PASSWORD_RESET'
   );
+  await RefreshTokenModel.revokeAllForUser(resetRequest.user_id, 'PASSWORD_RESET');
 
   await logAuditBestEffort({
     user_id: String(resetRequest.user_id),
@@ -178,6 +180,7 @@ router.post('/password/change', requireAuth, asyncHandler(async (req, res) => {
 
   const cutoff = Math.floor(Date.now() / 1000);
   await TokenBlocklistModel.revokeAllUserTokensIssuedBefore(user.id, cutoff, 'PASSWORD_CHANGE');
+  await RefreshTokenModel.revokeAllForUser(user.id, 'PASSWORD_CHANGE');
 
   const authorization = req.headers.authorization;
   const currentToken = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;

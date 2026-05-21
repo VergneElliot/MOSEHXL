@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import express from 'express';
-import jwt from 'jsonwebtoken';
-import { generateToken, verifyToken } from '../middleware/auth';
+import { verifyToken } from '../middleware/auth';
 
 const mocks = vi.hoisted(() => ({
   poolQuery: vi.fn(),
@@ -11,6 +10,9 @@ const mocks = vi.hoisted(() => ({
   lockClientRelease: vi.fn(),
   logAction: vi.fn().mockResolvedValue({}),
   getAuthRoleState: vi.fn(),
+  findById: vi.fn(),
+  findActiveRefreshToken: vi.fn(),
+  rotateRefreshToken: vi.fn(),
 }));
 
 vi.mock('../app', () => ({
@@ -31,6 +33,16 @@ vi.mock('../models/auditTrail', () => ({
 vi.mock('../models/user', () => ({
   UserModel: {
     getAuthRoleState: mocks.getAuthRoleState,
+    findById: mocks.findById,
+  },
+}));
+
+vi.mock('../models/refreshToken', () => ({
+  RefreshTokenModel: {
+    findActiveByRawToken: mocks.findActiveRefreshToken,
+    rotate: mocks.rotateRefreshToken,
+    create: vi.fn(),
+    revokeByRawToken: vi.fn(),
   },
 }));
 
@@ -40,35 +52,6 @@ const app = express();
 app.use(express.json());
 app.use('/auth', authLoginRouter);
 
-function establishmentAdminToken() {
-  return generateToken(
-    {
-      id: 10,
-      email: 'admin@est.example.com',
-      is_admin: false,
-      role: 'establishment_admin',
-      establishment_id: '11111111-1111-4111-8111-111111111111',
-    },
-    false
-  );
-}
-
-function legacyEstablishmentAdminToken() {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) throw new Error('JWT_SECRET is required for legacy token test');
-  return jwt.sign(
-    {
-      id: 10,
-      email: 'admin@est.example.com',
-      is_admin: false,
-      role: 'establishment_admin',
-      establishment_id: '11111111-1111-4111-8111-111111111111',
-    },
-    secret,
-    { expiresIn: '12h' }
-  );
-}
-
 describe('POST /auth/refresh token rotation', () => {
   beforeEach(() => {
     mocks.poolQuery.mockReset();
@@ -77,6 +60,9 @@ describe('POST /auth/refresh token rotation', () => {
     mocks.lockClientRelease.mockReset();
     mocks.logAction.mockReset();
     mocks.getAuthRoleState.mockReset();
+    mocks.findById.mockReset();
+    mocks.findActiveRefreshToken.mockReset();
+    mocks.rotateRefreshToken.mockReset();
 
     mocks.logAction.mockResolvedValue({});
     mocks.getAuthRoleState.mockResolvedValue({
@@ -84,6 +70,15 @@ describe('POST /auth/refresh token rotation', () => {
       establishment_id: '11111111-1111-4111-8111-111111111111',
       is_admin: false,
     });
+    mocks.findById.mockResolvedValue({
+      id: 10,
+      email: 'admin@est.example.com',
+    });
+    mocks.findActiveRefreshToken.mockResolvedValue({
+      user_id: 10,
+      family_id: '11111111-1111-4111-8111-111111111111',
+    });
+    mocks.rotateRefreshToken.mockResolvedValue(undefined);
     mocks.poolConnect.mockResolvedValue({
       query: mocks.lockClientQuery,
       release: mocks.lockClientRelease,
@@ -101,16 +96,14 @@ describe('POST /auth/refresh token rotation', () => {
     });
   });
 
-  it('reissues token and revokes the current bearer token', async () => {
-    const currentToken = establishmentAdminToken();
+  it('reissues access+refresh tokens and rotates refresh session', async () => {
     const res = await request(app)
       .post('/auth/refresh')
-      .set('Authorization', `Bearer ${currentToken}`)
-      .send({ rememberMe: false });
+      .send({ rememberMe: false, refreshToken: 'refresh-1' });
 
     expect(res.status).toBe(200);
     expect(typeof res.body.token).toBe('string');
-    expect(res.body.token).not.toBe(currentToken);
+    expect(typeof res.body.refreshToken).toBe('string');
     const decoded = verifyToken(res.body.token);
     expect(decoded.role).toBe('establishment_admin');
     expect(decoded.establishment_id).toBe('11111111-1111-4111-8111-111111111111');
@@ -123,9 +116,13 @@ describe('POST /auth/refresh token rotation', () => {
       })
     );
 
-    expect(mocks.poolQuery).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO token_blocklist'),
-      expect.arrayContaining([10, 'TOKEN_REFRESH_ROTATED'])
+    expect(mocks.rotateRefreshToken).toHaveBeenCalledWith(
+      'refresh-1',
+      expect.any(String),
+      expect.objectContaining({
+        userId: 10,
+        familyId: '11111111-1111-4111-8111-111111111111',
+      })
     );
     expect(mocks.lockClientQuery).toHaveBeenNthCalledWith(1, 'BEGIN');
     expect(mocks.lockClientQuery).toHaveBeenNthCalledWith(
@@ -137,17 +134,23 @@ describe('POST /auth/refresh token rotation', () => {
     expect(mocks.lockClientRelease).toHaveBeenCalled();
   });
 
-  it('accepts a legacy token carrying is_admin during refresh rollover', async () => {
-    const legacyToken = legacyEstablishmentAdminToken();
+  it('returns 400 when refresh token is missing', async () => {
     const res = await request(app)
       .post('/auth/refresh')
-      .set('Authorization', `Bearer ${legacyToken}`)
       .send({ rememberMe: false });
 
-    expect(res.status).toBe(200);
-    expect(typeof res.body.token).toBe('string');
-    const refreshedDecoded = verifyToken(res.body.token);
-    expect(refreshedDecoded.is_admin).toBeUndefined();
-    expect(refreshedDecoded.role).toBe('establishment_admin');
+    expect(res.status).toBe(400);
+    expect(String(res.body.error)).toContain('refreshToken is required');
+  });
+
+  it('rejects unknown refresh tokens', async () => {
+    mocks.findActiveRefreshToken.mockResolvedValueOnce(null);
+
+    const res = await request(app)
+      .post('/auth/refresh')
+      .send({ rememberMe: false, refreshToken: 'missing-token' });
+
+    expect(res.status).toBe(401);
+    expect(String(res.body.error)).toContain('Invalid or expired refresh token');
   });
 });

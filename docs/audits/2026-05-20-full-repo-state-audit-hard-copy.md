@@ -56,7 +56,7 @@ The IDs follow the existing audit convention: **P0/P1/P2** = priority, **L/S/Q/D
 | **P3-L7** | Unify register identifier across journal and receipts | Journal hash payload uses `MUSEBAR-REG-001` (global, `journalSigning.ts` L11) but printed ticket uses `CR-{establishment_id}` (`printDataRepo.ts` L143). Must be per-establishment/per-register, and printed identifier must match the hashed one. | **M** |
 | **P3-L8** | Reconcile closure bulletin totals against journal `SALE` sums | Today bulletin totals come from `orders`; if `legal_journal` diverges (e.g. failed append), the bulletin still says everything's fine. Add cross-check + flag discrepancies. | **M** |
 | **P3-L9** | Implement password reset + change API + global session revoke on password change | `authPassword.ts` is empty; UI promises an email flow; `password_reset_requests` table is in schema with no API. Required for any production identity story. | **M** |
-| **P3-S4** | Implement P2-S16 token long-term hardening — Phase 1 | See dedicated section §3. Short-lived access tokens, opaque refresh, httpOnly cookies or BFF. | **L** |
+| **P3-S4** | Implement P2-S16 token long-term hardening — Phase 1 | **Fixed (2026-05-21):** access tokens reduced to 15m, opaque refresh tokens persisted in DB with rotation and revoke-on-password-change. Cookie/BFF move remains in P3-S5. | **L** |
 | **P3-Q1** | Stop the closure-journal swallow (`closure.ts:65-71`) | Same as P3-L2 but specifically in the route catch block: rethrow or fail-closed. | **S** |
 | **P3-Q2** | Delete or mount `userManagement/roles/*` (~800+ LOC unmounted) | `RoleRoutes`, `RoleController`, `roleOperations`, `roleMutations`, `rolePermissionOperations` are exported but never mounted in `userManagement/index.ts`. This is dead surface that looks live in code review. Decision: delete or wire. | **M** |
 | **P3-Q3** | Extract `orderCancel` god handler (~380 LOC) into a service | `routes/orders/orderCancel.ts:41-427` is one handler. Fiscal critical path; needs staged tests. Mirror P2-Q11 pattern. | **L** |
@@ -113,7 +113,7 @@ You explicitly requested this as a to-do for this audit. It is now **P3-S4 (P1)*
 | 8 | **Anomaly signals** (geo/IP/UA delta) for admin endpoints, paired with 2FA | Operational detection. |
 | 9 | **Retire legacy `is_admin` JWT claim** after max TTL elapses (7d) + metrics | Completes the P2-S3 rollover (`auth.ts` L81-84). |
 
-**Current state to be honest about:** D1 blocklist, P1-S1 refresh serialization, P1-S2 prior-session kick, P2-S3 role authority, P2-S17 `rememberMe`, P2-S18 Swagger interceptor are all in place — but the underlying token shape is unchanged. Treat P2-S16 as an **active roadmap**, not closed.
+**Current state to be honest about (updated):** phase 1 is now in place (15m access JWT + DB-backed opaque rotating refresh tokens + refresh revoke on password reset/change). Remaining roadmap items are cookie/BFF transport, CSRF, algorithm pinning/migration to asymmetric signing, and session/device anomaly controls.
 
 ---
 
