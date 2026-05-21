@@ -49,6 +49,7 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
     if (!res.ok) {
       if (res.status === 401) {
         localStorage.removeItem('auth_token');
+        localStorage.removeItem('refresh_token');
         window.location.href = '/login';
         throw new Error('Session expired - please login again');
       }

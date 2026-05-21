@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   logAction: vi.fn(),
   revokeAllUserTokensIssuedBefore: vi.fn(),
   revokeToken: vi.fn(),
+  createRefreshToken: vi.fn(),
 }));
 
 vi.mock('../app', () => ({
@@ -42,6 +43,15 @@ vi.mock('../models/tokenBlocklist', () => ({
   },
 }));
 
+vi.mock('../models/refreshToken', () => ({
+  RefreshTokenModel: {
+    create: mocks.createRefreshToken,
+    findActiveByRawToken: vi.fn(),
+    rotate: vi.fn(),
+    revokeByRawToken: vi.fn(),
+  },
+}));
+
 import authLoginRouter from './authLogin';
 
 const app = express();
@@ -57,6 +67,7 @@ describe('POST /auth/login optional kickPriorSessions', () => {
     mocks.logAction.mockReset();
     mocks.revokeAllUserTokensIssuedBefore.mockReset();
     mocks.revokeToken.mockReset();
+    mocks.createRefreshToken.mockReset();
 
     mocks.findByEmail.mockResolvedValue({
       id: 10,
@@ -85,6 +96,7 @@ describe('POST /auth/login optional kickPriorSessions', () => {
     mocks.logAction.mockResolvedValue({});
     mocks.revokeAllUserTokensIssuedBefore.mockResolvedValue(undefined);
     mocks.revokeToken.mockResolvedValue(undefined);
+    mocks.createRefreshToken.mockResolvedValue({ id: 'rt-1', familyId: 'fam-1' });
   });
 
   it('does not revoke prior sessions by default', async () => {
@@ -96,7 +108,9 @@ describe('POST /auth/login optional kickPriorSessions', () => {
 
     expect(res.status).toBe(200);
     expect(typeof res.body.token).toBe('string');
+    expect(typeof res.body.refreshToken).toBe('string');
     expect(mocks.revokeAllUserTokensIssuedBefore).not.toHaveBeenCalled();
+    expect(mocks.createRefreshToken).toHaveBeenCalledTimes(1);
   });
 
   it('revokes prior sessions when kickPriorSessions is true', async () => {
@@ -108,6 +122,7 @@ describe('POST /auth/login optional kickPriorSessions', () => {
     });
 
     expect(res.status).toBe(200);
+    expect(typeof res.body.refreshToken).toBe('string');
     expect(mocks.revokeAllUserTokensIssuedBefore).toHaveBeenCalledWith(
       10,
       expect.any(Number),

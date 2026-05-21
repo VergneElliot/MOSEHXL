@@ -86,6 +86,15 @@ export function createRefreshRateLimitKeyResolver(jwtSecret: string) {
   };
 }
 
+export function resolveOpaqueRefreshRateLimitKey(req: Request): string {
+  const ip = req.ip ?? 'unknown';
+  const rawRefreshToken = typeof req.body?.refreshToken === 'string' ? req.body.refreshToken.trim() : '';
+  if (!rawRefreshToken) {
+    return `ip:${ip}:refresh:anon`;
+  }
+  return `ip:${ip}:refresh:${hashForRateLimit(rawRefreshToken)}`;
+}
+
 export function createAuthRateLimitMiddleware(options: AuthRateLimitOptions): SecurityMiddlewareFunction {
   const store = createStore(options.pool);
 

@@ -5,6 +5,7 @@ import { User } from '../types/auth';
 
 interface AuthState {
   token: string | null;
+  refreshTokenValue: string | null;
   user: User | null;
   permissions: string[];
   rememberMe: boolean;
@@ -13,26 +14,36 @@ interface AuthState {
 }
 
 interface AuthActions {
-  login: (jwt: string, userObj: User, rememberMeFlag: boolean, expiresIn: string) => void;
+  login: (
+    jwt: string,
+    refreshToken: string,
+    userObj: User,
+    rememberMeFlag: boolean,
+    expiresIn: string,
+    refreshExpiresIn?: string
+  ) => void;
   logout: () => void;
   refreshToken: () => Promise<void>;
 }
 
 export const useAuth = (): AuthState & AuthActions => {
   const [token, setToken] = useState<string | null>(null);
+  const [refreshTokenValue, setRefreshTokenValue] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [rememberMe, setRememberMe] = useState<boolean>(false);
-  const [tokenExpiresIn, setTokenExpiresIn] = useState<string>('12h');
+  const [tokenExpiresIn, setTokenExpiresIn] = useState<string>('15m');
 
   // Initialize authentication from localStorage
   useEffect(() => {
     const storedToken = localStorage.getItem('auth_token');
+    const storedRefreshToken = localStorage.getItem('refresh_token');
     const storedRememberMe = localStorage.getItem('remember_me') === 'true';
-    const storedExpiresIn = localStorage.getItem('token_expires_in') || '12h';
+    const storedExpiresIn = localStorage.getItem('token_expires_in') || '15m';
 
-    if (storedToken) {
+    if (storedToken && storedRefreshToken) {
       setToken(storedToken);
+      setRefreshTokenValue(storedRefreshToken);
       setRememberMe(storedRememberMe);
       setTokenExpiresIn(storedExpiresIn);
     }
@@ -41,13 +52,15 @@ export const useAuth = (): AuthState & AuthActions => {
   // Declare functions first
   const logout = useCallback(() => {
     setToken(null);
+    setRefreshTokenValue(null);
     setUser(null);
     setPermissions([]);
     setRememberMe(false);
-    setTokenExpiresIn('12h');
+    setTokenExpiresIn('15m');
 
     // Clear localStorage
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('refresh_token');
     localStorage.removeItem('remember_me');
     localStorage.removeItem('token_expires_in');
   }, []);
@@ -82,15 +95,29 @@ export const useAuth = (): AuthState & AuthActions => {
 
       const rememberMeForRefresh =
         rememberMe || localStorage.getItem('remember_me') === 'true';
-      const response = await apiService.post<{ token: string; expiresIn?: string }>(
+      const currentRefreshToken = refreshTokenValue || localStorage.getItem('refresh_token');
+      if (!currentRefreshToken) {
+        logout();
+        return;
+      }
+
+      const response = await apiService.post<{
+        token: string;
+        refreshToken: string;
+        expiresIn?: string;
+        refreshExpiresIn?: string;
+      }>(
         '/auth/refresh',
-        { rememberMe: rememberMeForRefresh }
+        { rememberMe: rememberMeForRefresh, refreshToken: currentRefreshToken }
       );
       const newToken = response.data.token;
-      const refreshedExpiresIn = response.data.expiresIn || (rememberMeForRefresh ? '7d' : '12h');
+      const nextRefreshToken = response.data.refreshToken;
+      const refreshedExpiresIn = response.data.expiresIn || '15m';
       
       setToken(newToken);
+      setRefreshTokenValue(nextRefreshToken);
       localStorage.setItem('auth_token', newToken);
+      localStorage.setItem('refresh_token', nextRefreshToken);
       setRememberMe(rememberMeForRefresh);
       setTokenExpiresIn(refreshedExpiresIn);
       localStorage.setItem('remember_me', rememberMeForRefresh.toString());
@@ -99,7 +126,7 @@ export const useAuth = (): AuthState & AuthActions => {
       // Refresh failed, logout required
       logout();
     }
-  }, [logout, rememberMe]);
+  }, [logout, rememberMe, refreshTokenValue]);
 
   // Check authentication status when token changes
   useEffect(() => {
@@ -118,20 +145,28 @@ export const useAuth = (): AuthState & AuthActions => {
     if (!token || !user) return;
 
     const refreshInterval =
-      tokenExpiresIn === '7d'
-        ? 6 * 24 * 60 * 60 * 1000 // Refresh every 6 days for 7-day tokens
-        : 10 * 60 * 60 * 1000; // Refresh every 10 hours for 12-hour tokens
+      tokenExpiresIn === '15m'
+        ? 12 * 60 * 1000
+        : 12 * 60 * 1000;
 
     const intervalId = setInterval(refreshToken, refreshInterval);
 
     return () => clearInterval(intervalId);
   }, [token, user, tokenExpiresIn, refreshToken]);
 
-  const login = useCallback((jwt: string, userObj: User, rememberMeFlag: boolean, expiresIn: string) => {
+  const login = useCallback((
+    jwt: string,
+    refreshToken: string,
+    userObj: User,
+    rememberMeFlag: boolean,
+    expiresIn: string,
+    _refreshExpiresIn?: string
+  ) => {
     // Set token on API client immediately so any request after this (e.g. /auth/me, /auth/users)
     // has the Bearer header before React re-renders and child effects run.
     ApiService.setToken(jwt);
     setToken(jwt);
+    setRefreshTokenValue(refreshToken);
     setUser(userObj);
     setPermissions(userObj.permissions || []);
     setRememberMe(rememberMeFlag);
@@ -139,12 +174,14 @@ export const useAuth = (): AuthState & AuthActions => {
 
     // Store in localStorage
     localStorage.setItem('auth_token', jwt);
+    localStorage.setItem('refresh_token', refreshToken);
     localStorage.setItem('remember_me', rememberMeFlag.toString());
     localStorage.setItem('token_expires_in', expiresIn);
   }, []);
 
   return {
     token,
+    refreshTokenValue,
     user,
     permissions,
     rememberMe,

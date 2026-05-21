@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   markUsed: vi.fn(),
   revokeAllUserTokensIssuedBefore: vi.fn(),
   revokeToken: vi.fn(),
+  revokeAllRefreshTokensForUser: vi.fn(),
   auditLogAction: vi.fn(),
   sendTemplateEmail: vi.fn(),
   emailIsConfigured: vi.fn(),
@@ -53,6 +54,12 @@ vi.mock('../models/tokenBlocklist', () => ({
   TokenBlocklistModel: {
     revokeAllUserTokensIssuedBefore: mocks.revokeAllUserTokensIssuedBefore,
     revokeToken: mocks.revokeToken,
+  },
+}));
+
+vi.mock('../models/refreshToken', () => ({
+  RefreshTokenModel: {
+    revokeAllForUser: mocks.revokeAllRefreshTokensForUser,
   },
 }));
 
@@ -97,6 +104,7 @@ describe('authPassword routes', () => {
     mocks.markUsed.mockReset();
     mocks.revokeAllUserTokensIssuedBefore.mockReset();
     mocks.revokeToken.mockReset();
+    mocks.revokeAllRefreshTokensForUser.mockReset();
     mocks.auditLogAction.mockReset();
     mocks.sendTemplateEmail.mockReset();
     mocks.emailIsConfigured.mockReset();
@@ -107,6 +115,7 @@ describe('authPassword routes', () => {
     mocks.updatePasswordById.mockResolvedValue(true);
     mocks.revokeAllUserTokensIssuedBefore.mockResolvedValue(undefined);
     mocks.revokeToken.mockResolvedValue(undefined);
+    mocks.revokeAllRefreshTokensForUser.mockResolvedValue(undefined);
     mocks.markUsed.mockResolvedValue(undefined);
     mocks.invalidateActiveRequestsForUser.mockResolvedValue(undefined);
     mocks.createRequest.mockResolvedValue({ id: 'req-1' });
@@ -172,6 +181,7 @@ describe('authPassword routes', () => {
       expect.any(Number),
       'PASSWORD_RESET'
     );
+    expect(mocks.revokeAllRefreshTokensForUser).toHaveBeenCalledWith(11, 'PASSWORD_RESET');
   });
 
   it('changes password when current password is valid and revokes sessions', async () => {
@@ -196,6 +206,7 @@ describe('authPassword routes', () => {
       expect.any(Number),
       'PASSWORD_CHANGE'
     );
+    expect(mocks.revokeAllRefreshTokensForUser).toHaveBeenCalledWith(77, 'PASSWORD_CHANGE');
     expect(mocks.revokeToken).toHaveBeenCalledWith(
       'token-123',
       expect.objectContaining({ userId: 77, reason: 'PASSWORD_CHANGE_CURRENT_TOKEN_REVOKE' })
