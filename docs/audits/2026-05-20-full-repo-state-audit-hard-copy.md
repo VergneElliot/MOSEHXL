@@ -133,6 +133,7 @@ This list is for posterity — verified during this audit, do not re-open.
 | `legal_journal` TRUNCATE protection missing | **Fixed** — DB-level `BEFORE TRUNCATE` deny trigger added (P3-L4) |
 | DB-level legal_journal hash-chain insert enforcement missing | **Fixed** — `BEFORE INSERT` trigger now recomputes and validates sequence/previous/current hash (P3-L5) |
 | Register identifier mismatch (journal vs receipts) | **Fixed** — unified to establishment-scoped `CR-<establishment_id>` across journal/printing/archive (P3-L7) |
+| Password reset/change API missing + no global revoke on password lifecycle events | **Fixed** — `/auth/password/forgot|reset|change` implemented with global token cutoff revoke and current-token revocation on change (P3-L9) |
 | `logClosure` dead on manual route | **Fixed** for manual routes and auto scheduler (P3-L1) |
 | Integrity verifier silently skipped seq 128 / CORRECTION | **Fixed** (P0-L5) |
 | Software events missing | **Fixed** with fail-safe critical-event journaling + retries (P3-L3) |
