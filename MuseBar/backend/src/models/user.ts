@@ -268,6 +268,16 @@ export class UserModel {
     return (result.rowCount ?? 0) > 0;
   }
 
+  static async updatePasswordById(userId: number, password: string): Promise<boolean> {
+    this.assertPasswordPolicy(password);
+    const password_hash = await bcrypt.hash(password, 12);
+    const result = await pool.query(
+      'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [password_hash, userId]
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
   /**
    * One-time system bootstrap: create the first admin user and mark it as system admin.
    * Throws with `statusCode = 400` when an admin already exists.
