@@ -129,7 +129,7 @@ This list is for posterity — verified during this audit, do not re-open.
 | April 29 finding | Current state |
 |------------------|---------------|
 | Refund/change journal fail-safe | **Fixed** (`orderCancel.ts:327-378`, `orderChange.ts:62-83`) |
-| Archive export endpoint lying about success | **Fixed** — now an honest `501` until P3-L6 lands; create path is real |
+| Archive export endpoint lying about success | **Fixed** — verify + download HTTP routes are live; legacy `/archive/:id/export` is now a functional download alias (P3-L6) |
 | `logClosure` dead on manual route | **Fixed** for manual routes and auto scheduler (P3-L1) |
 | Integrity verifier silently skipped seq 128 / CORRECTION | **Fixed** (P0-L5) |
 | Software events missing | **Fixed** with fail-safe critical-event journaling + retries (P3-L3) |

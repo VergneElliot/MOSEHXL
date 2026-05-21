@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import express from 'express';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { generateToken } from '../auth';
 import { errorHandler } from '../../middleware/errorHandler';
 
@@ -11,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   getUserPermissions: vi.fn(),
   getArchiveExports: vi.fn(),
   getArchiveExportById: vi.fn(),
+  verifyArchiveExport: vi.fn(),
+  downloadArchiveExport: vi.fn(),
   exportData: vi.fn(),
   getClosureBulletins: vi.fn(),
   getLastFondDeCaisse: vi.fn(),
@@ -47,6 +52,8 @@ vi.mock('../../models/archiveService', () => ({
   ArchiveService: {
     getArchiveExports: mocks.getArchiveExports,
     getArchiveExportById: mocks.getArchiveExportById,
+    verifyArchiveExport: mocks.verifyArchiveExport,
+    downloadArchiveExport: mocks.downloadArchiveExport,
     exportData: mocks.exportData,
   },
 }));
@@ -95,6 +102,8 @@ describe('legal archive/closure permission gating', () => {
     mocks.getUserPermissions.mockReset();
     mocks.getArchiveExports.mockReset();
     mocks.getArchiveExportById.mockReset();
+    mocks.verifyArchiveExport.mockReset();
+    mocks.downloadArchiveExport.mockReset();
     mocks.exportData.mockReset();
     mocks.getClosureBulletins.mockReset();
     mocks.getLastFondDeCaisse.mockReset();
@@ -116,6 +125,8 @@ describe('legal archive/closure permission gating', () => {
 
     mocks.getArchiveExports.mockResolvedValue([]);
     mocks.getArchiveExportById.mockResolvedValue(null);
+    mocks.verifyArchiveExport.mockResolvedValue({ isValid: true, errors: [] });
+    mocks.downloadArchiveExport.mockResolvedValue(null);
     mocks.exportData.mockResolvedValue({ id: 1 });
     mocks.getClosureBulletins.mockResolvedValue([]);
     mocks.getLastFondDeCaisse.mockResolvedValue(200);
@@ -315,6 +326,62 @@ describe('legal archive/closure permission gating', () => {
     expect(res.body.error).toBe('Invalid archive ID');
   });
 
+  it('verifies archive integrity via /archive/:id/verify', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    mocks.verifyArchiveExport.mockResolvedValue({
+      isValid: false,
+      errors: ['Digital signature verification failed - file authenticity compromised'],
+    });
+
+    const res = await request(app)
+      .post('/archive/77/verify')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`)
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(mocks.verifyArchiveExport).toHaveBeenCalledWith(77, EST);
+    expect(res.body.isValid).toBe(false);
+    expect(res.body.errors).toEqual([
+      'Digital signature verification failed - file authenticity compromised',
+    ]);
+  });
+
+  it('returns 404 for /archive/:id/verify when archive is missing', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    mocks.verifyArchiveExport.mockResolvedValue({
+      isValid: false,
+      errors: ['Archive export not found'],
+    });
+
+    const res = await request(app)
+      .post('/archive/77/verify')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`)
+      .send({});
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('Archive not found');
+  });
+
+  it('downloads archive via /archive/:id/download', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    const tempFilePath = path.join(os.tmpdir(), `archive-download-${Date.now()}.json`);
+    fs.writeFileSync(tempFilePath, '{"ok":true}', 'utf-8');
+    mocks.downloadArchiveExport.mockResolvedValue({
+      filePath: tempFilePath,
+      fileName: 'musebar_export_DAILY_77.json',
+    });
+
+    const res = await request(app)
+      .get('/archive/77/download')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(200);
+    expect(res.header['content-disposition']).toContain('musebar_export_DAILY_77.json');
+    expect(mocks.downloadArchiveExport).toHaveBeenCalledWith(77, EST);
+
+    fs.unlinkSync(tempFilePath);
+  });
+
   it('denies /archive/:id/export without access_closure', async () => {
     mocks.getUserPermissions.mockResolvedValue([]);
 
@@ -326,17 +393,26 @@ describe('legal archive/closure permission gating', () => {
     expect(res.status).toBe(403);
   });
 
-  it('returns 501 for /archive/:id/export with access_closure until export is implemented', async () => {
+  it('supports legacy /archive/:id/export as a download alias', async () => {
     mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    const tempFilePath = path.join(os.tmpdir(), `archive-export-${Date.now()}.json`);
+    fs.writeFileSync(tempFilePath, '{"ok":true}', 'utf-8');
+    mocks.downloadArchiveExport.mockResolvedValue({
+      filePath: tempFilePath,
+      fileName: 'musebar_export_DAILY_77.json',
+    });
 
     const res = await request(app)
       .post('/archive/77/export')
       .set('Authorization', `Bearer ${tokenFor('staff')}`)
       .send({});
 
-    expect(res.status).toBe(501);
-    expect(res.body.error).toBe('Archive export is not implemented yet');
-    expect(res.body.code).toBe('LEGAL_ARCHIVE_EXPORT_NOT_IMPLEMENTED');
+    expect(res.status).toBe(200);
+    expect(res.header['content-disposition']).toContain('musebar_export_DAILY_77.json');
+    expect(res.header.deprecation).toBe('true');
+    expect(mocks.downloadArchiveExport).toHaveBeenCalledWith(77, EST);
+
+    fs.unlinkSync(tempFilePath);
   });
 
   it('denies /closure/bulletins without access_closure', async () => {
