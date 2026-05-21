@@ -25,6 +25,7 @@ interface AuthActions {
 }
 
 export const useAuth = (): AuthState & AuthActions => {
+  const REFRESH_BOOTSTRAP_HINT_KEY = 'auth_refresh_bootstrap_hint';
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
@@ -51,7 +52,8 @@ export const useAuth = (): AuthState & AuthActions => {
     // Clear localStorage
     localStorage.removeItem('remember_me');
     localStorage.removeItem('token_expires_in');
-  }, []);
+    localStorage.removeItem(REFRESH_BOOTSTRAP_HINT_KEY);
+  }, [REFRESH_BOOTSTRAP_HINT_KEY]);
 
   const checkAuthStatus = useCallback(async () => {
     try {
@@ -99,11 +101,12 @@ export const useAuth = (): AuthState & AuthActions => {
       setTokenExpiresIn(refreshedExpiresIn);
       localStorage.setItem('remember_me', rememberMeForRefresh.toString());
       localStorage.setItem('token_expires_in', refreshedExpiresIn);
+      localStorage.setItem(REFRESH_BOOTSTRAP_HINT_KEY, 'true');
     } catch (error) {
       // Refresh failed, logout required
       logout();
     }
-  }, [logout, rememberMe]);
+  }, [logout, rememberMe, REFRESH_BOOTSTRAP_HINT_KEY]);
 
   // Check authentication status when token changes
   useEffect(() => {
@@ -150,13 +153,17 @@ export const useAuth = (): AuthState & AuthActions => {
     // Store in localStorage
     localStorage.setItem('remember_me', rememberMeFlag.toString());
     localStorage.setItem('token_expires_in', expiresIn);
-  }, []);
+    localStorage.setItem(REFRESH_BOOTSTRAP_HINT_KEY, 'true');
+  }, [REFRESH_BOOTSTRAP_HINT_KEY]);
 
   // Attempt bootstrap refresh on initial mount when refresh cookie exists.
   useEffect(() => {
     if (token) return;
+    const shouldAttemptBootstrapRefresh =
+      localStorage.getItem(REFRESH_BOOTSTRAP_HINT_KEY) === 'true';
+    if (!shouldAttemptBootstrapRefresh) return;
     void refreshToken();
-  }, [token, refreshToken]);
+  }, [token, refreshToken, REFRESH_BOOTSTRAP_HINT_KEY]);
 
   return {
     token,
