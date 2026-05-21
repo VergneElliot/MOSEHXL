@@ -81,7 +81,7 @@ Properties:
 
 In production, `legal_journal` has an **`establishment_id`** on every row. **Sequence numbers** and the **hash chain** are independent **per establishment** — tenant A’s sequence 1, 2, 3 has nothing to do with tenant B’s 1, 2, 3. Integrity checks and `MAX(sequence_number)` are always run **in SQL with `WHERE establishment_id = $1`**, so a fiscal review for one bar never includes another bar’s lines.
 
-The DB trigger on **UPDATE/DELETE** still applies in normal running code; only a controlled **migration** may temporarily remove it to add the column, then the trigger is put back (same rule as before: the journal is inalterable in operation).
+The DB trigger on **UPDATE/DELETE** still applies in normal running code, and a dedicated statement-level trigger also blocks **TRUNCATE**. Only a controlled **migration** may temporarily remove/recreate these protections while applying a schema change.
 
 ### How it's implemented
 
@@ -146,10 +146,21 @@ CREATE TRIGGER trigger_prevent_legal_journal_modification
     BEFORE UPDATE OR DELETE ON legal_journal
     FOR EACH ROW
     EXECUTE FUNCTION prevent_legal_journal_modification();
--- This BLOCKS any UPDATE or DELETE on the legal_journal table
+
+CREATE TRIGGER trigger_prevent_legal_journal_truncate
+    BEFORE TRUNCATE ON legal_journal
+    FOR EACH STATEMENT
+    EXECUTE FUNCTION prevent_legal_journal_truncate();
+-- This BLOCKS UPDATE, DELETE, and TRUNCATE on legal_journal during normal operation
 ```
 
-The trigger runs at the PostgreSQL level — even if someone bypasses our application code and connects directly to the database, they can't modify entries.
+The triggers run at the PostgreSQL level — even if someone bypasses our application code and connects directly to the database, they can't modify or purge entries.
+
+For backup/restore operations, the policy is:
+
+- use `pg_dump` for logical backups (read-only on source data),
+- restore into a controlled target environment where migrations are replayed,
+- never disable immutability triggers in production as part of routine export/import.
 
 ---
 
