@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   computePaymentBreakdownFromOrders: vi.fn(),
 }));
 
-vi.mock('../../app', () => ({
+vi.mock('../../db/pool', () => ({
   __esModule: true,
   default: express(),
   pool: {

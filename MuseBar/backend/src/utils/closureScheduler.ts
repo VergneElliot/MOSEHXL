@@ -1,4 +1,4 @@
-import { pool } from '../app';
+import { pool } from '../db/pool';
 import { DEFAULT_APP_TIMEZONE } from '../config/timezone';
 import { LegalJournalModel } from '../models/legalJournal';
 import { AuditTrailModel } from '../models/auditTrail';

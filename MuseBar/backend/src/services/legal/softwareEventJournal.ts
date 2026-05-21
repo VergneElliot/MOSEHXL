@@ -1,6 +1,6 @@
 import LegalJournalModel from '../../models/legalJournal';
 import { logError } from '../../utils/logger';
-import { pool } from '../../app';
+import { pool } from '../../db/pool';
 
 export type SoftwareEventType =
   | 'PRINTING_CONFIGURATION_UPDATED'

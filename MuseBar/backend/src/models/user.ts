@@ -1,4 +1,4 @@
-import { pool } from '../app';
+import { pool } from '../db/pool';
 import bcrypt from 'bcrypt';
 import { validatePasswordWithBreachCheck } from '../utils/passwordValidation';
 

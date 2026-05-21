@@ -3,7 +3,7 @@
  * Main orchestrator for the modular setup system
  */
 
-import { pool } from '../../app';
+import { pool } from '../../db/pool';
 import { SetupWizard } from './setupWizard';
 import { SetupValidator } from './setupValidator';
 import { SetupDatabase } from './setupDatabase';

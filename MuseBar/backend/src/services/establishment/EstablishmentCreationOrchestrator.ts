@@ -3,7 +3,7 @@
  * Main coordinator for establishment creation workflow - orchestrates all focused services
  */
 
-import { pool } from '../../app';
+import { pool } from '../../db/pool';
 import { Logger } from '../../utils/logger';
 import { EmailService } from '../email';
 import { getEnvironmentConfig } from '../../config/environment';

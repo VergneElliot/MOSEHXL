@@ -6,7 +6,7 @@
 import { ClosureBulletin, VATBreakdown, ClosureType } from './types';
 import { JournalQueries } from './journalQueries';
 import { JournalSigning } from './journalSigning';
-import { pool } from '../../app';
+import { pool } from '../../db/pool';
 import { DEFAULT_APP_TIMEZONE } from '../../config/timezone';
 import { getBusinessDayPeriod } from './businessDayPeriod';
 import { computePaymentBreakdownFromOrders } from './paymentBreakdown';

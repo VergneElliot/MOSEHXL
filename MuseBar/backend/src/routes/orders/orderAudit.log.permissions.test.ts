@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   logAction: vi.fn(),
 }));
 
-vi.mock('../../app', () => ({
+vi.mock('../../db/pool', () => ({
   __esModule: true,
   default: express(),
   pool: {

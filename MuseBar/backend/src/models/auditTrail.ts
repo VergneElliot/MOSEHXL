@@ -1,4 +1,4 @@
-import { pool } from '../app';
+import { pool } from '../db/pool';
 import { logError } from '../utils/logger';
 
 export interface AuditEntry {

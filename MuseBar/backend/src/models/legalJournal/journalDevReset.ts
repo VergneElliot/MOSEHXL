@@ -1,4 +1,4 @@
-import { pool } from '../../app';
+import { pool } from '../../db/pool';
 
 export async function resetJournalDevOnly(establishmentId: string): Promise<void> {
   if (process.env.NODE_ENV === 'production') {

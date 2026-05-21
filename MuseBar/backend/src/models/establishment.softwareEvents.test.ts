@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   logSoftwareEventBestEffort: vi.fn(),
 }));
 
-vi.mock('../app', () => ({
+vi.mock('../db/pool', () => ({
   pool: {
     query: mocks.poolQuery,
   },

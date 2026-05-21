@@ -1,4 +1,4 @@
-import { pool } from '../app';
+import { pool } from '../db/pool';
 import { Logger } from '../utils/logger';
 
 function logParseFailure(message: string, error: unknown): void {

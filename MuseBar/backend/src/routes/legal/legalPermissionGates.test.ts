@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
   countDailyClosuresForPeriod: vi.fn(),
 }));
 
-vi.mock('../../app', () => ({
+vi.mock('../../db/pool', () => ({
   __esModule: true,
   default: express(),
   pool: {
