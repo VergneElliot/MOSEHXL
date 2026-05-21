@@ -474,7 +474,7 @@ export class EmailReceiptService {
             <h3>CLÔTURE DÉFINITIVE</h3>
             <p>Conformité fiscale assurée</p>
             <p>Réf. légale: Article 286-I-3 bis du CGI</p>
-            <p>Registre: MUSEBAR-REG-001</p>
+            ${data.compliance_info?.cash_register_id ? `<p>Registre: ${data.compliance_info.cash_register_id}</p>` : ''}
             <p>Hash de clôture: ${data.closure_hash.substring(0, 16)}...</p>
             ${data.closed_at ? `<p>Clôturé le: ${new Date(data.closed_at).toLocaleString('fr-FR')}</p>` : ''}
           </div>

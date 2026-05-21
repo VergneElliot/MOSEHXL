@@ -4,6 +4,7 @@ import path from 'path';
 import PDFDocument from 'pdfkit';
 import { pool } from '../app';
 import LegalJournalModel from './legalJournal';
+import { getRegisterIdForEstablishment } from '../utils/registerId';
 
 export interface ArchiveExport {
   id: number;
@@ -35,6 +36,10 @@ export interface ExportData {
 export class ArchiveService {
   private static readonly EXPORT_DIR = path.join(process.cwd(), 'exports');
   // No hardcoded fallback: use ARCHIVE_SECRET_KEY from env; throw if missing when signing/verifying.
+
+  private static resolveRegisterId(establishmentId?: string): string {
+    return getRegisterIdForEstablishment(establishmentId);
+  }
 
   // Initialize export directory
   static async initialize(): Promise<void> {
@@ -185,7 +190,7 @@ export class ArchiveService {
             compliance_info: {
               legal_reference: 'Article 286-I-3 bis du CGI',
               export_timestamp: new Date().toISOString(),
-              register_id: 'MUSEBAR-REG-001'
+              register_id: this.resolveRegisterId(exportData.establishment_id)
             }
           };
         }
@@ -227,7 +232,7 @@ export class ArchiveService {
           compliance_info: {
             legal_reference: 'Article 286-I-3 bis du CGI',
             export_timestamp: new Date().toISOString(),
-            register_id: 'MUSEBAR-REG-001'
+            register_id: this.resolveRegisterId(exportData.establishment_id)
           }
         };
         break;
@@ -270,7 +275,7 @@ export class ArchiveService {
           compliance_info: {
             legal_reference: 'Article 286-I-3 bis du CGI',
             export_timestamp: new Date().toISOString(),
-            register_id: 'MUSEBAR-REG-001'
+            register_id: this.resolveRegisterId(exportData.establishment_id)
           }
         };
         break;
@@ -294,7 +299,7 @@ export class ArchiveService {
           closure_bulletins: allClosures,
           compliance_info: {
             legal_reference: 'Article 286-I-3 bis du CGI',
-            register_id: 'MUSEBAR-REG-001',
+            register_id: this.resolveRegisterId(eid),
             total_entries: allEntries.rows.length,
             integrity_verification: await LegalJournalModel.verifyJournalIntegrity(eid)
           }
@@ -340,7 +345,7 @@ export class ArchiveService {
     xmlContent += '  <compliance_info>\n';
     xmlContent += `    <legal_reference>${data.compliance_info?.legal_reference || 'Article 286-I-3 bis du CGI'}</legal_reference>\n`;
     xmlContent += `    <export_timestamp>${data.compliance_info?.export_timestamp || new Date().toISOString()}</export_timestamp>\n`;
-    xmlContent += `    <register_id>${data.compliance_info?.register_id || 'MUSEBAR-REG-001'}</register_id>\n`;
+    xmlContent += `    <register_id>${data.compliance_info?.register_id || getRegisterIdForEstablishment()}</register_id>\n`;
     xmlContent += '  </compliance_info>\n';
     
     // Add export data

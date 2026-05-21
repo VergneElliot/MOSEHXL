@@ -6,10 +6,9 @@
 import crypto from 'crypto';
 import { pool } from '../../app';
 import { IntegrityCheckResult } from './types';
+import { getRegisterIdForEstablishment } from '../../utils/registerId';
 
 export class JournalSigning {
-  private static registerKey = 'MUSEBAR-REG-001'; // Unique register identifier
-
   /**
    * Generate cryptographic hash for transaction integrity
    * @param data - The data to hash
@@ -99,8 +98,8 @@ export class JournalSigning {
    * Get the register key
    * @returns The unique register identifier
    */
-  static getRegisterKey(): string {
-    return this.registerKey;
+  static getRegisterKey(establishmentId?: string | null): string {
+    return getRegisterIdForEstablishment(establishmentId);
   }
 }
 
