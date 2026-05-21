@@ -18,6 +18,9 @@ export interface UserRow {
   last_name: string | null;
   email_verified: boolean;
   is_active: boolean;
+  failed_login_attempts: number;
+  lockout_count: number;
+  locked_until: Date | null;
   last_login: Date | null;
   created_at: Date;
   updated_at: Date;
@@ -108,6 +111,56 @@ export class UserModel {
 
   static async verifyPassword(user: UserRow, password: string): Promise<boolean> {
     return bcrypt.compare(password, user.password_hash);
+  }
+
+  static async incrementFailedLoginAttempts(userId: number): Promise<number> {
+    const result = await pool.query(
+      `UPDATE users
+       SET failed_login_attempts = COALESCE(failed_login_attempts, 0) + 1,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING failed_login_attempts`,
+      [userId]
+    );
+    return Number(result.rows[0]?.failed_login_attempts ?? 0);
+  }
+
+  static async applyLoginLockout(userId: number, lockedUntil: Date): Promise<number> {
+    const result = await pool.query(
+      `UPDATE users
+       SET locked_until = $2,
+           lockout_count = COALESCE(lockout_count, 0) + 1,
+           failed_login_attempts = 0,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING lockout_count`,
+      [userId, lockedUntil]
+    );
+    return Number(result.rows[0]?.lockout_count ?? 0);
+  }
+
+  static async clearLoginLockoutState(userId: number): Promise<void> {
+    await pool.query(
+      `UPDATE users
+       SET failed_login_attempts = 0,
+           locked_until = NULL,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [userId]
+    );
+  }
+
+  static async unlockUserAccount(userId: number): Promise<boolean> {
+    const result = await pool.query(
+      `UPDATE users
+       SET failed_login_attempts = 0,
+           lockout_count = 0,
+           locked_until = NULL,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [userId]
+    );
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Permission management.

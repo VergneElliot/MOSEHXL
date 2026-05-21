@@ -339,6 +339,38 @@ router.put('/users/:id/role', requireAuth, canManageUsers, asyncHandler(async (r
 }));
 
 // ---------------------------------------------------------------------------
+// PUT /api/auth/users/:id/unlock — clear lockout state within establishment
+// ---------------------------------------------------------------------------
+router.put('/users/:id/unlock', requireAuth, canManageUsers, asyncHandler(async (req, res) => {
+  const userId = parseInt(req.params.id);
+  const establishmentId = req.user!.establishment_id!;
+
+  const owns = await UserModel.userBelongsToEstablishment(userId, establishmentId);
+  if (!owns) {
+    return res.status(403).json({ error: 'User does not belong to your establishment' });
+  }
+
+  const unlocked = await UserModel.unlockUserAccount(userId);
+  if (!unlocked) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  await logAuditOrThrow({
+    user_id: String(req.user!.id),
+    action_type: 'ACCOUNT_UNLOCKED',
+    resource_type: 'USER',
+    resource_id: String(userId),
+    action_details: {
+      unlocked_by_user_id: req.user!.id,
+    },
+    ip_address: req.ip,
+    user_agent: req.headers['user-agent'],
+  }, 'UNLOCK_ESTABLISHMENT_USER_ACCOUNT');
+
+  return res.json({ userId, unlocked: true });
+}));
+
+// ---------------------------------------------------------------------------
 // POST /api/auth/setup — one-time system bootstrap (only works if no admin exists)
 // ---------------------------------------------------------------------------
 router.post('/setup', requireSetupSecret, asyncHandler(async (req, res) => {
