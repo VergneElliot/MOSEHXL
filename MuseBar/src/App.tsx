@@ -59,14 +59,13 @@ function App() {
 
   const handleLogin = (
     jwt: string,
-    refreshToken: string,
     userObj: User,
     rememberMeFlag: boolean,
     expiresIn: string,
     refreshExpiresIn?: string
   ) => {
     // Persist auth
-    login(jwt, refreshToken, userObj, rememberMeFlag, expiresIn, refreshExpiresIn);
+    login(jwt, userObj, rememberMeFlag, expiresIn, refreshExpiresIn);
     // After login, if not system admin, ensure POS loads fresh data for user's establishment
     // Nothing else here; POS view will load based on isSystemAdmin below
   };

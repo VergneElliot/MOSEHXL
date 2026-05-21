@@ -39,6 +39,7 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
   const config: RequestInit = { 
     ...options, 
     headers,
+    credentials: 'include',
     signal: options.signal || controller.signal
   };
 
@@ -48,8 +49,8 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
     
     if (!res.ok) {
       if (res.status === 401) {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('remember_me');
+        localStorage.removeItem('token_expires_in');
         window.location.href = '/login';
         throw new Error('Session expired - please login again');
       }

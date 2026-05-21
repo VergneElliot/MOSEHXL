@@ -46,7 +46,6 @@ describe('useAuth refresh rememberMe behavior', () => {
     mockPost.mockResolvedValue({
       data: {
         token: 'refreshed-token',
-        refreshToken: 'new-refresh-token',
         expiresIn: '15m',
       },
     });
@@ -55,11 +54,9 @@ describe('useAuth refresh rememberMe behavior', () => {
   it('sends rememberMe=true during refresh after remembered login', async () => {
     const { result } = renderHook(() => useAuth());
 
-    localStorage.setItem('refresh_token', 'initial-refresh-token');
     act(() => {
       result.current.login(
         'initial-token',
-        'initial-refresh-token',
         {
           id: 1,
           email: 'user@example.com',
@@ -83,14 +80,11 @@ describe('useAuth refresh rememberMe behavior', () => {
 
     expect(mockPost).toHaveBeenCalledWith('/auth/refresh', {
       rememberMe: true,
-      refreshToken: 'initial-refresh-token',
     });
   });
 
   it('falls back to localStorage remember_me when refreshing', async () => {
     localStorage.setItem('remember_me', 'true');
-    localStorage.setItem('refresh_token', 'stored-refresh-token');
-
     const { result } = renderHook(() => useAuth());
 
     await act(async () => {
@@ -99,7 +93,6 @@ describe('useAuth refresh rememberMe behavior', () => {
 
     expect(mockPost).toHaveBeenCalledWith('/auth/refresh', {
       rememberMe: true,
-      refreshToken: 'stored-refresh-token',
     });
   });
 });
