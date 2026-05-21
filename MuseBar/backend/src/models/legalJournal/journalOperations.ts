@@ -30,7 +30,7 @@ export class JournalOperations {
       paymentMethod,
       transactionData,
       userId,
-      JournalSigning.getRegisterKey()
+      JournalSigning.getRegisterKey(establishmentId)
     );
   }
 
@@ -55,7 +55,7 @@ export class JournalOperations {
         order_id: order.id,
         items: order.items || [],
         timestamp: order.created_at || new Date(),
-        register_id: JournalSigning.getRegisterKey()
+        register_id: JournalSigning.getRegisterKey(order.establishment_id)
       },
       userId
     );
@@ -81,7 +81,7 @@ export class JournalOperations {
         ...refundData,
         refund_type: 'CUSTOMER_REFUND',
         original_order_id: orderId,
-        register_id: JournalSigning.getRegisterKey()
+        register_id: JournalSigning.getRegisterKey(establishmentId)
       },
       userId
     );
@@ -105,7 +105,7 @@ export class JournalOperations {
       {
         ...correctionData,
         correction_type: correctionType,
-        register_id: JournalSigning.getRegisterKey()
+        register_id: JournalSigning.getRegisterKey(establishmentId)
       },
       userId
     );
@@ -129,7 +129,7 @@ export class JournalOperations {
       {
         ...closureData,
         closure_type: closureType,
-        register_id: JournalSigning.getRegisterKey()
+        register_id: JournalSigning.getRegisterKey(establishmentId)
       },
       userId
     );
@@ -147,7 +147,7 @@ export class JournalOperations {
         card: amount,
         cash: -amount,
         operation: 'faire_de_la_monnaie',
-        register_id: JournalSigning.getRegisterKey(),
+        register_id: JournalSigning.getRegisterKey(establishmentId),
       },
       userId
     );
@@ -163,7 +163,7 @@ export class JournalOperations {
       'archive',
       {
         ...archiveData,
-        register_id: JournalSigning.getRegisterKey()
+        register_id: JournalSigning.getRegisterKey(establishmentId)
       },
       userId
     );
@@ -186,7 +186,7 @@ export class JournalOperations {
         correction_type: 'SOFTWARE_EVENT',
         software_event_type: eventType,
         event_data: eventData,
-        register_id: JournalSigning.getRegisterKey(),
+        register_id: JournalSigning.getRegisterKey(establishmentId),
       },
       userId
     );

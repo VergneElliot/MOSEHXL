@@ -347,7 +347,8 @@ export class JournalQueries {
 
         const timestamp = new Date();
         const orderIdForHash = orderId === null ? 'null' : (orderId || '');
-        const dataString = `${sequenceNumber}|${transactionType}|${orderIdForHash}|${amount}|${vatAmount}|${paymentMethod}|${timestamp.toISOString()}|${registerId ?? JournalSigning.getRegisterKey()}`;
+        const effectiveRegisterId = registerId ?? JournalSigning.getRegisterKey(establishmentId);
+        const dataString = `${sequenceNumber}|${transactionType}|${orderIdForHash}|${amount}|${vatAmount}|${paymentMethod}|${timestamp.toISOString()}|${effectiveRegisterId}`;
         const currentHash = JournalSigning.generateHash(dataString, previousHash);
 
         const insertResult = await client.query(
@@ -372,7 +373,7 @@ export class JournalQueries {
             currentHash,
             timestamp,
             userId,
-            registerId ?? JournalSigning.getRegisterKey(),
+            effectiveRegisterId,
           ]
         );
 

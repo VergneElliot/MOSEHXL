@@ -272,7 +272,9 @@ export abstract class BasePrintingService implements IPrintingService {
     // Legal compliance info
     content += ESC_POS.LEFT;
     content += `Ref. legale: Article 286-I-3 bis du CGI\n`;
-    content += `Registre: MUSEBAR-REG-001\n`;
+    if (data.compliance_info?.cash_register_id) {
+      content += `Registre: ${data.compliance_info.cash_register_id}\n`;
+    }
     content += `Hash: ${data.closure_hash.substring(0, 16)}...\n`;
     
     // Cut paper

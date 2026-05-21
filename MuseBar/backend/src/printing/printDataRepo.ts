@@ -1,4 +1,5 @@
 import type { Pool } from 'pg';
+import { getRegisterIdForEstablishment } from '../utils/registerId';
 
 import type {
   PrintResult,
@@ -49,7 +50,7 @@ export async function buildTestReceiptData(pool: Pool, user: PrintingUser): Prom
       tax_identification: est.tax_identification ? String(est.tax_identification) : undefined,
     },
     compliance_info: {
-      cash_register_id: `CR-${user.establishment_id}`,
+      cash_register_id: getRegisterIdForEstablishment(user.establishment_id),
       operator_id: user.username,
     },
   };
@@ -141,7 +142,7 @@ export async function buildReceiptDataForOrder(
     change: receiptRow.change ? parseFloat(receiptRow.change) : undefined,
     compliance_info: {
       receipt_hash: receiptRow.receipt_hash ? String(receiptRow.receipt_hash) : undefined,
-      cash_register_id: `CR-${user.establishment_id}`,
+      cash_register_id: getRegisterIdForEstablishment(user.establishment_id),
       operator_id: user.username,
     },
   };
@@ -231,7 +232,7 @@ export async function buildClosureBulletinData(
       tax_identification: bulletin.tax_identification ? String(bulletin.tax_identification) : undefined,
     },
     compliance_info: {
-      cash_register_id: `CR-${user.establishment_id}`,
+      cash_register_id: getRegisterIdForEstablishment(user.establishment_id),
       operator_id: user.username,
     },
   };

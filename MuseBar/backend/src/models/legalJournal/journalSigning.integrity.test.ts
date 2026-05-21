@@ -14,7 +14,7 @@ import { JournalSigning } from './journalSigning';
 
 const EST = '11111111-1111-4111-8111-111111111111';
 const ZERO_HASH = '0000000000000000000000000000000000000000000000000000000000000000';
-const REGISTER = JournalSigning.getRegisterKey();
+const REGISTER = JournalSigning.getRegisterKey(EST);
 
 function buildEntry(input: {
   sequence: number;
