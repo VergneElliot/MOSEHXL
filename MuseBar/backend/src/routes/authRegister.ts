@@ -311,6 +311,10 @@ router.put('/users/:id/role', requireAuth, canManageUsers, asyncHandler(async (r
     return res.status(403).json({ error: 'User does not belong to your establishment' });
   }
 
+  if (role === 'establishment_admin' && !req.user!.is_admin) {
+    return res.status(403).json({ error: 'Only system administrators can grant establishment_admin role' });
+  }
+
   await UserModel.updateUserRoleById(userId, role);
   await logAuditOrThrow({
     user_id: String(req.user!.id),
