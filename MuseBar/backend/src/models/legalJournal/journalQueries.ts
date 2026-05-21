@@ -39,6 +39,13 @@ export class JournalQueries {
     return code === '40001' || code === '40P01';
   }
 
+  private static formatDecimalForHash(value: number): string {
+    if (!Number.isFinite(value)) {
+      return '0.0000';
+    }
+    return value.toFixed(4);
+  }
+
   /**
    * Get the next sequence number for a new journal entry
    * @returns The next sequence number
@@ -348,7 +355,9 @@ export class JournalQueries {
         const timestamp = new Date();
         const orderIdForHash = orderId === null ? 'null' : (orderId || '');
         const effectiveRegisterId = registerId ?? JournalSigning.getRegisterKey(establishmentId);
-        const dataString = `${sequenceNumber}|${transactionType}|${orderIdForHash}|${amount}|${vatAmount}|${paymentMethod}|${timestamp.toISOString()}|${effectiveRegisterId}`;
+        const amountForHash = JournalQueries.formatDecimalForHash(amount);
+        const vatAmountForHash = JournalQueries.formatDecimalForHash(vatAmount);
+        const dataString = `${sequenceNumber}|${transactionType}|${orderIdForHash}|${amountForHash}|${vatAmountForHash}|${paymentMethod}|${timestamp.toISOString()}|${effectiveRegisterId}`;
         const currentHash = JournalSigning.generateHash(dataString, previousHash);
 
         const insertResult = await client.query(
