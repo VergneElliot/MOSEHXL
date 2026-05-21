@@ -72,7 +72,7 @@ The IDs follow the existing audit convention: **P0/P1/P2** = priority, **L/S/Q/D
 |----|-------|-----------|--------|
 | **P3-S5** | Move tokens from `localStorage` to httpOnly cookie or BFF (part of P2-S16) | **Fixed (2026-05-21):** refresh token transport moved to httpOnly cookie and frontend token persistence removed from localStorage; BFF and CSRF follow-up tracked separately. | **L** |
 | **P3-S6** | Account lockout after N failed logins + admin unlock | **Fixed (2026-05-21):** DB-backed failed-attempt lockout with progressive duration and establishment-scoped admin unlock endpoint + audit coverage. | **M** |
-| **P3-S7** | Optional HIBP k-anonymity check on set-password paths | Cheap to integrate; widely expected control. | **S** |
+| **P3-S7** | Optional HIBP k-anonymity check on set-password paths | **Fixed (2026-05-21):** shared breach-aware validator integrated with HIBP k-anonymity and wired into password set/reset/change flows (opt-in via env). | **S** |
 | **P3-S8** | 2FA (TOTP) for `system_admin` and `establishment_admin` | Step-up auth for admin paths. | **L** |
 | **P3-S9** | Drop Epson poll `?key=` query fallback (`epsonPollHandler.ts` L48-51) | Query params leak in logs/referrers. Header-only. | **S** |
 | **P3-S10** | `requirePermission(P.access_pos)` (or `access_compliance`) on `GET /api/orders/audit/:orderId` | Currently `requireAuth` only. | **S** |

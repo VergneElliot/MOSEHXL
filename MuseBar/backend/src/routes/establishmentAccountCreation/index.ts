@@ -8,7 +8,7 @@ import { validateBody } from '../../middleware/validation';
 import { validateInvitation } from './middleware/validateInvitation';
 import { validateBusinessInfo } from './middleware/validateBusinessInfo';
 import { Logger } from '../../utils/logger';
-import { validatePassword } from '../../utils/passwordValidation';
+import { validatePasswordWithBreachCheck } from '../../utils/passwordValidation';
 import { pool } from '../../db/pool';
 import { EstablishmentAccountService } from '../../services/establishmentAccountCreation/EstablishmentAccountService';
 import { 
@@ -52,7 +52,7 @@ router.post('/complete',
 
       logger.info('Extracted request data', { tokenPreview: token.substring(0, 8) + '...', businessType: businessInfo.businessType });
 
-      const passwordValidation = validatePassword(password);
+      const passwordValidation = await validatePasswordWithBreachCheck(password);
       if (!passwordValidation.isValid) {
         logger.warn('Password validation failed', { error: passwordValidation.error });
         return res.status(400).json({

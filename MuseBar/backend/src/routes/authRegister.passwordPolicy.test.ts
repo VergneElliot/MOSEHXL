@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import express from 'express';
+import crypto from 'crypto';
 
 const mocks = vi.hoisted(() => ({
   createUser: vi.fn(),
@@ -69,11 +70,16 @@ app.use((req, _res, next) => {
 app.use('/auth', authRegisterRouter);
 
 describe('authRegister password policy enforcement', () => {
+  const originalBreachToggle = process.env.PASSWORD_BREACH_CHECK_ENABLED;
+
   beforeEach(() => {
     mocks.createUser.mockReset();
     mocks.createUserForEstablishment.mockReset();
     mocks.auditLogAction.mockReset();
     mocks.auditLogAction.mockResolvedValue(undefined);
+    process.env.PASSWORD_BREACH_CHECK_ENABLED = originalBreachToggle;
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it('rejects weak passwords on POST /auth/register', async () => {
@@ -94,5 +100,23 @@ describe('authRegister password policy enforcement', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Password must be at least 8 characters long');
     expect(mocks.createUserForEstablishment).not.toHaveBeenCalled();
+  });
+
+  it('rejects breached passwords when HIBP check is enabled', async () => {
+    process.env.PASSWORD_BREACH_CHECK_ENABLED = 'true';
+    const hashHex = crypto.createHash('sha1').update('StrongPass1').digest('hex').toUpperCase();
+    const suffix = hashHex.slice(5);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => `${suffix}:42\n`,
+    }));
+
+    const res = await request(app)
+      .post('/auth/register')
+      .send({ email: 'u@example.com', password: 'StrongPass1', is_admin: false });
+
+    expect(res.status).toBe(400);
+    expect(String(res.body.error)).toContain('known data breaches');
+    expect(mocks.createUser).not.toHaveBeenCalled();
   });
 });

@@ -11,7 +11,7 @@ import {
 } from '../middleware/auth';
 import { P } from '../permissions/registry';
 import { logSoftwareEventBestEffort } from '../services/legal/softwareEventJournal';
-import { validatePassword } from '../utils/passwordValidation';
+import { validatePasswordWithBreachCheck } from '../utils/passwordValidation';
 
 const canManageUsers = requireEstablishmentAdminOrPermission(P.access_user_management);
 
@@ -57,7 +57,7 @@ router.post('/register', requireAuth, requireAdmin, asyncHandler(async (req, res
     return res.status(400).json({ error: 'Email and password required' });
   }
 
-  const passwordValidation = validatePassword(password);
+  const passwordValidation = await validatePasswordWithBreachCheck(password);
   if (!passwordValidation.isValid) {
     await logAuditOrThrow({
       user_id: String(req.user!.id),
@@ -211,7 +211,7 @@ router.post('/users', requireAuth, canManageUsers, asyncHandler(async (req, res)
     return res.status(400).json({ error: 'Email and password required' });
   }
 
-  const passwordValidation = validatePassword(password);
+  const passwordValidation = await validatePasswordWithBreachCheck(password);
   if (!passwordValidation.isValid) {
     return res.status(400).json({ error: passwordValidation.error ?? 'Invalid password' });
   }
@@ -379,7 +379,7 @@ router.post('/setup', requireSetupSecret, asyncHandler(async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password required' });
     }
-    const passwordValidation = validatePassword(password);
+    const passwordValidation = await validatePasswordWithBreachCheck(password);
     if (!passwordValidation.isValid) {
       return res.status(400).json({ error: passwordValidation.error ?? 'Invalid password' });
     }
