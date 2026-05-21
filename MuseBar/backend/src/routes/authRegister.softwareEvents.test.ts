@@ -133,7 +133,7 @@ describe('authRegister software-event journaling', () => {
   it('logs software event after establishment user creation', async () => {
     const res = await request(app)
       .post('/auth/users')
-      .send({ email: 'staff@example.com', password: 'secret', role: 'staff' });
+      .send({ email: 'staff@example.com', password: 'StrongPass1', role: 'staff' });
 
     expect(res.status).toBe(201);
     expect(mocks.logSoftwareEventBestEffort).toHaveBeenCalledWith(

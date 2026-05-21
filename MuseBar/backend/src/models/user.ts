@@ -1,5 +1,6 @@
 import { pool } from '../app';
 import bcrypt from 'bcrypt';
+import { validatePassword } from '../utils/passwordValidation';
 
 /**
  * Full database row from the `users` table.
@@ -39,12 +40,23 @@ export interface AuthenticatedUser {
 export type User = UserRow;
 
 export class UserModel {
+  private static assertPasswordPolicy(password: string): void {
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      throw Object.assign(
+        new Error(passwordValidation.error ?? 'Invalid password'),
+        { statusCode: 400 }
+      );
+    }
+  }
+
   private static getEstablishmentAdminPermissionMode(): 'implicit_all' | 'explicit_only' {
     const raw = process.env.ESTABLISHMENT_ADMIN_PERMISSION_MODE?.trim().toLowerCase();
     return raw === 'explicit_only' ? 'explicit_only' : 'implicit_all';
   }
 
   static async createUser(email: string, password: string, is_admin: boolean = false): Promise<UserRow> {
+    this.assertPasswordPolicy(password);
     const password_hash = await bcrypt.hash(password, 12);
     const result = await pool.query(
       `INSERT INTO users (email, password_hash, is_admin) VALUES ($1, $2, $3) RETURNING *`,
@@ -59,6 +71,7 @@ export class UserModel {
     role: string,
     establishmentId: string
   ): Promise<UserRow> {
+    this.assertPasswordPolicy(password);
     const password_hash = await bcrypt.hash(password, 12);
     const result = await pool.query(
       `INSERT INTO users (email, password_hash, is_admin, role, establishment_id, email_verified)
