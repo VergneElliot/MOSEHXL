@@ -22,6 +22,9 @@ import {
 const router = express.Router();
 
 const MAX_SUPPORT_IMPERSONATION_MINUTES = 120;
+const MAX_FAILED_LOGIN_ATTEMPTS = Number(process.env.AUTH_LOCKOUT_MAX_FAILED_ATTEMPTS ?? 5);
+const BASE_LOCKOUT_MINUTES = Number(process.env.AUTH_LOCKOUT_BASE_MINUTES ?? 15);
+const MAX_LOCKOUT_MINUTES = Number(process.env.AUTH_LOCKOUT_MAX_MINUTES ?? 240);
 const authRateLimitBase = process.env.NODE_ENV === 'development' ? 5 : 1;
 const authLimiterPool = process.env.NODE_ENV === 'test' ? undefined : pool;
 const authRateLimitLogger = {
@@ -66,6 +69,17 @@ function computeRefreshExpiry(rememberMe: boolean): { expiresAt: Date; refreshEx
     expiresAt: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
     refreshExpiresIn: rememberMe ? '7d' : '1d',
   };
+}
+
+function toPositiveFiniteNumber(raw: number, fallback: number): number {
+  return Number.isFinite(raw) && raw > 0 ? raw : fallback;
+}
+
+function computeLockoutDurationMinutes(lockoutCount: number): number {
+  const base = toPositiveFiniteNumber(BASE_LOCKOUT_MINUTES, 15);
+  const max = toPositiveFiniteNumber(MAX_LOCKOUT_MINUTES, 240);
+  const exponent = Math.max(0, lockoutCount - 1);
+  return Math.min(max, base * (2 ** exponent));
 }
 
 function getRefreshCookieName(): string {
@@ -163,17 +177,71 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const valid = await UserModel.verifyPassword(user, password);
-    if (!valid) {
+    if (user.is_active === false) {
       await logAuditOrThrow({
         user_id: String(user.id),
         action_type: 'LOGIN_FAILED',
-        action_details: { reason: 'Invalid password', email },
+        action_details: { reason: 'User inactive', email },
+        ip_address: ip,
+        user_agent: userAgent,
+      }, 'LOGIN_FAILED_USER_INACTIVE');
+      return res.status(403).json({ error: 'Account is inactive' });
+    }
+
+    const now = new Date();
+    if (user.locked_until && new Date(user.locked_until).getTime() > now.getTime()) {
+      await logAuditOrThrow({
+        user_id: String(user.id),
+        action_type: 'LOGIN_BLOCKED',
+        action_details: {
+          reason: 'ACCOUNT_LOCKED',
+          locked_until: new Date(user.locked_until).toISOString(),
+          email,
+        },
+        ip_address: ip,
+        user_agent: userAgent,
+      }, 'LOGIN_BLOCKED_ACCOUNT_LOCKED');
+      return res.status(423).json({
+        error: 'Account is temporarily locked due to repeated failed login attempts',
+        code: 'ACCOUNT_LOCKED',
+        lockedUntil: new Date(user.locked_until).toISOString(),
+      });
+    }
+
+    const valid = await UserModel.verifyPassword(user, password);
+    if (!valid) {
+      const failedAttempts = await UserModel.incrementFailedLoginAttempts(user.id);
+      const lockThreshold = toPositiveFiniteNumber(MAX_FAILED_LOGIN_ATTEMPTS, 5);
+      if (failedAttempts >= lockThreshold) {
+        const nextLockoutCount = (user.lockout_count ?? 0) + 1;
+        const lockMinutes = computeLockoutDurationMinutes(nextLockoutCount);
+        const lockedUntil = new Date(Date.now() + lockMinutes * 60 * 1000);
+        await UserModel.applyLoginLockout(user.id, lockedUntil);
+        await logAuditOrThrow({
+          user_id: String(user.id),
+          action_type: 'ACCOUNT_LOCKED',
+          action_details: {
+            email,
+            failed_attempts: failedAttempts,
+            lockout_count: nextLockoutCount,
+            lockout_minutes: lockMinutes,
+            locked_until: lockedUntil.toISOString(),
+          },
+          ip_address: ip,
+          user_agent: userAgent,
+        }, 'LOGIN_ACCOUNT_LOCKED');
+      }
+      await logAuditOrThrow({
+        user_id: String(user.id),
+        action_type: 'LOGIN_FAILED',
+        action_details: { reason: 'Invalid password', email, failed_attempts: failedAttempts },
         ip_address: ip,
         user_agent: userAgent,
       }, 'LOGIN_FAILED_INVALID_PASSWORD');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+
+    await UserModel.clearLoginLockoutState(user.id);
 
     // Fetch the full user record to build the JWT payload
     const d = await UserModel.getAuthLoginDetails(user.id);

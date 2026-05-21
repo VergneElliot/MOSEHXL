@@ -7,6 +7,9 @@ const mocks = vi.hoisted(() => ({
   findByEmail: vi.fn(),
   verifyPassword: vi.fn(),
   getAuthLoginDetails: vi.fn(),
+  clearLoginLockoutState: vi.fn(),
+  incrementFailedLoginAttempts: vi.fn(),
+  applyLoginLockout: vi.fn(),
   logAction: vi.fn(),
   revokeAllUserTokensIssuedBefore: vi.fn(),
   revokeToken: vi.fn(),
@@ -27,6 +30,9 @@ vi.mock('../models/user', () => ({
     findByEmail: mocks.findByEmail,
     verifyPassword: mocks.verifyPassword,
     getAuthLoginDetails: mocks.getAuthLoginDetails,
+    clearLoginLockoutState: mocks.clearLoginLockoutState,
+    incrementFailedLoginAttempts: mocks.incrementFailedLoginAttempts,
+    applyLoginLockout: mocks.applyLoginLockout,
   },
 }));
 
@@ -64,6 +70,9 @@ describe('POST /auth/login optional kickPriorSessions', () => {
     mocks.findByEmail.mockReset();
     mocks.verifyPassword.mockReset();
     mocks.getAuthLoginDetails.mockReset();
+    mocks.clearLoginLockoutState.mockReset();
+    mocks.incrementFailedLoginAttempts.mockReset();
+    mocks.applyLoginLockout.mockReset();
     mocks.logAction.mockReset();
     mocks.revokeAllUserTokensIssuedBefore.mockReset();
     mocks.revokeToken.mockReset();
@@ -80,6 +89,9 @@ describe('POST /auth/login optional kickPriorSessions', () => {
       last_name: 'User',
       email_verified: true,
       is_active: true,
+      failed_login_attempts: 0,
+      lockout_count: 0,
+      locked_until: null,
       last_login: null,
       created_at: new Date(),
       updated_at: new Date(),
@@ -94,6 +106,9 @@ describe('POST /auth/login optional kickPriorSessions', () => {
       email_verified: true,
     });
     mocks.logAction.mockResolvedValue({});
+    mocks.clearLoginLockoutState.mockResolvedValue(undefined);
+    mocks.incrementFailedLoginAttempts.mockResolvedValue(1);
+    mocks.applyLoginLockout.mockResolvedValue(1);
     mocks.revokeAllUserTokensIssuedBefore.mockResolvedValue(undefined);
     mocks.revokeToken.mockResolvedValue(undefined);
     mocks.createRefreshToken.mockResolvedValue({ id: 'rt-1', familyId: 'fam-1' });
