@@ -4,7 +4,7 @@
  */
 
 import express from 'express';
-import type { NextFunction, Response } from 'express';
+import type { Response } from 'express';
 import { requireAuth, requireAdmin, requireEstablishmentAdminOrPermission } from '../auth';
 import { P } from '../../permissions/registry';
 
@@ -15,6 +15,7 @@ import { EstablishmentModel } from '../../models/establishment';
 import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';
 import { INVITATION_ROLE_LABELS, InvitationRoleLabel } from '../../auth/roleVocabulary';
+import { asyncHandler } from '../../middleware/errorHandler';
 import {
   AuthenticatedRequest,
   EstablishmentInvitationData,
@@ -44,7 +45,7 @@ export function initializeInvitationRoutes(services: ServiceInitialization): voi
 router.post('/send-establishment-invitation', requireAuth, requireAdmin, validateBody([
   { field: 'name', required: true },
   { field: 'email', required: true },
-]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+]), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { name, email, phone, address, subscription_plan }: EstablishmentInvitationData = req.body;
     const user = req.user!;
@@ -104,9 +105,9 @@ router.post('/send-establishment-invitation', requireAuth, requireAdmin, validat
       },
       'INVITATION_ROUTES'
     );
-    next(error);
+    throw error;
   }
-});
+}));
 
 /**
  * POST /send-user-invitation
@@ -118,7 +119,7 @@ router.post('/send-user-invitation', requireAuth, canManageUsers, validateBody([
   { field: 'lastName', required: true },
   { field: 'role', required: true },
   { field: 'establishmentId', required: true },
-]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+]), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { email, firstName, lastName, role, establishmentId }: UserInvitationData = req.body;
     const user = req.user!;
@@ -207,9 +208,9 @@ router.post('/send-user-invitation', requireAuth, canManageUsers, validateBody([
       },
       'INVITATION_ROUTES'
     );
-    next(error);
+    throw error;
   }
-});
+}));
 
 /**
  * POST /accept-invitation
@@ -218,7 +219,7 @@ router.post('/send-user-invitation', requireAuth, canManageUsers, validateBody([
 router.post('/accept-invitation', validateBody([
   { field: 'token', required: true },
   { field: 'password', required: true },
-]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+]), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { token, password, firstName, lastName }: InvitationAcceptanceData = req.body;
 
@@ -266,15 +267,15 @@ router.post('/accept-invitation', validateBody([
       },
       'INVITATION_ROUTES'
     );
-    next(error);
+    throw error;
   }
-});
+}));
 
 /**
  * GET /pending-invitations
  * Get pending invitations for establishment
  */
-router.get('/pending-invitations', requireAuth, canManageUsers, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+router.get('/pending-invitations', requireAuth, canManageUsers, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = req.user!;
     const establishmentId = req.query.establishmentId as string || user.establishment_id;
@@ -313,9 +314,9 @@ router.get('/pending-invitations', requireAuth, canManageUsers, async (req: Auth
       },
       'INVITATION_ROUTES'
     );
-    next(error);
+    throw error;
   }
-});
+}));
 
 /**
  * DELETE /cancel-invitation/:invitationId
@@ -323,7 +324,7 @@ router.get('/pending-invitations', requireAuth, canManageUsers, async (req: Auth
  */
 router.delete('/cancel-invitation/:invitationId', requireAuth, canManageUsers, validateParams([
   { param: 'invitationId', validator: (v: string) => typeof v === 'string' && v.length > 0 }
-]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+]), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { invitationId } = req.params;
     const user = req.user!;
@@ -361,9 +362,9 @@ router.delete('/cancel-invitation/:invitationId', requireAuth, canManageUsers, v
       },
       'INVITATION_ROUTES'
     );
-    next(error);
+    throw error;
   }
-});
+}));
 
 /**
  * POST /resend-invitation/:invitationId
@@ -371,7 +372,7 @@ router.delete('/cancel-invitation/:invitationId', requireAuth, canManageUsers, v
  */
 router.post('/resend-invitation/:invitationId', requireAuth, canManageUsers, validateParams([
   { param: 'invitationId', validator: (v: string) => typeof v === 'string' && v.length > 0 }
-]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+]), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { invitationId } = req.params;
     const user = req.user!;
@@ -410,9 +411,9 @@ router.post('/resend-invitation/:invitationId', requireAuth, canManageUsers, val
       },
       'INVITATION_ROUTES'
     );
-    next(error);
+    throw error;
   }
-});
+}));
 
 export { router as invitationRoutes };
 
