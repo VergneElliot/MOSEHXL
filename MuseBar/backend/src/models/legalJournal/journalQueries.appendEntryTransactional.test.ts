@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { JournalSigning } from './journalSigning';
 
 const mocks = vi.hoisted(() => ({
   connect: vi.fn(),
@@ -106,5 +107,37 @@ describe('JournalQueries.appendEntryTransactional', () => {
     ).rejects.toMatchObject({ code: '40001' });
 
     expect(mocks.connect).toHaveBeenCalledTimes(3);
+  });
+
+  it('builds hash payload with 4-decimal amounts to match DB trigger', async () => {
+    vi.useFakeTimers();
+    const fixedDate = new Date('2026-05-21T16:58:33.000Z');
+    vi.setSystemTime(fixedDate);
+
+    const client = createClient({});
+    mocks.connect.mockResolvedValueOnce(client);
+
+    await JournalQueries.appendEntryTransactional(
+      EST,
+      'CORRECTION',
+      null,
+      0,
+      0,
+      'system',
+      { software_event_type: 'SERVER_STARTED' },
+      '22',
+      'CR-est-1'
+    );
+
+    const insertCall = client.query.mock.calls.find((c) =>
+      String(c[0] ?? '').includes('INSERT INTO legal_journal')
+    );
+    const values = (insertCall?.[1] ?? []) as Array<string | number | Date | null | undefined>;
+    const hashedValue = String(values[9]);
+    const expectedDataString = `8|CORRECTION|null|0.0000|0.0000|system|${fixedDate.toISOString()}|CR-est-1`;
+    const expectedHash = JournalSigning.generateHash(expectedDataString, 'prev-hash');
+
+    expect(hashedValue).toBe(expectedHash);
+    vi.useRealTimers();
   });
 });
