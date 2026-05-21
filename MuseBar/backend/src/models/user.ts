@@ -58,7 +58,11 @@ export class UserModel {
 
   private static getEstablishmentAdminPermissionMode(): 'implicit_all' | 'explicit_only' {
     const raw = process.env.ESTABLISHMENT_ADMIN_PERMISSION_MODE?.trim().toLowerCase();
-    return raw === 'explicit_only' ? 'explicit_only' : 'implicit_all';
+    if (raw === 'explicit_only') return 'explicit_only';
+    if (raw === 'implicit_all') return 'implicit_all';
+    return process.env.NODE_ENV?.trim().toLowerCase() === 'production'
+      ? 'explicit_only'
+      : 'implicit_all';
   }
 
   static async createUser(email: string, password: string, is_admin: boolean = false): Promise<UserRow> {
@@ -220,8 +224,8 @@ export class UserModel {
     const role: string = userResult.rows[0]?.role || '';
     const establishmentAdminPermissionMode = this.getEstablishmentAdminPermissionMode();
 
-    // Default mode (`implicit_all`): establishment_admin gets full permission names to avoid lockout.
-    // Least-privilege mode (`explicit_only`): establishment_admin must have explicit rows.
+    // Default mode in production (`explicit_only`): establishment_admin must have explicit rows.
+    // Non-production default (`implicit_all`) remains available to avoid local lockout during setup.
     if (role === 'establishment_admin' && establishmentAdminPermissionMode === 'implicit_all') {
       const allPerms = await pool.query('SELECT name FROM permissions');
       return allPerms.rows.map((row) => (row as { name: string }).name);
