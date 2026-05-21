@@ -224,6 +224,12 @@ export const getEnvironmentConfig = (): EnvironmentConfig => {
   const nodeEnv = process.env.NODE_ENV as 'development' | 'production' | 'test';
   const isProduction = nodeEnv === 'production';
   const isDevelopment = nodeEnv === 'development';
+  const resolveEstablishmentAdminPermissionMode = (): 'implicit_all' | 'explicit_only' => {
+    const raw = process.env.ESTABLISHMENT_ADMIN_PERMISSION_MODE?.trim().toLowerCase();
+    if (raw === 'explicit_only') return 'explicit_only';
+    if (raw === 'implicit_all') return 'implicit_all';
+    return isProduction ? 'explicit_only' : 'implicit_all';
+  };
 
   const allowSelfSigned =
     process.env.DB_SSL_ALLOW_SELF_SIGNED != null
@@ -269,10 +275,7 @@ export const getEnvironmentConfig = (): EnvironmentConfig => {
       jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
       archiveSecretKey: process.env.ARCHIVE_SECRET_KEY,
       setupSecret: process.env.SETUP_SECRET,
-      establishmentAdminPermissionMode:
-        process.env.ESTABLISHMENT_ADMIN_PERMISSION_MODE === 'explicit_only'
-          ? 'explicit_only'
-          : 'implicit_all',
+      establishmentAdminPermissionMode: resolveEstablishmentAdminPermissionMode(),
       bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS || '12'),
       rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
       // Default tuned for POS: menus, history, orders, change ops, refetches — almost all traffic is authenticated
