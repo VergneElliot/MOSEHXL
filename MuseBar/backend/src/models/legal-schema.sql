@@ -128,6 +128,20 @@ CREATE TRIGGER trigger_prevent_legal_journal_modification
     FOR EACH ROW
     EXECUTE FUNCTION prevent_legal_journal_modification();
 
+-- Statement-level trigger to prevent table-wide purge by TRUNCATE
+CREATE OR REPLACE FUNCTION prevent_legal_journal_truncate()
+RETURNS TRIGGER AS $$
+BEGIN
+    RAISE EXCEPTION 'TRUNCATE of legal journal is forbidden for legal compliance (Article 286-I-3 bis du CGI)';
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_prevent_legal_journal_truncate ON legal_journal;
+CREATE TRIGGER trigger_prevent_legal_journal_truncate
+    BEFORE TRUNCATE ON legal_journal
+    FOR EACH STATEMENT
+    EXECUTE FUNCTION prevent_legal_journal_truncate();
+
 -- Trigger to prevent modification of closed closure bulletins
 CREATE OR REPLACE FUNCTION prevent_closed_bulletin_modification()
 RETURNS TRIGGER AS $$
