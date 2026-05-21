@@ -45,10 +45,7 @@ export async function epsonServerDirectPollHandler(pool: Pool, req: Request, res
   const rawId = req.query.establishment_id ?? req.query.eid;
   const establishmentId = String(rawId ?? '').trim();
   const headerKey = req.header('x-epson-poll-key');
-  const queryKey = req.query.key;
-  const key = typeof headerKey === 'string' && headerKey.length > 0
-    ? headerKey
-    : String(queryKey ?? '');
+  const key = typeof headerKey === 'string' ? headerKey.trim() : '';
 
   if (!establishmentId) {
     return res.status(400).type('text/plain').send('Missing or invalid establishment_id');
