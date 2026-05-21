@@ -59,10 +59,16 @@ vi.mock('../models/refreshToken', () => ({
   },
 }));
 
-vi.mock('otplib', () => ({
-  verifySync: mocks.totpCheck,
-  generateSecret: vi.fn(() => 'SECRET'),
-  generateURI: vi.fn(() => 'otpauth://example'),
+vi.mock('speakeasy', () => ({
+  default: {
+    totp: {
+      verify: mocks.totpCheck,
+    },
+    generateSecret: vi.fn(() => ({
+      base32: 'SECRET',
+      otpauth_url: 'otpauth://example',
+    })),
+  },
 }));
 
 import authLoginRouter from './authLogin';
@@ -142,7 +148,7 @@ describe('POST /auth/login admin 2FA enforcement', () => {
       mfa_totp_enabled: true,
       mfa_totp_secret: 'SECRET',
     });
-    mocks.totpCheck.mockReturnValueOnce({ valid: false });
+    mocks.totpCheck.mockReturnValueOnce(false);
 
     const res = await request(app).post('/auth/login').send({
       email: 'admin@est.example.com',
