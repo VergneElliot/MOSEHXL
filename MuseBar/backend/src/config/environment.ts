@@ -101,6 +101,20 @@ export const validateEnvironment = (): void => {
     invalid.push("DB_SSL_ALLOW_SELF_SIGNED must be either 'true' or 'false'");
   }
 
+  if (
+    process.env.PASSWORD_BREACH_CHECK_ENABLED &&
+    !isBooleanString(process.env.PASSWORD_BREACH_CHECK_ENABLED)
+  ) {
+    invalid.push("PASSWORD_BREACH_CHECK_ENABLED must be either 'true' or 'false'");
+  }
+
+  if (process.env.PASSWORD_BREACH_CHECK_TIMEOUT_MS) {
+    const timeout = Number(process.env.PASSWORD_BREACH_CHECK_TIMEOUT_MS);
+    if (!Number.isFinite(timeout) || timeout <= 0) {
+      invalid.push('PASSWORD_BREACH_CHECK_TIMEOUT_MS must be a positive number');
+    }
+  }
+
   const establishmentAdminPermissionMode = process.env.ESTABLISHMENT_ADMIN_PERMISSION_MODE;
   if (
     establishmentAdminPermissionMode &&

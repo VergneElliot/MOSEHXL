@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import type { SignOptions } from 'jsonwebtoken';
 import { Logger } from '../../../utils/logger';
-import { validatePassword } from '../../../utils/passwordValidation';
+import { validatePassword, validatePasswordWithBreachCheck } from '../../../utils/passwordValidation';
 import { UserQueries } from '../../../utils/database';
 
 export interface UserAccountData {
@@ -60,6 +60,11 @@ export class UserAccountOperations {
     const { email, password, establishmentId, role } = userData;
 
     try {
+      const passwordValidation = await validatePasswordWithBreachCheck(password);
+      if (!passwordValidation.isValid) {
+        throw new Error(passwordValidation.error ?? 'Invalid password');
+      }
+
       // 1. Hash the password
       const passwordHash = await bcrypt.hash(password, 12);
       this.logger.debug('Password hashed successfully for user', { email });

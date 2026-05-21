@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import express from 'express';
+import crypto from 'crypto';
 
 const mocks = vi.hoisted(() => ({
   findByEmail: vi.fn(),
@@ -93,6 +94,8 @@ app.use('/auth', authPasswordRouter);
 app.use(errorHandler);
 
 describe('authPassword routes', () => {
+  const originalBreachToggle = process.env.PASSWORD_BREACH_CHECK_ENABLED;
+
   beforeEach(() => {
     mocks.findByEmail.mockReset();
     mocks.findById.mockReset();
@@ -119,6 +122,9 @@ describe('authPassword routes', () => {
     mocks.markUsed.mockResolvedValue(undefined);
     mocks.invalidateActiveRequestsForUser.mockResolvedValue(undefined);
     mocks.createRequest.mockResolvedValue({ id: 'req-1' });
+    process.env.PASSWORD_BREACH_CHECK_ENABLED = originalBreachToggle;
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it('returns generic success for unknown email on forgot-password', async () => {
@@ -211,5 +217,23 @@ describe('authPassword routes', () => {
       'token-123',
       expect.objectContaining({ userId: 77, reason: 'PASSWORD_CHANGE_CURRENT_TOKEN_REVOKE' })
     );
+  });
+
+  it('rejects breached passwords on reset when check is enabled', async () => {
+    process.env.PASSWORD_BREACH_CHECK_ENABLED = 'true';
+    const hashHex = crypto.createHash('sha1').update('StrongPass1').digest('hex').toUpperCase();
+    const suffix = hashHex.slice(5);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => `${suffix}:999\n`,
+    }));
+
+    const res = await request(app)
+      .post('/auth/password/reset')
+      .send({ token: 'ok-token', newPassword: 'StrongPass1' });
+
+    expect(res.status).toBe(400);
+    expect(String(res.body.error)).toContain('known data breaches');
+    expect(mocks.updatePasswordById).not.toHaveBeenCalled();
   });
 });

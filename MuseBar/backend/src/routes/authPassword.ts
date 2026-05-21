@@ -7,7 +7,7 @@ import { RefreshTokenModel } from '../models/refreshToken';
 import { AuditTrailModel } from '../models/auditTrail';
 import { Logger } from '../utils/logger';
 import { EmailService } from '../services/email/EmailService';
-import { validatePassword } from '../utils/passwordValidation';
+import { validatePasswordWithBreachCheck } from '../utils/passwordValidation';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { requireAuth } from '../middleware/auth';
 
@@ -108,7 +108,7 @@ router.post('/password/reset', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'Token and newPassword are required' });
   }
 
-  const passwordValidation = validatePassword(newPassword);
+  const passwordValidation = await validatePasswordWithBreachCheck(newPassword);
   if (!passwordValidation.isValid) {
     return res.status(400).json({ error: passwordValidation.error ?? 'Invalid password' });
   }
@@ -153,7 +153,7 @@ router.post('/password/change', requireAuth, asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'currentPassword and newPassword are required' });
   }
 
-  const passwordValidation = validatePassword(newPassword);
+  const passwordValidation = await validatePasswordWithBreachCheck(newPassword);
   if (!passwordValidation.isValid) {
     return res.status(400).json({ error: passwordValidation.error ?? 'Invalid password' });
   }

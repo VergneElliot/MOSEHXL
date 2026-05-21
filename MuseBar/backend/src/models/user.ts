@@ -1,6 +1,6 @@
 import { pool } from '../app';
 import bcrypt from 'bcrypt';
-import { validatePassword } from '../utils/passwordValidation';
+import { validatePasswordWithBreachCheck } from '../utils/passwordValidation';
 
 /**
  * Full database row from the `users` table.
@@ -43,8 +43,8 @@ export interface AuthenticatedUser {
 export type User = UserRow;
 
 export class UserModel {
-  private static assertPasswordPolicy(password: string): void {
-    const passwordValidation = validatePassword(password);
+  private static async assertPasswordPolicy(password: string): Promise<void> {
+    const passwordValidation = await validatePasswordWithBreachCheck(password);
     if (!passwordValidation.isValid) {
       throw Object.assign(
         new Error(passwordValidation.error ?? 'Invalid password'),
@@ -59,7 +59,7 @@ export class UserModel {
   }
 
   static async createUser(email: string, password: string, is_admin: boolean = false): Promise<UserRow> {
-    this.assertPasswordPolicy(password);
+    await this.assertPasswordPolicy(password);
     const password_hash = await bcrypt.hash(password, 12);
     const result = await pool.query(
       `INSERT INTO users (email, password_hash, is_admin) VALUES ($1, $2, $3) RETURNING *`,
@@ -74,7 +74,7 @@ export class UserModel {
     role: string,
     establishmentId: string
   ): Promise<UserRow> {
-    this.assertPasswordPolicy(password);
+    await this.assertPasswordPolicy(password);
     const password_hash = await bcrypt.hash(password, 12);
     const result = await pool.query(
       `INSERT INTO users (email, password_hash, is_admin, role, establishment_id, email_verified)
@@ -322,7 +322,7 @@ export class UserModel {
   }
 
   static async updatePasswordById(userId: number, password: string): Promise<boolean> {
-    this.assertPasswordPolicy(password);
+    await this.assertPasswordPolicy(password);
     const password_hash = await bcrypt.hash(password, 12);
     const result = await pool.query(
       'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
