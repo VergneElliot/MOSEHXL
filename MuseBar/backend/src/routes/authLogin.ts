@@ -1,5 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
+import QRCode from 'qrcode';
+import { generateSecret, generateURI, verifySync } from 'otplib';
 import { UserModel } from '../models/user';
 import { AuditTrailModel } from '../models/auditTrail';
 import { TokenBlocklistModel } from '../models/tokenBlocklist';
@@ -27,6 +29,7 @@ const BASE_LOCKOUT_MINUTES = Number(process.env.AUTH_LOCKOUT_BASE_MINUTES ?? 15)
 const MAX_LOCKOUT_MINUTES = Number(process.env.AUTH_LOCKOUT_MAX_MINUTES ?? 240);
 const authRateLimitBase = process.env.NODE_ENV === 'development' ? 5 : 1;
 const authLimiterPool = process.env.NODE_ENV === 'test' ? undefined : pool;
+const TOTP_ISSUER = 'MOSEHXL';
 const authRateLimitLogger = {
   security: (
     event: string,
@@ -120,6 +123,17 @@ function clearRefreshTokenCookie(res: express.Response): void {
     sameSite: 'strict',
     path: '/api/auth',
   });
+}
+
+function isAdminTwoFactorEnforced(): boolean {
+  const raw = process.env.AUTH_ENFORCE_ADMIN_2FA?.trim().toLowerCase();
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return process.env.NODE_ENV === 'production';
+}
+
+function requiresAdminTwoFactor(role: CanonicalAuthRole): boolean {
+  return role === 'system_admin' || role === 'establishment_admin';
 }
 
 async function logAuditOrThrow(
@@ -241,6 +255,60 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    const loginRole = deriveCanonicalRole({
+      roleFromDb: user.role,
+      isAdminFlag: user.is_admin,
+      establishmentId: user.establishment_id,
+    });
+
+    if (isAdminTwoFactorEnforced() && requiresAdminTwoFactor(loginRole)) {
+      const mfaState = await UserModel.getMfaTotpState(user.id);
+      if (!mfaState?.mfa_totp_enabled || !mfaState.mfa_totp_secret) {
+        await logAuditOrThrow({
+          user_id: String(user.id),
+          action_type: 'LOGIN_BLOCKED',
+          action_details: {
+            reason: 'ADMIN_2FA_SETUP_REQUIRED',
+            email,
+            role: loginRole,
+          },
+          ip_address: ip,
+          user_agent: userAgent,
+        }, 'LOGIN_BLOCKED_ADMIN_2FA_SETUP_REQUIRED');
+        return res.status(403).json({
+          error: 'Two-factor authentication setup is required for this admin account',
+          code: 'ADMIN_2FA_SETUP_REQUIRED',
+        });
+      }
+
+      const totpCode = typeof req.body?.totpCode === 'string' ? req.body.totpCode.trim() : '';
+      const isValidTotp =
+        totpCode.length > 0 &&
+        verifySync({
+          secret: mfaState.mfa_totp_secret,
+          token: totpCode,
+          strategy: 'totp',
+          epochTolerance: 30,
+        }).valid;
+      if (!isValidTotp) {
+        await logAuditOrThrow({
+          user_id: String(user.id),
+          action_type: 'LOGIN_FAILED',
+          action_details: {
+            reason: 'INVALID_2FA_CODE',
+            email,
+            role: loginRole,
+          },
+          ip_address: ip,
+          user_agent: userAgent,
+        }, 'LOGIN_FAILED_INVALID_2FA_CODE');
+        return res.status(401).json({
+          error: 'Invalid two-factor authentication code',
+          code: 'INVALID_2FA_CODE',
+        });
+      }
+    }
+
     await UserModel.clearLoginLockoutState(user.id);
 
     // Fetch the full user record to build the JWT payload
@@ -305,6 +373,139 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
     Logger.getInstance().error('Login error', error as Error);
     throw new AppError('Internal server error during login', 500, 'LOGIN_FAILED');
   }
+}));
+
+// ---------------------------------------------------------------------------
+// 2FA / TOTP enrollment and management
+// ---------------------------------------------------------------------------
+router.get('/2fa/totp/status', requireAuth, asyncHandler(async (req, res) => {
+  const userId = req.user!.id;
+  const dbUser = await UserModel.findById(userId);
+  if (!dbUser) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  const role = deriveCanonicalRole({
+    roleFromDb: dbUser.role,
+    isAdminFlag: dbUser.is_admin,
+    establishmentId: dbUser.establishment_id,
+  });
+
+  return res.json({
+    enabled: dbUser.mfa_totp_enabled === true,
+    required_for_role: isAdminTwoFactorEnforced() && requiresAdminTwoFactor(role),
+    role,
+  });
+}));
+
+router.post('/2fa/totp/setup', requireAuth, asyncHandler(async (req, res) => {
+  const userId = req.user!.id;
+  const dbUser = await UserModel.findById(userId);
+  if (!dbUser) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  const secret = generateSecret();
+  const otpauthUrl = generateURI({
+    strategy: 'totp',
+    issuer: TOTP_ISSUER,
+    label: dbUser.email,
+    secret,
+  });
+  const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
+  await UserModel.setMfaTotpSecret(userId, secret);
+
+  await logAuditOrThrow({
+    user_id: String(userId),
+    action_type: 'MFA_TOTP_SETUP_STARTED',
+    action_details: { issuer: TOTP_ISSUER },
+    ip_address: req.ip,
+    user_agent: req.headers['user-agent'],
+  }, 'MFA_TOTP_SETUP_STARTED');
+
+  return res.json({
+    secret,
+    otpauthUrl,
+    qrCodeDataUrl,
+  });
+}));
+
+router.post('/2fa/totp/enable', requireAuth, asyncHandler(async (req, res) => {
+  const userId = req.user!.id;
+  const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+  if (!code) {
+    return res.status(400).json({ error: 'code is required' });
+  }
+
+  const mfaState = await UserModel.getMfaTotpState(userId);
+  if (!mfaState?.mfa_totp_secret) {
+    return res.status(400).json({ error: 'TOTP setup is required before enabling two-factor authentication' });
+  }
+
+  if (
+    !verifySync({
+      secret: mfaState.mfa_totp_secret,
+      token: code,
+      strategy: 'totp',
+      epochTolerance: 30,
+    }).valid
+  ) {
+    return res.status(400).json({ error: 'Invalid two-factor authentication code' });
+  }
+
+  await UserModel.enableMfaTotp(userId);
+  await logAuditOrThrow({
+    user_id: String(userId),
+    action_type: 'MFA_TOTP_ENABLED',
+    ip_address: req.ip,
+    user_agent: req.headers['user-agent'],
+  }, 'MFA_TOTP_ENABLED');
+
+  return res.json({ message: 'Two-factor authentication enabled' });
+}));
+
+router.post('/2fa/totp/disable', requireAuth, asyncHandler(async (req, res) => {
+  const userId = req.user!.id;
+  const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  if (!code || !password) {
+    return res.status(400).json({ error: 'code and password are required' });
+  }
+
+  const dbUser = await UserModel.findById(userId);
+  if (!dbUser) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  const validPassword = await UserModel.verifyPassword(dbUser, password);
+  if (!validPassword) {
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
+
+  const mfaState = await UserModel.getMfaTotpState(userId);
+  if (!mfaState?.mfa_totp_enabled || !mfaState.mfa_totp_secret) {
+    return res.status(400).json({ error: 'Two-factor authentication is not enabled' });
+  }
+  if (
+    !verifySync({
+      secret: mfaState.mfa_totp_secret,
+      token: code,
+      strategy: 'totp',
+      epochTolerance: 30,
+    }).valid
+  ) {
+    return res.status(400).json({ error: 'Invalid two-factor authentication code' });
+  }
+
+  await UserModel.disableMfaTotp(userId);
+  await logAuditOrThrow({
+    user_id: String(userId),
+    action_type: 'MFA_TOTP_DISABLED',
+    ip_address: req.ip,
+    user_agent: req.headers['user-agent'],
+  }, 'MFA_TOTP_DISABLED');
+
+  return res.json({ message: 'Two-factor authentication disabled' });
 }));
 
 // ---------------------------------------------------------------------------

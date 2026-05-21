@@ -115,6 +115,13 @@ export const validateEnvironment = (): void => {
     }
   }
 
+  if (
+    process.env.AUTH_ENFORCE_ADMIN_2FA &&
+    !isBooleanString(process.env.AUTH_ENFORCE_ADMIN_2FA)
+  ) {
+    invalid.push("AUTH_ENFORCE_ADMIN_2FA must be either 'true' or 'false'");
+  }
+
   const establishmentAdminPermissionMode = process.env.ESTABLISHMENT_ADMIN_PERMISSION_MODE;
   if (
     establishmentAdminPermissionMode &&

@@ -21,6 +21,9 @@ export interface UserRow {
   failed_login_attempts: number;
   lockout_count: number;
   locked_until: Date | null;
+  mfa_totp_enabled?: boolean;
+  mfa_totp_secret?: string | null;
+  mfa_totp_enabled_at?: Date | null;
   last_login: Date | null;
   created_at: Date;
   updated_at: Date;
@@ -144,6 +147,52 @@ export class UserModel {
       `UPDATE users
        SET failed_login_attempts = 0,
            locked_until = NULL,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [userId]
+    );
+  }
+
+  static async getMfaTotpState(userId: number): Promise<{
+    mfa_totp_enabled: boolean;
+    mfa_totp_secret: string | null;
+  } | null> {
+    const result = await pool.query(
+      'SELECT mfa_totp_enabled, mfa_totp_secret FROM users WHERE id = $1',
+      [userId]
+    );
+    return result.rows[0] || null;
+  }
+
+  static async setMfaTotpSecret(userId: number, secret: string): Promise<void> {
+    await pool.query(
+      `UPDATE users
+       SET mfa_totp_secret = $2,
+           mfa_totp_enabled = false,
+           mfa_totp_enabled_at = NULL,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [userId, secret]
+    );
+  }
+
+  static async enableMfaTotp(userId: number): Promise<void> {
+    await pool.query(
+      `UPDATE users
+       SET mfa_totp_enabled = true,
+           mfa_totp_enabled_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [userId]
+    );
+  }
+
+  static async disableMfaTotp(userId: number): Promise<void> {
+    await pool.query(
+      `UPDATE users
+       SET mfa_totp_enabled = false,
+           mfa_totp_secret = NULL,
+           mfa_totp_enabled_at = NULL,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $1`,
       [userId]
