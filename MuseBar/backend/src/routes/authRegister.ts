@@ -57,6 +57,18 @@ router.post('/register', requireAuth, requireAdmin, asyncHandler(async (req, res
     return res.status(400).json({ error: 'Email and password required' });
   }
 
+  const passwordValidation = validatePassword(password);
+  if (!passwordValidation.isValid) {
+    await logAuditOrThrow({
+      user_id: String(req.user!.id),
+      action_type: 'CREATE_USER_FAILED',
+      action_details: { reason: passwordValidation.error ?? 'Invalid password', email },
+      ip_address: ip,
+      user_agent: userAgent,
+    }, 'REGISTER_SYSTEM_USER_PASSWORD_POLICY');
+    return res.status(400).json({ error: passwordValidation.error ?? 'Invalid password' });
+  }
+
   try {
     const user = await UserModel.createUser(email, password, !!is_admin);
     await logAuditOrThrow({
@@ -197,6 +209,11 @@ router.post('/users', requireAuth, canManageUsers, asyncHandler(async (req, res)
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password required' });
+  }
+
+  const passwordValidation = validatePassword(password);
+  if (!passwordValidation.isValid) {
+    return res.status(400).json({ error: passwordValidation.error ?? 'Invalid password' });
   }
 
   if (!establishmentId) {

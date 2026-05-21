@@ -140,7 +140,7 @@ This list is for posterity — verified during this audit, do not re-open.
 | `business-day-stats` missing `access_compliance` | **Fixed** |
 | `journal/stats` permission inconsistency (S8/S9) | **Fixed** |
 | Swagger try-it-out in production | **Fixed** (P2-S11) |
-| Setup bootstrap password policy (S4) | **Fixed** — but still **missing on other create paths (P3-S2)** |
+| Setup/bootstrap password policy consistency | **Fixed** on setup + auth create paths (`/auth/register`, `/auth/users`) (P3-S2) |
 | `orderAudit` POST actor from body | **Fixed** (now `req.user.id`) |
 | `send-user-invitation` accessible to any authed user | **Fixed** (`canManageUsers` + establishment check) |
 | Auth endpoint rate limits | **Fixed** (P2-S12 with Postgres-backed store in prod) |
