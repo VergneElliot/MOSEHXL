@@ -154,7 +154,9 @@ CREATE TRIGGER trigger_prevent_legal_journal_truncate
 -- This BLOCKS UPDATE, DELETE, and TRUNCATE on legal_journal during normal operation
 ```
 
-The triggers run at the PostgreSQL level — even if someone bypasses our application code and connects directly to the database, they can't modify or purge entries.
+The triggers run at the PostgreSQL level — even if someone bypasses our application code and connects directly to the database, they can't modify, purge, or inject a broken chain entry.
+
+For defense in depth, insert paths are also checked in PostgreSQL: a `BEFORE INSERT` trigger recomputes the expected hash payload from the previous row in the same establishment chain and rejects any mismatch on sequence, `previous_hash`, or `current_hash`.
 
 For backup/restore operations, the policy is:
 

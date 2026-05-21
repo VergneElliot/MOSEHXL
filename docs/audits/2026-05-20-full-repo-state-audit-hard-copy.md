@@ -131,6 +131,7 @@ This list is for posterity — verified during this audit, do not re-open.
 | Refund/change journal fail-safe | **Fixed** (`orderCancel.ts:327-378`, `orderChange.ts:62-83`) |
 | Archive export endpoint lying about success | **Fixed** — verify + download HTTP routes are live; legacy `/archive/:id/export` is now a functional download alias (P3-L6) |
 | `legal_journal` TRUNCATE protection missing | **Fixed** — DB-level `BEFORE TRUNCATE` deny trigger added (P3-L4) |
+| DB-level legal_journal hash-chain insert enforcement missing | **Fixed** — `BEFORE INSERT` trigger now recomputes and validates sequence/previous/current hash (P3-L5) |
 | `logClosure` dead on manual route | **Fixed** for manual routes and auto scheduler (P3-L1) |
 | Integrity verifier silently skipped seq 128 / CORRECTION | **Fixed** (P0-L5) |
 | Software events missing | **Fixed** with fail-safe critical-event journaling + retries (P3-L3) |
