@@ -3,7 +3,7 @@
  * Validation logic for user and establishment invitations
  */
 
-import { pool } from '../../app';
+import { pool } from '../../db/pool';
 import { Logger } from '../../utils/logger';
 import { InvitationQueries } from '../../utils/database';
 import { validatePassword as validatePasswordShared } from '../../utils/passwordValidation';

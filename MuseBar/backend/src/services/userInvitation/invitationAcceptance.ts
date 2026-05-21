@@ -4,7 +4,7 @@
  */
 
 import bcrypt from 'bcrypt';
-import { pool } from '../../app';
+import { pool } from '../../db/pool';
 import { Logger } from '../../utils/logger';
 import { InvitationQueries } from '../../utils/database';
 import { EstablishmentModel, CreateEstablishmentData } from '../../models/establishment';

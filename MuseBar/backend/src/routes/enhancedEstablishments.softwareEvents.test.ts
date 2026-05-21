@@ -18,7 +18,7 @@ vi.mock('./auth', () => ({
   requireAdmin: (_req: express.Request, _res: express.Response, next: express.NextFunction) => next(),
 }));
 
-vi.mock('../app', () => ({
+vi.mock('../db/pool', () => ({
   pool: {
     query: mocks.poolQuery,
   },

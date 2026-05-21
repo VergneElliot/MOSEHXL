@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   clientRelease: vi.fn(),
 }));
 
-vi.mock('../../app', () => ({
+vi.mock('../../db/pool', () => ({
   pool: {
     connect: mocks.poolConnect,
   },

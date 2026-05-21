@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   rotateRefreshToken: vi.fn(),
 }));
 
-vi.mock('../app', () => ({
+vi.mock('../db/pool', () => ({
   __esModule: true,
   default: express(),
   pool: {

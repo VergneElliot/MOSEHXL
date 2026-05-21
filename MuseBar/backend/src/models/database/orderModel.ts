@@ -4,7 +4,7 @@
  * order_items and sub_bills are scoped through parent orders and explicit establishment attribution.
  */
 
-import { pool } from '../../app';
+import { pool } from '../../db/pool';
 import { Order, OrderItem, SubBill } from '../interfaces';
 
 /** Only these columns may be set by update(); prevents SQL injection via object keys. */

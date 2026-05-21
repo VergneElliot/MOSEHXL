@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   createRefreshToken: vi.fn(),
 }));
 
-vi.mock('../app', () => ({
+vi.mock('../db/pool', () => ({
   __esModule: true,
   default: express(),
   pool: {

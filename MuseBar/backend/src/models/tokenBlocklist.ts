@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
-import { pool } from '../app';
+import { pool } from '../db/pool';
 
 export class TokenBlocklistModel {
   static hashToken(token: string): string {

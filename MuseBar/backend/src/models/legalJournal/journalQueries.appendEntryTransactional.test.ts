@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   connect: vi.fn(),
 }));
 
-vi.mock('../../app', () => ({
+vi.mock('../../db/pool', () => ({
   pool: {
     connect: mocks.connect,
     query: vi.fn(),

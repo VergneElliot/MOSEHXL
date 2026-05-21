@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   loggerError: vi.fn(),
 }));
 
-vi.mock('../app', () => ({
+vi.mock('../db/pool', () => ({
   pool: {
     query: mocks.poolQuery,
   },

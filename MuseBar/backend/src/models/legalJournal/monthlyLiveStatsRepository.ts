@@ -1,4 +1,4 @@
-import { pool } from '../../app';
+import { pool } from '../../db/pool';
 
 /**
  * Live "monthly stats" for the closure dashboard.

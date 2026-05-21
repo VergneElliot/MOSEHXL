@@ -4,7 +4,7 @@
  */
 
 import crypto from 'crypto';
-import { pool } from '../../app';
+import { pool } from '../../db/pool';
 import { IntegrityCheckResult } from './types';
 import { getRegisterIdForEstablishment } from '../../utils/registerId';
 

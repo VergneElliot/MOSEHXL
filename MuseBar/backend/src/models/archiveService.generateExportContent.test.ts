@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   verifyJournalIntegrity: vi.fn(),
 }));
 
-vi.mock('../app', () => ({
+vi.mock('../db/pool', () => ({
   pool: {
     query: mocks.poolQuery,
   },

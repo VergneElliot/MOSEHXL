@@ -20,7 +20,7 @@ const mocks = vi.hoisted(() => ({
   poolQuery: vi.fn(),
 }));
 
-vi.mock('../../app', () => ({
+vi.mock('../../db/pool', () => ({
   __esModule: true,
   default: express(),
   pool: {

@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   poolQuery: vi.fn().mockResolvedValue({ rows: [{ id: 1 }] }),
 }));
 
-vi.mock('../../app', () => ({
+vi.mock('../../db/pool', () => ({
   pool: {
     query: mocks.poolQuery,
   },

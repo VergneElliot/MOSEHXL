@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import PDFDocument from 'pdfkit';
-import { pool } from '../app';
+import { pool } from '../db/pool';
 import LegalJournalModel from './legalJournal';
 import { getRegisterIdForEstablishment } from '../utils/registerId';
 

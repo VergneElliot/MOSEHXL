@@ -6,7 +6,7 @@ import { P } from '../../permissions/registry';
 
 // `middleware/auth` → `user` → `app` is pulled; avoid loading the real `app` (and thus
 // the full category router) when this suite imports `orderLegal`.
-vi.mock('../../app', () => {
+vi.mock('../../db/pool', () => {
   return {
     __esModule: true,
     default: express(),

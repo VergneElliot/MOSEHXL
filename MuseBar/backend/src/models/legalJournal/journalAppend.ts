@@ -1,4 +1,4 @@
-import { pool } from '../../app';
+import { pool } from '../../db/pool';
 import { JournalEntry, ClosureBulletin } from './types';
 import { JournalSigning } from './journalSigning';
 

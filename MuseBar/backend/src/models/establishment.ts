@@ -5,7 +5,7 @@
  * `establishments.schema_name` is legacy metadata and is not used for runtime isolation.
  */
 
-import { pool } from '../app';
+import { pool } from '../db/pool';
 import { randomUUID } from 'crypto';
 import { Logger } from '../utils/logger';
 import { logSoftwareEventBestEffort } from '../services/legal/softwareEventJournal';

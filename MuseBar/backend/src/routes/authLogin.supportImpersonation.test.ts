@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   getAuthRoleState: vi.fn(),
 }));
 
-vi.mock('../app', () => ({
+vi.mock('../db/pool', () => ({
   __esModule: true,
   default: express(),
   pool: {
