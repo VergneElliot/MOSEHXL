@@ -101,7 +101,7 @@ describe('epsonServerDirectPollHandler', () => {
     expect(client.release).toHaveBeenCalled();
   });
 
-  it('accepts legacy query key fallback when header is missing', async () => {
+  it('rejects query key fallback when header is missing', async () => {
     client.query
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
@@ -118,8 +118,8 @@ describe('epsonServerDirectPollHandler', () => {
 
     await epsonServerDirectPollHandler(pool, req, res);
 
-    expect(state.statusCode).toBe(200);
-    expect(state.body).toBe('');
+    expect(state.statusCode).toBe(403);
+    expect(state.body).toBe('Forbidden');
   });
 
   it('returns 403 when provided key is invalid', async () => {
@@ -134,6 +134,28 @@ describe('epsonServerDirectPollHandler', () => {
 
     const req = makeReq({
       query: { establishment_id: '11111111-1111-4111-8111-111111111111', key: 'wrong-key' },
+    });
+    const { res, state } = makeRes();
+
+    await epsonServerDirectPollHandler(pool, req, res);
+
+    expect(state.statusCode).toBe(403);
+    expect(state.body).toBe('Forbidden');
+  });
+
+  it('returns 403 when header key is empty', async () => {
+    client.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ provider: 'epson-server-direct', config: { pollKey: 'expected-key' } }],
+      })
+      .mockResolvedValueOnce({ rows: [] });
+    mocks.dequeueEposJob.mockReturnValue(undefined);
+
+    const req = makeReq({
+      query: { establishment_id: '11111111-1111-4111-8111-111111111111' },
+      headers: { 'x-epson-poll-key': '   ' },
     });
     const { res, state } = makeRes();
 
