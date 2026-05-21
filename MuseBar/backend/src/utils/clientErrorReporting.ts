@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+
 export const MAX_CLIENT_ERROR_REPORT_BYTES = 16 * 1024; // 16 KiB
 
 const SENSITIVE_KEY_FRAGMENTS = [
@@ -69,4 +71,19 @@ export function sanitizeClientErrorForLog(payload: unknown): Record<string, unkn
     context: sanitizeValue(raw.context ?? raw.metadata ?? {}),
     tags: sanitizeValue(raw.tags ?? {}),
   };
+}
+
+export function verifyClientErrorReportKey(provided: string, expected: string): boolean {
+  if (!provided || !expected) return false;
+
+  try {
+    const providedBuffer = Buffer.from(provided, 'utf8');
+    const expectedBuffer = Buffer.from(expected, 'utf8');
+    if (providedBuffer.length !== expectedBuffer.length) {
+      return false;
+    }
+    return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
+  } catch {
+    return false;
+  }
 }

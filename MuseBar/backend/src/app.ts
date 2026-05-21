@@ -9,7 +9,8 @@ import {
   getClientErrorPayloadSizeBytes,
   isClientErrorPayloadTooLarge,
   MAX_CLIENT_ERROR_REPORT_BYTES,
-  sanitizeClientErrorForLog
+  sanitizeClientErrorForLog,
+  verifyClientErrorReportKey
 } from './utils/clientErrorReporting';
 import type { Request, Response } from 'express';
 import { logSoftwareEventForAllEstablishmentsBestEffort } from './services/legal/softwareEventJournal';
@@ -153,7 +154,7 @@ if (isDevelopment) {
   if (clientErrorReportKey && clientErrorReportKey.length >= 16) {
     app.post('/api/client-errors', asyncHandler(async (req: Request, res: Response) => {
       const provided = req.header('x-client-error-key') ?? '';
-      if (provided !== clientErrorReportKey) {
+      if (!verifyClientErrorReportKey(provided, clientErrorReportKey)) {
         return res.status(403).json({ error: 'Forbidden' });
       }
 
