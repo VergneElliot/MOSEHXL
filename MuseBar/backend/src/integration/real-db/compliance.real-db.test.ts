@@ -174,4 +174,58 @@ describeRealDb('real-db compliance assertions', () => {
     });
     expect(visibleFromOtherTenant.rows).toHaveLength(0);
   });
+
+  it('does not expose tenant rows when request context has no establishment_id', async () => {
+    if (await currentRoleBypassesRls()) {
+      // Superusers / BYPASSRLS roles bypass policy evaluation and cannot validate RLS behavior.
+      return;
+    }
+
+    const establishmentId = await createEstablishment();
+    const order = await runWithTenantContext({ establishmentId }, async () => {
+      return await OrderModel.create(
+        {
+          total_amount: 18.4,
+          total_tax: 3.07,
+          payment_method: 'card',
+          status: 'completed',
+          notes: 'null-context-read-test',
+          tips: 0,
+          change: 0,
+          operation_type: 'sale',
+          change_amount: null,
+          establishment_id: establishmentId,
+        },
+        establishmentId
+      );
+    });
+    createdOrderIds.add(order.id);
+
+    const visibleWithNullContext = await runWithTenantContext({ establishmentId: null }, async () => {
+      return await appPool.query('SELECT id FROM orders WHERE id = $1', [order.id]);
+    });
+    expect(visibleWithNullContext.rows).toHaveLength(0);
+  });
+
+  it('blocks tenant writes when request context has no establishment_id', async () => {
+    if (await currentRoleBypassesRls()) {
+      // Superusers / BYPASSRLS roles bypass policy evaluation and cannot validate RLS behavior.
+      return;
+    }
+
+    const establishmentId = await createEstablishment();
+
+    await expect(
+      runWithTenantContext({ establishmentId: null }, async () => {
+        await appPool.query(
+          `
+            INSERT INTO orders (
+              establishment_id, total_amount, total_tax, payment_method, status
+            ) VALUES ($1, 9.9, 1.65, 'cash', 'completed')
+          `,
+          [establishmentId]
+        );
+      })
+    ).rejects.toThrow(/row-level security|policy|permission|rls/i);
+  });
 });
