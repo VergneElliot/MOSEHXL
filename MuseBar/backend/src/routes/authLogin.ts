@@ -1,7 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
 import QRCode from 'qrcode';
-import { generateSecret, generateURI, verifySync } from 'otplib';
+import speakeasy from 'speakeasy';
 import { UserModel } from '../models/user';
 import { AuditTrailModel } from '../models/auditTrail';
 import { TokenBlocklistModel } from '../models/tokenBlocklist';
@@ -284,12 +284,12 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
       const totpCode = typeof req.body?.totpCode === 'string' ? req.body.totpCode.trim() : '';
       const isValidTotp =
         totpCode.length > 0 &&
-        verifySync({
+        speakeasy.totp.verify({
           secret: mfaState.mfa_totp_secret,
+          encoding: 'base32',
           token: totpCode,
-          strategy: 'totp',
-          epochTolerance: 30,
-        }).valid;
+          window: 1,
+        });
       if (!isValidTotp) {
         await logAuditOrThrow({
           user_id: String(user.id),
@@ -405,13 +405,16 @@ router.post('/2fa/totp/setup', requireAuth, asyncHandler(async (req, res) => {
     return res.status(404).json({ error: 'User not found' });
   }
 
-  const secret = generateSecret();
-  const otpauthUrl = generateURI({
-    strategy: 'totp',
+  const generatedSecret = speakeasy.generateSecret({
+    length: 20,
+    name: `${TOTP_ISSUER}:${dbUser.email}`,
     issuer: TOTP_ISSUER,
-    label: dbUser.email,
-    secret,
   });
+  const secret = generatedSecret.base32;
+  const otpauthUrl = generatedSecret.otpauth_url;
+  if (!secret || !otpauthUrl) {
+    throw new AppError('Failed to generate TOTP setup material', 500, 'MFA_TOTP_SETUP_GENERATION_FAILED');
+  }
   const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
   await UserModel.setMfaTotpSecret(userId, secret);
 
@@ -442,14 +445,12 @@ router.post('/2fa/totp/enable', requireAuth, asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'TOTP setup is required before enabling two-factor authentication' });
   }
 
-  if (
-    !verifySync({
-      secret: mfaState.mfa_totp_secret,
-      token: code,
-      strategy: 'totp',
-      epochTolerance: 30,
-    }).valid
-  ) {
+  if (!speakeasy.totp.verify({
+    secret: mfaState.mfa_totp_secret,
+    encoding: 'base32',
+    token: code,
+    window: 1,
+  })) {
     return res.status(400).json({ error: 'Invalid two-factor authentication code' });
   }
 
@@ -486,14 +487,12 @@ router.post('/2fa/totp/disable', requireAuth, asyncHandler(async (req, res) => {
   if (!mfaState?.mfa_totp_enabled || !mfaState.mfa_totp_secret) {
     return res.status(400).json({ error: 'Two-factor authentication is not enabled' });
   }
-  if (
-    !verifySync({
-      secret: mfaState.mfa_totp_secret,
-      token: code,
-      strategy: 'totp',
-      epochTolerance: 30,
-    }).valid
-  ) {
+  if (!speakeasy.totp.verify({
+    secret: mfaState.mfa_totp_secret,
+    encoding: 'base32',
+    token: code,
+    window: 1,
+  })) {
     return res.status(400).json({ error: 'Invalid two-factor authentication code' });
   }
 
