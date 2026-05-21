@@ -6,7 +6,7 @@
 import express from 'express';
 import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';
-import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
+import { getEstablishmentId, requireAnyPermission, requireAuth, requirePermission } from '../auth';
 import { P } from '../../permissions/registry';
 import { AppError, asyncHandler } from '../../middleware/errorHandler';
 
@@ -58,7 +58,7 @@ router.post('/log', requireAuth, requirePermission(P.access_pos), asyncHandler(a
  * GET audit trail for order
  * GET /api/orders/audit/:orderId
  */
-router.get('/:orderId', requireAuth, asyncHandler(async (req, res) => {
+router.get('/:orderId', requireAuth, requireAnyPermission([P.access_pos, P.access_compliance]), asyncHandler(async (req, res) => {
   try {
     const establishmentId = getEstablishmentId(req, res);
     if (!establishmentId) return;

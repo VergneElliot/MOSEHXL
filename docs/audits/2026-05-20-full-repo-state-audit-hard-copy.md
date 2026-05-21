@@ -75,7 +75,7 @@ The IDs follow the existing audit convention: **P0/P1/P2** = priority, **L/S/Q/D
 | **P3-S7** | Optional HIBP k-anonymity check on set-password paths | **Fixed (2026-05-21):** shared breach-aware validator integrated with HIBP k-anonymity and wired into password set/reset/change flows (opt-in via env). | **S** |
 | **P3-S8** | 2FA (TOTP) for `system_admin` and `establishment_admin` | **Fixed (2026-05-21):** added admin TOTP lifecycle endpoints and login-time step-up enforcement (env-controlled, production-secure default) for admin roles. | **L** |
 | **P3-S9** | Drop Epson poll `?key=` query fallback (`epsonPollHandler.ts` L48-51) | **Fixed (2026-05-21):** removed query fallback and enforced header-only `x-epson-poll-key` auth for Epson Server Direct poll requests. | **S** |
-| **P3-S10** | `requirePermission(P.access_pos)` (or `access_compliance`) on `GET /api/orders/audit/:orderId` | Currently `requireAuth` only. | **S** |
+| **P3-S10** | `requirePermission(P.access_pos)` (or `access_compliance`) on `GET /api/orders/audit/:orderId` | **Fixed (2026-05-21):** endpoint now requires `access_pos` or `access_compliance` via `requireAnyPermission`. | **S** |
 | **P3-S11** | Default `ESTABLISHMENT_ADMIN_PERMISSION_MODE=explicit_only` in production | Reduces blast radius of a compromised tenant admin. | **S** |
 | **P3-S12** | `timingSafeEqual` for prod client-error key compare (`app.ts` L212-214) | Same posture as `requireSetupSecret`. | **S** |
 | **P3-S13** | Audit `establishment_id IS NULL` (`system_admin`) paths against RLS policies | Risk: super-admin path bypasses tenant wrapper; integration tests should prove RLS still blocks where intended. | **M** |

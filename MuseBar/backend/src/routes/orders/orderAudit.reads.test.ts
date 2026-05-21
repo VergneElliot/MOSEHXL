@@ -8,6 +8,7 @@ const EST = '11111111-1111-4111-8111-111111111111';
 
 const mocks = vi.hoisted(() => ({
   poolQuery: vi.fn(),
+  getUserPermissions: vi.fn(),
 }));
 
 vi.mock('../../db/pool', () => ({
@@ -15,6 +16,12 @@ vi.mock('../../db/pool', () => ({
   default: express(),
   pool: {
     query: mocks.poolQuery,
+  },
+}));
+
+vi.mock('../../models/user', () => ({
+  UserModel: {
+    getUserPermissions: mocks.getUserPermissions,
   },
 }));
 
@@ -47,6 +54,7 @@ function staffToken() {
 describe('orderAudit read endpoints', () => {
   beforeEach(() => {
     mocks.poolQuery.mockReset();
+    mocks.getUserPermissions.mockReset();
     mocks.poolQuery.mockImplementation(async (query: unknown, values?: unknown[]) => {
       const sql = String(query ?? '');
 
@@ -85,6 +93,7 @@ describe('orderAudit read endpoints', () => {
 
       return { rows: [] };
     });
+    mocks.getUserPermissions.mockResolvedValue(['access_pos']);
   });
 
   it('returns real audit entries for an order id', async () => {
@@ -100,6 +109,28 @@ describe('orderAudit read endpoints', () => {
       expect.stringContaining('FROM audit_trail'),
       [EST, '123']
     );
+  });
+
+  it('denies reading audit entries when user has neither access_pos nor access_compliance', async () => {
+    mocks.getUserPermissions.mockResolvedValue([]);
+
+    const res = await request(app)
+      .get('/audit/123')
+      .set('Authorization', `Bearer ${staffToken()}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('Permission denied');
+  });
+
+  it('allows reading audit entries with access_compliance permission', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
+
+    const res = await request(app)
+      .get('/audit/123')
+      .set('Authorization', `Bearer ${staffToken()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.total_entries).toBe(2);
   });
 
   it('returns computed summary for an order id', async () => {
