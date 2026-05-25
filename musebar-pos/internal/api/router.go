@@ -16,12 +16,14 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 
 	// Initialize repositories
 	legalRepo := postgres.NewLegalRepository(db)
+	productRepo := postgres.NewProductRepository(db)
 
 	// Initialize services
 	journalService := legal.NewJournalService(legalRepo)
 
 	// Initialize handlers
 	legalHandler := handlers.NewLegalHandler(journalService, legalRepo)
+	productHandler := handlers.NewProductHandler(productRepo)
 
 	// Health check endpoint (no middleware)
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
@@ -35,6 +37,20 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	mux.HandleFunc("GET /api/legal/journal/entries", middleware.InjectTestEstablishment(legalHandler.GetJournalEntries))
 	mux.HandleFunc("GET /api/legal/journal/stats", middleware.InjectTestEstablishment(legalHandler.GetJournalStats))
 	mux.HandleFunc("GET /api/legal/closure", middleware.InjectTestEstablishment(legalHandler.GetClosureBulletins))
+
+	// Category endpoints
+	mux.HandleFunc("POST /api/categories", middleware.InjectTestEstablishment(productHandler.CreateCategory))
+	mux.HandleFunc("GET /api/categories", middleware.InjectTestEstablishment(productHandler.GetCategories))
+	mux.HandleFunc("GET /api/categories/{id}", middleware.InjectTestEstablishment(productHandler.GetCategory))
+	mux.HandleFunc("PATCH /api/categories/{id}", middleware.InjectTestEstablishment(productHandler.UpdateCategory))
+	mux.HandleFunc("DELETE /api/categories/{id}", middleware.InjectTestEstablishment(productHandler.ArchiveCategory))
+
+	// Product endpoints
+	mux.HandleFunc("POST /api/products", middleware.InjectTestEstablishment(productHandler.CreateProduct))
+	mux.HandleFunc("GET /api/products", middleware.InjectTestEstablishment(productHandler.GetProducts))
+	mux.HandleFunc("GET /api/products/{id}", middleware.InjectTestEstablishment(productHandler.GetProduct))
+	mux.HandleFunc("PATCH /api/products/{id}", middleware.InjectTestEstablishment(productHandler.UpdateProduct))
+	mux.HandleFunc("DELETE /api/products/{id}", middleware.InjectTestEstablishment(productHandler.ArchiveProduct))
 
 	return mux
 }
