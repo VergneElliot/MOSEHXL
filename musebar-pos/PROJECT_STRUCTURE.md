@@ -1,7 +1,7 @@
 # Complete Go + Svelte Project Structure
 
 ```
-restaurant-pos/
+musebar-pos/
 │
 ├── README.md                          # Complete project documentation
 ├── MIGRATION_STATUS.md                # What's done, what's remaining

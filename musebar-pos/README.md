@@ -1,4 +1,4 @@
-# Restaurant POS - Go + Svelte Rewrite
+# Musebar POS - Go + Svelte Rewrite
 
 ## Stack Comparison
 
@@ -266,7 +266,3 @@ Faster:   3-5x
 ## License
 
 Same as original MOSEHXL project.
-
----
-
-**Ready to start the migration?** Share your legal service files and I'll create the complete Go implementation with your exact compliance logic preserved.

@@ -10,14 +10,26 @@ import (
 // InitDB initializes PostgreSQL connection pool using pgx
 func InitDB(cfg *Config) (*pgxpool.Pool, error) {
 	// Build connection string
-	connString := fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		cfg.DatabaseHost,
-		cfg.DatabasePort,
-		cfg.DatabaseUser,
-		cfg.DatabasePass,
-		cfg.DatabaseName,
-	)
+	// If no password is set, use Unix socket (peer authentication)
+	var connString string
+	if cfg.DatabasePass == "" {
+		// Peer authentication via Unix socket
+		connString = fmt.Sprintf(
+			"host=/var/run/postgresql user=%s dbname=%s sslmode=disable",
+			cfg.DatabaseUser,
+			cfg.DatabaseName,
+		)
+	} else {
+		// TCP connection with password
+		connString = fmt.Sprintf(
+			"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+			cfg.DatabaseHost,
+			cfg.DatabasePort,
+			cfg.DatabaseUser,
+			cfg.DatabasePass,
+			cfg.DatabaseName,
+		)
+	}
 
 	// Create pool configuration
 	poolConfig, err := pgxpool.ParseConfig(connString)

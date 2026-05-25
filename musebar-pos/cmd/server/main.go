@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"musebar-pos/internal/api"
 	"musebar-pos/internal/config"
 )
 
@@ -19,27 +21,22 @@ func main() {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	log.Printf("✅ Configuration loaded")
-	log.Printf("🌐 Environment: %s", cfg.Environment)
-	log.Printf("🔧 Skipping database connection for now")
+	// Initialize database
+	db, err := config.InitDB(cfg)
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer db.Close()
 
-	// Simple HTTP handler
-	mux := http.NewServeMux()
-	
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"ok","message":"MuseBar POS - Go Backend","version":"0.1.0"}`))
-	})
+	log.Printf("✅ Connected to PostgreSQL: %s", cfg.DatabaseName)
 
-	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"healthy","timestamp":"` + time.Now().Format(time.RFC3339) + `"}`))
-	})
+	// Initialize router with all handlers
+	router := api.NewRouter(cfg, db)
 
 	// Configure HTTP server
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%s", cfg.Port),
-		Handler:      mux,
+		Handler:      router,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -48,7 +45,8 @@ func main() {
 	// Start server in goroutine
 	go func() {
 		log.Printf("🚀 Server starting on port %s", cfg.Port)
-		log.Printf("📍 Try: http://localhost:%s/api/health", cfg.Port)
+		log.Printf("🌐 Environment: %s", cfg.Environment)
+		log.Printf("📊 Database: %s", cfg.DatabaseName)
 		
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server failed to start: %v", err)
@@ -61,5 +59,13 @@ func main() {
 	<-quit
 
 	log.Println("🛑 Shutting down server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
+
 	log.Println("✅ Server exited gracefully")
 }
