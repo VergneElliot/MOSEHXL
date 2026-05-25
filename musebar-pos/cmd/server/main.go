@@ -31,7 +31,7 @@ func main() {
 	log.Printf("✅ Connected to PostgreSQL: %s", cfg.DatabaseName)
 
 	// Initialize router with all handlers
-	router := api.NewRouter(cfg, db)
+	router := api.NewRouter(db)
 
 	// Configure HTTP server
 	server := &http.Server{
