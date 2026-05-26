@@ -282,3 +282,30 @@ func joinStrings(strs []string, sep string) string {
 	}
 	return result
 }
+
+// ToggleHappyHour enables or disables happy hour for all products
+func (r *ProductRepositoryPostgres) ToggleHappyHour(ctx context.Context, schemaName string, active bool) error {
+	query := fmt.Sprintf(`
+		UPDATE "%s".products
+		SET happy_hour_active = $1
+		WHERE happy_hour_price IS NOT NULL
+	`, schemaName)
+
+	_, err := r.db.Exec(ctx, query, active)
+	return err
+}
+
+// GetHappyHourStatus checks if happy hour is currently active
+func (r *ProductRepositoryPostgres) GetHappyHourStatus(ctx context.Context, schemaName string) (bool, error) {
+	query := fmt.Sprintf(`
+		SELECT EXISTS(
+			SELECT 1 FROM "%s".products
+			WHERE happy_hour_active = true
+			LIMIT 1
+		)
+	`, schemaName)
+
+	var active bool
+	err := r.db.QueryRow(ctx, query).Scan(&active)
+	return active, err
+}

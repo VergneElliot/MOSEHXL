@@ -7,30 +7,39 @@ import (
 	"musebar-pos/internal/models"
 )
 
-// LegalRepository defines operations for legal compliance data
+// LegalRepository defines operations for legal journal
 type LegalRepository interface {
-	// Legal Journal
 	InsertEntry(ctx context.Context, schemaName string, entry *models.LegalEntry) error
-	GetLastEntry(ctx context.Context, schemaName string) (*models.LegalEntry, error)
 	GetLastHash(ctx context.Context, schemaName string) (string, error)
 	GetLastSequenceNumber(ctx context.Context, schemaName string) (int, error)
 	GetAllEntries(ctx context.Context, schemaName string) ([]models.LegalEntry, error)
-	GetEntries(ctx context.Context, schemaName string, startDate, endDate *time.Time, entryType *string, limit, offset int) ([]models.LegalEntry, error)
-	GetEntriesCount(ctx context.Context, schemaName string, startDate, endDate *time.Time, entryType *string) (int, error)
-
-	// Closure Bulletins
+	GetEntriesCount(ctx context.Context, schemaName string, startDate, endDate *time.Time, transactionType *string) (int, error)
+	GetEntries(ctx context.Context, schemaName string, startDate, endDate *time.Time, transactionType *string, limit, offset int) ([]models.LegalEntry, error)
+	GetClosureBulletins(ctx context.Context, schemaName string, closureType *string, startDate, endDate *time.Time) ([]models.ClosureBulletin, error)
 	InsertClosureBulletin(ctx context.Context, bulletin *models.ClosureBulletin) error
 	GetClosureBulletin(ctx context.Context, bulletinID int64) (*models.ClosureBulletin, error)
-	GetClosureBulletins(ctx context.Context, establishmentID string, bulletinType *string, startDate, endDate *time.Time) ([]models.ClosureBulletin, error)
+}
 
-	// Audit Trail
-	InsertAuditEntry(ctx context.Context, entry *models.AuditEntry) error
-	GetAuditEntries(ctx context.Context, userID *string, actionType *string, startDate, endDate *time.Time, limit, offset int) ([]models.AuditEntry, error)
+// ProductRepository defines operations for products and categories
+type ProductRepository interface {
+	// Category operations
+	CreateCategory(ctx context.Context, schemaName string, category *models.Category) error
+	GetCategoryByID(ctx context.Context, schemaName string, categoryID int64) (*models.Category, error)
+	GetAllCategories(ctx context.Context, schemaName string, includeArchived bool) ([]models.Category, error)
+	UpdateCategory(ctx context.Context, schemaName string, categoryID int64, updates map[string]interface{}) error
+	ArchiveCategory(ctx context.Context, schemaName string, categoryID int64) error
 
-	// Archive Exports
-	InsertArchiveExport(ctx context.Context, export *models.ArchiveExport) error
-	GetArchiveExport(ctx context.Context, exportID int64) (*models.ArchiveExport, error)
-	UpdateArchiveStatus(ctx context.Context, exportID int64, status string, verifiedAt *time.Time) error
+	// Product operations
+	CreateProduct(ctx context.Context, schemaName string, product *models.Product) error
+	GetProductByID(ctx context.Context, schemaName string, productID int64) (*models.Product, error)
+	GetAllProducts(ctx context.Context, schemaName string, includeArchived bool) ([]models.Product, error)
+	UpdateProduct(ctx context.Context, schemaName string, productID int64, updates map[string]interface{}) error
+	ArchiveProduct(ctx context.Context, schemaName string, productID int64) error
+	GetProductsByCategory(ctx context.Context, schemaName string, categoryID int64) ([]models.Product, error)
+	
+	// Happy Hour operations
+	ToggleHappyHour(ctx context.Context, schemaName string, active bool) error
+	GetHappyHourStatus(ctx context.Context, schemaName string) (bool, error)
 }
 
 // OrderRepository defines operations for orders
@@ -39,28 +48,8 @@ type OrderRepository interface {
 	GetOrderByID(ctx context.Context, schemaName string, orderID int64) (*models.Order, error)
 	GetOrdersByPeriod(ctx context.Context, schemaName string, startDate, endDate time.Time) ([]models.Order, error)
 	UpdateOrderStatus(ctx context.Context, schemaName string, orderID int64, status string) error
-	
-	// Order Items
 	CreateOrderItems(ctx context.Context, schemaName string, items []models.OrderItem) error
 	GetOrderItems(ctx context.Context, schemaName string, orderID int64) ([]models.OrderItem, error)
-}
-
-// ProductRepository defines operations for products and categories
-type ProductRepository interface {
-	// Categories
-	CreateCategory(ctx context.Context, schemaName string, category *models.Category) error
-	GetCategoryByID(ctx context.Context, schemaName string, categoryID int64) (*models.Category, error)
-	GetAllCategories(ctx context.Context, schemaName string, includeArchived bool) ([]models.Category, error)
-	UpdateCategory(ctx context.Context, schemaName string, categoryID int64, updates map[string]interface{}) error
-	ArchiveCategory(ctx context.Context, schemaName string, categoryID int64) error
-
-	// Products
-	CreateProduct(ctx context.Context, schemaName string, product *models.Product) error
-	GetProductByID(ctx context.Context, schemaName string, productID int64) (*models.Product, error)
-	GetAllProducts(ctx context.Context, schemaName string, includeArchived bool) ([]models.Product, error)
-	GetProductsByCategory(ctx context.Context, schemaName string, categoryID int64) ([]models.Product, error)
-	UpdateProduct(ctx context.Context, schemaName string, productID int64, updates map[string]interface{}) error
-	ArchiveProduct(ctx context.Context, schemaName string, productID int64) error
 }
 
 // UserRepository defines operations for users
