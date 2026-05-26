@@ -27,14 +27,14 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	productHandler := handlers.NewProductHandler(productRepo)
 	orderHandler := handlers.NewOrderHandler(orderRepo, productRepo, journalService)
 
-	// Health check endpoint (no middleware)
+	// Health check
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok","service":"musebar-pos"}`))
 	})
 
-	// Legal endpoints (with establishment middleware)
+	// Legal endpoints
 	mux.HandleFunc("GET /api/legal/journal/verify", middleware.InjectTestEstablishment(legalHandler.VerifyJournalIntegrity))
 	mux.HandleFunc("GET /api/legal/journal/entries", middleware.InjectTestEstablishment(legalHandler.GetJournalEntries))
 	mux.HandleFunc("GET /api/legal/journal/stats", middleware.InjectTestEstablishment(legalHandler.GetJournalStats))
@@ -58,6 +58,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	mux.HandleFunc("POST /api/orders", middleware.InjectTestEstablishment(orderHandler.CreateOrder))
 	mux.HandleFunc("GET /api/orders", middleware.InjectTestEstablishment(orderHandler.GetOrders))
 	mux.HandleFunc("GET /api/orders/{id}", middleware.InjectTestEstablishment(orderHandler.GetOrder))
+	mux.HandleFunc("POST /api/orders/{id}/refund", middleware.InjectTestEstablishment(orderHandler.RefundOrder))
 
 	return mux
 }
