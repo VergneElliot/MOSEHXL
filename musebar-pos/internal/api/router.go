@@ -38,7 +38,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 		w.Write([]byte(`{"status":"ok","service":"musebar-pos"}`))
 	})
 
-	// Auth endpoints
+	// Auth endpoints (public)
 	mux.HandleFunc("POST /api/auth/login", authHandler.Login)
 	mux.HandleFunc("POST /api/auth/refresh", authHandler.Refresh)
 	mux.HandleFunc("POST /api/auth/logout", authmw.RequireAuth(authHandler.Logout))
@@ -80,5 +80,6 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	mux.HandleFunc("GET /api/happy-hour/status", authmw.RequireAuth(happyHourHandler.GetHappyHourStatus))
 	mux.HandleFunc("PATCH /api/products/{id}/happy-hour", authmw.RequireAdmin(happyHourHandler.SetProductHappyHourPrice))
 
-	return mux
+	// Wrap entire mux with DB context injection
+	return authmw.WithDB(db)(mux)
 }
