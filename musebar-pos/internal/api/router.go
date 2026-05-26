@@ -17,6 +17,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	// Initialize repositories
 	legalRepo := postgres.NewLegalRepository(db)
 	productRepo := postgres.NewProductRepository(db)
+	orderRepo := postgres.NewOrderRepository(db)
 
 	// Initialize services
 	journalService := legal.NewJournalService(legalRepo)
@@ -24,6 +25,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	// Initialize handlers
 	legalHandler := handlers.NewLegalHandler(journalService, legalRepo)
 	productHandler := handlers.NewProductHandler(productRepo)
+	orderHandler := handlers.NewOrderHandler(orderRepo, productRepo, journalService)
 
 	// Health check endpoint (no middleware)
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
@@ -51,6 +53,11 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	mux.HandleFunc("GET /api/products/{id}", middleware.InjectTestEstablishment(productHandler.GetProduct))
 	mux.HandleFunc("PATCH /api/products/{id}", middleware.InjectTestEstablishment(productHandler.UpdateProduct))
 	mux.HandleFunc("DELETE /api/products/{id}", middleware.InjectTestEstablishment(productHandler.ArchiveProduct))
+
+	// Order endpoints
+	mux.HandleFunc("POST /api/orders", middleware.InjectTestEstablishment(orderHandler.CreateOrder))
+	mux.HandleFunc("GET /api/orders", middleware.InjectTestEstablishment(orderHandler.GetOrders))
+	mux.HandleFunc("GET /api/orders/{id}", middleware.InjectTestEstablishment(orderHandler.GetOrder))
 
 	return mux
 }
