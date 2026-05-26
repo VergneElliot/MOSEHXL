@@ -97,9 +97,7 @@ func (r *OrderRepositoryPostgres) GetOrdersByPeriod(ctx context.Context, schemaN
 func (r *OrderRepositoryPostgres) UpdateOrderStatus(ctx context.Context, schemaName string, orderID int64, status string) error {
 	query := fmt.Sprintf(`
 		UPDATE "%s".orders
-		SET status = $1,
-		    completed_at = CASE WHEN $1 = 'COMPLETED' THEN NOW() ELSE completed_at END,
-		    cancelled_at = CASE WHEN $1 = 'CANCELLED' THEN NOW() ELSE cancelled_at END
+		SET status = $1::VARCHAR
 		WHERE id = $2
 	`, schemaName)
 

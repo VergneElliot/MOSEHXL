@@ -235,3 +235,87 @@ func (h *OrderHandler) GetOrders(w http.ResponseWriter, r *http.Request) {
 		"total":  len(orders),
 	})
 }
+
+// RefundOrderRequest represents a refund request
+type RefundOrderRequest struct {
+	Reason string `json:"reason"`
+}
+
+// RefundOrder processes a refund for a completed order
+func (h *OrderHandler) RefundOrder(w http.ResponseWriter, r *http.Request) {
+	schemaName := r.Context().Value("schema_name").(string)
+	idStr := r.PathValue("id")
+	orderID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid order ID", http.StatusBadRequest)
+		return
+	}
+
+	var req RefundOrderRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	order, err := h.orderRepo.GetOrderByID(r.Context(), schemaName, orderID)
+	if err != nil {
+		http.Error(w, "Order not found", http.StatusNotFound)
+		return
+	}
+
+	if order.Status == "REFUNDED" {
+		http.Error(w, "Order already refunded", http.StatusBadRequest)
+		return
+	}
+	if order.Status == "CANCELLED" {
+		http.Error(w, "Cannot refund cancelled order", http.StatusBadRequest)
+		return
+	}
+
+	items, err := h.orderRepo.GetOrderItems(r.Context(), schemaName, orderID)
+	if err != nil {
+		http.Error(w, "Failed to get order items", http.StatusInternalServerError)
+		return
+	}
+
+	if err := h.orderRepo.UpdateOrderStatus(r.Context(), schemaName, orderID, "REFUNDED"); err != nil {
+		http.Error(w, "Failed to update order status", http.StatusInternalServerError)
+		return
+	}
+
+	refundData := map[string]interface{}{
+		"order_id":       orderID,
+		"order_number":   order.OrderNumber,
+		"refund_reason":  req.Reason,
+		"original_items": items,
+	}
+
+	var userID *string
+	if order.CreatedBy != nil {
+		userIDStr := fmt.Sprintf("%d", *order.CreatedBy)
+		userID = &userIDStr
+	}
+
+	err = h.journalService.RecordRefund(
+		r.Context(),
+		schemaName,
+		orderID,
+		-order.TotalAmount,
+		-order.TotalVAT,
+		order.PaymentMethod,
+		refundData,
+		userID,
+		"MUSEBAR-REG-001",
+	)
+
+	if err != nil {
+		fmt.Printf("WARNING: Failed to record refund in legal journal: %v\n", err)
+	}
+
+	refundedOrder, _ := h.orderRepo.GetOrderByID(r.Context(), schemaName, orderID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"order":   refundedOrder,
+		"message": "Order refunded successfully",
+	})
+}
