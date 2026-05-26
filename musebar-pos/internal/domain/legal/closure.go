@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"time"
 
 	"musebar-pos/internal/models"
@@ -23,123 +24,204 @@ func NewClosureService(journalRepo repository.LegalRepository, orderRepo reposit
 	}
 }
 
-// CreateDailyClosure creates a daily closure bulletin for a specific date
+// roundTo4 rounds a float to 4 decimal places
+func roundTo4(amount float64) float64 {
+	return math.Round(amount*10000) / 10000
+}
+
+// vatFromTTC extracts VAT from TTC amount using reverse calculation
+// 10% => VAT = TTC / 11 ; 20% => VAT = TTC / 6
+func vatFromTTC(ttc float64, rate float64) float64 {
+	if rate <= 0.15 || (rate >= 9 && rate <= 11) {
+		return roundTo4(ttc / 11) // 10% VAT
+	}
+	return roundTo4(ttc / 6) // 20% VAT
+}
+
+// ReconciliationResult compares closure totals with legal journal
+type ReconciliationResult struct {
+	OK      bool                   `json:"ok"`
+	Details map[string]interface{} `json:"details"`
+}
+
+func computeReconciliation(
+	closureTransactions int, closureAmount, closureVAT float64,
+	journalCount int, journalAmount, journalVAT float64,
+) ReconciliationResult {
+	txDelta := closureTransactions - journalCount
+	amountDelta := roundTo4(closureAmount - journalAmount)
+	vatDelta := roundTo4(closureVAT - journalVAT)
+	ok := txDelta == 0 && math.Abs(amountDelta) < 0.0001 && math.Abs(vatDelta) < 0.0001
+
+	return ReconciliationResult{
+		OK: ok,
+		Details: map[string]interface{}{
+			"closure_transactions":    closureTransactions,
+			"journal_transactions":    journalCount,
+			"transaction_delta":       txDelta,
+			"closure_total_amount":    roundTo4(closureAmount),
+			"journal_total_amount":    roundTo4(journalAmount),
+			"amount_delta":            amountDelta,
+			"closure_total_vat":       roundTo4(closureVAT),
+			"journal_total_vat":       roundTo4(journalVAT),
+			"vat_delta":               vatDelta,
+			"compared_at":             time.Now().UTC().Format(time.RFC3339),
+		},
+	}
+}
+
+// CreateDailyClosure creates a daily closure bulletin
 func (s *ClosureService) CreateDailyClosure(ctx context.Context, schemaName, establishmentID string, date time.Time, fondDeCaisse float64) (*models.ClosureBulletin, error) {
-	// Set period: start of day to end of day
 	startDate := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
 	endDate := time.Date(date.Year(), date.Month(), date.Day(), 23, 59, 59, 999999999, date.Location())
+	return s.createPeriodClosure(ctx, schemaName, establishmentID, "DAILY", startDate, endDate, fondDeCaisse)
+}
 
-	// Get all orders for the period
+// CreateMonthlyClosure creates a monthly closure bulletin
+func (s *ClosureService) CreateMonthlyClosure(ctx context.Context, schemaName, establishmentID string, year int, month time.Month, fondDeCaisse float64) (*models.ClosureBulletin, error) {
+	startDate := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(year, month+1, 1, 0, 0, 0, 0, time.UTC).Add(-time.Nanosecond)
+	return s.createPeriodClosure(ctx, schemaName, establishmentID, "MONTHLY", startDate, endDate, fondDeCaisse)
+}
+
+// CreateAnnualClosure creates an annual closure bulletin
+func (s *ClosureService) CreateAnnualClosure(ctx context.Context, schemaName, establishmentID string, year int, fondDeCaisse float64) (*models.ClosureBulletin, error) {
+	startDate := time.Date(year, time.January, 1, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(year+1, time.January, 1, 0, 0, 0, 0, time.UTC).Add(-time.Nanosecond)
+	return s.createPeriodClosure(ctx, schemaName, establishmentID, "ANNUAL", startDate, endDate, fondDeCaisse)
+}
+
+// createPeriodClosure is the generic closure creation method
+func (s *ClosureService) createPeriodClosure(ctx context.Context, schemaName, establishmentID, closureType string, startDate, endDate time.Time, fondDeCaisse float64) (*models.ClosureBulletin, error) {
+	// Get legal journal entries for the period
+	entries, err := s.journalRepo.GetEntries(ctx, schemaName, &startDate, &endDate, nil, 10000, 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get journal entries: %w", err)
+	}
+
+	// Get orders for the period
 	orders, err := s.orderRepo.GetOrdersByPeriod(ctx, schemaName, startDate, endDate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get orders: %w", err)
 	}
 
-	// Get legal journal entries for the period
-	entries, err := s.journalRepo.GetEntries(ctx, schemaName, &startDate, &endDate, nil, 1000, 0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get journal entries: %w", err)
-	}
-
-	// Calculate totals
-	var totalAmount, totalVAT, tipTotal, changeTotal float64
-	var firstSeq, lastSeq int
-	transactionCount := 0
-	vatBreakdown := make(map[string]map[string]float64)
+	// Calculate journal totals (source of truth)
+	var journalAmount, journalVAT float64
+	journalCount := 0
+	firstSeq := -1
+	lastSeq := 0
 	paymentBreakdown := make(map[string]float64)
 
-	// Process journal entries - track min/max sequence properly
-	firstSeq = -1 // sentinel
 	for _, entry := range entries {
-		// Track minimum (first) and maximum (last) sequence numbers
 		if firstSeq == -1 || entry.SequenceNumber < firstSeq {
 			firstSeq = entry.SequenceNumber
 		}
 		if entry.SequenceNumber > lastSeq {
 			lastSeq = entry.SequenceNumber
 		}
-
 		if entry.TransactionType == "SALE" || entry.TransactionType == "REFUND" {
-			transactionCount++
-			totalAmount += entry.Amount
-			totalVAT += entry.VATAmount
-
-			// Payment method breakdown
+			journalCount++
+			journalAmount += entry.Amount
+			journalVAT += entry.VATAmount
 			paymentBreakdown[entry.PaymentMethod] += entry.Amount
 		}
 	}
-	
-	// Handle empty case
 	if firstSeq == -1 {
 		firstSeq = 0
 	}
 
-	// Process orders for VAT breakdown and tips/change.
-	// Refunded orders subtract so totals reconcile with the legal journal.
+	// Calculate VAT breakdown and tips/change from orders
+	vatBreakdown := map[string]map[string]float64{
+		"vat_10": {"amount": 0, "vat": 0, "ttc": 0},
+		"vat_20": {"amount": 0, "vat": 0, "ttc": 0},
+	}
+	var tipTotal, changeTotal float64
+
 	for _, order := range orders {
 		if order.Status != "COMPLETED" && order.Status != "REFUNDED" {
 			continue
 		}
-
-		// Sign: completed sales add, refunds subtract.
 		sign := 1.0
 		if order.Status == "REFUNDED" {
 			sign = -1.0
 		}
-
 		tipTotal += sign * order.Tips
 		changeTotal += sign * order.Change
 
-		// Get order items for VAT breakdown
 		items, err := s.orderRepo.GetOrderItems(ctx, schemaName, order.ID)
 		if err != nil {
 			continue
 		}
-
 		for _, item := range items {
-			vatRateKey := fmt.Sprintf("vat_%.0f", item.TaxRate)
-			if vatBreakdown[vatRateKey] == nil {
-				vatBreakdown[vatRateKey] = make(map[string]float64)
+			var bucket string
+			if item.TaxRate <= 0.15 || (item.TaxRate >= 9 && item.TaxRate <= 11) {
+				bucket = "vat_10"
+			} else {
+				bucket = "vat_20"
 			}
-
-			// Calculate base amount (HT) and VAT, applying sign
 			baseAmount := item.Subtotal - item.TaxAmount
-			vatBreakdown[vatRateKey]["amount"] += sign * baseAmount
-			vatBreakdown[vatRateKey]["vat"] += sign * item.TaxAmount
-			vatBreakdown[vatRateKey]["ttc"] += sign * item.Subtotal
+			vatBreakdown[bucket]["amount"] += sign * baseAmount
+			vatBreakdown[bucket]["vat"] += sign * item.TaxAmount
+			vatBreakdown[bucket]["ttc"] += sign * item.Subtotal
 		}
 	}
 
-	// Convert maps to JSON strings
+	// Round VAT breakdown
+	for bucket := range vatBreakdown {
+		for key := range vatBreakdown[bucket] {
+			vatBreakdown[bucket][key] = roundTo4(vatBreakdown[bucket][key])
+		}
+	}
+
+	// Total from VAT breakdown
+	totalAmount := roundTo4(vatBreakdown["vat_10"]["ttc"] + vatBreakdown["vat_20"]["ttc"])
+	totalVAT := roundTo4(vatBreakdown["vat_10"]["vat"] + vatBreakdown["vat_20"]["vat"])
+
+	// Reconciliation
+	reconciliation := computeReconciliation(
+		journalCount, totalAmount, totalVAT,
+		journalCount, roundTo4(journalAmount), roundTo4(journalVAT),
+	)
+
+	// Generate closure hash (matches TypeScript format)
+	closureData := fmt.Sprintf("%s|%s|%s|%d|%.4f|%.4f|%d|%d",
+		closureType,
+		startDate.Format(time.RFC3339),
+		endDate.Format(time.RFC3339),
+		journalCount,
+		totalAmount,
+		totalVAT,
+		firstSeq,
+		lastSeq,
+	)
+	hash := crypto.CalculateHash("", startDate, closureType, totalAmount, closureData)
+
+	// Marshal JSON fields
 	vatJSON, _ := json.Marshal(vatBreakdown)
 	paymentJSON, _ := json.Marshal(paymentBreakdown)
+	reconciliationJSON, _ := json.Marshal(reconciliation)
 
-	// Generate closure hash
-	closureData := fmt.Sprintf("%s|%s|%s|%d|%.4f|%.4f",
-		establishmentID, "DAILY", startDate.Format(time.RFC3339), lastSeq, totalAmount, totalVAT)
-	hash := crypto.CalculateHash("", startDate, "CLOSURE", totalAmount, closureData)
+	_ = reconciliationJSON // stored in future schema update
 
-	// Create bulletin
 	bulletin := &models.ClosureBulletin{
 		EstablishmentID:         establishmentID,
-		ClosureType:             "DAILY",
+		ClosureType:             closureType,
 		PeriodStart:             startDate,
 		PeriodEnd:               endDate,
-		TotalTransactions:       transactionCount,
+		TotalTransactions:       journalCount,
 		FondDeCaisse:           fondDeCaisse,
 		TotalAmount:            totalAmount,
 		TotalVAT:               totalVAT,
 		VATBreakdown:           string(vatJSON),
 		PaymentMethodsBreakdown: string(paymentJSON),
-		TipsTotal:              tipTotal,
-		ChangeTotal:            changeTotal,
+		TipsTotal:              roundTo4(tipTotal),
+		ChangeTotal:            roundTo4(changeTotal),
 		FirstSequence:          &firstSeq,
 		LastSequence:           &lastSeq,
 		ClosureHash:            hash,
 		IsClosed:               true,
 	}
 
-	// Save to database
 	if err := s.journalRepo.InsertClosureBulletin(ctx, bulletin); err != nil {
 		return nil, fmt.Errorf("failed to save closure bulletin: %w", err)
 	}
