@@ -2,10 +2,12 @@ package legal
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"musebar-pos/internal/models"
+	"musebar-pos/internal/pkg/crypto"
 	"musebar-pos/internal/repository"
 )
 
@@ -21,71 +23,131 @@ func NewClosureService(journalRepo repository.LegalRepository, orderRepo reposit
 	}
 }
 
-// GenerateDailyClosure creates a daily closure bulletin
-func (s *ClosureService) GenerateDailyClosure(ctx context.Context, establishmentID string, date time.Time) (*models.ClosureBulletin, error) {
+// CreateDailyClosure creates a daily closure bulletin for a specific date
+func (s *ClosureService) CreateDailyClosure(ctx context.Context, schemaName, establishmentID string, date time.Time, fondDeCaisse float64) (*models.ClosureBulletin, error) {
+	// Set period: start of day to end of day
 	startDate := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
-	endDate := startDate.Add(24*time.Hour - time.Nanosecond)
-	return s.generateClosure(ctx, establishmentID, "DAILY", startDate, endDate)
-}
+	endDate := time.Date(date.Year(), date.Month(), date.Day(), 23, 59, 59, 999999999, date.Location())
 
-// GenerateWeeklyClosure creates a weekly closure bulletin
-func (s *ClosureService) GenerateWeeklyClosure(ctx context.Context, establishmentID string, startDate time.Time) (*models.ClosureBulletin, error) {
-	endDate := startDate.AddDate(0, 0, 7).Add(-time.Nanosecond)
-	return s.generateClosure(ctx, establishmentID, "WEEKLY", startDate, endDate)
-}
-
-// GenerateMonthlyClosure creates a monthly closure bulletin
-func (s *ClosureService) GenerateMonthlyClosure(ctx context.Context, establishmentID string, year int, month time.Month) (*models.ClosureBulletin, error) {
-	startDate := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
-	endDate := startDate.AddDate(0, 1, 0).Add(-time.Nanosecond)
-	return s.generateClosure(ctx, establishmentID, "MONTHLY", startDate, endDate)
-}
-
-// GenerateAnnualClosure creates an annual closure bulletin
-func (s *ClosureService) GenerateAnnualClosure(ctx context.Context, establishmentID string, year int) (*models.ClosureBulletin, error) {
-	startDate := time.Date(year, time.January, 1, 0, 0, 0, 0, time.UTC)
-	endDate := startDate.AddDate(1, 0, 0).Add(-time.Nanosecond)
-	return s.generateClosure(ctx, establishmentID, "ANNUAL", startDate, endDate)
-}
-
-// generateClosure creates a closure bulletin for the given period
-func (s *ClosureService) generateClosure(ctx context.Context, establishmentID string, bulletinType string, startDate, endDate time.Time) (*models.ClosureBulletin, error) {
-	// Note: This is a simplified version
-	// In production, you'd get orders from the schema-scoped repository
-	
-	// Create closure bulletin with basic data
-	bulletin := &models.ClosureBulletin{
-		EstablishmentID:         establishmentID,
-		ClosureType:             bulletinType,
-		PeriodStart:             startDate,
-		PeriodEnd:               endDate,
-		TotalTransactions:       0,
-		FondDeCaisse:            0,
-		TotalAmount:             0,
-		TotalVAT:                0,
-		VATBreakdown:            "{}",
-		PaymentMethodsBreakdown: "{}",
-		TipsTotal:               0,
-		ChangeTotal:             0,
-		ClosureHash:             "placeholder_hash", // TODO: Calculate proper hash
-		IsClosed:                false,
-		CreatedAt:               time.Now().UTC(),
+	// Get all orders for the period
+	orders, err := s.orderRepo.GetOrdersByPeriod(ctx, schemaName, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get orders: %w", err)
 	}
 
-	// Insert bulletin into database
+	// Get legal journal entries for the period
+	entries, err := s.journalRepo.GetEntries(ctx, schemaName, &startDate, &endDate, nil, 1000, 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get journal entries: %w", err)
+	}
+
+	// Calculate totals
+	var totalAmount, totalVAT, tipTotal, changeTotal float64
+	var firstSeq, lastSeq int
+	transactionCount := 0
+	vatBreakdown := make(map[string]map[string]float64)
+	paymentBreakdown := make(map[string]float64)
+
+	// Process journal entries - track min/max sequence properly
+	firstSeq = -1 // sentinel
+	for _, entry := range entries {
+		// Track minimum (first) and maximum (last) sequence numbers
+		if firstSeq == -1 || entry.SequenceNumber < firstSeq {
+			firstSeq = entry.SequenceNumber
+		}
+		if entry.SequenceNumber > lastSeq {
+			lastSeq = entry.SequenceNumber
+		}
+
+		if entry.TransactionType == "SALE" || entry.TransactionType == "REFUND" {
+			transactionCount++
+			totalAmount += entry.Amount
+			totalVAT += entry.VATAmount
+
+			// Payment method breakdown
+			paymentBreakdown[entry.PaymentMethod] += entry.Amount
+		}
+	}
+	
+	// Handle empty case
+	if firstSeq == -1 {
+		firstSeq = 0
+	}
+
+	// Process orders for VAT breakdown and tips/change.
+	// Refunded orders subtract so totals reconcile with the legal journal.
+	for _, order := range orders {
+		if order.Status != "COMPLETED" && order.Status != "REFUNDED" {
+			continue
+		}
+
+		// Sign: completed sales add, refunds subtract.
+		sign := 1.0
+		if order.Status == "REFUNDED" {
+			sign = -1.0
+		}
+
+		tipTotal += sign * order.Tips
+		changeTotal += sign * order.Change
+
+		// Get order items for VAT breakdown
+		items, err := s.orderRepo.GetOrderItems(ctx, schemaName, order.ID)
+		if err != nil {
+			continue
+		}
+
+		for _, item := range items {
+			vatRateKey := fmt.Sprintf("vat_%.0f", item.TaxRate)
+			if vatBreakdown[vatRateKey] == nil {
+				vatBreakdown[vatRateKey] = make(map[string]float64)
+			}
+
+			// Calculate base amount (HT) and VAT, applying sign
+			baseAmount := item.Subtotal - item.TaxAmount
+			vatBreakdown[vatRateKey]["amount"] += sign * baseAmount
+			vatBreakdown[vatRateKey]["vat"] += sign * item.TaxAmount
+			vatBreakdown[vatRateKey]["ttc"] += sign * item.Subtotal
+		}
+	}
+
+	// Convert maps to JSON strings
+	vatJSON, _ := json.Marshal(vatBreakdown)
+	paymentJSON, _ := json.Marshal(paymentBreakdown)
+
+	// Generate closure hash
+	closureData := fmt.Sprintf("%s|%s|%s|%d|%.4f|%.4f",
+		establishmentID, "DAILY", startDate.Format(time.RFC3339), lastSeq, totalAmount, totalVAT)
+	hash := crypto.CalculateHash("", startDate, "CLOSURE", totalAmount, closureData)
+
+	// Create bulletin
+	bulletin := &models.ClosureBulletin{
+		EstablishmentID:         establishmentID,
+		ClosureType:             "DAILY",
+		PeriodStart:             startDate,
+		PeriodEnd:               endDate,
+		TotalTransactions:       transactionCount,
+		FondDeCaisse:           fondDeCaisse,
+		TotalAmount:            totalAmount,
+		TotalVAT:               totalVAT,
+		VATBreakdown:           string(vatJSON),
+		PaymentMethodsBreakdown: string(paymentJSON),
+		TipsTotal:              tipTotal,
+		ChangeTotal:            changeTotal,
+		FirstSequence:          &firstSeq,
+		LastSequence:           &lastSeq,
+		ClosureHash:            hash,
+		IsClosed:               true,
+	}
+
+	// Save to database
 	if err := s.journalRepo.InsertClosureBulletin(ctx, bulletin); err != nil {
-		return nil, fmt.Errorf("failed to insert closure bulletin: %w", err)
+		return nil, fmt.Errorf("failed to save closure bulletin: %w", err)
 	}
 
 	return bulletin, nil
 }
 
-// GetClosureBulletin retrieves a specific closure bulletin
-func (s *ClosureService) GetClosureBulletin(ctx context.Context, bulletinID int64) (*models.ClosureBulletin, error) {
-	return s.journalRepo.GetClosureBulletin(ctx, bulletinID)
-}
-
-// GetClosureBulletins retrieves closure bulletins with filters
-func (s *ClosureService) GetClosureBulletins(ctx context.Context, establishmentID string, bulletinType *string, startDate, endDate *time.Time) ([]models.ClosureBulletin, error) {
-	return s.journalRepo.GetClosureBulletins(ctx, establishmentID, bulletinType, startDate, endDate)
+// GetClosureBulletins retrieves closure bulletins with optional filters
+func (s *ClosureService) GetClosureBulletins(ctx context.Context, schemaName, establishmentID string, closureType *string, startDate, endDate *time.Time) ([]models.ClosureBulletin, error) {
+	return s.journalRepo.GetClosureBulletins(ctx, establishmentID, closureType, startDate, endDate)
 }
