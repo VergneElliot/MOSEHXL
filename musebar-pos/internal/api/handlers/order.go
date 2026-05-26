@@ -191,48 +191,65 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetOrders retrieves orders with optional filters
+
+// GetOrders retrieves orders with optional filters and pagination
 func (h *OrderHandler) GetOrders(w http.ResponseWriter, r *http.Request) {
 	schemaName := r.Context().Value("schema_name").(string)
 
-	// Parse date filters
-	var startDate, endDate *time.Time
-	if startStr := r.URL.Query().Get("start_date"); startStr != "" {
-		t, err := time.Parse("2006-01-02", startStr)
-		if err == nil {
-			startDate = &t
+	// Parse query parameters
+	statusFilter := r.URL.Query().Get("status") // COMPLETED, REFUNDED, PENDING, CANCELLED
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
+
+	limit := 50
+	offset := 0
+
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 200 {
+			limit = l
 		}
 	}
-	if endStr := r.URL.Query().Get("end_date"); endStr != "" {
-		t, err := time.Parse("2006-01-02", endStr)
-		if err == nil {
-			// Set to end of day
-			t = t.Add(24*time.Hour - time.Second)
-			endDate = &t
+	if offsetStr != "" {
+		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
+			offset = o
 		}
 	}
 
-	var orders []models.Order
-	var err error
-
-	if startDate != nil && endDate != nil {
-		orders, err = h.orderRepo.GetOrdersByPeriod(r.Context(), schemaName, *startDate, *endDate)
-	} else {
-		// Default: today's orders
-		today := time.Now()
-		start := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location())
-		end := start.Add(24*time.Hour - time.Second)
-		orders, err = h.orderRepo.GetOrdersByPeriod(r.Context(), schemaName, start, end)
+	var statusPtr *string
+	if statusFilter != "" {
+		statusPtr = &statusFilter
 	}
 
+	orders, total, err := h.orderRepo.GetOrders(r.Context(), schemaName, statusPtr, limit, offset)
 	if err != nil {
-		http.Error(w, "Failed to get orders", http.StatusInternalServerError)
+		http.Error(w, "Failed to fetch orders", http.StatusInternalServerError)
 		return
+	}
+
+	// Enrich orders with items
+	type OrderWithItems struct {
+		models.Order
+		Items []models.OrderItem `json:"items"`
+	}
+
+	ordersWithItems := make([]OrderWithItems, 0, len(orders))
+	for _, order := range orders {
+		items, err := h.orderRepo.GetOrderItems(r.Context(), schemaName, order.ID)
+		if err != nil || items == nil {
+			items = []models.OrderItem{}
+		}
+		ordersWithItems = append(ordersWithItems, OrderWithItems{
+			Order: order,
+			Items: items,
+		})
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"orders": orders,
-		"total":  len(orders),
+		"orders": ordersWithItems,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
 	})
 }
 
@@ -240,8 +257,6 @@ func (h *OrderHandler) GetOrders(w http.ResponseWriter, r *http.Request) {
 type RefundOrderRequest struct {
 	Reason string `json:"reason"`
 }
-
-// RefundOrder processes a refund for a completed order
 func (h *OrderHandler) RefundOrder(w http.ResponseWriter, r *http.Request) {
 	schemaName := r.Context().Value("schema_name").(string)
 	idStr := r.PathValue("id")
