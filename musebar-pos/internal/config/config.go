@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -16,33 +17,40 @@ type Config struct {
 	DatabaseUser string
 	DatabasePass string
 	JWTSecret    string
-	CORSOrigin   string
+	CORSOrigins  []string // multiple origins supported
 	ArchiveKey   string
 }
 
 // Load reads configuration from environment variables
 func Load() (*Config, error) {
-	// Load .env file if it exists (development)
 	_ = godotenv.Load()
+
+	// Parse CORS_ORIGIN - comma-separated list
+	corsRaw := getEnv("CORS_ORIGIN", "http://localhost:3000,http://localhost:5173")
+	corsOrigins := []string{}
+	for _, origin := range strings.Split(corsRaw, ",") {
+		origin = strings.TrimSpace(origin)
+		if origin != "" {
+			corsOrigins = append(corsOrigins, origin)
+		}
+	}
 
 	cfg := &Config{
 		Environment:  getEnv("NODE_ENV", "development"),
-		Port:         getEnv("PORT", "3001"),
+		Port:         getEnv("PORT", "3002"),
 		DatabaseHost: getEnv("DB_HOST", "localhost"),
 		DatabasePort: getEnv("DB_PORT", "5432"),
-		DatabaseName: getEnv("DB_NAME", "mosehxl_development"),
-		DatabaseUser: getEnv("DB_USER", "postgres"),
+		DatabaseName: getEnv("DB_NAME", "restaurant_pos_development"),
+		DatabaseUser: getEnv("DB_USER", "student"),
 		DatabasePass: getEnv("DB_PASSWORD", ""),
 		JWTSecret:    os.Getenv("JWT_SECRET"),
-		CORSOrigin:   getEnv("CORS_ORIGIN", "http://localhost:3000"),
+		CORSOrigins:  corsOrigins,
 		ArchiveKey:   os.Getenv("ARCHIVE_SECRET_KEY"),
 	}
 
-	// Validate required fields
 	if cfg.JWTSecret == "" {
 		return nil, fmt.Errorf("JWT_SECRET is required")
 	}
-
 	if cfg.Environment == "production" && cfg.ArchiveKey == "" {
 		return nil, fmt.Errorf("ARCHIVE_SECRET_KEY is required in production")
 	}
