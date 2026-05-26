@@ -5,12 +5,14 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"musebar-pos/internal/api/handlers"
-	authmw "musebar-pos/internal/middleware/auth"
+	"musebar-pos/internal/config"
 	"musebar-pos/internal/domain/legal"
+	corsmw "musebar-pos/internal/middleware/cors"
+	authmw "musebar-pos/internal/middleware/auth"
 	"musebar-pos/internal/repository/postgres"
 )
 
-func NewRouter(db *pgxpool.Pool) http.Handler {
+func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	mux := http.NewServeMux()
 
 	// Repositories
@@ -35,10 +37,10 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	// Public
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"ok","service":"musebar-pos"}`))
+		w.Write([]byte(`{"status":"ok","service":"musebar-pos","version":"1.0.0"}`))
 	})
 
-	// Auth endpoints (public)
+	// Auth endpoints
 	mux.HandleFunc("POST /api/auth/login", authHandler.Login)
 	mux.HandleFunc("POST /api/auth/refresh", authHandler.Refresh)
 	mux.HandleFunc("POST /api/auth/logout", authmw.RequireAuth(authHandler.Logout))
@@ -80,6 +82,12 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	mux.HandleFunc("GET /api/happy-hour/status", authmw.RequireAuth(happyHourHandler.GetHappyHourStatus))
 	mux.HandleFunc("PATCH /api/products/{id}/happy-hour", authmw.RequireAdmin(happyHourHandler.SetProductHappyHourPrice))
 
-	// Wrap entire mux with DB context injection
-	return authmw.WithDB(db)(mux)
+	// Apply middleware stack (order matters: CORS → DB injection → router)
+	handler := authmw.WithDB(db)(mux)
+	handler = corsmw.Middleware(corsmw.Config{
+		AllowedOrigins: cfg.CORSOrigins,
+		IsDevelopment:  cfg.Environment == "development",
+	})(handler)
+
+	return handler
 }
