@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"musebar-pos/internal/domain/legal"
+	"musebar-pos/internal/validation"
 	"musebar-pos/internal/models"
 	"musebar-pos/internal/repository"
 )
@@ -44,15 +45,28 @@ type OrderItemRequest struct {
 func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	schemaName := r.Context().Value("schema_name").(string)
 
-	var req CreateOrderRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	body, readErr := validation.ReadBody(r)
+	if readErr != nil {
+		http.Error(w, "Failed to read request body", http.StatusBadRequest)
+		return
+	}
+	vreq, verr := validation.ValidateCreateOrder(body)
+	if verr != nil {
+		validation.WriteValidationError(w, verr)
 		return
 	}
 
-	if len(req.Items) == 0 {
-		http.Error(w, "Order must have at least one item", http.StatusBadRequest)
-		return
+	req := CreateOrderRequest{
+		Items:         make([]OrderItemRequest, len(vreq.Items)),
+		PaymentMethod: vreq.PaymentMethod,
+		Tips:          vreq.Tips,
+		Change:        vreq.Change,
+	}
+	for i, item := range vreq.Items {
+		req.Items[i] = OrderItemRequest{
+			ProductID: item.ProductID,
+			Quantity:  item.Quantity,
+		}
 	}
 
 	// Calculate totals by fetching product details

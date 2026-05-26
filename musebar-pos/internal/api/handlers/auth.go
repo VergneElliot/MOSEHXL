@@ -11,6 +11,7 @@ import (
 
 	"musebar-pos/internal/middleware/auth"
 	"musebar-pos/internal/repository"
+	"musebar-pos/internal/validation"
 	"musebar-pos/internal/repository/postgres"
 
 	"golang.org/x/crypto/bcrypt"
@@ -96,13 +97,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		Email      string `json:"email"`
-		Password   string `json:"password"`
-		RememberMe bool   `json:"remember_me"`
+	body, err := validation.ReadBody(r)
+	if err != nil {
+		http.Error(w, "Failed to read request body", http.StatusBadRequest)
+		return
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	req, verr := validation.ValidateLogin(body)
+	if verr != nil {
+		validation.WriteValidationError(w, verr)
 		return
 	}
 
