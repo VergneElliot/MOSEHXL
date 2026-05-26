@@ -19,15 +19,13 @@ func NewJournalService(repo repository.LegalRepository) *JournalService {
 	return &JournalService{repo: repo}
 }
 
-// RecordSale creates an immutable SALE entry in the legal journal
+// RecordSale records a sale transaction in the legal journal
 func (s *JournalService) RecordSale(ctx context.Context, schemaName string, orderID int64, amount, vatAmount float64, paymentMethod string, orderData interface{}, userID *string, registerID string) error {
-	// Serialize order data to JSON
 	rawData, err := json.Marshal(orderData)
 	if err != nil {
 		return fmt.Errorf("failed to marshal order data: %w", err)
 	}
 
-	// Get the last entry's hash and sequence number (for chain continuity)
 	previousHash, err := s.repo.GetLastHash(ctx, schemaName)
 	if err != nil {
 		return fmt.Errorf("failed to get previous hash: %w", err)
@@ -38,24 +36,27 @@ func (s *JournalService) RecordSale(ctx context.Context, schemaName string, orde
 		return fmt.Errorf("failed to get last sequence number: %w", err)
 	}
 
-	// If this is the first entry, use genesis hash and sequence 0
 	sequenceNumber := lastSeq + 1
 	if previousHash == "" {
 		previousHash = "0000000000000000000000000000000000000000000000000000000000000000"
 		sequenceNumber = 0
 	}
 
-	// Calculate current hash
 	timestamp := time.Now().UTC()
-	currentHash := crypto.CalculateHash(
+	
+	// Use the new CalculateEntryHash that matches TypeScript implementation
+	currentHash := crypto.CalculateEntryHash(
 		previousHash,
-		timestamp,
+		sequenceNumber,
 		"SALE",
+		&orderID,
 		amount,
-		string(rawData),
+		vatAmount,
+		paymentMethod,
+		timestamp,
+		registerID,
 	)
 
-	// Create entry
 	entry := &models.LegalEntry{
 		SequenceNumber:  sequenceNumber,
 		TransactionType: "SALE",
@@ -71,7 +72,6 @@ func (s *JournalService) RecordSale(ctx context.Context, schemaName string, orde
 		RegisterID:      registerID,
 	}
 
-	// Insert into database (append-only table with DB trigger preventing updates/deletes)
 	if err := s.repo.InsertEntry(ctx, schemaName, entry); err != nil {
 		return fmt.Errorf("failed to insert journal entry: %w", err)
 	}
@@ -79,7 +79,7 @@ func (s *JournalService) RecordSale(ctx context.Context, schemaName string, orde
 	return nil
 }
 
-// RecordRefund creates an immutable REFUND entry in the legal journal
+// RecordRefund records a refund transaction in the legal journal
 func (s *JournalService) RecordRefund(ctx context.Context, schemaName string, orderID int64, amount, vatAmount float64, paymentMethod string, refundData interface{}, userID *string, registerID string) error {
 	rawData, err := json.Marshal(refundData)
 	if err != nil {
@@ -97,18 +97,18 @@ func (s *JournalService) RecordRefund(ctx context.Context, schemaName string, or
 	}
 
 	sequenceNumber := lastSeq + 1
-	if previousHash == "" {
-		previousHash = "0000000000000000000000000000000000000000000000000000000000000000"
-		sequenceNumber = 0
-	}
-
 	timestamp := time.Now().UTC()
-	currentHash := crypto.CalculateHash(
+
+	currentHash := crypto.CalculateEntryHash(
 		previousHash,
-		timestamp,
+		sequenceNumber,
 		"REFUND",
+		&orderID,
 		amount,
-		string(rawData),
+		vatAmount,
+		paymentMethod,
+		timestamp,
+		registerID,
 	)
 
 	entry := &models.LegalEntry{
@@ -133,8 +133,7 @@ func (s *JournalService) RecordRefund(ctx context.Context, schemaName string, or
 	return nil
 }
 
-// VerifyChainIntegrity verifies the hash chain integrity
-// This is critical for NF525/LNE certification
+// VerifyChainIntegrity verifies the integrity of the hash chain
 func (s *JournalService) VerifyChainIntegrity(ctx context.Context, schemaName string) (bool, error) {
 	entries, err := s.repo.GetAllEntries(ctx, schemaName)
 	if err != nil {
@@ -142,48 +141,42 @@ func (s *JournalService) VerifyChainIntegrity(ctx context.Context, schemaName st
 	}
 
 	if len(entries) == 0 {
-		return true, nil // Empty chain is valid
+		return true, nil
 	}
 
-	// Verify first entry (should have genesis hash as previous)
-	genesisHash := "0000000000000000000000000000000000000000000000000000000000000000"
-	if entries[0].PreviousHash != genesisHash {
-		return false, fmt.Errorf("first entry must have genesis hash (all zeros) as previous hash, got: %s", entries[0].PreviousHash)
-	}
+	expectedPreviousHash := "0000000000000000000000000000000000000000000000000000000000000000"
 
-	// Verify each entry's hash and chain linkage
-	for i := 0; i < len(entries); i++ {
-		entry := entries[i]
+	for _, entry := range entries {
+		// Check previous hash continuity
+		if entry.PreviousHash != expectedPreviousHash {
+			return false, fmt.Errorf("hash chain broken at sequence %d", entry.SequenceNumber)
+		}
 
-		// Recalculate hash
-		expectedHash := crypto.CalculateHash(
+		// Recalculate hash using the same method as when it was created
+		expectedHash := crypto.CalculateEntryHash(
 			entry.PreviousHash,
-			entry.Timestamp,
+			entry.SequenceNumber,
 			entry.TransactionType,
+			entry.OrderID,
 			entry.Amount,
-			entry.TransactionData,
+			entry.VATAmount,
+			entry.PaymentMethod,
+			entry.Timestamp,
+			entry.RegisterID,
 		)
 
-		// Verify current hash
 		if entry.CurrentHash != expectedHash {
 			return false, fmt.Errorf("hash mismatch at sequence %d (entry ID %d): expected %s, got %s",
 				entry.SequenceNumber, entry.ID, expectedHash, entry.CurrentHash)
 		}
 
-		// Verify chain linkage (except for first entry)
-		if i > 0 {
-			if entry.PreviousHash != entries[i-1].CurrentHash {
-				return false, fmt.Errorf("chain broken between sequence %d and %d (entries %d and %d)",
-					entries[i-1].SequenceNumber, entry.SequenceNumber,
-					entries[i-1].ID, entry.ID)
-			}
-		}
+		expectedPreviousHash = entry.CurrentHash
 	}
 
 	return true, nil
 }
 
-// GetEntries retrieves legal journal entries with optional filters
-func (s *JournalService) GetEntries(ctx context.Context, schemaName string, startDate, endDate *time.Time, entryType *string, limit, offset int) ([]models.LegalEntry, error) {
-	return s.repo.GetEntries(ctx, schemaName, startDate, endDate, entryType, limit, offset)
+// GetEntries retrieves journal entries with optional filters
+func (s *JournalService) GetEntries(ctx context.Context, schemaName string, startDate, endDate *time.Time, transactionType *string, limit, offset int) ([]models.LegalEntry, error) {
+	return s.repo.GetEntries(ctx, schemaName, startDate, endDate, transactionType, limit, offset)
 }
