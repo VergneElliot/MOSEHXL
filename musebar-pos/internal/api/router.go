@@ -28,6 +28,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	productHandler := handlers.NewProductHandler(productRepo)
 	orderHandler := handlers.NewOrderHandler(orderRepo, productRepo, journalService)
 	authHandler := handlers.NewAuthHandler(userRepo)
+	happyHourHandler := handlers.NewHappyHourHandler(productRepo)
 
 	// Public endpoints (no auth required)
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
@@ -41,7 +42,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	mux.HandleFunc("POST /api/auth/logout", authmw.RequireAuth(authHandler.Logout))
 	mux.HandleFunc("GET /api/auth/me", authmw.RequireAuth(authHandler.Me))
 
-	// Protected endpoints - use real auth instead of test middleware
+	// Protected endpoints - use real auth
 	// Legal endpoints
 	mux.HandleFunc("GET /api/legal/journal/verify", authmw.RequireAuth(legalHandler.VerifyJournalIntegrity))
 	mux.HandleFunc("GET /api/legal/journal/entries", authmw.RequireAuth(legalHandler.GetJournalEntries))
@@ -67,6 +68,11 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	mux.HandleFunc("GET /api/orders", authmw.RequireAuth(orderHandler.GetOrders))
 	mux.HandleFunc("GET /api/orders/{id}", authmw.RequireAuth(orderHandler.GetOrder))
 	mux.HandleFunc("POST /api/orders/{id}/refund", authmw.RequireAuth(orderHandler.RefundOrder))
+
+	// Happy Hour endpoints (admin only)
+	mux.HandleFunc("POST /api/happy-hour/toggle", authmw.RequireAdmin(happyHourHandler.ToggleHappyHour))
+	mux.HandleFunc("GET /api/happy-hour/status", authmw.RequireAuth(happyHourHandler.GetHappyHourStatus))
+	mux.HandleFunc("PATCH /api/products/{id}/happy-hour", authmw.RequireAdmin(happyHourHandler.SetProductHappyHourPrice))
 
 	return mux
 }

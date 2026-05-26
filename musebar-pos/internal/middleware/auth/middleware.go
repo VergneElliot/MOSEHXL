@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 )
@@ -15,7 +16,6 @@ func RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// Extract token from "Bearer <token>"
 		parts := strings.Split(authHeader, " ")
 		if len(parts) != 2 || parts[0] != "Bearer" {
 			http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
@@ -33,11 +33,8 @@ func RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// For now, hardcode to test_001 schema since we only have one establishment
-		// TODO: Later fetch from establishments table based on establishment_id
 		schemaName := "establishment_test_001"
 
-		// Add claims to context
 		ctx := context.WithValue(r.Context(), "user_id", claims.UserID)
 		ctx = context.WithValue(ctx, "email", claims.Email)
 		ctx = context.WithValue(ctx, "role", claims.Role)
@@ -64,5 +61,5 @@ func RequireRole(role string) func(http.HandlerFunc) http.HandlerFunc {
 
 // RequireAdmin middleware checks for admin role
 func RequireAdmin(next http.HandlerFunc) http.HandlerFunc {
-	return RequireRole("establishment_admin")(next)
+	return RequireAuth(RequireRole("establishment_admin")(next))
 }
