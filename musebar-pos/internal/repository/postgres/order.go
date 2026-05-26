@@ -162,3 +162,59 @@ func (r *OrderRepositoryPostgres) GetOrderItems(ctx context.Context, schemaName 
 
 	return items, nil
 }
+
+// GetOrders retrieves orders with optional filters and pagination
+func (r *OrderRepositoryPostgres) GetOrders(ctx context.Context, schemaName string, status *string, limit, offset int) ([]models.Order, int, error) {
+	// Build query with optional status filter
+	whereClause := ""
+	args := []interface{}{}
+	argIdx := 1
+
+	if status != nil && *status != "" {
+		whereClause = fmt.Sprintf("WHERE status = $%d::VARCHAR", argIdx)
+		args = append(args, *status)
+		argIdx++
+	}
+
+	// Count total
+	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM "%s".orders %s`, schemaName, whereClause)
+	var total int
+	if err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	// Get orders with pagination
+	args = append(args, limit, offset)
+	query := fmt.Sprintf(`
+		SELECT id, order_number, status, total_amount, total_vat,
+		       payment_method, tips, change, created_by,
+		       completed_at, cancelled_at, created_at, updated_at
+		FROM "%s".orders
+		%s
+		ORDER BY created_at DESC
+		LIMIT $%d OFFSET $%d
+	`, schemaName, whereClause, argIdx, argIdx+1)
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var orders []models.Order
+	for rows.Next() {
+		var order models.Order
+		err := rows.Scan(
+			&order.ID, &order.OrderNumber, &order.Status, &order.TotalAmount,
+			&order.TotalVAT, &order.PaymentMethod, &order.Tips, &order.Change,
+			&order.CreatedBy, &order.CompletedAt, &order.CancelledAt,
+			&order.CreatedAt, &order.UpdatedAt,
+		)
+		if err != nil {
+			return nil, 0, err
+		}
+		orders = append(orders, order)
+	}
+
+	return orders, total, nil
+}

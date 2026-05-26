@@ -50,6 +50,7 @@ type OrderRepository interface {
 	UpdateOrderStatus(ctx context.Context, schemaName string, orderID int64, status string) error
 	CreateOrderItems(ctx context.Context, schemaName string, items []models.OrderItem) error
 	GetOrderItems(ctx context.Context, schemaName string, orderID int64) ([]models.OrderItem, error)
+	GetOrders(ctx context.Context, schemaName string, status *string, limit, offset int) ([]models.Order, int, error)
 }
 
 // UserRepository defines operations for users
