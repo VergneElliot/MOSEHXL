@@ -7,6 +7,7 @@ import (
 
 	"musebar-pos/internal/models"
 	"musebar-pos/internal/repository"
+	"musebar-pos/internal/validation"
 )
 
 type ProductHandler struct {
@@ -22,10 +23,19 @@ func NewProductHandler(repo repository.ProductRepository) *ProductHandler {
 func (h *ProductHandler) CreateCategory(w http.ResponseWriter, r *http.Request) {
 	schemaName := r.Context().Value("schema_name").(string)
 
-	var category models.Category
-	if err := json.NewDecoder(r.Body).Decode(&category); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	body, err := validation.ReadBody(r)
+	if err != nil {
+		http.Error(w, "Failed to read request body", http.StatusBadRequest)
 		return
+	}
+	vreq, verr := validation.ValidateCreateCategory(body)
+	if verr != nil {
+		validation.WriteValidationError(w, verr)
+		return
+	}
+
+	category := models.Category{
+		Name: vreq.Name,
 	}
 
 	// Set defaults
@@ -135,17 +145,29 @@ func (h *ProductHandler) ArchiveCategory(w http.ResponseWriter, r *http.Request)
 func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	schemaName := r.Context().Value("schema_name").(string)
 
-	var product models.Product
-	if err := json.NewDecoder(r.Body).Decode(&product); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	body, err := validation.ReadBody(r)
+	if err != nil {
+		http.Error(w, "Failed to read request body", http.StatusBadRequest)
+		return
+	}
+	vreq, verr := validation.ValidateCreateProduct(body)
+	if verr != nil {
+		validation.WriteValidationError(w, verr)
 		return
 	}
 
-	// Set defaults
+	desc := vreq.Description
+	product := models.Product{
+		CategoryID:  vreq.CategoryID,
+		Name:        vreq.Name,
+		Description: &desc,
+		Price:       vreq.Price,
+		TaxRate:     vreq.TaxRate,
+		IsActive:    true,
+	}
 	if product.TaxRate == 0 {
 		product.TaxRate = 20.00
 	}
-	product.IsActive = true
 
 	if err := h.repo.CreateProduct(r.Context(), schemaName, &product); err != nil {
 		http.Error(w, "Failed to create product", http.StatusInternalServerError)
