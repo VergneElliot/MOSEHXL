@@ -18,6 +18,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	productRepo := postgres.NewProductRepository(db)
 	orderRepo := postgres.NewOrderRepository(db)
 	userRepo := postgres.NewUserRepository(db)
+	refreshRepo := postgres.NewRefreshTokenRepository(db)
 
 	// Services
 	journalService := legal.NewJournalService(legalRepo)
@@ -27,7 +28,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	legalHandler := handlers.NewLegalHandler(journalService, legalRepo)
 	productHandler := handlers.NewProductHandler(productRepo)
 	orderHandler := handlers.NewOrderHandler(orderRepo, productRepo, journalService)
-	authHandler := handlers.NewAuthHandler(userRepo)
+	authHandler := handlers.NewAuthHandler(userRepo, refreshRepo)
 	happyHourHandler := handlers.NewHappyHourHandler(productRepo)
 	closureHandler := handlers.NewClosureHandler(closureService)
 
@@ -37,8 +38,9 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 		w.Write([]byte(`{"status":"ok","service":"musebar-pos"}`))
 	})
 
-	// Auth
+	// Auth endpoints
 	mux.HandleFunc("POST /api/auth/login", authHandler.Login)
+	mux.HandleFunc("POST /api/auth/refresh", authHandler.Refresh)
 	mux.HandleFunc("POST /api/auth/logout", authmw.RequireAuth(authHandler.Logout))
 	mux.HandleFunc("GET /api/auth/me", authmw.RequireAuth(authHandler.Me))
 
@@ -47,7 +49,7 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 	mux.HandleFunc("GET /api/legal/journal/entries", authmw.RequireAuth(legalHandler.GetJournalEntries))
 	mux.HandleFunc("GET /api/legal/journal/stats", authmw.RequireAuth(legalHandler.GetJournalStats))
 
-	// Closures (admin only for creation)
+	// Closures
 	mux.HandleFunc("POST /api/legal/closure/daily", authmw.RequireAdmin(closureHandler.CreateDailyClosure))
 	mux.HandleFunc("POST /api/legal/closure/monthly", authmw.RequireAdmin(closureHandler.CreateMonthlyClosure))
 	mux.HandleFunc("POST /api/legal/closure/annual", authmw.RequireAdmin(closureHandler.CreateAnnualClosure))
