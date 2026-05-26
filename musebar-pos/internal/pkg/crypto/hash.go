@@ -7,32 +7,60 @@ import (
 	"time"
 )
 
-// CalculateHash generates SHA-256 hash for legal journal entry
-// This implements the immutable hash chain required by French law
-func CalculateHash(previousHash string, timestamp time.Time, entryType string, amount float64, rawData string) string {
-	// Format: previousHash|timestamp|type|amount|rawData
-	// This ensures any modification breaks the chain
-	data := fmt.Sprintf("%s|%s|%s|%.4f|%s",
-		previousHash,
-		timestamp.Format(time.RFC3339Nano), // High precision timestamp
-		entryType,
+// CalculateHash generates a SHA-256 hash for legal journal entries (deprecated - use CalculateEntryHash)
+func CalculateHash(previousHash string, timestamp time.Time, transactionType string, amount float64, transactionData string) string {
+	data := fmt.Sprintf("%s|%s|%.4f|%s",
+		timestamp.Format(time.RFC3339Nano),
+		transactionType,
 		amount,
-		rawData,
+		transactionData,
 	)
-
-	hash := sha256.Sum256([]byte(data))
+	content := fmt.Sprintf("%s|%s", previousHash, data)
+	hash := sha256.Sum256([]byte(content))
 	return hex.EncodeToString(hash[:])
 }
 
-// CalculateFileHash generates SHA-256 hash of file content
-func CalculateFileHash(data []byte) string {
-	hash := sha256.Sum256(data)
+// CalculateEntryHash generates hash for a complete legal journal entry
+// This matches the TypeScript implementation exactly
+func CalculateEntryHash(
+	previousHash string,
+	sequenceNumber int,
+	transactionType string,
+	orderID *int64,
+	amount float64,
+	vatAmount float64,
+	paymentMethod string,
+	timestamp time.Time,
+	registerID string,
+) string {
+	// Format amounts with 4 decimal places (matches TypeScript formatDecimalForHash)
+	amountStr := fmt.Sprintf("%.4f", amount)
+	vatAmountStr := fmt.Sprintf("%.4f", vatAmount)
+	
+	// Handle null order_id (matches TypeScript: orderId === null ? 'null' : orderId)
+	orderIDStr := "null"
+	if orderID != nil {
+		orderIDStr = fmt.Sprintf("%d", *orderID)
+	}
+	
+	// CRITICAL: Use UTC timestamp with milliseconds in ISO format (toISOString() format)
+	// This must match JavaScript's toISOString() which gives: "2026-05-26T13:24:03.123Z"
+	timestampStr := timestamp.UTC().Format("2006-01-02T15:04:05.999Z07:00")
+	
+	// Build data string (matches TypeScript dataString format exactly)
+	dataString := fmt.Sprintf("%d|%s|%s|%s|%s|%s|%s|%s",
+		sequenceNumber,
+		transactionType,
+		orderIDStr,
+		amountStr,
+		vatAmountStr,
+		paymentMethod,
+		timestampStr,
+		registerID,
+	)
+	
+	// Generate hash: previousHash|dataString (matches TypeScript generateHash)
+	content := fmt.Sprintf("%s|%s", previousHash, dataString)
+	hash := sha256.Sum256([]byte(content))
 	return hex.EncodeToString(hash[:])
-}
-
-// VerifyHash verifies if a hash matches the expected value
-func VerifyHash(data string, expectedHash string) bool {
-	hash := sha256.Sum256([]byte(data))
-	actualHash := hex.EncodeToString(hash[:])
-	return actualHash == expectedHash
 }

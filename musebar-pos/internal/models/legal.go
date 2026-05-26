@@ -79,3 +79,11 @@ type ArchiveExport struct {
 	CreatedAt        time.Time  `json:"created_at"`
 	VerifiedAt       *time.Time `json:"verified_at,omitempty"`
 }
+
+// JournalStats represents statistics about the legal journal
+type JournalStats struct {
+	TotalEntries int                `json:"total_entries"`
+	TotalAmount  float64            `json:"total_amount"`
+	TotalVAT     float64            `json:"total_vat"`
+	TypeCounts   map[string]int     `json:"types"`
+}
