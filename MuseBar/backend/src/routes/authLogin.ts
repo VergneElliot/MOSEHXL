@@ -34,6 +34,7 @@ const MAX_SUPPORT_IMPERSONATION_MINUTES = 120;
 const MAX_FAILED_LOGIN_ATTEMPTS = Number(process.env.AUTH_LOCKOUT_MAX_FAILED_ATTEMPTS ?? 5);
 const BASE_LOCKOUT_MINUTES = Number(process.env.AUTH_LOCKOUT_BASE_MINUTES ?? 15);
 const MAX_LOCKOUT_MINUTES = Number(process.env.AUTH_LOCKOUT_MAX_MINUTES ?? 240);
+const MAX_REFRESH_SESSION_ABSOLUTE_DAYS = Number(process.env.AUTH_REFRESH_ABSOLUTE_MAX_DAYS ?? 30);
 const authRateLimitBase = process.env.NODE_ENV === 'development' ? 5 : 1;
 const authLimiterPool = process.env.NODE_ENV === 'test' ? undefined : pool;
 const TOTP_ISSUER = 'MOSEHXL';
@@ -73,11 +74,21 @@ const refreshRateLimit = createAuthRateLimitMiddleware({
   errorMessage: 'Too many token refresh attempts. Please retry later.',
 });
 
-function computeRefreshExpiry(rememberMe: boolean): { expiresAt: Date; refreshExpiresIn: string } {
+function computeRefreshExpiry(
+  rememberMe: boolean,
+  sessionStartedAt?: Date
+): { expiresAt: Date; refreshExpiresIn: string } {
+  const nowMs = Date.now();
   const days = rememberMe ? 7 : 1;
+  const rollingExpiryMs = nowMs + days * 24 * 60 * 60 * 1000;
+  const absoluteCapDays = toPositiveFiniteNumber(MAX_REFRESH_SESSION_ABSOLUTE_DAYS, 30);
+  const sessionStartMs = sessionStartedAt?.getTime() ?? nowMs;
+  const absoluteExpiryMs = sessionStartMs + absoluteCapDays * 24 * 60 * 60 * 1000;
+  const effectiveExpiryMs = Math.min(rollingExpiryMs, absoluteExpiryMs);
+  const expiresInSeconds = Math.max(1, Math.floor((effectiveExpiryMs - nowMs) / 1000));
   return {
-    expiresAt: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
-    refreshExpiresIn: rememberMe ? '7d' : '1d',
+    expiresAt: new Date(effectiveExpiryMs),
+    refreshExpiresIn: `${expiresInSeconds}s`,
   };
 }
 
@@ -135,8 +146,23 @@ function getRefreshTokenFromRequest(
   return typeof bodyToken === 'string' && bodyToken.trim().length > 0 ? bodyToken.trim() : null;
 }
 
-function setRefreshTokenCookie(res: express.Response, refreshToken: string, rememberMe: boolean): void {
-  const maxAgeMs = rememberMe ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+function computeRefreshCookieMaxAgeMs(rememberMe: boolean, expiresAt?: Date): number {
+  const defaultMaxAgeMs = rememberMe ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+  if (!expiresAt) {
+    return defaultMaxAgeMs;
+  }
+  const remainingMs = expiresAt.getTime() - Date.now();
+  const boundedRemainingMs = Math.max(1_000, remainingMs);
+  return Math.min(defaultMaxAgeMs, boundedRemainingMs);
+}
+
+function setRefreshTokenCookie(
+  res: express.Response,
+  refreshToken: string,
+  rememberMe: boolean,
+  expiresAt?: Date
+): void {
+  const maxAgeMs = computeRefreshCookieMaxAgeMs(rememberMe, expiresAt);
   res.cookie(getRefreshCookieName(), refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -146,8 +172,13 @@ function setRefreshTokenCookie(res: express.Response, refreshToken: string, reme
   });
 }
 
-function setCsrfTokenCookie(res: express.Response, csrfToken: string, rememberMe: boolean): void {
-  const maxAgeMs = rememberMe ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+function setCsrfTokenCookie(
+  res: express.Response,
+  csrfToken: string,
+  rememberMe: boolean,
+  expiresAt?: Date
+): void {
+  const maxAgeMs = computeRefreshCookieMaxAgeMs(rememberMe, expiresAt);
   res.cookie(getCsrfCookieName(), csrfToken, {
     httpOnly: false,
     secure: process.env.NODE_ENV === 'production',
@@ -407,8 +438,8 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
     });
-    setRefreshTokenCookie(res, refreshToken, !!rememberMe);
-    setCsrfTokenCookie(res, csrfToken, !!rememberMe);
+    setRefreshTokenCookie(res, refreshToken, !!rememberMe, expiresAt);
+    setCsrfTokenCookie(res, csrfToken, !!rememberMe, expiresAt);
 
     await logAuditOrThrow({
       user_id: String(user.id),
@@ -630,6 +661,8 @@ router.post('/refresh', refreshRateLimit, asyncHandler(async (req, res) => {
     refreshFamilyId = refreshSession.family_id;
     const userId = refreshSession.user_id;
     refreshUserId = userId;
+    const familyIssuedAt = await RefreshTokenModel.getFamilyIssuedAt(refreshSession.family_id);
+    const refreshSessionStartedAt = familyIssuedAt ?? refreshSession.issued_at ?? new Date();
 
     await lockClient.query('SELECT pg_advisory_xact_lock($1::bigint)', [userId]);
 
@@ -688,7 +721,13 @@ router.post('/refresh', refreshRateLimit, asyncHandler(async (req, res) => {
     );
     const nextRefreshToken = crypto.randomBytes(32).toString('hex');
     const nextCsrfToken = crypto.randomBytes(32).toString('hex');
-    const { expiresAt, refreshExpiresIn } = computeRefreshExpiry(!!rememberMe);
+    const { expiresAt, refreshExpiresIn } = computeRefreshExpiry(!!rememberMe, refreshSessionStartedAt);
+    if (expiresAt.getTime() <= Date.now()) {
+      await RefreshTokenModel.revokeFamily(refreshSession.family_id, 'ABSOLUTE_SESSION_CAP_REACHED');
+      clearRefreshTokenCookie(res);
+      clearCsrfTokenCookie(res);
+      throw new AuthenticationError('Session expired. Please log in again.');
+    }
     await RefreshTokenModel.rotate(refreshTokenRaw, nextRefreshToken, {
       userId,
       familyId: refreshSession.family_id,
@@ -706,8 +745,8 @@ router.post('/refresh', refreshRateLimit, asyncHandler(async (req, res) => {
     }, 'TOKEN_REFRESH');
 
     await lockClient.query('COMMIT');
-    setRefreshTokenCookie(res, nextRefreshToken, !!rememberMe);
-    setCsrfTokenCookie(res, nextCsrfToken, !!rememberMe);
+    setRefreshTokenCookie(res, nextRefreshToken, !!rememberMe, expiresAt);
+    setCsrfTokenCookie(res, nextCsrfToken, !!rememberMe, expiresAt);
     return res.json({
       token,
       expiresIn: '15m',

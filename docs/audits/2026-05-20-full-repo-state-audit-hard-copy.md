@@ -56,7 +56,7 @@ The IDs follow the existing audit convention: **P0/P1/P2** = priority, **L/S/Q/D
 | **P3-L7** | Unify register identifier across journal and receipts | **Fixed (2026-05-20):** register identifier unified to establishment-scoped `CR-<establishment_id>` across journal, receipts, and archive paths. | **M** |
 | **P3-L8** | Reconcile closure bulletin totals against journal `SALE` sums | **Fixed (2026-05-21):** closure generation now compares order-derived totals with legal journal `SALE` aggregates and persists discrepancy flags/details on closure bulletins. | **M** |
 | **P3-L9** | Implement password reset + change API + global session revoke on password change | **Fixed (2026-05-20 + follow-up):** `/auth/password/forgot|reset|change` endpoints implemented and wired with global session revoke/cutoff on password lifecycle events; forgot/reset now have dedicated auth endpoint rate limits (`377`). | **M** |
-| **P3-S4** | Implement P2-S16 token long-term hardening — Phase 1 | **Fixed (2026-05-21):** access tokens reduced to 15m, opaque refresh tokens persisted in DB with rotation and revoke-on-password-change. Cookie/BFF move remains in P3-S5. | **L** |
+| **P3-S4** | Implement P2-S16 token long-term hardening — Phase 1 | **Fixed (2026-05-21 + follow-up):** access tokens reduced to 15m, opaque refresh tokens persisted in DB with rotation and revoke-on-password-change; refresh families now enforce an absolute max lifetime cap (`379`). Cookie/BFF move remains in P3-S5. | **L** |
 | **P3-Q1** | Stop the closure-journal swallow (`closure.ts:65-71`) | **Fixed (2026-05-21):** closure creation now fails closed with rollback/delete of open bulletins and propagated `LEGAL_CLOSURE_JOURNAL_APPEND_FAILED` errors. | **S** |
 | **P3-Q2** | Delete or mount `userManagement/roles/*` (~800+ LOC unmounted) | **Fixed (2026-05-21):** removed unmounted `routes/userManagement/roles/*` module to eliminate dead API surface. | **M** |
 | **P3-Q3** | Extract `orderCancel` god handler (~380 LOC) into a service | **Fixed (2026-05-21):** cancellation business logic extracted into `services/orders/orderCancellationService.ts`; route reduced to transport/middleware concerns while preserving fail-closed legal journaling behavior. | **L** |
@@ -113,7 +113,7 @@ You explicitly requested this as a to-do for this audit. It is now **P3-S4 (P1)*
 | 8 | **Anomaly signals** (geo/IP/UA delta) for admin endpoints, paired with 2FA | Operational detection. |
 | 9 | **Retire legacy `is_admin` JWT claim** after max TTL elapses (7d) + metrics | Completes the P2-S3 rollover (`auth.ts` L81-84). |
 
-**Current state to be honest about (updated):** phase 1 and cookie transport are in place (15m access JWT + DB-backed opaque rotating refresh tokens + refresh revoke on password reset/change + httpOnly refresh cookie, no localStorage token persistence), with refresh CSRF double-submit, `HS256` verify-algorithm pinning, and refresh family-revoke on reuse now landed. Remaining roadmap items are asymmetric signing/JWKS rollout and session/device anomaly controls.
+**Current state to be honest about (updated):** phase 1 and cookie transport are in place (15m access JWT + DB-backed opaque rotating refresh tokens + absolute family cap + refresh revoke on password reset/change + httpOnly refresh cookie, no localStorage token persistence), with refresh CSRF double-submit, `HS256` verify-algorithm pinning, and refresh family-revoke on reuse now landed. Remaining roadmap items are asymmetric signing/JWKS rollout and session/device anomaly controls.
 
 ---
 

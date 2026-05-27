@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   getAuthRoleState: vi.fn(),
   findById: vi.fn(),
   findActiveRefreshToken: vi.fn(),
+  getRefreshFamilyIssuedAt: vi.fn(),
   rotateRefreshToken: vi.fn(),
   revokeRefreshFamily: vi.fn(),
   revokeAllRefreshTokensForUser: vi.fn(),
@@ -43,6 +44,7 @@ vi.mock('../models/user', () => ({
 vi.mock('../models/refreshToken', () => ({
   RefreshTokenModel: {
     findActiveByRawToken: mocks.findActiveRefreshToken,
+    getFamilyIssuedAt: mocks.getRefreshFamilyIssuedAt,
     rotate: mocks.rotateRefreshToken,
     revokeFamily: mocks.revokeRefreshFamily,
     revokeAllForUser: mocks.revokeAllRefreshTokensForUser,
@@ -72,6 +74,7 @@ describe('POST /auth/refresh token rotation', () => {
     mocks.getAuthRoleState.mockReset();
     mocks.findById.mockReset();
     mocks.findActiveRefreshToken.mockReset();
+    mocks.getRefreshFamilyIssuedAt.mockReset();
     mocks.rotateRefreshToken.mockReset();
     mocks.revokeRefreshFamily.mockReset();
     mocks.revokeAllRefreshTokensForUser.mockReset();
@@ -91,7 +94,9 @@ describe('POST /auth/refresh token rotation', () => {
     mocks.findActiveRefreshToken.mockResolvedValue({
       user_id: 10,
       family_id: '11111111-1111-4111-8111-111111111111',
+      issued_at: new Date(),
     });
+    mocks.getRefreshFamilyIssuedAt.mockResolvedValue(new Date());
     mocks.rotateRefreshToken.mockResolvedValue(undefined);
     mocks.revokeRefreshFamily.mockResolvedValue(undefined);
     mocks.revokeAllRefreshTokensForUser.mockResolvedValue(undefined);
@@ -222,6 +227,25 @@ describe('POST /auth/refresh token rotation', () => {
       '11111111-1111-4111-8111-111111111111',
       'REUSE_DETECTED'
     );
+  });
+
+  it('expires refresh session when absolute cap is reached', async () => {
+    const longAgo = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
+    mocks.getRefreshFamilyIssuedAt.mockResolvedValueOnce(longAgo);
+
+    const res = await request(app)
+      .post('/auth/refresh')
+      .set('Cookie', [REFRESH_COOKIE, CSRF_COOKIE])
+      .set(CSRF_HEADER)
+      .send({ rememberMe: true });
+
+    expect(res.status).toBe(401);
+    expect(String(res.body.error?.message)).toContain('Session expired. Please log in again.');
+    expect(mocks.revokeRefreshFamily).toHaveBeenCalledWith(
+      '11111111-1111-4111-8111-111111111111',
+      'ABSOLUTE_SESSION_CAP_REACHED'
+    );
+    expect(mocks.rotateRefreshToken).not.toHaveBeenCalled();
   });
 
   it('blocks refresh for inactive users and revokes refresh sessions', async () => {
