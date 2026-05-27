@@ -3,7 +3,7 @@
  */
 
 import express from 'express';
-import { SetupService } from '../services/SetupService';
+import { SetupService } from '../services/setup/SetupService';
 import { validateParams, validateBody } from '../middleware/validation';
 import { Logger } from '../utils/logger';
 import { getEnvironmentConfig } from '../config/environment';

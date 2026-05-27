@@ -8,7 +8,7 @@
 export { SetupValidator } from './setupValidator';
 export { SetupDatabase } from './setupDatabase';
 export { SetupDefaults } from './setupDefaults';
-export { SetupWizard } from './setupWizard';
+export { SetupWizard } from './wizard/SetupWizard';
 
 // Specialized database operation modules
 export { InvitationOperations } from './invitationOperations';
