@@ -12,6 +12,7 @@ import { SetupJwtPayload } from './types';
  */
 export class SetupAuthManager {
   private static logger = Logger.getInstance();
+  private static readonly JWT_VERIFY_OPTIONS: jwt.VerifyOptions = { algorithms: ['HS256'] };
 
   private static assertAuthUser(
     user: unknown
@@ -74,7 +75,11 @@ export class SetupAuthManager {
     }
 
     try {
-      const decoded = jwt.verify(token, jwtSecret) as SetupJwtPayload;
+      const decoded = jwt.verify(
+        token,
+        jwtSecret,
+        SetupAuthManager.JWT_VERIFY_OPTIONS
+      ) as SetupJwtPayload;
       
       this.logger.debug(
         'Authentication token verified',
@@ -148,7 +153,7 @@ export class SetupAuthManager {
     }
 
     try {
-      const decoded = jwt.verify(token, jwtSecret) as {
+      const decoded = jwt.verify(token, jwtSecret, SetupAuthManager.JWT_VERIFY_OPTIONS) as {
         establishmentId?: unknown;
         stepId?: unknown;
         type?: unknown;

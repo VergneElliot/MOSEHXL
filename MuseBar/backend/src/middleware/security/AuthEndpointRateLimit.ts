@@ -60,6 +60,8 @@ export function resolveLoginRateLimitKey(req: Request): string {
   return `ip:${ip}:email:${emailHash}`;
 }
 
+const JWT_VERIFY_OPTIONS: jwt.VerifyOptions = { algorithms: ['HS256'] };
+
 export function createRefreshRateLimitKeyResolver(jwtSecret: string) {
   return (req: Request): string => {
     const ip = req.ip ?? 'unknown';
@@ -74,7 +76,7 @@ export function createRefreshRateLimitKeyResolver(jwtSecret: string) {
     }
 
     try {
-      const decoded = jwt.verify(token, jwtSecret) as { id?: number };
+      const decoded = jwt.verify(token, jwtSecret, JWT_VERIFY_OPTIONS) as { id?: number };
       if (typeof decoded?.id === 'number' && Number.isFinite(decoded.id)) {
         return `ip:${ip}:user:${decoded.id}`;
       }
