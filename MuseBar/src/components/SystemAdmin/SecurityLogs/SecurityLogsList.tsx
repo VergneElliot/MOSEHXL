@@ -15,13 +15,14 @@ import {
   AccordionDetails
 } from '@mui/material';
 import { ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
-import { SystemSecurityLog } from '../../../types/system';
+import type { SecurityLogFilters, SystemSecurityLog } from '../../../types/system';
 
 interface SecurityLogsListProps {
-  filters: any; // Filters will be used when connected to API
+  filters: SecurityLogFilters;
 }
 
 export const SecurityLogsList: React.FC<SecurityLogsListProps> = ({ filters }) => {
+  void filters; // Hook wiring pending API integration.
   // TODO: Replace with actual data from hook based on filters
   const logs: SystemSecurityLog[] = [
     {
