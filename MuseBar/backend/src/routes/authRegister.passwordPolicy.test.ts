@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 import crypto from 'crypto';
+import { errorHandler } from '../middleware/errorHandler';
 
 const mocks = vi.hoisted(() => ({
   createUser: vi.fn(),
@@ -68,6 +69,7 @@ app.use((req, _res, next) => {
   next();
 });
 app.use('/auth', authRegisterRouter);
+app.use(errorHandler);
 
 describe('authRegister password policy enforcement', () => {
   const originalBreachToggle = process.env.PASSWORD_BREACH_CHECK_ENABLED;
@@ -88,7 +90,7 @@ describe('authRegister password policy enforcement', () => {
       .send({ email: 'u@example.com', password: 'weak', is_admin: false });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe('Password must be at least 8 characters long');
+    expect(res.body.error?.message).toBe('Password must be at least 8 characters long');
     expect(mocks.createUser).not.toHaveBeenCalled();
   });
 
@@ -98,7 +100,7 @@ describe('authRegister password policy enforcement', () => {
       .send({ email: 'staff@example.com', password: 'weak', role: 'staff' });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe('Password must be at least 8 characters long');
+    expect(res.body.error?.message).toBe('Password must be at least 8 characters long');
     expect(mocks.createUserForEstablishment).not.toHaveBeenCalled();
   });
 
@@ -116,7 +118,7 @@ describe('authRegister password policy enforcement', () => {
       .send({ email: 'u@example.com', password: 'StrongPass1', is_admin: false });
 
     expect(res.status).toBe(400);
-    expect(String(res.body.error)).toContain('known data breaches');
+    expect(String(res.body.error?.message)).toContain('known data breaches');
     expect(mocks.createUser).not.toHaveBeenCalled();
   });
 });

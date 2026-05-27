@@ -70,7 +70,7 @@ describe('POST /auth/setup password validation', () => {
     });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe('Password must be at least 8 characters long');
+    expect(res.body.error?.message).toBe('Password must be at least 8 characters long');
     expect(mocks.bootstrapSystemAdmin).not.toHaveBeenCalled();
   });
 

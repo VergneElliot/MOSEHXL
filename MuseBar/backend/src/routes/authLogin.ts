@@ -7,7 +7,14 @@ import { AuditTrailModel } from '../models/auditTrail';
 import { TokenBlocklistModel } from '../models/tokenBlocklist';
 import { RefreshTokenModel } from '../models/refreshToken';
 import { Logger } from '../utils/logger';
-import { AppError, asyncHandler } from '../middleware/errorHandler';
+import {
+  AppError,
+  asyncHandler,
+  AuthenticationError,
+  AuthorizationError,
+  NotFoundError,
+  ValidationError,
+} from '../middleware/errorHandler';
 import {
   generateToken,
   requireAdmin,
@@ -175,7 +182,7 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
   const userAgent = req.headers['user-agent'];
 
   if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password required' });
+    throw new ValidationError('Email and password required');
   }
 
   try {
@@ -188,7 +195,7 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
         ip_address: ip,
         user_agent: userAgent,
       }, 'LOGIN_FAILED_USER_NOT_FOUND');
-      return res.status(401).json({ error: 'Invalid credentials' });
+      throw new AuthenticationError('Invalid credentials');
     }
 
     if (user.is_active === false) {
@@ -199,7 +206,7 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
         ip_address: ip,
         user_agent: userAgent,
       }, 'LOGIN_FAILED_USER_INACTIVE');
-      return res.status(403).json({ error: 'Account is inactive' });
+      throw new AuthorizationError('Account is inactive');
     }
 
     const now = new Date();
@@ -252,7 +259,7 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
         ip_address: ip,
         user_agent: userAgent,
       }, 'LOGIN_FAILED_INVALID_PASSWORD');
-      return res.status(401).json({ error: 'Invalid credentials' });
+      throw new AuthenticationError('Invalid credentials');
     }
 
     const loginRole = deriveCanonicalRole({
@@ -275,10 +282,11 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
           ip_address: ip,
           user_agent: userAgent,
         }, 'LOGIN_BLOCKED_ADMIN_2FA_SETUP_REQUIRED');
-        return res.status(403).json({
-          error: 'Two-factor authentication setup is required for this admin account',
-          code: 'ADMIN_2FA_SETUP_REQUIRED',
-        });
+        throw new AppError(
+          'Two-factor authentication setup is required for this admin account',
+          403,
+          'ADMIN_2FA_SETUP_REQUIRED'
+        );
       }
 
       const totpCode = typeof req.body?.totpCode === 'string' ? req.body.totpCode.trim() : '';
@@ -302,10 +310,7 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
           ip_address: ip,
           user_agent: userAgent,
         }, 'LOGIN_FAILED_INVALID_2FA_CODE');
-        return res.status(401).json({
-          error: 'Invalid two-factor authentication code',
-          code: 'INVALID_2FA_CODE',
-        });
+        throw new AppError('Invalid two-factor authentication code', 401, 'INVALID_2FA_CODE');
       }
     }
 
@@ -370,6 +375,9 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
       refreshExpiresIn,
     });
   } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
     Logger.getInstance().error('Login error', error as Error);
     throw new AppError('Internal server error during login', 500, 'LOGIN_FAILED');
   }
@@ -382,7 +390,7 @@ router.get('/2fa/totp/status', requireAuth, asyncHandler(async (req, res) => {
   const userId = req.user!.id;
   const dbUser = await UserModel.findById(userId);
   if (!dbUser) {
-    return res.status(404).json({ error: 'User not found' });
+    throw new NotFoundError('User');
   }
 
   const role = deriveCanonicalRole({
@@ -402,7 +410,7 @@ router.post('/2fa/totp/setup', requireAuth, asyncHandler(async (req, res) => {
   const userId = req.user!.id;
   const dbUser = await UserModel.findById(userId);
   if (!dbUser) {
-    return res.status(404).json({ error: 'User not found' });
+    throw new NotFoundError('User');
   }
 
   const generatedSecret = speakeasy.generateSecret({
@@ -437,12 +445,12 @@ router.post('/2fa/totp/enable', requireAuth, asyncHandler(async (req, res) => {
   const userId = req.user!.id;
   const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
   if (!code) {
-    return res.status(400).json({ error: 'code is required' });
+    throw new ValidationError('code is required');
   }
 
   const mfaState = await UserModel.getMfaTotpState(userId);
   if (!mfaState?.mfa_totp_secret) {
-    return res.status(400).json({ error: 'TOTP setup is required before enabling two-factor authentication' });
+    throw new ValidationError('TOTP setup is required before enabling two-factor authentication');
   }
 
   if (!speakeasy.totp.verify({
@@ -451,7 +459,7 @@ router.post('/2fa/totp/enable', requireAuth, asyncHandler(async (req, res) => {
     token: code,
     window: 1,
   })) {
-    return res.status(400).json({ error: 'Invalid two-factor authentication code' });
+    throw new ValidationError('Invalid two-factor authentication code');
   }
 
   await UserModel.enableMfaTotp(userId);
@@ -470,22 +478,22 @@ router.post('/2fa/totp/disable', requireAuth, asyncHandler(async (req, res) => {
   const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
   if (!code || !password) {
-    return res.status(400).json({ error: 'code and password are required' });
+    throw new ValidationError('code and password are required');
   }
 
   const dbUser = await UserModel.findById(userId);
   if (!dbUser) {
-    return res.status(404).json({ error: 'User not found' });
+    throw new NotFoundError('User');
   }
 
   const validPassword = await UserModel.verifyPassword(dbUser, password);
   if (!validPassword) {
-    return res.status(401).json({ error: 'Invalid credentials' });
+    throw new AuthenticationError('Invalid credentials');
   }
 
   const mfaState = await UserModel.getMfaTotpState(userId);
   if (!mfaState?.mfa_totp_enabled || !mfaState.mfa_totp_secret) {
-    return res.status(400).json({ error: 'Two-factor authentication is not enabled' });
+    throw new ValidationError('Two-factor authentication is not enabled');
   }
   if (!speakeasy.totp.verify({
     secret: mfaState.mfa_totp_secret,
@@ -493,7 +501,7 @@ router.post('/2fa/totp/disable', requireAuth, asyncHandler(async (req, res) => {
     token: code,
     window: 1,
   })) {
-    return res.status(400).json({ error: 'Invalid two-factor authentication code' });
+    throw new ValidationError('Invalid two-factor authentication code');
   }
 
   await UserModel.disableMfaTotp(userId);
@@ -549,15 +557,13 @@ router.post('/refresh', refreshRateLimit, asyncHandler(async (req, res) => {
     const refreshTokenRaw = getRefreshTokenFromRequest(req);
     const rememberMe = req.body?.rememberMe === true;
     if (!refreshTokenRaw || typeof refreshTokenRaw !== 'string') {
-      await lockClient.query('COMMIT');
-      return res.status(400).json({ error: 'refreshToken is required' });
+      throw new ValidationError('refreshToken is required');
     }
 
     const refreshSession = await RefreshTokenModel.findActiveByRawToken(refreshTokenRaw);
     if (!refreshSession) {
-      await lockClient.query('COMMIT');
       clearRefreshTokenCookie(res);
-      return res.status(401).json({ error: 'Invalid or expired refresh token' });
+      throw new AuthenticationError('Invalid or expired refresh token');
     }
     const userId = refreshSession.user_id;
 
@@ -566,13 +572,11 @@ router.post('/refresh', refreshRateLimit, asyncHandler(async (req, res) => {
     // Re-fetch role and establishment_id in case they changed since last login
     const d = await UserModel.getAuthRoleState(userId);
     if (!d) {
-      await lockClient.query('COMMIT');
-      return res.status(404).json({ error: 'User not found' });
+      throw new NotFoundError('User');
     }
     const userRow = await UserModel.findById(userId);
     if (!userRow) {
-      await lockClient.query('COMMIT');
-      return res.status(404).json({ error: 'User not found' });
+      throw new NotFoundError('User');
     }
     const is_admin: boolean = d.is_admin;
     const establishment_id: string | null = d.establishment_id || null;
@@ -615,7 +619,10 @@ router.post('/refresh', refreshRateLimit, asyncHandler(async (req, res) => {
     await lockClient.query('ROLLBACK');
     if (error instanceof Error && error.message === 'REFRESH_TOKEN_ALREADY_USED_OR_EXPIRED') {
       clearRefreshTokenCookie(res);
-      return res.status(401).json({ error: 'Invalid or expired refresh token' });
+      throw new AuthenticationError('Invalid or expired refresh token');
+    }
+    if (error instanceof AppError) {
+      throw error;
     }
     throw new AppError('Internal server error', 500, 'TOKEN_REFRESH_FAILED');
   } finally {
@@ -644,16 +651,16 @@ router.post('/support/impersonation/start', requireAuth, requireAdmin, asyncHand
     : 30;
 
   if (!establishment_id) {
-    return res.status(400).json({ error: 'establishment_id is required' });
+    throw new ValidationError('establishment_id is required');
   }
   if (!reason || reason.length < 5) {
-    return res.status(400).json({ error: 'reason is required (minimum 5 characters)' });
+    throw new ValidationError('reason is required (minimum 5 characters)');
   }
 
   try {
     const estResult = await pool.query('SELECT id, name FROM establishments WHERE id = $1', [establishment_id]);
     if (estResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Target establishment not found' });
+      throw new NotFoundError('Target establishment');
     }
     const estName = String(estResult.rows[0].name ?? '');
 
@@ -706,6 +713,9 @@ router.post('/support/impersonation/start', requireAuth, requireAdmin, asyncHand
       reason,
     });
   } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
     Logger.getInstance().error('Failed to start support impersonation', error as Error, 'AUTH_ROUTE');
     throw new AppError('Failed to start support impersonation', 500, 'SUPPORT_IMPERSONATION_START_FAILED');
   }
@@ -722,13 +732,13 @@ router.post('/support/impersonation/stop', requireAuth, requireAdmin, asyncHandl
   const currentImpersonation = req.user?.support_impersonation;
 
   if (!currentImpersonation || !req.user?.establishment_id) {
-    return res.status(400).json({ error: 'No active support impersonation session in this token' });
+    throw new ValidationError('No active support impersonation session in this token');
   }
 
   try {
     const d = await UserModel.getAuthRoleState(actorUserId);
     if (!d) {
-      return res.status(404).json({ error: 'User not found' });
+      throw new NotFoundError('User');
     }
 
     const resetToken = generateToken(
@@ -768,6 +778,9 @@ router.post('/support/impersonation/stop', requireAuth, requireAdmin, asyncHandl
       expiresIn: '15m',
     });
   } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
     Logger.getInstance().error('Failed to stop support impersonation', error as Error, 'AUTH_ROUTE');
     throw new AppError('Failed to stop support impersonation', 500, 'SUPPORT_IMPERSONATION_STOP_FAILED');
   }
