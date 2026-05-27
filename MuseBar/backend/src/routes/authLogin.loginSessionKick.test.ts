@@ -127,6 +127,7 @@ describe('POST /auth/login optional kickPriorSessions', () => {
     const setCookieHeader = res.headers['set-cookie'] ?? [];
     expect(Array.isArray(setCookieHeader)).toBe(true);
     expect(String(setCookieHeader[0] ?? '')).toContain('musebar_refresh_token=');
+    expect(setCookieHeader.some((cookie: string) => cookie.startsWith('musebar_csrf_token='))).toBe(true);
     expect(mocks.revokeAllUserTokensIssuedBefore).not.toHaveBeenCalled();
     expect(mocks.createRefreshToken).toHaveBeenCalledTimes(1);
   });
@@ -141,6 +142,8 @@ describe('POST /auth/login optional kickPriorSessions', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.refreshToken).toBeUndefined();
+    const setCookieHeader = res.headers['set-cookie'] ?? [];
+    expect(setCookieHeader.some((cookie: string) => cookie.startsWith('musebar_csrf_token='))).toBe(true);
     expect(mocks.revokeAllUserTokensIssuedBefore).toHaveBeenCalledWith(
       10,
       expect.any(Number),

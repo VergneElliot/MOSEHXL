@@ -14,6 +14,21 @@ export function getToken(): string | null {
   return authToken;
 }
 
+function readCookieValue(cookieName: string): string | null {
+  if (typeof document === 'undefined' || typeof document.cookie !== 'string') {
+    return null;
+  }
+  const cookiePart = document.cookie
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${cookieName}=`));
+  if (!cookiePart) {
+    return null;
+  }
+  const value = cookiePart.slice(cookieName.length + 1).trim();
+  return value.length > 0 ? decodeURIComponent(value) : null;
+}
+
 export async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   if (!apiConfig.isReady()) {
     await apiConfig.initialize();
@@ -26,6 +41,13 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
 
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`;
+  }
+
+  if (endpoint === '/auth/refresh') {
+    const csrfToken = readCookieValue('musebar_csrf_token');
+    if (csrfToken) {
+      headers['x-csrf-token'] = csrfToken;
+    }
   }
 
   if (options.headers && typeof options.headers === 'object' && !(options.headers instanceof Headers)) {

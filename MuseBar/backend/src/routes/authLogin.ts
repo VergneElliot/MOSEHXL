@@ -96,21 +96,37 @@ function getRefreshCookieName(): string {
   return 'musebar_refresh_token';
 }
 
+function getCsrfCookieName(): string {
+  return 'musebar_csrf_token';
+}
+
+function getCookieValue(req: express.Request, cookieName: string): string | null {
+  const rawCookieHeader = req.headers.cookie;
+  if (typeof rawCookieHeader !== 'string' || rawCookieHeader.length === 0) {
+    return null;
+  }
+
+  const cookiePair = rawCookieHeader
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${cookieName}=`));
+
+  if (!cookiePair) {
+    return null;
+  }
+
+  const value = cookiePair.slice(cookieName.length + 1).trim();
+  return value.length > 0 ? decodeURIComponent(value) : null;
+}
+
 function getRefreshTokenFromRequest(
   req: express.Request,
   options?: { allowBodyFallback?: boolean }
 ): string | null {
   const allowBodyFallback = options?.allowBodyFallback === true;
-  const rawCookieHeader = req.headers.cookie;
-  if (typeof rawCookieHeader === 'string' && rawCookieHeader.length > 0) {
-    const cookiePair = rawCookieHeader
-      .split(';')
-      .map((part) => part.trim())
-      .find((part) => part.startsWith(`${getRefreshCookieName()}=`));
-    if (cookiePair) {
-      const value = cookiePair.slice(getRefreshCookieName().length + 1).trim();
-      if (value.length > 0) return decodeURIComponent(value);
-    }
+  const refreshFromCookie = getCookieValue(req, getRefreshCookieName());
+  if (refreshFromCookie) {
+    return refreshFromCookie;
   }
   if (!allowBodyFallback) {
     return null;
@@ -130,6 +146,17 @@ function setRefreshTokenCookie(res: express.Response, refreshToken: string, reme
   });
 }
 
+function setCsrfTokenCookie(res: express.Response, csrfToken: string, rememberMe: boolean): void {
+  const maxAgeMs = rememberMe ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+  res.cookie(getCsrfCookieName(), csrfToken, {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/api/auth',
+    maxAge: maxAgeMs,
+  });
+}
+
 function clearRefreshTokenCookie(res: express.Response): void {
   res.clearCookie(getRefreshCookieName(), {
     httpOnly: true,
@@ -137,6 +164,29 @@ function clearRefreshTokenCookie(res: express.Response): void {
     sameSite: 'strict',
     path: '/api/auth',
   });
+}
+
+function clearCsrfTokenCookie(res: express.Response): void {
+  res.clearCookie(getCsrfCookieName(), {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/api/auth',
+  });
+}
+
+function validateRefreshCsrf(req: express.Request): void {
+  const csrfFromCookie = getCookieValue(req, getCsrfCookieName());
+  const csrfFromHeader = req.header('x-csrf-token');
+  if (!csrfFromCookie || !csrfFromHeader) {
+    throw new ValidationError('CSRF token is required');
+  }
+
+  const cookieBuffer = Buffer.from(csrfFromCookie);
+  const headerBuffer = Buffer.from(csrfFromHeader);
+  if (cookieBuffer.length !== headerBuffer.length || !crypto.timingSafeEqual(cookieBuffer, headerBuffer)) {
+    throw new AuthenticationError('Invalid CSRF token');
+  }
 }
 
 function isAdminTwoFactorEnforced(): boolean {
@@ -348,6 +398,7 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
       !!rememberMe
     );
     const refreshToken = crypto.randomBytes(32).toString('hex');
+    const csrfToken = crypto.randomBytes(32).toString('hex');
     const { expiresAt, refreshExpiresIn } = computeRefreshExpiry(!!rememberMe);
     await RefreshTokenModel.create({
       userId: user.id,
@@ -357,6 +408,7 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
       userAgent: req.headers['user-agent'],
     });
     setRefreshTokenCookie(res, refreshToken, !!rememberMe);
+    setCsrfTokenCookie(res, csrfToken, !!rememberMe);
 
     await logAuditOrThrow({
       user_id: String(user.id),
@@ -566,6 +618,7 @@ router.post('/refresh', refreshRateLimit, asyncHandler(async (req, res) => {
     if (!refreshTokenRaw || typeof refreshTokenRaw !== 'string') {
       throw new ValidationError('Refresh token cookie is required');
     }
+    validateRefreshCsrf(req);
 
     const refreshSession = await RefreshTokenModel.findActiveByRawToken(refreshTokenRaw);
     if (!refreshSession) {
@@ -598,6 +651,7 @@ router.post('/refresh', refreshRateLimit, asyncHandler(async (req, res) => {
       !!rememberMe
     );
     const nextRefreshToken = crypto.randomBytes(32).toString('hex');
+    const nextCsrfToken = crypto.randomBytes(32).toString('hex');
     const { expiresAt, refreshExpiresIn } = computeRefreshExpiry(!!rememberMe);
     await RefreshTokenModel.rotate(refreshTokenRaw, nextRefreshToken, {
       userId,
@@ -617,6 +671,7 @@ router.post('/refresh', refreshRateLimit, asyncHandler(async (req, res) => {
 
     await lockClient.query('COMMIT');
     setRefreshTokenCookie(res, nextRefreshToken, !!rememberMe);
+    setCsrfTokenCookie(res, nextCsrfToken, !!rememberMe);
     return res.json({
       token,
       expiresIn: '15m',
@@ -807,6 +862,7 @@ router.post('/logout', requireAuth, asyncHandler(async (req, res) => {
     await RefreshTokenModel.revokeByRawToken(refreshToken, 'LOGOUT');
   }
   clearRefreshTokenCookie(res);
+  clearCsrfTokenCookie(res);
 
   await logAuditOrThrow({
     user_id: String(req.user!.id),

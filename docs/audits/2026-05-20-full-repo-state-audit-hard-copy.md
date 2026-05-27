@@ -70,7 +70,7 @@ The IDs follow the existing audit convention: **P0/P1/P2** = priority, **L/S/Q/D
 
 | ID | Title | Rationale | Effort |
 |----|-------|-----------|--------|
-| **P3-S5** | Move tokens from `localStorage` to httpOnly cookie or BFF (part of P2-S16) | **Fixed (2026-05-21 + follow-up):** refresh token transport moved to httpOnly cookie and frontend token persistence removed from localStorage; refresh endpoint now enforces cookie-only token source (no body fallback) (`364/365`). BFF and CSRF follow-up remain tracked separately. | **L** |
+| **P3-S5** | Move tokens from `localStorage` to httpOnly cookie or BFF (part of P2-S16) | **Fixed (2026-05-21 + follow-ups):** refresh token transport moved to httpOnly cookie and frontend token persistence removed from localStorage; refresh endpoint enforces cookie-only token source (`364/365`) and now requires CSRF double-submit (`367`). BFF-level hardening remains tracked separately. | **L** |
 | **P3-S6** | Account lockout after N failed logins + admin unlock | **Fixed (2026-05-21):** DB-backed failed-attempt lockout with progressive duration and establishment-scoped admin unlock endpoint + audit coverage. | **M** |
 | **P3-S7** | Optional HIBP k-anonymity check on set-password paths | **Fixed (2026-05-21):** shared breach-aware validator integrated with HIBP k-anonymity and wired into password set/reset/change flows (opt-in via env). | **S** |
 | **P3-S8** | 2FA (TOTP) for `system_admin` and `establishment_admin` | **Fixed (2026-05-21):** added admin TOTP lifecycle endpoints and login-time step-up enforcement (env-controlled, production-secure default) for admin roles. | **L** |
