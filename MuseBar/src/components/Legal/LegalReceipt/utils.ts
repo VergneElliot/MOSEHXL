@@ -39,7 +39,7 @@ export const calculateReceiptTotals = (
  */
 export const getVatRate = (vatItem: VatBreakdownItem): number => {
   // Support both 'tax_rate' and 'rate' for backend compatibility
-  const rateCandidate = (vatItem as any).rate;
+  const rateCandidate = vatItem.rate;
   
   if (typeof vatItem.tax_rate === 'number' && !isNaN(vatItem.tax_rate)) {
     return vatItem.tax_rate;

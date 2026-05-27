@@ -18,8 +18,23 @@
   "rules": {
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "warn",
-    "no-console": "off"
+    "no-console": "off",
+    "@typescript-eslint/no-explicit-any": "error"
   },
+  "overrides": [
+    {
+      "files": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "src/setupTests.ts",
+        "src/utils/testing/**/*.ts",
+        "src/utils/testing/**/*.tsx"
+      ],
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "off"
+      }
+    }
+  ],
   "env": {
     "browser": true,
     "es6": true,
