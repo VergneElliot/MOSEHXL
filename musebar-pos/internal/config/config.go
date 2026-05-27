@@ -17,8 +17,12 @@ type Config struct {
 	DatabaseUser string
 	DatabasePass string
 	JWTSecret    string
-	CORSOrigins  []string // multiple origins supported
-	ArchiveKey   string
+	CORSOrigins        []string // multiple origins supported
+	ArchiveKey         string
+	GoogleClientID     string
+	GoogleClientSecret string
+	GoogleRedirectURL  string
+	FrontendURL        string
 }
 
 // Load reads configuration from environment variables
@@ -44,8 +48,12 @@ func Load() (*Config, error) {
 		DatabaseUser: getEnv("DB_USER", "student"),
 		DatabasePass: getEnv("DB_PASSWORD", ""),
 		JWTSecret:    os.Getenv("JWT_SECRET"),
-		CORSOrigins:  corsOrigins,
-		ArchiveKey:   os.Getenv("ARCHIVE_SECRET_KEY"),
+		CORSOrigins:        corsOrigins,
+		ArchiveKey:         os.Getenv("ARCHIVE_SECRET_KEY"),
+		GoogleClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+		GoogleRedirectURL:  getEnv("GOOGLE_REDIRECT_URL", "http://localhost:3002/api/auth/google/callback"),
+		FrontendURL:        getEnv("FRONTEND_URL", "http://localhost:5173"),
 	}
 
 	if cfg.JWTSecret == "" {

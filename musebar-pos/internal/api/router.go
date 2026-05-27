@@ -35,6 +35,7 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	orderHandler := handlers.NewOrderHandler(orderRepo, productRepo, journalService)
 	authHandler := handlers.NewAuthHandler(userRepo, refreshRepo)
 	happyHourHandler := handlers.NewHappyHourHandler(productRepo)
+	oauthHandler := handlers.NewOAuthHandler(cfg, userRepo, refreshRepo)
 	closureHandler := handlers.NewClosureHandler(closureService)
 
 	// Public
@@ -47,6 +48,10 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	mux.HandleFunc("POST /api/auth/refresh", authHandler.Refresh)
 	mux.HandleFunc("POST /api/auth/logout", authmw.RequireAuth(authHandler.Logout))
 	mux.HandleFunc("GET /api/auth/me", authmw.RequireAuth(authHandler.Me))
+
+	// Google OAuth endpoints
+	mux.HandleFunc("GET /api/auth/google", oauthHandler.GoogleLogin)
+	mux.HandleFunc("GET /api/auth/google/callback", oauthHandler.GoogleCallback)
 
 	// Legal journal
 	mux.HandleFunc("GET /api/legal/journal/verify", authmw.RequireAuth(legalHandler.VerifyJournalIntegrity))

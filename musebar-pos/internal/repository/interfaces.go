@@ -61,6 +61,7 @@ type UserRepository interface {
 	CreateUser(ctx context.Context, user *models.User) error
 	GetUserByID(ctx context.Context, userID int64) (*models.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
+	GetUserByGoogleID(ctx context.Context, googleID string) (*models.User, error)
 	GetUsersByEstablishment(ctx context.Context, establishmentID string) ([]models.User, error)
 	UpdateUser(ctx context.Context, userID int64, updates map[string]interface{}) error
 	DeleteUser(ctx context.Context, userID int64) error
