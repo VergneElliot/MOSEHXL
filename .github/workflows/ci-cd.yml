@@ -19,6 +19,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -72,6 +74,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -83,6 +87,13 @@ jobs:
     - name: Install backend dependencies
       working-directory: MuseBar/backend
       run: npm ci --workspaces=false --include-workspace-root=false
+
+    - name: Enforce schema drift policy
+      working-directory: MuseBar/backend
+      env:
+        GIT_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        GIT_HEAD: ${{ github.sha }}
+      run: npm run check:schema-drift
 
     - name: Run backend linting
       working-directory: MuseBar/backend
