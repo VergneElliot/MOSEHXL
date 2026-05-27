@@ -143,7 +143,12 @@ export class ClosureScheduler {
 
       let closureBulletin;
       try {
-        closureBulletin = await LegalJournalModel.createDailyClosure(businessDayDate, establishmentId, timezone);
+        // Create an OPEN bulletin first so we can keep bulletin+journal atomic.
+        closureBulletin = await LegalJournalModel.createDailyClosureOpen(
+          businessDayDate,
+          establishmentId,
+          timezone
+        );
       } catch (err) {
         if (err instanceof Error && err.message.includes('already exists')) {
           return null;
@@ -151,9 +156,13 @@ export class ClosureScheduler {
         throw err;
       }
 
-      // Append the matching CLOSURE entry to the legal journal so the
-      // auto-closure shows up in the immutable hash chain (P3-L1).
-      // Strict bulletin+journal atomicity is handled separately under P3-L2.
+      const closureId = Number(closureBulletin.id);
+      if (!Number.isFinite(closureId)) {
+        throw new Error('Automatic closure created without valid bulletin id');
+      }
+
+      // Append the matching CLOSURE entry to the legal journal and only then
+      // finalize the bulletin. If append fails, rollback the OPEN bulletin.
       const totalAmount = toFiniteNumber(closureBulletin.total_amount);
       const totalVat = toFiniteNumber(closureBulletin.total_vat);
       let journalSequenceNumber: number | null = null;
@@ -196,18 +205,34 @@ export class ClosureScheduler {
           ip_address: 'system',
           user_agent: 'ClosureScheduler'
         });
+
+        const rolledBack = await LegalJournalModel.deleteOpenClosureBulletin(closureId, establishmentId);
+        if (!rolledBack) {
+          Logger.getInstance().error(
+            `Failed to rollback open auto-closure bulletin ${closureId} after journal append failure`,
+            new Error('Open closure bulletin rollback affected 0 rows'),
+            'LEGAL_CLOSURE'
+          );
+        }
+
+        throw new Error('AUTO_CLOSURE_JOURNAL_APPEND_FAILED');
+      }
+
+      const finalizedBulletin = await LegalJournalModel.closeOpenClosureBulletin(closureId, establishmentId);
+      if (!finalizedBulletin) {
+        throw new Error(`Failed to finalize auto-closure bulletin ${closureId}`);
       }
 
       await AuditTrailModel.logAction({
         action_type: 'AUTO_CLOSURE_EXECUTED',
         resource_type: 'CLOSURE_BULLETIN',
-        resource_id: closureBulletin.id.toString(),
+        resource_id: closureId.toString(),
         action_details: {
           closure_type: 'DAILY',
           establishment_id: establishmentId,
           period_start: businessDay.toISOString(),
-          transaction_count: closureBulletin.total_transactions,
-          total_amount: closureBulletin.total_amount,
+          transaction_count: finalizedBulletin.total_transactions,
+          total_amount: finalizedBulletin.total_amount,
           closure_time: now.toISOString(),
           trigger: 'AUTOMATIC',
           journal_sequence_number: journalSequenceNumber,
@@ -216,7 +241,7 @@ export class ClosureScheduler {
         user_agent: 'ClosureScheduler'
       });
 
-      return { establishmentId, bulletinId: closureBulletin.id };
+      return { establishmentId, bulletinId: closureId };
       
     } catch (error) {
       // Failed to execute automatic closure

@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   poolQuery: vi.fn(),
-  createDailyClosure: vi.fn(),
+  createDailyClosureOpen: vi.fn(),
+  closeOpenClosureBulletin: vi.fn(),
+  deleteOpenClosureBulletin: vi.fn(),
   logClosure: vi.fn(),
   auditLogAction: vi.fn(),
   loggerError: vi.fn(),
@@ -16,7 +18,9 @@ vi.mock('../db/pool', () => ({
 
 vi.mock('../models/legalJournal', () => ({
   LegalJournalModel: {
-    createDailyClosure: mocks.createDailyClosure,
+    createDailyClosureOpen: mocks.createDailyClosureOpen,
+    closeOpenClosureBulletin: mocks.closeOpenClosureBulletin,
+    deleteOpenClosureBulletin: mocks.deleteOpenClosureBulletin,
     logClosure: mocks.logClosure,
   },
 }));
@@ -58,18 +62,24 @@ function fakeBulletin(overrides: Record<string, unknown> = {}) {
 describe('ClosureScheduler.executeAutomaticClosureForEstablishment', () => {
   beforeEach(() => {
     mocks.poolQuery.mockReset();
-    mocks.createDailyClosure.mockReset();
+    mocks.createDailyClosureOpen.mockReset();
+    mocks.closeOpenClosureBulletin.mockReset();
+    mocks.deleteOpenClosureBulletin.mockReset();
     mocks.logClosure.mockReset();
     mocks.auditLogAction.mockReset();
     mocks.loggerError.mockReset();
 
     mocks.poolQuery.mockResolvedValue({ rows: [] });
     mocks.auditLogAction.mockResolvedValue(undefined);
+    mocks.closeOpenClosureBulletin.mockImplementation(async (closureId: number) =>
+      fakeBulletin({ id: closureId })
+    );
+    mocks.deleteOpenClosureBulletin.mockResolvedValue(true);
   });
 
   it('appends a CLOSURE legal journal entry after the bulletin is created', async () => {
     const bulletin = fakeBulletin();
-    mocks.createDailyClosure.mockResolvedValue(bulletin);
+    mocks.createDailyClosureOpen.mockResolvedValue(bulletin);
     mocks.logClosure.mockResolvedValue({ sequence_number: 118 });
 
     const result = await ClosureScheduler.executeAutomaticClosureForEstablishment(
@@ -78,6 +88,8 @@ describe('ClosureScheduler.executeAutomaticClosureForEstablishment', () => {
     );
 
     expect(result).toEqual({ establishmentId: ESTABLISHMENT_ID, bulletinId: 42 });
+    expect(mocks.closeOpenClosureBulletin).toHaveBeenCalledWith(42, ESTABLISHMENT_ID);
+    expect(mocks.deleteOpenClosureBulletin).not.toHaveBeenCalled();
 
     expect(mocks.logClosure).toHaveBeenCalledTimes(1);
     expect(mocks.logClosure).toHaveBeenCalledWith(
@@ -122,7 +134,7 @@ describe('ClosureScheduler.executeAutomaticClosureForEstablishment', () => {
   });
 
   it('returns null and skips the journal append when the bulletin already exists', async () => {
-    mocks.createDailyClosure.mockRejectedValue(
+    mocks.createDailyClosureOpen.mockRejectedValue(
       new Error('Daily closure bulletin already exists for this period')
     );
 
@@ -133,6 +145,8 @@ describe('ClosureScheduler.executeAutomaticClosureForEstablishment', () => {
 
     expect(result).toBeNull();
     expect(mocks.logClosure).not.toHaveBeenCalled();
+    expect(mocks.closeOpenClosureBulletin).not.toHaveBeenCalled();
+    expect(mocks.deleteOpenClosureBulletin).not.toHaveBeenCalled();
 
     const executedCall = mocks.auditLogAction.mock.calls.find(
       ([entry]) => entry?.action_type === 'AUTO_CLOSURE_EXECUTED'
@@ -145,17 +159,14 @@ describe('ClosureScheduler.executeAutomaticClosureForEstablishment', () => {
     expect(failureCall).toBeUndefined();
   });
 
-  it('records AUTO_CLOSURE_JOURNAL_APPEND_FAILED and continues when the journal append fails', async () => {
+  it('records AUTO_CLOSURE_JOURNAL_APPEND_FAILED and fails closed when the journal append fails', async () => {
     const bulletin = fakeBulletin();
-    mocks.createDailyClosure.mockResolvedValue(bulletin);
+    mocks.createDailyClosureOpen.mockResolvedValue(bulletin);
     mocks.logClosure.mockRejectedValue(new Error('journal append boom'));
 
-    const result = await ClosureScheduler.executeAutomaticClosureForEstablishment(
-      ESTABLISHMENT_ID,
-      NOW
-    );
-
-    expect(result).toEqual({ establishmentId: ESTABLISHMENT_ID, bulletinId: 42 });
+    await expect(
+      ClosureScheduler.executeAutomaticClosureForEstablishment(ESTABLISHMENT_ID, NOW)
+    ).rejects.toThrow('AUTO_CLOSURE_JOURNAL_APPEND_FAILED');
 
     expect(mocks.loggerError).toHaveBeenCalledTimes(1);
     expect(mocks.loggerError).toHaveBeenCalledWith(
@@ -178,18 +189,22 @@ describe('ClosureScheduler.executeAutomaticClosureForEstablishment', () => {
         error: 'journal append boom',
       }),
     });
+    expect(mocks.deleteOpenClosureBulletin).toHaveBeenCalledWith(42, ESTABLISHMENT_ID);
+    expect(mocks.closeOpenClosureBulletin).not.toHaveBeenCalled();
 
     const executedCall = mocks.auditLogAction.mock.calls.find(
       ([entry]) => entry?.action_type === 'AUTO_CLOSURE_EXECUTED'
     );
-    expect(executedCall).toBeDefined();
-    expect(executedCall![0].action_details).toMatchObject({
-      journal_sequence_number: null,
-    });
+    expect(executedCall).toBeUndefined();
+
+    const schedulerFailureCall = mocks.auditLogAction.mock.calls.find(
+      ([entry]) => entry?.action_type === 'AUTO_CLOSURE_FAILED'
+    );
+    expect(schedulerFailureCall).toBeDefined();
   });
 
   it('rethrows non-"already exists" bulletin failures and records AUTO_CLOSURE_FAILED', async () => {
-    mocks.createDailyClosure.mockRejectedValue(new Error('database down'));
+    mocks.createDailyClosureOpen.mockRejectedValue(new Error('database down'));
 
     await expect(
       ClosureScheduler.executeAutomaticClosureForEstablishment(ESTABLISHMENT_ID, NOW)
