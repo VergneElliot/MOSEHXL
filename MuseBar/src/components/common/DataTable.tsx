@@ -13,7 +13,7 @@ import {
 import { TableColumn, BaseComponentProps } from '../../types/ui';
 import LoadingSpinner from './LoadingSpinner';
 
-interface DataTableProps<T = any> extends BaseComponentProps {
+interface DataTableProps<T extends Record<string, unknown>> extends BaseComponentProps {
   columns: TableColumn<T>[];
   data: T[];
   loading?: boolean;
@@ -24,7 +24,7 @@ interface DataTableProps<T = any> extends BaseComponentProps {
   keyField?: keyof T;
 }
 
-function DataTable<T extends Record<string, any>>({
+function DataTable<T extends Record<string, unknown>>({
   columns,
   data,
   loading = false,
@@ -36,6 +36,13 @@ function DataTable<T extends Record<string, any>>({
   className,
   'data-testid': testId,
 }: DataTableProps<T>) {
+  const toCellDisplayValue = (input: unknown): React.ReactNode => {
+    if (input == null || React.isValidElement(input)) {
+      return input;
+    }
+    return String(input);
+  };
+
   if (loading) {
     return <LoadingSpinner message="Chargement des données..." />;
   }
@@ -84,10 +91,11 @@ function DataTable<T extends Record<string, any>>({
               {columns.map(column => {
                 const value = row[column.id];
                 const formattedValue = column.format ? column.format(value) : value;
+                const displayValue = toCellDisplayValue(formattedValue);
 
                 return (
                   <TableCell key={String(column.id)} align={column.align || 'left'}>
-                    {formattedValue}
+                    {displayValue}
                   </TableCell>
                 );
               })}

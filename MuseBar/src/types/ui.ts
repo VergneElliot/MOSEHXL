@@ -13,7 +13,7 @@ export interface LoadingState {
   error: string | null;
 }
 
-export interface FormState<T = any> {
+export interface FormState<T extends Record<string, unknown> = Record<string, unknown>> {
   values: T;
   errors: Partial<Record<keyof T, string>>;
   touched: Partial<Record<keyof T, boolean>>;
@@ -60,16 +60,16 @@ export interface WithError {
 }
 
 // Table/Grid related types
-export interface TableColumn<T = any> {
+export interface TableColumn<T extends Record<string, unknown> = Record<string, unknown>> {
   id: keyof T;
   label: string;
   minWidth?: number;
   align?: 'left' | 'center' | 'right';
-  format?: (value: any) => string;
+  format?: (value: T[keyof T]) => string;
   sortable?: boolean;
 }
 
-export interface TableProps<T = any> {
+export interface TableProps<T extends Record<string, unknown> = Record<string, unknown>> {
   columns: TableColumn<T>[];
   data: T[];
   loading?: boolean;
