@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { Box, Snackbar, Alert } from '@mui/material';
-import { Category, Product, OrderItem } from '../../types';
+import { Category, Product, OrderItem, Order } from '../../types';
 import { usePOSState } from '../../hooks/usePOSState';
 import { usePOSLogic } from '../../hooks/usePOSLogic';
 import { usePOSAPI } from '../../hooks/usePOSAPI';
@@ -53,7 +53,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
     isHappyHourActive
   );
 
-  const handlePaymentComplete = (message: string, createdOrder?: any) => {
+  const handlePaymentComplete = (message: string, createdOrder?: Order) => {
     actions.setSnackbar({ open: true, message, severity: 'success' });
     const rawId = createdOrder?.id;
     const parsedId =

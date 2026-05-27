@@ -4,7 +4,7 @@
  */
 
 import { useCallback } from 'react';
-import { OrderItem } from '../../../../types';
+import { OrderItem, Order } from '../../../../types';
 import { usePOSAPI } from '../../../../hooks/usePOSAPI';
 import { PaymentState } from '../types';
 
@@ -14,7 +14,7 @@ interface UsePaymentProcessingProps {
   totalWithTips: number;
   cashChange: number;
   onLoading: (loading: boolean) => void;
-  onSuccess: (createdOrder?: any) => void;
+  onSuccess: (createdOrder?: Order) => void;
   onError: (error: string) => void;
   onReset: () => void;
 }
