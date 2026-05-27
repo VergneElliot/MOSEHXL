@@ -15,7 +15,7 @@ import { EstablishmentModel } from '../../models/establishment';
 import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';
 import { INVITATION_ROLE_LABELS, InvitationRoleLabel } from '../../auth/roleVocabulary';
-import { asyncHandler } from '../../middleware/errorHandler';
+import { AuthorizationError, NotFoundError, ValidationError, asyncHandler } from '../../middleware/errorHandler';
 import {
   AuthenticatedRequest,
   EstablishmentInvitationData,
@@ -52,10 +52,7 @@ router.post('/send-establishment-invitation', requireAuth, requireAdmin, validat
 
     // Validate required fields
     if (!name || !email) {
-      return res.status(400).json({
-        success: false,
-        message: 'Establishment name and email are required'
-      });
+      throw new ValidationError('Establishment name and email are required');
     }
 
     // Email uniqueness check removed - users can have multiple establishments with same email
@@ -126,41 +123,29 @@ router.post('/send-user-invitation', requireAuth, canManageUsers, validateBody([
 
     // Validate required fields
     if (!email || !firstName || !lastName || !role || !establishmentId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email, first name, last name, role, and establishment ID are required'
-      });
+      throw new ValidationError('Email, first name, last name, role, and establishment ID are required');
     }
 
     // Validate user has access to this establishment
     if (!user.is_admin && user.establishment_id !== establishmentId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied to this establishment'
-      });
+      throw new AuthorizationError('Access denied to this establishment');
     }
 
     // Get establishment details
     const establishment = await EstablishmentModel.getById(establishmentId);
     if (!establishment) {
-      return res.status(404).json({
-        success: false,
-        message: 'Establishment not found'
-      });
+      throw new NotFoundError('Establishment');
     }
 
     // Check if user already exists in this establishment
     // Check if user already exists (simplified check)
     const existingUserCheck = { exists: false };
     if (existingUserCheck.exists) {
-      return res.status(400).json({
-        success: false,
-        message: 'User already exists in this establishment'
-      });
+      throw new ValidationError('User already exists in this establishment');
     }
 
     if (!INVITATION_ROLE_LABELS.includes(role as InvitationRoleLabel)) {
-      return res.status(400).json({ success: false, message: 'Invalid role' });
+      throw new ValidationError('Invalid role');
     }
 
     // Send user invitation
@@ -224,19 +209,13 @@ router.post('/accept-invitation', validateBody([
     const { token, password, firstName, lastName }: InvitationAcceptanceData = req.body;
 
     if (!token || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Token and password are required'
-      });
+      throw new ValidationError('Token and password are required');
     }
 
     // Get invitation details
     const invitation = await userInvitationService.getInvitationByToken(token);
     if (!invitation) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid or expired invitation token'
-      });
+      throw new ValidationError('Invalid or expired invitation token');
     }
 
     // Accept invitation based on type
@@ -250,7 +229,10 @@ router.post('/accept-invitation', validateBody([
     }
 
     if (!result.success) {
-      return res.status(400).json(result);
+      throw new ValidationError(
+        typeof result.message === 'string' ? result.message : 'Failed to accept invitation',
+        { result: result as unknown as Record<string, unknown> }
+      );
     }
 
     res.json({
@@ -281,10 +263,7 @@ router.get('/pending-invitations', requireAuth, canManageUsers, asyncHandler(asy
     const establishmentId = req.query.establishmentId as string || user.establishment_id;
 
     if (!establishmentId) {
-      return res.status(400).json({
-        success: false,
-        message: 'User must be associated with an establishment'
-      });
+      throw new ValidationError('User must be associated with an establishment');
     }
 
     const invitations = await userInvitationService.getPendingInvitations(establishmentId);
@@ -332,10 +311,7 @@ router.delete('/cancel-invitation/:invitationId', requireAuth, canManageUsers, v
     const success = await userInvitationService.cancelInvitation(invitationId, String(user.id));
 
     if (!success) {
-      return res.status(404).json({
-        success: false,
-        message: 'Invitation not found or already processed'
-      });
+      throw new NotFoundError('Invitation');
     }
 
     await AuditTrailModel.logAction({
@@ -380,7 +356,7 @@ router.post('/resend-invitation/:invitationId', requireAuth, canManageUsers, val
     const result = { success: true, trackingId: 'placeholder' };
 
     if (!result.success) {
-      return res.status(400).json(result);
+      throw new ValidationError('Failed to resend invitation');
     }
 
     await AuditTrailModel.logAction({
