@@ -4,7 +4,7 @@
  */
 
 import { pool } from '../../db/pool';
-import { SetupWizard } from './setupWizard';
+import { SetupWizard } from './wizard/SetupWizard';
 import { SetupValidator } from './setupValidator';
 import { SetupDatabase } from './setupDatabase';
 import { SetupDefaults } from './setupDefaults';
