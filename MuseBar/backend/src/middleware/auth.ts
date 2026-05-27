@@ -19,6 +19,7 @@ if (!rawSecret || rawSecret.length < 32) {
   );
 }
 const JWT_SECRET: string = rawSecret;
+const JWT_VERIFY_OPTIONS: jwt.VerifyOptions = { algorithms: ['HS256'] };
 
 export interface JwtPayload {
   id: number;
@@ -48,7 +49,7 @@ export function generateToken(
 }
 
 export function verifyToken(token: string): JwtPayload {
-  return jwt.verify(token, JWT_SECRET) as JwtPayload;
+  return jwt.verify(token, JWT_SECRET, JWT_VERIFY_OPTIONS) as JwtPayload;
 }
 
 async function isTokenRevoked(token: string): Promise<boolean> {

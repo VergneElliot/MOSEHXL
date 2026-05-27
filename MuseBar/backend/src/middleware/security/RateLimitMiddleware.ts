@@ -15,6 +15,7 @@ import { InMemoryRateLimitStore } from './InMemoryRateLimitStore';
 import { PostgresRateLimitStore } from './PostgresRateLimitStore';
 
 export class RateLimitMiddleware {
+  private static readonly JWT_VERIFY_OPTIONS: jwt.VerifyOptions = { algorithms: ['HS256'] };
   private store: IRateLimitStoreAdapter;
   private config: EnvironmentConfig;
   private logger: Logger;
@@ -121,7 +122,11 @@ export class RateLimitMiddleware {
       const token = auth.slice(7).trim();
       if (token) {
         try {
-          const decoded = jwt.verify(token, this.config.security.jwtSecret) as { id?: number };
+          const decoded = jwt.verify(
+            token,
+            this.config.security.jwtSecret,
+            RateLimitMiddleware.JWT_VERIFY_OPTIONS
+          ) as { id?: number };
           if (typeof decoded?.id === 'number' && Number.isFinite(decoded.id)) {
             return `user:${decoded.id}`;
           }
