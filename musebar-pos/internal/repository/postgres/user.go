@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"strings"
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -128,7 +129,7 @@ func (r *UserRepositoryPostgres) UpdateUser(ctx context.Context, userID int64, u
 		UPDATE users
 		SET %s
 		WHERE id = $%d
-	`, joinStrings(setClauses, ", "), argIndex)
+	`, strings.Join(setClauses, ", "), argIndex)
 
 	_, err := r.db.Exec(ctx, query, args...)
 	return err

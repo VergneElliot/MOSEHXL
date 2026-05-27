@@ -36,6 +36,7 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	authHandler := handlers.NewAuthHandler(userRepo, refreshRepo)
 	happyHourHandler := handlers.NewHappyHourHandler(productRepo)
 	oauthHandler := handlers.NewOAuthHandler(cfg, userRepo, refreshRepo)
+	userHandler := handlers.NewUserHandler(userRepo)
 	closureHandler := handlers.NewClosureHandler(closureService)
 
 	// Public
@@ -48,6 +49,13 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	mux.HandleFunc("POST /api/auth/refresh", authHandler.Refresh)
 	mux.HandleFunc("POST /api/auth/logout", authmw.RequireAuth(authHandler.Logout))
 	mux.HandleFunc("GET /api/auth/me", authmw.RequireAuth(authHandler.Me))
+
+	// User management endpoints (admin only)
+	mux.HandleFunc("GET /api/users", authmw.RequireAdmin(userHandler.ListUsers))
+	mux.HandleFunc("POST /api/users", authmw.RequireAdmin(userHandler.CreateUser))
+	mux.HandleFunc("PATCH /api/users/{id}", authmw.RequireAdmin(userHandler.UpdateUser))
+	mux.HandleFunc("DELETE /api/users/{id}", authmw.RequireAdmin(userHandler.DeactivateUser))
+	mux.HandleFunc("POST /api/auth/change-password", authmw.RequireAuth(userHandler.ChangePassword))
 
 	// Google OAuth endpoints
 	mux.HandleFunc("GET /api/auth/google", oauthHandler.GoogleLogin)
