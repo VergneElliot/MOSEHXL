@@ -63,7 +63,7 @@ router.get('/:orderId', requireAuth, requireAnyPermission([P.access_pos, P.acces
     const establishmentId = getEstablishmentId(req, res);
     if (!establishmentId) return;
 
-    const orderId = parseInt(req.params.orderId);
+    const orderId = parseInt(req.params.orderId ?? '', 10);
     if (isNaN(orderId)) {
       return res.status(400).json({ error: 'Invalid order ID' });
     }
@@ -95,7 +95,7 @@ router.get('/:orderId/summary', requireAuth, asyncHandler(async (req, res) => {
     const establishmentId = getEstablishmentId(req, res);
     if (!establishmentId) return;
 
-    const orderId = parseInt(req.params.orderId);
+    const orderId = parseInt(req.params.orderId ?? '', 10);
     if (isNaN(orderId)) {
       return res.status(400).json({ error: 'Invalid order ID' });
     }

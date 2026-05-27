@@ -110,7 +110,7 @@ router.get('/users', requireAuth, canManageUsers, asyncHandler(async (req, res) 
 // GET /api/auth/users/:id/permissions — establishment-scoped
 // ---------------------------------------------------------------------------
 router.get('/users/:id/permissions', requireAuth, canManageUsers, asyncHandler(async (req, res) => {
-  const userId = parseInt(req.params.id);
+  const userId = parseInt(req.params.id ?? '', 10);
   const establishmentId = req.user!.establishment_id!;
 
   const owns = await UserModel.userBelongsToEstablishment(userId, establishmentId);
@@ -126,7 +126,7 @@ router.get('/users/:id/permissions', requireAuth, canManageUsers, asyncHandler(a
 // POST /api/auth/users/:id/permissions — establishment-scoped
 // ---------------------------------------------------------------------------
 router.post('/users/:id/permissions', requireAuth, canManageUsers, asyncHandler(async (req, res) => {
-  const userId = parseInt(req.params.id);
+  const userId = parseInt(req.params.id ?? '', 10);
   const establishmentId = req.user!.establishment_id!;
   const { permissions } = req.body;
   const ip = req.ip;
@@ -169,7 +169,7 @@ router.post('/users/:id/permissions', requireAuth, canManageUsers, asyncHandler(
 // PUT /api/auth/users/:id/permissions — alias used by the frontend
 // ---------------------------------------------------------------------------
 router.put('/users/:id/permissions', requireAuth, canManageUsers, asyncHandler(async (req, res) => {
-  const userId = parseInt(req.params.id);
+  const userId = parseInt(req.params.id ?? '', 10);
   const establishmentId = req.user!.establishment_id!;
   const { permissions } = req.body;
 
@@ -266,7 +266,7 @@ router.post('/users', requireAuth, canManageUsers, asyncHandler(async (req, res)
 // DELETE /api/auth/users/:id — remove user from the requester's establishment
 // ---------------------------------------------------------------------------
 router.delete('/users/:id', requireAuth, canManageUsers, asyncHandler(async (req, res) => {
-  const userId = parseInt(req.params.id);
+  const userId = parseInt(req.params.id ?? '', 10);
   const establishmentId = req.user!.establishment_id!;
 
   if (userId === req.user!.id) {
@@ -304,7 +304,7 @@ router.delete('/users/:id', requireAuth, canManageUsers, asyncHandler(async (req
 // PUT /api/auth/users/:id/role — update role within the establishment
 // ---------------------------------------------------------------------------
 router.put('/users/:id/role', requireAuth, canManageUsers, asyncHandler(async (req, res) => {
-  const userId = parseInt(req.params.id);
+  const userId = parseInt(req.params.id ?? '', 10);
   const establishmentId = req.user!.establishment_id!;
   const { role } = req.body;
 
@@ -348,7 +348,7 @@ router.put('/users/:id/role', requireAuth, canManageUsers, asyncHandler(async (r
 // PUT /api/auth/users/:id/unlock — clear lockout state within establishment
 // ---------------------------------------------------------------------------
 router.put('/users/:id/unlock', requireAuth, canManageUsers, asyncHandler(async (req, res) => {
-  const userId = parseInt(req.params.id);
+  const userId = parseInt(req.params.id ?? '', 10);
   const establishmentId = req.user!.establishment_id!;
 
   const owns = await UserModel.userBelongsToEstablishment(userId, establishmentId);

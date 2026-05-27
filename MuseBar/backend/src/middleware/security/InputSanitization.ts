@@ -148,7 +148,7 @@ export class InputSanitizationService {
       '/': '&#x2F;',
     };
 
-    return str.replace(/[&<>"'/]/g, char => htmlEntities[char]);
+    return str.replace(/[&<>"'/]/g, char => htmlEntities[char] ?? char);
   }
 
   /**

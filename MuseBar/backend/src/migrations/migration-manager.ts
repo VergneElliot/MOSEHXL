@@ -85,7 +85,11 @@ export class MigrationManager {
       throw new Error(`Invalid migration filename format: ${filename}`);
     }
 
-    const [, id, name] = match;
+    const id = match[1];
+    const name = match[2];
+    if (!id || !name) {
+      throw new Error(`Invalid migration filename format: ${filename}`);
+    }
     
     // Split content into up and down migrations
     const sections = content.split('-- DOWN');
@@ -93,8 +97,13 @@ export class MigrationManager {
       throw new Error(`Migration ${filename} must contain -- UP and -- DOWN sections`);
     }
 
-    const up = sections[0].replace('-- UP', '').trim();
-    const down = sections[1].trim();
+    const upSection = sections[0];
+    const downSection = sections[1];
+    if (!upSection || !downSection) {
+      throw new Error(`Migration ${filename} must contain both -- UP and -- DOWN sections`);
+    }
+    const up = upSection.replace('-- UP', '').trim();
+    const down = downSection.trim();
     const up_checksum = crypto.createHash('sha256').update(up, 'utf8').digest('hex');
 
     return {

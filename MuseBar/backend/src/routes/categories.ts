@@ -71,7 +71,7 @@ router.get('/:id', readCatalog, validateParams([paramValidations.id]), asyncHand
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id ?? '', 10);
     const category = await CategoryModel.getById(id, establishmentId);
     if (!category) return res.status(404).json({ error: 'Category not found' });
     res.json(category);
@@ -108,7 +108,7 @@ router.put('/:id', menuWrite, validateParams([paramValidations.id]), asyncHandle
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id ?? '', 10);
     const { name, default_tax_rate, color, is_active } = req.body;
     const category = await CategoryModel.update(
       id,
@@ -140,7 +140,7 @@ router.delete('/:id', menuWrite, validateParams([paramValidations.id]), asyncHan
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id ?? '', 10);
     const result = await CategoryModel.delete(id, establishmentId);
     if (!result.deleted) return res.status(404).json({ error: 'Category not found' });
     await logAuditOrThrow({
@@ -167,7 +167,7 @@ router.post('/:id/restore', menuWrite, validateParams([paramValidations.id]), as
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id ?? '', 10);
     const restored = await CategoryModel.restore(id, establishmentId);
     if (!restored) return res.status(404).json({ error: 'Category not found or already active' });
     await logAuditOrThrow({
