@@ -13,6 +13,7 @@ import (
 	"musebar-pos/internal/repository"
 	"musebar-pos/internal/validation"
 	"musebar-pos/internal/repository/postgres"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -281,10 +282,21 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Logout revokes the refresh token and clears cookie
+// Logout revokes the refresh token, blocks the JWT, and clears cookie
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	// Revoke refresh token
 	if cookie, err := r.Cookie("musebar_refresh_token"); err == nil {
 		h.refreshRepo.RevokeByRawToken(r.Context(), cookie.Value, "LOGOUT")
+	}
+
+	// Add JWT to blocklist
+	if rawToken, ok := r.Context().Value("raw_token").(string); ok && rawToken != "" {
+		if db, ok := r.Context().Value("db").(*pgxpool.Pool); ok && db != nil {
+			userID, _ := r.Context().Value("user_id").(int64)
+			blocklistRepo := postgres.NewTokenBlocklistRepository(db)
+			// Token expires when JWT expires (15min from issue)
+			blocklistRepo.RevokeToken(r.Context(), rawToken, userID, "LOGOUT", nil)
+		}
 	}
 
 	// Clear cookie

@@ -7,9 +7,10 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"musebar-pos/internal/repository/postgres"
 )
 
-// RequireAuth middleware validates JWT token and resolves schema from DB
+// RequireAuth middleware validates JWT token and checks blocklist
 func RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
@@ -24,7 +25,8 @@ func RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		claims, err := ValidateToken(parts[1])
+		rawToken := parts[1]
+		claims, err := ValidateToken(rawToken)
 		if err != nil {
 			if err == ErrExpiredToken {
 				http.Error(w, "Token expired", http.StatusUnauthorized)
@@ -34,6 +36,16 @@ func RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
+		// Check token blocklist if DB is available
+		if db, ok := r.Context().Value("db").(*pgxpool.Pool); ok && db != nil {
+			blocklistRepo := postgres.NewTokenBlocklistRepository(db)
+			revoked, err := blocklistRepo.IsRevoked(r.Context(), rawToken, claims.UserID, claims.IssuedAt.Unix())
+			if err == nil && revoked {
+				http.Error(w, "Token has been revoked", http.StatusUnauthorized)
+				return
+			}
+		}
+
 		// Resolve schema_name from establishments table
 		schemaName, err := resolveSchemaName(r.Context(), claims.EstablishmentID)
 		if err != nil {
@@ -41,11 +53,14 @@ func RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), "user_id", claims.UserID)
+		// Store raw token in context for logout use
+		ctx := context.WithValue(r.Context(), "raw_token", rawToken)
+		ctx = context.WithValue(ctx, "user_id", claims.UserID)
 		ctx = context.WithValue(ctx, "email", claims.Email)
 		ctx = context.WithValue(ctx, "role", claims.Role)
 		ctx = context.WithValue(ctx, "establishment_id", claims.EstablishmentID)
 		ctx = context.WithValue(ctx, "schema_name", schemaName)
+		ctx = context.WithValue(ctx, "token_iat", claims.IssuedAt.Unix())
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}
@@ -55,7 +70,6 @@ func RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 func resolveSchemaName(ctx context.Context, establishmentID string) (string, error) {
 	db, ok := ctx.Value("db").(*pgxpool.Pool)
 	if !ok || db == nil {
-		// Fallback for tests or when db not in context
 		return "establishment_test_001", nil
 	}
 
