@@ -775,6 +775,54 @@ router.post('/support/impersonation/start', requireAuth, requireAdmin, asyncHand
     throw new ValidationError('reason is required (minimum 5 characters)');
   }
 
+  if (isAdminTwoFactorEnforced()) {
+    const mfaState = await UserModel.getMfaTotpState(actorUserId);
+    if (!mfaState?.mfa_totp_enabled || !mfaState.mfa_totp_secret) {
+      await logAuditOrThrow({
+        user_id: String(actorUserId),
+        action_type: 'SUPPORT_IMPERSONATION_BLOCKED',
+        action_details: {
+          reason: 'ADMIN_2FA_SETUP_REQUIRED',
+          establishment_id,
+        },
+        ip_address: ip,
+        user_agent: userAgent,
+      }, 'SUPPORT_IMPERSONATION_BLOCKED_ADMIN_2FA_SETUP_REQUIRED');
+      throw new AppError(
+        'Two-factor authentication setup is required for support impersonation',
+        403,
+        'SUPPORT_IMPERSONATION_2FA_SETUP_REQUIRED'
+      );
+    }
+
+    const totpCode = typeof req.body?.totpCode === 'string' ? req.body.totpCode.trim() : '';
+    const isValidTotp =
+      totpCode.length > 0 &&
+      speakeasy.totp.verify({
+        secret: mfaState.mfa_totp_secret,
+        encoding: 'base32',
+        token: totpCode,
+        window: 1,
+      });
+    if (!isValidTotp) {
+      await logAuditOrThrow({
+        user_id: String(actorUserId),
+        action_type: 'SUPPORT_IMPERSONATION_BLOCKED',
+        action_details: {
+          reason: 'INVALID_2FA_CODE',
+          establishment_id,
+        },
+        ip_address: ip,
+        user_agent: userAgent,
+      }, 'SUPPORT_IMPERSONATION_BLOCKED_INVALID_2FA_CODE');
+      throw new AppError(
+        'Invalid two-factor authentication code',
+        401,
+        'SUPPORT_IMPERSONATION_INVALID_2FA_CODE'
+      );
+    }
+  }
+
   try {
     const estResult = await pool.query('SELECT id, name FROM establishments WHERE id = $1', [establishment_id]);
     if (estResult.rows.length === 0) {
