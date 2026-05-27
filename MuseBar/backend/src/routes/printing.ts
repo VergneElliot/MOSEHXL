@@ -170,11 +170,11 @@ export async function printClosureBulletinResponse(
 router.get('/receipt/:orderId/preview', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
-    const orderId = parseInt(req.params.orderId, 10);
+    const orderId = parseInt(req.params.orderId ?? '', 10);
     if (!Number.isFinite(orderId) || orderId <= 0) {
       throw new ValidationError('Invalid order id');
     }
-    const type = (req.query.type as string) || 'detailed';
+    const type = typeof req.query.type === 'string' ? req.query.type : 'detailed';
     const receiptData = await buildReceiptDataForOrder(pool, user.establishment_id, user, orderId, type);
     res.json({ receipt_data: receiptData });
   } catch (error: unknown) {
@@ -196,11 +196,11 @@ router.get('/receipt/:orderId/preview', authenticateToken, ensureEstablishment, 
 router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
-    const orderId = parseInt(req.params.orderId, 10);
+    const orderId = parseInt(req.params.orderId ?? '', 10);
     if (!Number.isFinite(orderId) || orderId <= 0) {
       throw new ValidationError('Invalid order id');
     }
-    const type = (req.query.type as string) || 'detailed';
+    const type = typeof req.query.type === 'string' ? req.query.type : 'detailed';
     const { result, receiptData } = await printReceiptResponse(user, orderId, type);
     res.json({ ...result, receipt_data: receiptData });
   } catch (error: unknown) {
@@ -222,7 +222,7 @@ router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, asyncHa
 router.post('/closure/:bulletinId', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
-    const bulletinId = parseInt(req.params.bulletinId, 10);
+    const bulletinId = parseInt(req.params.bulletinId ?? '', 10);
     if (!Number.isFinite(bulletinId) || bulletinId <= 0) {
       throw new ValidationError('Invalid closure bulletin id');
     }
@@ -332,7 +332,7 @@ router.get('/history', authenticateToken, ensureEstablishment, asyncHandler(asyn
     
     res.json({
       history: historyResult.rows,
-      total: parseInt(countResult.rows[0].count),
+      total: parseInt(String(countResult.rows[0]?.count ?? '0'), 10),
       limit,
       offset
     });

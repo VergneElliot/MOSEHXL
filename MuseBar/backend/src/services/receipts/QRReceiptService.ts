@@ -144,18 +144,20 @@ export class QRReceiptService {
       });
       // If not JSON, assume it's a URL
       const urlMatch = qrData.match(/\/receipts\/(\d+)$/);
-      if (urlMatch) {
+      const receiptId = urlMatch?.[1];
+      if (receiptId) {
         return {
           type: 'receipt_url',
-          receiptId: parseInt(urlMatch[1])
+          receiptId: parseInt(receiptId, 10)
         };
       }
 
       const bulletinMatch = qrData.match(/\/closure-bulletins\/(\d+)$/);
-      if (bulletinMatch) {
+      const bulletinId = bulletinMatch?.[1];
+      if (bulletinId) {
         return {
           type: 'bulletin_url',
-          bulletinId: parseInt(bulletinMatch[1])
+          bulletinId: parseInt(bulletinId, 10)
         };
       }
 

@@ -40,8 +40,8 @@ const ensureEstablishment = (req: AuthenticatedRequest, res: Response, next: Nex
 router.post('/api/legal/receipt/:orderId/thermal-print', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
-    const orderId = parseInt(req.params.orderId);
-    const type = (req.query.type as string) || 'detailed';
+    const orderId = parseInt(req.params.orderId ?? '', 10);
+    const type = typeof req.query.type === 'string' ? req.query.type : 'detailed';
     const { result, receiptData } = await printReceiptResponse(user, orderId, type);
     const r = result as { success?: boolean; message?: string; metadata?: Record<string, unknown> };
     res.json({
@@ -65,7 +65,7 @@ router.post('/api/legal/receipt/:orderId/thermal-print', authenticateToken, ensu
 router.post('/api/legal/closure/:bulletinId/thermal-print', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
-    const bulletinId = parseInt(req.params.bulletinId);
+    const bulletinId = parseInt(req.params.bulletinId ?? '', 10);
     const { result } = await printClosureBulletinResponse(user, bulletinId);
     const r = result as { success?: boolean; message?: string; metadata?: Record<string, unknown> };
     res.json({

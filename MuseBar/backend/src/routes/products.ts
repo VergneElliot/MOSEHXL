@@ -70,12 +70,12 @@ router.get('/all', readCatalog, asyncHandler(async (req, res) => {
 router.get(
   '/category/:categoryId',
   readCatalog,
-  validateParams([{ param: 'categoryId', validator: (v: string) => !isNaN(parseInt(v)), message: 'Invalid category ID' }]),
+  validateParams([{ param: 'categoryId', validator: (v: string) => !isNaN(parseInt(v, 10)), message: 'Invalid category ID' }]),
   asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const categoryId = parseInt(req.params.categoryId);
+    const categoryId = parseInt(req.params.categoryId ?? '', 10);
     const products = await ProductModel.getByCategory(categoryId, establishmentId);
     res.json(products);
   } catch {
@@ -89,7 +89,7 @@ router.get('/:id', readCatalog, validateParams([paramValidations.id]), asyncHand
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id ?? '', 10);
     const product = await ProductModel.getById(id, establishmentId);
     if (!product) throw new NotFoundError('Product');
     res.json(product);
@@ -136,7 +136,7 @@ router.put('/:id', menuWrite, validateParams([paramValidations.id]), asyncHandle
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id ?? '', 10);
     const updateData: Record<string, unknown> = {};
     if (req.body.name !== undefined) updateData.name = req.body.name;
     if (req.body.price !== undefined) updateData.price = req.body.price;
@@ -173,7 +173,7 @@ router.delete('/:id', menuWrite, validateParams([paramValidations.id]), asyncHan
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id ?? '', 10);
     const result = await ProductModel.delete(id, establishmentId);
     if (!result.deleted) throw new NotFoundError('Product');
     await logAuditOrThrow({
@@ -204,7 +204,7 @@ router.put('/:id/restore', menuWrite, validateParams([paramValidations.id]), asy
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id ?? '', 10);
     const restored = await ProductModel.restore(id, establishmentId);
     if (!restored) throw new NotFoundError('Product');
     await logAuditOrThrow({

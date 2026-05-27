@@ -92,15 +92,15 @@ export class DashboardDataService {
     `;
 
     const result = await client.query(query);
-    const row = result.rows[0];
+    const row = result.rows[0] ?? {};
 
     return {
-      total: parseInt(row.total),
-      active: parseInt(row.active),
-      pending_setup: parseInt(row.pending_setup),
-      setup_in_progress: parseInt(row.setup_in_progress),
-      suspended: parseInt(row.suspended),
-      cancelled: parseInt(row.cancelled)
+      total: parseInt(String((row as Record<string, unknown>).total ?? '0'), 10),
+      active: parseInt(String((row as Record<string, unknown>).active ?? '0'), 10),
+      pending_setup: parseInt(String((row as Record<string, unknown>).pending_setup ?? '0'), 10),
+      setup_in_progress: parseInt(String((row as Record<string, unknown>).setup_in_progress ?? '0'), 10),
+      suspended: parseInt(String((row as Record<string, unknown>).suspended ?? '0'), 10),
+      cancelled: parseInt(String((row as Record<string, unknown>).cancelled ?? '0'), 10)
     };
   }
 
@@ -118,13 +118,13 @@ export class DashboardDataService {
     `;
 
     const result = await client.query(query);
-    const row = result.rows[0];
+    const row = result.rows[0] ?? {};
 
     return {
-      completed: parseInt(row.completed),
-      in_progress: parseInt(row.in_progress),
-      not_started: parseInt(row.not_started),
-      stalled: parseInt(row.stalled)
+      completed: parseInt(String((row as Record<string, unknown>).completed ?? '0'), 10),
+      in_progress: parseInt(String((row as Record<string, unknown>).in_progress ?? '0'), 10),
+      not_started: parseInt(String((row as Record<string, unknown>).not_started ?? '0'), 10),
+      stalled: parseInt(String((row as Record<string, unknown>).stalled ?? '0'), 10)
     };
   }
 
@@ -158,9 +158,9 @@ export class DashboardDataService {
     );
 
     return {
-      created_today: parseInt(results[0].rows[0].count),
-      status_changes_today: parseInt(results[1].rows[0].count),
-      setup_completions_today: parseInt(results[2].rows[0].count)
+      created_today: parseInt(String(results[0]?.rows[0]?.count ?? '0'), 10),
+      status_changes_today: parseInt(String(results[1]?.rows[0]?.count ?? '0'), 10),
+      setup_completions_today: parseInt(String(results[2]?.rows[0]?.count ?? '0'), 10)
     };
   }
 
@@ -206,9 +206,9 @@ export class DashboardDataService {
     );
 
     return {
-      avg_setup_time_hours: parseFloat(results[0].rows[0].avg_hours) || 0,
-      completion_rate_percentage: parseFloat(results[1].rows[0].completion_rate) || 0,
-      active_establishments_percentage: parseFloat(results[2].rows[0].active_percentage) || 0
+      avg_setup_time_hours: parseFloat(String(results[0]?.rows[0]?.avg_hours ?? '0')) || 0,
+      completion_rate_percentage: parseFloat(String(results[1]?.rows[0]?.completion_rate ?? '0')) || 0,
+      active_establishments_percentage: parseFloat(String(results[2]?.rows[0]?.active_percentage ?? '0')) || 0
     };
   }
 }

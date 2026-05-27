@@ -82,7 +82,7 @@ router.get('/health', (req, res) => {
 // GET /api/establishments/:id - Get establishment details (system admin only)
 router.get('/:id', requireAuth, requireAdmin, validateParams([paramValidations.id]), asyncHandler(async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id ?? '';
     const result = await establishmentService.getEstablishmentById(id);
     res.json(result);
   } catch (error) {
@@ -102,7 +102,7 @@ router.get('/:id', requireAuth, requireAdmin, validateParams([paramValidations.i
 // DELETE /api/establishments/:id - Delete establishment (system admin only)
 router.delete('/:id', requireAuth, requireAdmin, validateParams([paramValidations.id]), asyncHandler(async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id ?? '';
     await establishmentService.deleteEstablishment(id);
     await logSoftwareEventBestEffort({
       establishmentId: id,

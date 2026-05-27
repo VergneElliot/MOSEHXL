@@ -14,9 +14,9 @@ const config = getEnvironmentConfig();
 const logger = Logger.getInstance(config);
 
 // GET /api/setup/validate/:token - Validate invitation token
-router.get('/validate/:token', validateParams([{ param: 'token', validator: (v: string)=> typeof v === 'string' && v.length > 0 }]), asyncHandler(async (req, res) => {
+router.get('/validate/:token', validateParams([{ param: 'token', validator: (v: string) => v.length > 0 }]), asyncHandler(async (req, res) => {
   try {
-    const { token } = req.params;
+    const token = req.params.token ?? '';
     const setupService = SetupService.getInstance();
     const result = await setupService.validateInvitation(token);
 
@@ -40,9 +40,9 @@ router.get('/validate/:token', validateParams([{ param: 'token', validator: (v: 
 }));
 
 // GET /api/setup/status/:token - Check setup completion status
-router.get('/status/:token', validateParams([{ param: 'token', validator: (v: string)=> typeof v === 'string' && v.length > 0 }]), asyncHandler(async (req, res) => {
+router.get('/status/:token', validateParams([{ param: 'token', validator: (v: string) => v.length > 0 }]), asyncHandler(async (req, res) => {
   try {
-    const { token } = req.params;
+    const token = req.params.token ?? '';
     const setupService = SetupService.getInstance();
     const result = await setupService.checkSetupStatus(token);
 

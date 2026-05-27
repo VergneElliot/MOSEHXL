@@ -44,7 +44,8 @@ export class InMemoryRateLimitStore implements IRateLimitStoreAdapter {
   async cleanup(): Promise<void> {
     const now = Date.now();
     for (const key of Object.keys(this.store)) {
-      if (this.store[key].resetTime < now) {
+      const entry = this.store[key];
+      if (entry && entry.resetTime < now) {
         delete this.store[key];
       }
     }

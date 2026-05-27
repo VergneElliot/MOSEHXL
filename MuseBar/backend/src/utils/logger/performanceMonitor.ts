@@ -157,6 +157,9 @@ export class PerformanceMonitor {
       }
       
       const breakdown = operationBreakdown[metric.operation];
+      if (!breakdown) {
+        return;
+      }
       breakdown.count++;
       breakdown.totalDuration += metric.duration;
       breakdown.averageDuration = breakdown.totalDuration / breakdown.count;

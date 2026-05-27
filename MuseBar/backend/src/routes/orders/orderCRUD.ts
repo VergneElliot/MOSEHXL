@@ -71,7 +71,7 @@ router.get('/:id', validateParams([paramValidations.id]), asyncHandler(async (re
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id ?? '', 10);
     const order = await OrderModel.getById(id, establishmentId);
     if (!order) return res.status(404).json({ error: 'Order not found' });
     const items = await OrderItemModel.getByOrderId(id, establishmentId);
@@ -139,7 +139,7 @@ router.put('/:id', requireEstablishmentAdmin, validateParams([paramValidations.i
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id ?? '', 10);
     const order = await OrderModel.getById(id, establishmentId);
     if (!order) return res.status(404).json({ error: 'Order not found' });
     const updatedOrder = await OrderModel.update(id, req.body, establishmentId);
@@ -163,7 +163,7 @@ router.delete('/:id', requireEstablishmentAdmin, validateParams([paramValidation
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id ?? '', 10);
     const order = await OrderModel.getById(id, establishmentId);
     if (!order) return res.status(404).json({ error: 'Order not found' });
     if (order.status === 'completed') {

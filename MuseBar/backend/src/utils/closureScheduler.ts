@@ -133,7 +133,7 @@ export class ClosureScheduler {
       const timezone = settings.timezone || DEFAULT_APP_TIMEZONE;
 
       const nowTz = moment.tz(now, timezone);
-      const closureHour = parseInt(closureTime.split(':')[0], 10);
+      const closureHour = parseInt(closureTime.split(':')[0] ?? '0', 10);
       let businessDay = nowTz.clone();
       if (closureHour < 12 && nowTz.hour() < closureHour) {
         businessDay = businessDay.subtract(1, 'day');

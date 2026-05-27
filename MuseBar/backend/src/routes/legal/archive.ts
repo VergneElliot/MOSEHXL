@@ -92,7 +92,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const archiveId = parseInt(req.params.id);
+    const archiveId = parseInt(req.params.id ?? '', 10);
     if (isNaN(archiveId)) {
       throw new ValidationError('Invalid archive ID');
     }
@@ -125,7 +125,7 @@ router.post('/:id/verify', asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const archiveId = parseInt(req.params.id);
+    const archiveId = parseInt(req.params.id ?? '', 10);
     if (isNaN(archiveId)) {
       throw new ValidationError('Invalid archive ID');
     }
@@ -159,7 +159,7 @@ router.get('/:id/download', asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const archiveId = parseInt(req.params.id);
+    const archiveId = parseInt(req.params.id ?? '', 10);
     if (isNaN(archiveId)) {
       throw new ValidationError('Invalid archive ID');
     }
@@ -189,7 +189,7 @@ router.post('/:id/export', asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const archiveId = parseInt(req.params.id);
+    const archiveId = parseInt(req.params.id ?? '', 10);
     if (isNaN(archiveId)) {
       throw new ValidationError('Invalid archive ID');
     }

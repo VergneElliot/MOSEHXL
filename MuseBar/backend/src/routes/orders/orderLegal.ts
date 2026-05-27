@@ -101,7 +101,7 @@ router.get('/compliance/:orderId', requireAuth, requirePermission(P.access_compl
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const orderId = parseInt(req.params.orderId);
+    const orderId = parseInt(req.params.orderId ?? '', 10);
     if (isNaN(orderId)) {
       return res.status(400).json({ error: 'Invalid order ID' });
     }
@@ -133,7 +133,7 @@ router.get('/journal/:orderId', requireAuth, requirePermission(P.access_complian
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const orderId = parseInt(req.params.orderId);
+    const orderId = parseInt(req.params.orderId ?? '', 10);
     if (isNaN(orderId)) {
       return res.status(400).json({ error: 'Invalid order ID' });
     }

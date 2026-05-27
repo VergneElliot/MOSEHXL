@@ -302,10 +302,10 @@ router.get('/pending-invitations', requireAuth, canManageUsers, asyncHandler(asy
  * Cancel invitation (Establishment Admin only)
  */
 router.delete('/cancel-invitation/:invitationId', requireAuth, canManageUsers, validateParams([
-  { param: 'invitationId', validator: (v: string) => typeof v === 'string' && v.length > 0 }
+  { param: 'invitationId', validator: (v: string) => v.length > 0 }
 ]), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { invitationId } = req.params;
+    const invitationId = req.params.invitationId ?? '';
     const user = req.user!;
 
     const success = await userInvitationService.cancelInvitation(invitationId, String(user.id));
@@ -347,10 +347,10 @@ router.delete('/cancel-invitation/:invitationId', requireAuth, canManageUsers, v
  * Resend invitation (Establishment Admin only)
  */
 router.post('/resend-invitation/:invitationId', requireAuth, canManageUsers, validateParams([
-  { param: 'invitationId', validator: (v: string) => typeof v === 'string' && v.length > 0 }
+  { param: 'invitationId', validator: (v: string) => v.length > 0 }
 ]), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { invitationId } = req.params;
+    const invitationId = req.params.invitationId ?? '';
     const user = req.user!;
 
     const result = { success: true, trackingId: 'placeholder' };

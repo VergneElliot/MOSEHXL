@@ -105,7 +105,7 @@ router.get('/health', asyncHandler(async (req: Request, res: Response) => {
  */
 router.get('/validate/:token', asyncHandler(async (req: Request, res: Response) => {
   try {
-    const { token } = req.params;
+    const token = req.params.token ?? '';
     
     // Initialize service if not already done
     if (!establishmentAccountService) {
