@@ -8,7 +8,7 @@ import LegalJournalModel from '../../models/legalJournal';
 import { Logger } from '../../utils/logger';
 import { JournalQueries } from '../../models/legalJournal';
 import { getEstablishmentId, requireAuth, requireAdmin, requirePermission } from '../auth';
-import { AppError, asyncHandler } from '../../middleware/errorHandler';
+import { AppError, asyncHandler, AuthorizationError } from '../../middleware/errorHandler';
 import { P } from '../../permissions/registry';
 
 const router = express.Router();
@@ -117,7 +117,7 @@ router.post('/reset', requireAdmin, asyncHandler(async (req, res) => {
   } catch (error: unknown) {
     const e = error as { statusCode?: number; message?: string };
     if (e?.statusCode === 403) {
-      return res.status(403).json({ error: e.message || 'Journal reset not allowed in production' });
+      throw new AuthorizationError(e.message || 'Journal reset not allowed in production');
     }
     logger.error(
       'Error resetting journal',

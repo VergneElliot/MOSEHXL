@@ -10,7 +10,7 @@ import { ArchiveService } from '../../models/archiveService';
 import { P } from '../../permissions/registry';
 import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
 import { Logger } from '../../utils/logger';
-import { AppError, asyncHandler } from '../../middleware/errorHandler';
+import { AppError, asyncHandler, NotFoundError, ValidationError } from '../../middleware/errorHandler';
 
 const router = express.Router();
 const logger = Logger.getInstance();
@@ -29,7 +29,7 @@ router.post('/create', asyncHandler(async (req, res) => {
     const { archiveType, startDate, endDate } = req.body;
     
     if (!archiveType || !startDate || !endDate) {
-      return res.status(400).json({ error: 'Archive type, start date, and end date are required' });
+      throw new ValidationError('Archive type, start date, and end date are required');
     }
     
     const archive = await ArchiveService.exportData({
@@ -47,6 +47,7 @@ router.post('/create', asyncHandler(async (req, res) => {
       compliance_note: 'Archive created for regulatory retention requirements'
     });
   } catch (error: unknown) {
+    if (error instanceof AppError) throw error;
     logger.error(
       'Error creating archive',
       error instanceof Error ? error : new Error(String(error)),
@@ -93,12 +94,12 @@ router.get('/:id', asyncHandler(async (req, res) => {
   try {
     const archiveId = parseInt(req.params.id);
     if (isNaN(archiveId)) {
-      return res.status(400).json({ error: 'Invalid archive ID' });
+      throw new ValidationError('Invalid archive ID');
     }
     
     const archive = await ArchiveService.getArchiveExportById(archiveId, establishmentId);
     if (!archive) {
-      return res.status(404).json({ error: 'Archive not found' });
+      throw new NotFoundError('Archive');
     }
     
     res.json({
@@ -106,6 +107,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
       compliance_note: 'Archive details for regulatory compliance'
     });
   } catch (error: unknown) {
+    if (error instanceof AppError) throw error;
     logger.error(
       'Error fetching archive details',
       error instanceof Error ? error : new Error(String(error)),
@@ -125,12 +127,12 @@ router.post('/:id/verify', asyncHandler(async (req, res) => {
   try {
     const archiveId = parseInt(req.params.id);
     if (isNaN(archiveId)) {
-      return res.status(400).json({ error: 'Invalid archive ID' });
+      throw new ValidationError('Invalid archive ID');
     }
 
     const verification = await ArchiveService.verifyArchiveExport(archiveId, establishmentId);
     if (!verification.isValid && verification.errors.includes('Archive export not found')) {
-      return res.status(404).json({ error: 'Archive not found' });
+      throw new NotFoundError('Archive');
     }
 
     res.json({
@@ -139,6 +141,7 @@ router.post('/:id/verify', asyncHandler(async (req, res) => {
       compliance_note: 'Archive integrity and signature verification result'
     });
   } catch (error: unknown) {
+    if (error instanceof AppError) throw error;
     logger.error(
       'Error verifying archive',
       error instanceof Error ? error : new Error(String(error)),
@@ -158,16 +161,17 @@ router.get('/:id/download', asyncHandler(async (req, res) => {
   try {
     const archiveId = parseInt(req.params.id);
     if (isNaN(archiveId)) {
-      return res.status(400).json({ error: 'Invalid archive ID' });
+      throw new ValidationError('Invalid archive ID');
     }
 
     const download = await ArchiveService.downloadArchiveExport(archiveId, establishmentId);
     if (!download) {
-      return res.status(404).json({ error: 'Archive file not found' });
+      throw new NotFoundError('Archive file');
     }
 
     return res.download(download.filePath, download.fileName);
   } catch (error: unknown) {
+    if (error instanceof AppError) throw error;
     logger.error(
       'Error downloading archive',
       error instanceof Error ? error : new Error(String(error)),
@@ -187,17 +191,18 @@ router.post('/:id/export', asyncHandler(async (req, res) => {
   try {
     const archiveId = parseInt(req.params.id);
     if (isNaN(archiveId)) {
-      return res.status(400).json({ error: 'Invalid archive ID' });
+      throw new ValidationError('Invalid archive ID');
     }
 
     const download = await ArchiveService.downloadArchiveExport(archiveId, establishmentId);
     if (!download) {
-      return res.status(404).json({ error: 'Archive file not found' });
+      throw new NotFoundError('Archive file');
     }
 
     res.setHeader('Deprecation', 'true');
     return res.download(download.filePath, download.fileName);
   } catch (error: unknown) {
+    if (error instanceof AppError) throw error;
     logger.error(
       'Error exporting archive',
       error instanceof Error ? error : new Error(String(error)),

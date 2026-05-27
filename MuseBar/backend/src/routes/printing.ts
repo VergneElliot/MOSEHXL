@@ -21,7 +21,7 @@ import {
 } from '../printing/printDataRepo';
 import { createPrintingServiceManager } from '../printing/printingServiceManager';
 import { logSoftwareEventBestEffort } from '../services/legal/softwareEventJournal';
-import { AppError, asyncHandler } from '../middleware/errorHandler';
+import { AppError, asyncHandler, NotFoundError, ValidationError } from '../middleware/errorHandler';
 
 const router = Router();
 
@@ -64,8 +64,9 @@ async function getPrintingService(establishmentId: string): Promise<IPrintingSer
 const ensureEstablishment = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   const user = getPrintingUser(req);
   if (!user) {
-    return res.status(400).json({ error: 'Establishment context required' });
+    throw new ValidationError('Establishment context required');
   }
+  void res;
   next();
 };
 
@@ -171,15 +172,16 @@ router.get('/receipt/:orderId/preview', authenticateToken, ensureEstablishment, 
     const user = getPrintingUser(req)!;
     const orderId = parseInt(req.params.orderId, 10);
     if (!Number.isFinite(orderId) || orderId <= 0) {
-      return res.status(400).json({ error: 'Invalid order id' });
+      throw new ValidationError('Invalid order id');
     }
     const type = (req.query.type as string) || 'detailed';
     const receiptData = await buildReceiptDataForOrder(pool, user.establishment_id, user, orderId, type);
     res.json({ receipt_data: receiptData });
   } catch (error: unknown) {
+    if (error instanceof AppError) throw error;
     const e = error as { statusCode?: number; message?: string };
     if (e?.statusCode === 404) {
-      return res.status(404).json({ error: 'Receipt not found' });
+      throw new NotFoundError('Receipt');
     }
     getLogger().error('Error generating receipt preview', error instanceof Error ? error : undefined);
     throw new AppError(
@@ -196,15 +198,16 @@ router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, asyncHa
     const user = getPrintingUser(req)!;
     const orderId = parseInt(req.params.orderId, 10);
     if (!Number.isFinite(orderId) || orderId <= 0) {
-      return res.status(400).json({ error: 'Invalid order id' });
+      throw new ValidationError('Invalid order id');
     }
     const type = (req.query.type as string) || 'detailed';
     const { result, receiptData } = await printReceiptResponse(user, orderId, type);
     res.json({ ...result, receipt_data: receiptData });
   } catch (error: unknown) {
+    if (error instanceof AppError) throw error;
     const e = error as { statusCode?: number; message?: string };
     if (e?.statusCode === 404) {
-      return res.status(404).json({ error: 'Receipt not found' });
+      throw new NotFoundError('Receipt');
     }
     getLogger().error('Error printing receipt', error instanceof Error ? error : undefined);
     throw new AppError(
@@ -221,14 +224,15 @@ router.post('/closure/:bulletinId', authenticateToken, ensureEstablishment, asyn
     const user = getPrintingUser(req)!;
     const bulletinId = parseInt(req.params.bulletinId, 10);
     if (!Number.isFinite(bulletinId) || bulletinId <= 0) {
-      return res.status(400).json({ error: 'Invalid closure bulletin id' });
+      throw new ValidationError('Invalid closure bulletin id');
     }
     const { result, bulletinData } = await printClosureBulletinResponse(user, bulletinId);
     res.json({ ...result, bulletin_data: bulletinData });
   } catch (error: unknown) {
+    if (error instanceof AppError) throw error;
     const e = error as { statusCode?: number; message?: string };
     if (e?.statusCode === 404) {
-      return res.status(404).json({ error: 'Closure bulletin not found' });
+      throw new NotFoundError('Closure bulletin');
     }
     getLogger().error('Error printing closure bulletin', error instanceof Error ? error : undefined);
     throw new AppError(
@@ -266,7 +270,7 @@ router.post('/configuration', authenticateToken, ensureEstablishment, asyncHandl
     const { provider, config: bodyConfig } = req.body;
 
     if (!provider) {
-      return res.status(400).json({ error: 'Provider is required' });
+      throw new ValidationError('Provider is required');
     }
 
     const { configuration } = await savePrintingConfiguration(
@@ -293,7 +297,7 @@ router.post('/configuration', authenticateToken, ensureEstablishment, asyncHandl
   } catch (error) {
     const e = error as { statusCode?: number; message?: string };
     if (e?.statusCode === 400) {
-      return res.status(400).json({ error: e.message });
+      throw new ValidationError(e.message ?? 'Invalid printing configuration');
     }
     getLogger().error('Error updating printing configuration', error instanceof Error ? error : undefined);
     throw new AppError(
