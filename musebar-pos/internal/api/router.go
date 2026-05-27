@@ -22,6 +22,8 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	userRepo := postgres.NewUserRepository(db)
 	refreshRepo := postgres.NewRefreshTokenRepository(db)
 
+	healthHandler := handlers.NewHealthHandler(db)
+
 	// Services
 	journalService := legal.NewJournalService(legalRepo)
 	closureService := legal.NewClosureService(legalRepo, orderRepo)
@@ -35,10 +37,9 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	closureHandler := handlers.NewClosureHandler(closureService)
 
 	// Public
-	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"ok","service":"musebar-pos","version":"1.0.0"}`))
-	})
+	mux.HandleFunc("GET /api/health", healthHandler.Health)
+	mux.HandleFunc("GET /api/health/ready", healthHandler.Ready)
+	mux.HandleFunc("GET /api/health/live", healthHandler.Live)
 
 	// Auth endpoints
 	mux.HandleFunc("POST /api/auth/login", authHandler.Login)
