@@ -13,8 +13,10 @@ import InvitationAcceptance from './components/InvitationAcceptance';
 import { AppHeader } from './components/common/AppHeader';
 import { BusinessSetupWizard } from './components/Setup';
 import EstablishmentAccountCreation from './components/EstablishmentAccountCreation';
+import { useTranslation } from 'react-i18next';
 
 function App() {
+  const { t } = useTranslation('common');
   const {
     user,
     token,
@@ -78,7 +80,7 @@ function App() {
   if (!isSystemAdmin && isLoading) {
     return (
       <Container maxWidth="xl" sx={{ mt: 2 }}>
-        <div>Loading...</div>
+        <div>{t('loading')}</div>
       </Container>
     );
   }
@@ -87,7 +89,7 @@ function App() {
   if (!isSystemAdmin && error) {
     return (
       <Container maxWidth="xl" sx={{ mt: 2 }}>
-        <div>Error: {error}</div>
+        <div>{t('errorPrefix')} {error}</div>
       </Container>
     );
   }

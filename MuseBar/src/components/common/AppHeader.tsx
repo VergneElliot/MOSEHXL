@@ -2,6 +2,8 @@ import React from 'react';
 import { AppBar, Toolbar, Typography, Box, Chip, Button } from '@mui/material';
 import { Restaurant as RestaurantIcon } from '@mui/icons-material';
 import { User } from '../../types/auth';
+import { useTranslation } from 'react-i18next';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 interface AppHeaderProps {
   isHappyHourActive: boolean;
@@ -16,25 +18,28 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onLogout,
   user,
 }) => {
+  const { t } = useTranslation('common');
+
   return (
     <AppBar position="static" sx={{ backgroundColor: '#1a1a1a' }}>
       <Toolbar>
         <RestaurantIcon sx={{ mr: 2 }} />
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-          MuseBar POS
+          {t('appTitle')}
         </Typography>
         
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <LanguageSwitcher />
           {isHappyHourActive ? (
             <Chip
-              label="Happy Hour Active!"
+              label={t('happyHour.active')}
               color="success"
               variant="filled"
               sx={{ fontWeight: 'bold' }}
             />
           ) : (
             <Chip
-              label={`Happy Hour in ${timeUntilHappyHour}`}
+              label={t('happyHour.in', { time: timeUntilHappyHour })}
               color="warning"
               variant="outlined"
             />
@@ -50,7 +55,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 onClick={onLogout}
                 sx={{ textTransform: 'none' }}
               >
-                Logout
+                {t('auth.logout')}
               </Button>
             </Box>
           )}
