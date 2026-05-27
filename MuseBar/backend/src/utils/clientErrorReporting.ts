@@ -10,6 +10,8 @@ const SENSITIVE_KEY_FRAGMENTS = [
   'cookie',
   'api_key',
   'apikey',
+  'refresh_token',
+  'invitation_token',
   'client_error_key',
   'setup_secret',
   'creditcard',
