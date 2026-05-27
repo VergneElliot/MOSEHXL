@@ -1,6 +1,7 @@
 import * as nodemailer from 'nodemailer';
 import { ReceiptData, ClosureBulletinData } from '../printing/types';
 import * as QRCode from 'qrcode';
+import { formatEuroAmount } from '../../utils/formatCurrency';
 
 interface EmailConfig {
   from: string;
@@ -94,8 +95,8 @@ export class EmailReceiptService {
             <tr>
               <td>${item.product_name}</td>
               <td class="center">${item.quantity}</td>
-              <td class="right">${item.unit_price.toFixed(2)} €</td>
-              <td class="right">${item.total_price.toFixed(2)} €</td>
+              <td class="right">${formatEuroAmount(item.unit_price)}</td>
+              <td class="right">${formatEuroAmount(item.total_price)}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -109,11 +110,11 @@ export class EmailReceiptService {
           ${data.vat_breakdown.map(vat => `
             <tr>
               <td>Base HT (${vat.rate}%):</td>
-              <td class="right">${vat.subtotal_ht.toFixed(2)} €</td>
+              <td class="right">${formatEuroAmount(vat.subtotal_ht)}</td>
             </tr>
             <tr>
               <td>TVA ${vat.rate}%:</td>
-              <td class="right">${vat.vat.toFixed(2)} €</td>
+              <td class="right">${formatEuroAmount(vat.vat)}</td>
             </tr>
           `).join('')}
           <tr class="separator">
@@ -121,11 +122,11 @@ export class EmailReceiptService {
           </tr>
           <tr>
             <td><strong>TVA Totale:</strong></td>
-            <td class="right"><strong>${data.total_tax.toFixed(2)} €</strong></td>
+            <td class="right"><strong>${formatEuroAmount(data.total_tax)}</strong></td>
           </tr>
           <tr>
             <td><strong>Sous-total HT:</strong></td>
-            <td class="right"><strong>${(data.total_amount - data.total_tax).toFixed(2)} €</strong></td>
+            <td class="right"><strong>${formatEuroAmount(data.total_amount - data.total_tax)}</strong></td>
           </tr>
         </table>
       </div>
@@ -259,11 +260,11 @@ export class EmailReceiptService {
           ${itemsHTML}
           ${vatHTML}
           
-          ${data.tips && data.tips > 0 ? `<p><strong>Pourboire:</strong> ${data.tips.toFixed(2)} €</p>` : ''}
-          ${data.change && data.change > 0 ? `<p><strong>Monnaie:</strong> ${data.change.toFixed(2)} €</p>` : ''}
+          ${data.tips && data.tips > 0 ? `<p><strong>Pourboire:</strong> ${formatEuroAmount(data.tips)}</p>` : ''}
+          ${data.change && data.change > 0 ? `<p><strong>Monnaie:</strong> ${formatEuroAmount(data.change)}</p>` : ''}
           
           <div class="total-section">
-            <h2>TOTAL TTC: ${data.total_amount.toFixed(2)} €</h2>
+            <h2>TOTAL TTC: ${formatEuroAmount(data.total_amount)}</h2>
           </div>
           
           ${data.compliance_info ? `
@@ -393,15 +394,15 @@ export class EmailReceiptService {
               </tr>
               <tr>
                 <td>Montant total TTC:</td>
-                <td class="value">${data.total_amount.toFixed(2)} EUR</td>
+                <td class="value">${formatEuroAmount(data.total_amount, 'EUR')}</td>
               </tr>
               <tr>
                 <td>Total HT:</td>
-                <td class="value">${htTotalShown.toFixed(2)} EUR</td>
+                <td class="value">${formatEuroAmount(htTotalShown, 'EUR')}</td>
               </tr>
               <tr>
                 <td>Montant total TVA:</td>
-                <td class="value">${vatTotalShown.toFixed(2)} EUR</td>
+                <td class="value">${formatEuroAmount(vatTotalShown, 'EUR')}</td>
               </tr>
             </table>
           </div>
@@ -412,21 +413,21 @@ export class EmailReceiptService {
               ${data.vat_breakdown.vat_10 ? `
                 <tr>
                   <td>Total soumis à TVA 10%:</td>
-                  <td class="value">${(((data.vat_breakdown.vat_10 as { ttc?: number }).ttc ?? (data.vat_breakdown.vat_10.amount + data.vat_breakdown.vat_10.vat)) as number).toFixed(2)} EUR</td>
+                  <td class="value">${formatEuroAmount((((data.vat_breakdown.vat_10 as { ttc?: number }).ttc ?? (data.vat_breakdown.vat_10.amount + data.vat_breakdown.vat_10.vat)) as number), 'EUR')}</td>
                 </tr>
                 <tr>
                   <td>Montant TVA 10%:</td>
-                  <td class="value">${vat10Shown.toFixed(2)} EUR</td>
+                  <td class="value">${formatEuroAmount(vat10Shown, 'EUR')}</td>
                 </tr>
               ` : ''}
               ${data.vat_breakdown.vat_20 ? `
                 <tr>
                   <td>Total soumis à TVA 20%:</td>
-                  <td class="value">${(((data.vat_breakdown.vat_20 as { ttc?: number }).ttc ?? (data.vat_breakdown.vat_20.amount + data.vat_breakdown.vat_20.vat)) as number).toFixed(2)} EUR</td>
+                  <td class="value">${formatEuroAmount((((data.vat_breakdown.vat_20 as { ttc?: number }).ttc ?? (data.vat_breakdown.vat_20.amount + data.vat_breakdown.vat_20.vat)) as number), 'EUR')}</td>
                 </tr>
                 <tr>
                   <td>Montant TVA 20%:</td>
-                  <td class="value">${vat20Shown.toFixed(2)} EUR</td>
+                  <td class="value">${formatEuroAmount(vat20Shown, 'EUR')}</td>
                 </tr>
               ` : ''}
             </table>
@@ -438,7 +439,7 @@ export class EmailReceiptService {
               ${Object.entries(data.payment_methods_breakdown).map(([method, amount]) => `
                 <tr>
                   <td>${this.formatPaymentMethod(method)}:</td>
-                  <td class="value">${amount.toFixed(2)} EUR</td>
+                  <td class="value">${formatEuroAmount(amount, 'EUR')}</td>
                 </tr>
               `).join('')}
             </table>
@@ -446,13 +447,13 @@ export class EmailReceiptService {
           
           ${data.tips_total && data.tips_total > 0 ? `
             <div class="section">
-              <p><strong>Total des pourboires:</strong> ${data.tips_total.toFixed(2)} EUR</p>
+              <p><strong>Total des pourboires:</strong> ${formatEuroAmount(data.tips_total, 'EUR')}</p>
             </div>
           ` : ''}
           
           ${data.change_total && data.change_total > 0 ? `
             <div class="section">
-              <p><strong>Total de la monnaie rendue:</strong> ${data.change_total.toFixed(2)} EUR</p>
+              <p><strong>Total de la monnaie rendue:</strong> ${formatEuroAmount(data.change_total, 'EUR')}</p>
             </div>
           ` : ''}
           
