@@ -245,7 +245,7 @@ router.post('/accept-invitation', validateBody([
       'Failed to accept invitation',
       { 
         error: error as Error,
-        token: req.body.token 
+        token_present: typeof req.body.token === 'string' && req.body.token.length > 0
       },
       'INVITATION_ROUTES'
     );
