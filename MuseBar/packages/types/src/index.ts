@@ -60,3 +60,28 @@ export interface SubBill {
   status: SubBillStatus;
   created_at: Date;
 }
+
+export interface ProductRecord {
+  id: number | string;
+  name: string;
+  description?: string | null;
+  price: number | string;
+  tax_rate: number | string;
+  category_id: number | string;
+  happy_hour_discount_percent?: number | string | null;
+  happy_hour_discount_fixed?: number | string | null;
+  is_happy_hour_eligible: boolean;
+  is_active?: boolean;
+  created_at: string | Date;
+  updated_at: string | Date;
+}
+
+export interface CategoryRecord {
+  id: number | string;
+  name: string;
+  description?: string | null;
+  color?: string | null;
+  is_active?: boolean;
+  created_at: string | Date;
+  updated_at: string | Date;
+}
