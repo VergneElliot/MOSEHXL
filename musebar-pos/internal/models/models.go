@@ -70,6 +70,8 @@ type Category struct {
 type User struct {
 	ID              int64     `json:"id"`
 	Email           string    `json:"email"`
+	GoogleID        *string   `json:"google_id,omitempty"`
+	AvatarURL       *string   `json:"avatar_url,omitempty"`
 	PasswordHash    string    `json:"-"` // Never send password hash in JSON
 	FirstName       string    `json:"first_name"`
 	LastName        string    `json:"last_name"`
