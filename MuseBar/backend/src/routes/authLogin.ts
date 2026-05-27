@@ -642,6 +642,38 @@ router.post('/refresh', refreshRateLimit, asyncHandler(async (req, res) => {
     if (!userRow) {
       throw new NotFoundError('User');
     }
+    const now = new Date();
+    if (userRow.is_active === false) {
+      await RefreshTokenModel.revokeAllForUser(userId, 'USER_INACTIVE_REFRESH_BLOCK');
+      clearRefreshTokenCookie(res);
+      clearCsrfTokenCookie(res);
+      await logAuditOrThrow({
+        user_id: String(userId),
+        action_type: 'TOKEN_REFRESH_BLOCKED',
+        action_details: { reason: 'USER_INACTIVE' },
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+      }, 'TOKEN_REFRESH_BLOCKED_USER_INACTIVE');
+      throw new AuthorizationError('Account is inactive');
+    }
+
+    const lockedUntil = userRow.locked_until ? new Date(userRow.locked_until) : null;
+    if (lockedUntil && lockedUntil.getTime() > now.getTime()) {
+      await RefreshTokenModel.revokeAllForUser(userId, 'ACCOUNT_LOCKED_REFRESH_BLOCK');
+      clearRefreshTokenCookie(res);
+      clearCsrfTokenCookie(res);
+      await logAuditOrThrow({
+        user_id: String(userId),
+        action_type: 'TOKEN_REFRESH_BLOCKED',
+        action_details: {
+          reason: 'ACCOUNT_LOCKED',
+          locked_until: lockedUntil.toISOString(),
+        },
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+      }, 'TOKEN_REFRESH_BLOCKED_ACCOUNT_LOCKED');
+      throw new AuthorizationError('Account is locked');
+    }
     const is_admin: boolean = d.is_admin;
     const establishment_id: string | null = d.establishment_id || null;
     const role: CanonicalAuthRole = deriveCanonicalRole({
