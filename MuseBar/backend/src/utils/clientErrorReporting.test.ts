@@ -30,8 +30,10 @@ describe('client error reporting utilities', () => {
       message: 'Oops',
       context: {
         token: 'abc123',
+        refresh_token: 'refresh-abc',
         nested: {
           password: 'hunter2',
+          invitation_token: 'invite-secret',
           keep: 'value',
         },
       },
@@ -44,7 +46,9 @@ describe('client error reporting utilities', () => {
     expect(sanitized.errorId).toBe('client-err-42');
     expect(sanitized.message).toBe('Oops');
     expect((sanitized.context as Record<string, unknown>).token).toBe('[REDACTED]');
+    expect((sanitized.context as Record<string, unknown>).refresh_token).toBe('[REDACTED]');
     expect(((sanitized.context as Record<string, unknown>).nested as Record<string, unknown>).password).toBe('[REDACTED]');
+    expect(((sanitized.context as Record<string, unknown>).nested as Record<string, unknown>).invitation_token).toBe('[REDACTED]');
     expect(((sanitized.context as Record<string, unknown>).nested as Record<string, unknown>).keep).toBe('value');
     expect((sanitized.tags as Record<string, unknown>).setup_secret).toBe('[REDACTED]');
     expect((sanitized.tags as Record<string, unknown>).feature).toBe('checkout');

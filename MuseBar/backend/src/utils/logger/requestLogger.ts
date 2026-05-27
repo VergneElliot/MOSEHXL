@@ -111,6 +111,7 @@ export class RequestLogger {
       'x-api-key',
       'x-auth-token',
       'x-access-token',
+      'x-refresh-token',
       'x-csrf-token',
       'x-setup-secret',
       'x-client-error-key'
@@ -142,6 +143,8 @@ export class RequestLogger {
       'currentPassword',
       'newPassword',
       'token',
+      'refresh_token',
+      'invitation_token',
       'secret',
       'apiKey',
       'creditCard',
