@@ -66,7 +66,7 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({
     const passwordErrors = validatePassword(value);
     setErrors(prev => ({
       ...prev,
-      password: passwordErrors.length > 0 ? passwordErrors[0] : ''
+      password: passwordErrors[0] ?? ''
     }));
   };
 
@@ -94,7 +94,7 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({
     // Validate passwords
     const passwordErrors = validatePassword(password);
     if (passwordErrors.length > 0) {
-      setErrors({ password: passwordErrors[0] });
+      setErrors({ password: passwordErrors[0] ?? 'Password validation failed' });
       setIsSubmitting(false);
       return;
     }

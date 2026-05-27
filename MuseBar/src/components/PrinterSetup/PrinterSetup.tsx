@@ -467,9 +467,10 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
   ];
 
   if (embedded) {
+    const activeContent = steps[activeStep]?.content;
     return (
       <Box>
-        {steps[activeStep].content()}
+        {activeContent ? activeContent() : null}
       </Box>
     );
   }

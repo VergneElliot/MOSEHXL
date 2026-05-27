@@ -106,7 +106,7 @@ export const useClosureAPI = (
         );
         addBulletin(result.closure ?? (result as unknown as ClosureBulletin));
         setShowCreateDialog(false);
-        setSelectedDate(new Date().toISOString().split('T')[0]);
+        setSelectedDate(new Date().toISOString().split('T')[0] ?? '');
         showSuccess('Bulletin de clôture créé avec succès');
 
         // Refresh today status

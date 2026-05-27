@@ -101,7 +101,7 @@ export const useClosureState = (): [ClosureState, ClosureActions] => {
   const [printBulletin, setPrintBulletin] = useState<ClosureBulletin | null>(null);
 
   // Form state
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0] ?? '');
   const [filterType, setFilterType] = useState<string>('ALL');
   const [selectedClosureType, setSelectedClosureType] = useState<
     'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL'
