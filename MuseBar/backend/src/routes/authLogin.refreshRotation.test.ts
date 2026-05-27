@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   findById: vi.fn(),
   findActiveRefreshToken: vi.fn(),
   rotateRefreshToken: vi.fn(),
+  revokeRefreshFamily: vi.fn(),
 }));
 
 vi.mock('../db/pool', () => ({
@@ -42,6 +43,7 @@ vi.mock('../models/refreshToken', () => ({
   RefreshTokenModel: {
     findActiveByRawToken: mocks.findActiveRefreshToken,
     rotate: mocks.rotateRefreshToken,
+    revokeFamily: mocks.revokeRefreshFamily,
     create: vi.fn(),
     revokeByRawToken: vi.fn(),
   },
@@ -69,6 +71,7 @@ describe('POST /auth/refresh token rotation', () => {
     mocks.findById.mockReset();
     mocks.findActiveRefreshToken.mockReset();
     mocks.rotateRefreshToken.mockReset();
+    mocks.revokeRefreshFamily.mockReset();
 
     mocks.logAction.mockResolvedValue({});
     mocks.getAuthRoleState.mockResolvedValue({
@@ -85,6 +88,7 @@ describe('POST /auth/refresh token rotation', () => {
       family_id: '11111111-1111-4111-8111-111111111111',
     });
     mocks.rotateRefreshToken.mockResolvedValue(undefined);
+    mocks.revokeRefreshFamily.mockResolvedValue(undefined);
     mocks.poolConnect.mockResolvedValue({
       query: mocks.lockClientQuery,
       release: mocks.lockClientRelease,
@@ -195,5 +199,22 @@ describe('POST /auth/refresh token rotation', () => {
 
     expect(res.status).toBe(401);
     expect(String(res.body.error?.message)).toContain('Invalid CSRF token');
+  });
+
+  it('revokes token family when refresh rotation detects reuse', async () => {
+    mocks.rotateRefreshToken.mockRejectedValueOnce(new Error('REFRESH_TOKEN_ALREADY_USED_OR_EXPIRED'));
+
+    const res = await request(app)
+      .post('/auth/refresh')
+      .set('Cookie', [REFRESH_COOKIE, CSRF_COOKIE])
+      .set(CSRF_HEADER)
+      .send({ rememberMe: false });
+
+    expect(res.status).toBe(401);
+    expect(String(res.body.error?.message)).toContain('Invalid or expired refresh token');
+    expect(mocks.revokeRefreshFamily).toHaveBeenCalledWith(
+      '11111111-1111-4111-8111-111111111111',
+      'REUSE_DETECTED'
+    );
   });
 });

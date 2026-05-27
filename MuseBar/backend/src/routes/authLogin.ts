@@ -611,6 +611,8 @@ router.get('/me', requireAuth, asyncHandler(async (req, res) => {
 // ---------------------------------------------------------------------------
 router.post('/refresh', refreshRateLimit, asyncHandler(async (req, res) => {
   const lockClient = await pool.connect();
+  let refreshFamilyId: string | null = null;
+  let refreshUserId: number | null = null;
   try {
     await lockClient.query('BEGIN');
     const refreshTokenRaw = getRefreshTokenFromRequest(req);
@@ -625,7 +627,9 @@ router.post('/refresh', refreshRateLimit, asyncHandler(async (req, res) => {
       clearRefreshTokenCookie(res);
       throw new AuthenticationError('Invalid or expired refresh token');
     }
+    refreshFamilyId = refreshSession.family_id;
     const userId = refreshSession.user_id;
+    refreshUserId = userId;
 
     await lockClient.query('SELECT pg_advisory_xact_lock($1::bigint)', [userId]);
 
@@ -680,7 +684,27 @@ router.post('/refresh', refreshRateLimit, asyncHandler(async (req, res) => {
   } catch (error) {
     await lockClient.query('ROLLBACK');
     if (error instanceof Error && error.message === 'REFRESH_TOKEN_ALREADY_USED_OR_EXPIRED') {
+      if (refreshFamilyId) {
+        try {
+          await RefreshTokenModel.revokeFamily(refreshFamilyId, 'REUSE_DETECTED');
+          if (refreshUserId !== null) {
+            const revokeBeforeIat = Math.floor(Date.now() / 1000);
+            await TokenBlocklistModel.revokeAllUserTokensIssuedBefore(
+              refreshUserId,
+              revokeBeforeIat,
+              'REFRESH_REUSE_DETECTED'
+            );
+          }
+        } catch (revokeError) {
+          Logger.getInstance().error(
+            `Failed to revoke refresh token family ${refreshFamilyId} after reuse detection`,
+            revokeError as Error,
+            'AUTH_ROUTE'
+          );
+        }
+      }
       clearRefreshTokenCookie(res);
+      clearCsrfTokenCookie(res);
       throw new AuthenticationError('Invalid or expired refresh token');
     }
     if (error instanceof AppError) {

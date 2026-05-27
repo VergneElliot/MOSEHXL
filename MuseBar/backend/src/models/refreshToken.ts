@@ -140,4 +140,15 @@ export class RefreshTokenModel {
       [userId, reason]
     );
   }
+
+  static async revokeFamily(familyId: string, reason: string): Promise<void> {
+    await pool.query(
+      `UPDATE auth_refresh_tokens
+       SET revoked_at = CURRENT_TIMESTAMP,
+           revoke_reason = $2
+       WHERE family_id = $1
+         AND revoked_at IS NULL`,
+      [familyId, reason]
+    );
+  }
 }
