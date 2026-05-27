@@ -7,7 +7,7 @@ import { SetupService } from '../services/SetupService';
 import { validateParams, validateBody } from '../middleware/validation';
 import { Logger } from '../utils/logger';
 import { getEnvironmentConfig } from '../config/environment';
-import { AppError, asyncHandler } from '../middleware/errorHandler';
+import { AppError, asyncHandler, NotFoundError, ValidationError } from '../middleware/errorHandler';
 
 const router = express.Router();
 const config = getEnvironmentConfig();
@@ -21,11 +21,15 @@ router.get('/validate/:token', validateParams([{ param: 'token', validator: (v: 
     const result = await setupService.validateInvitation(token);
 
     if (!result.isValid) {
-      return res.status(400).json(result);
+      throw new ValidationError(
+        typeof result.error === 'string' ? result.error : 'Invalid invitation token',
+        { result: result as unknown as Record<string, unknown> }
+      );
     }
 
     res.json(result);
   } catch (error) {
+    if (error instanceof AppError) throw error;
     logger.error('Error validating invitation token', { error: error as Error }, 'SETUP_API');
     throw new AppError(
       error instanceof Error ? error.message : 'Internal server error during validation',
@@ -43,11 +47,12 @@ router.get('/status/:token', validateParams([{ param: 'token', validator: (v: st
     const result = await setupService.checkSetupStatus(token);
 
     if (result.error) {
-      return res.status(404).json(result);
+      throw new NotFoundError(typeof result.error === 'string' ? result.error : 'Setup status');
     }
 
     res.json(result);
   } catch (error) {
+    if (error instanceof AppError) throw error;
     logger.error('Error checking setup status', { error: error as Error }, 'SETUP_API');
     throw new AppError(
       error instanceof Error ? error.message : 'Internal server error',
@@ -79,11 +84,15 @@ router.post('/complete', validateBody([
     );
 
     if (!result.success) {
-      return res.status(400).json(result);
+      throw new ValidationError(
+        typeof result.message === 'string' ? result.message : 'Failed to complete setup',
+        { result: result as unknown as Record<string, unknown> }
+      );
     }
 
     res.status(201).json(result);
   } catch (error) {
+    if (error instanceof AppError) throw error;
     logger.error('Error completing business setup', { error: error as Error }, 'SETUP_API');
     throw new AppError(
       error instanceof Error ? error.message : 'Failed to complete setup. Please try again.',

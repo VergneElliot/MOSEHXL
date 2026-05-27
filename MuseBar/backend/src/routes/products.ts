@@ -5,7 +5,7 @@ import { getEstablishmentId, requireAuth, requireAnyPermission, requirePermissio
 import { P } from '../permissions/registry';
 import { validateParams, paramValidations } from '../middleware/validation';
 import { Logger } from '../utils/logger';
-import { AppError, asyncHandler } from '../middleware/errorHandler';
+import { AppError, asyncHandler, NotFoundError, ValidationError } from '../middleware/errorHandler';
 
 const router = express.Router();
 
@@ -91,7 +91,7 @@ router.get('/:id', readCatalog, validateParams([paramValidations.id]), asyncHand
   try {
     const id = parseInt(req.params.id);
     const product = await ProductModel.getById(id, establishmentId);
-    if (!product) return res.status(404).json({ error: 'Product not found' });
+    if (!product) throw new NotFoundError('Product');
     res.json(product);
   } catch {
     throw new AppError('Failed to fetch product', 500, 'PRODUCT_FETCH_FAILED');
@@ -105,10 +105,10 @@ router.post('/', menuWrite, asyncHandler(async (req, res) => {
   try {
     const { name, price, tax_rate, category_id, happy_hour_discount_percent, happy_hour_discount_fixed, is_happy_hour_eligible } = req.body;
 
-    if (!name || typeof name !== 'string') return res.status(400).json({ error: 'Product name is required' });
-    if (price === undefined || typeof price !== 'number' || price <= 0) return res.status(400).json({ error: 'Valid price is required' });
-    if (tax_rate === undefined || typeof tax_rate !== 'number' || tax_rate < 0) return res.status(400).json({ error: 'Valid tax rate is required' });
-    if (!category_id || typeof category_id !== 'number') return res.status(400).json({ error: 'Category ID is required' });
+    if (!name || typeof name !== 'string') throw new ValidationError('Product name is required');
+    if (price === undefined || typeof price !== 'number' || price <= 0) throw new ValidationError('Valid price is required');
+    if (tax_rate === undefined || typeof tax_rate !== 'number' || tax_rate < 0) throw new ValidationError('Valid tax rate is required');
+    if (!category_id || typeof category_id !== 'number') throw new ValidationError('Category ID is required');
 
     const product = await ProductModel.create(
       { name, price, tax_rate, category_id, happy_hour_discount_percent, happy_hour_discount_fixed, is_happy_hour_eligible: is_happy_hour_eligible !== undefined ? is_happy_hour_eligible : true, is_active: true, establishment_id: establishmentId },
@@ -125,6 +125,7 @@ router.post('/', menuWrite, asyncHandler(async (req, res) => {
     }, 'CREATE_PRODUCT');
     res.status(201).json(product);
   } catch (error) {
+    if (error instanceof AppError) throw error;
     Logger.getInstance().error('Create product failed', error as Error, 'PRODUCTS_ROUTE');
     throw new AppError('Failed to create product', 500, 'PRODUCT_CREATE_FAILED');
   }
@@ -146,10 +147,10 @@ router.put('/:id', menuWrite, validateParams([paramValidations.id]), asyncHandle
     if (req.body.is_happy_hour_eligible !== undefined) updateData.is_happy_hour_eligible = req.body.is_happy_hour_eligible;
     if (req.body.is_active !== undefined) updateData.is_active = req.body.is_active === true;
 
-    if (Object.keys(updateData).length === 0) return res.status(400).json({ error: 'No valid fields to update' });
+    if (Object.keys(updateData).length === 0) throw new ValidationError('No valid fields to update');
 
     const product = await ProductModel.update(id, updateData, establishmentId);
-    if (!product) return res.status(404).json({ error: 'Product not found' });
+    if (!product) throw new NotFoundError('Product');
     await logAuditOrThrow({
       user_id: String(req.user!.id),
       action_type: 'UPDATE_PRODUCT',
@@ -161,6 +162,7 @@ router.put('/:id', menuWrite, validateParams([paramValidations.id]), asyncHandle
     }, 'UPDATE_PRODUCT');
     res.json(product);
   } catch (error) {
+    if (error instanceof AppError) throw error;
     Logger.getInstance().error('Update product failed', error as Error, 'PRODUCTS_ROUTE');
     throw new AppError('Failed to update product', 500, 'PRODUCT_UPDATE_FAILED');
   }
@@ -173,7 +175,7 @@ router.delete('/:id', menuWrite, validateParams([paramValidations.id]), asyncHan
   try {
     const id = parseInt(req.params.id);
     const result = await ProductModel.delete(id, establishmentId);
-    if (!result.deleted) return res.status(404).json({ error: 'Product not found or could not be deleted.' });
+    if (!result.deleted) throw new NotFoundError('Product');
     await logAuditOrThrow({
       user_id: String(req.user!.id),
       action_type: result.action === 'hard' ? 'DELETE_PRODUCT' : 'ARCHIVE_PRODUCT',
@@ -188,6 +190,7 @@ router.delete('/:id', menuWrite, validateParams([paramValidations.id]), asyncHan
       : 'Produit supprimé définitivement avec succès (jamais utilisé)';
     res.json({ message, action: result.action });
   } catch (error: unknown) {
+    if (error instanceof AppError) throw error;
     const e = error as { code?: unknown };
     const message = e?.code === '23503'
       ? 'Impossible de supprimer le produit : il est référencé dans des commandes existantes.'
@@ -203,7 +206,7 @@ router.put('/:id/restore', menuWrite, validateParams([paramValidations.id]), asy
   try {
     const id = parseInt(req.params.id);
     const restored = await ProductModel.restore(id, establishmentId);
-    if (!restored) return res.status(404).json({ error: 'Product not found or could not be restored.' });
+    if (!restored) throw new NotFoundError('Product');
     await logAuditOrThrow({
       user_id: String(req.user!.id),
       action_type: 'RESTORE_PRODUCT',
@@ -215,6 +218,7 @@ router.put('/:id/restore', menuWrite, validateParams([paramValidations.id]), asy
     }, 'RESTORE_PRODUCT');
     res.json({ message: 'Produit restauré avec succès' });
   } catch (error) {
+    if (error instanceof AppError) throw error;
     Logger.getInstance().error('Restore product failed', error as Error, 'PRODUCTS_ROUTE');
     throw new AppError('Failed to restore product', 500, 'PRODUCT_RESTORE_FAILED');
   }
