@@ -145,7 +145,17 @@ describe('POST /auth/refresh token rotation', () => {
       .send({ rememberMe: false });
 
     expect(res.status).toBe(400);
-    expect(String(res.body.error?.message)).toContain('refreshToken is required');
+    expect(String(res.body.error?.message)).toContain('Refresh token cookie is required');
+  });
+
+  it('returns 400 when refresh token is provided only in body', async () => {
+    const res = await request(app)
+      .post('/auth/refresh')
+      .send({ rememberMe: false, refreshToken: 'body-only-token' });
+
+    expect(res.status).toBe(400);
+    expect(String(res.body.error?.message)).toContain('Refresh token cookie is required');
+    expect(mocks.findActiveRefreshToken).not.toHaveBeenCalled();
   });
 
   it('rejects unknown refresh tokens', async () => {

@@ -96,8 +96,7 @@ export function resolveOpaqueRefreshRateLimitKey(req: Request): string {
   const refreshFromCookie = refreshCookiePart
     ? decodeURIComponent(refreshCookiePart.slice('musebar_refresh_token='.length).trim())
     : '';
-  const refreshFromBody = typeof req.body?.refreshToken === 'string' ? req.body.refreshToken.trim() : '';
-  const rawRefreshToken = refreshFromCookie || refreshFromBody;
+  const rawRefreshToken = refreshFromCookie;
   if (!rawRefreshToken) {
     return `ip:${ip}:refresh:anon`;
   }

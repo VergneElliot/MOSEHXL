@@ -96,7 +96,11 @@ function getRefreshCookieName(): string {
   return 'musebar_refresh_token';
 }
 
-function getRefreshTokenFromRequest(req: express.Request): string | null {
+function getRefreshTokenFromRequest(
+  req: express.Request,
+  options?: { allowBodyFallback?: boolean }
+): string | null {
+  const allowBodyFallback = options?.allowBodyFallback === true;
   const rawCookieHeader = req.headers.cookie;
   if (typeof rawCookieHeader === 'string' && rawCookieHeader.length > 0) {
     const cookiePair = rawCookieHeader
@@ -107,6 +111,9 @@ function getRefreshTokenFromRequest(req: express.Request): string | null {
       const value = cookiePair.slice(getRefreshCookieName().length + 1).trim();
       if (value.length > 0) return decodeURIComponent(value);
     }
+  }
+  if (!allowBodyFallback) {
+    return null;
   }
   const bodyToken = req.body?.refreshToken;
   return typeof bodyToken === 'string' && bodyToken.trim().length > 0 ? bodyToken.trim() : null;
@@ -557,7 +564,7 @@ router.post('/refresh', refreshRateLimit, asyncHandler(async (req, res) => {
     const refreshTokenRaw = getRefreshTokenFromRequest(req);
     const rememberMe = req.body?.rememberMe === true;
     if (!refreshTokenRaw || typeof refreshTokenRaw !== 'string') {
-      throw new ValidationError('refreshToken is required');
+      throw new ValidationError('Refresh token cookie is required');
     }
 
     const refreshSession = await RefreshTokenModel.findActiveByRawToken(refreshTokenRaw);
@@ -790,7 +797,7 @@ router.post('/support/impersonation/stop', requireAuth, requireAdmin, asyncHandl
 // POST /api/auth/logout
 // ---------------------------------------------------------------------------
 router.post('/logout', requireAuth, asyncHandler(async (req, res) => {
-  const refreshToken = getRefreshTokenFromRequest(req);
+  const refreshToken = getRefreshTokenFromRequest(req, { allowBodyFallback: true });
   const authorization = req.headers.authorization;
   const currentToken = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
   if (currentToken) {
