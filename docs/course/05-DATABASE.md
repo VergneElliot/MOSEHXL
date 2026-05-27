@@ -232,6 +232,26 @@ Migration files live in `src/migrations/files/` and are named with timestamps to
 
 The migration manager (`migration-manager.ts`) tracks which migrations have been applied in a `migrations` table in the database. Running `migrate` applies any migration not yet in that table.
 
+### Schema source-of-truth policy (audit P3-Q17)
+
+Canonical source of schema truth is:
+- `backend/src/migrations/files/*.sql`
+
+Snapshot/reference files:
+- `backend/src/models/legal-schema.sql`
+- `backend/src/models/multi-tenant-schema.sql`
+
+Policy:
+1. **Never** treat snapshot SQL files as the deploy mechanism.
+2. Every schema-changing migration must be followed by a snapshot refresh in the same change set.
+3. If a migration is data-only or otherwise does not affect snapshots, it must include:
+
+```sql
+-- SCHEMA_SNAPSHOT_NOT_REQUIRED
+```
+
+CI enforces this policy through `npm run check:schema-drift` in the backend workflow.
+
 ### Why migrations instead of editing schema.sql?
 
 Because the production database already has data. You can't DROP and re-CREATE a table without losing everything. Migrations add/modify columns **in place** without losing data:
