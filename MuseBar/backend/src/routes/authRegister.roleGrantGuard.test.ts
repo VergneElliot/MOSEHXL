@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import express from 'express';
+import { errorHandler } from '../middleware/errorHandler';
 
 const mocks = vi.hoisted(() => ({
   userBelongsToEstablishment: vi.fn(),
@@ -70,6 +71,7 @@ app.use((req, _res, next) => {
   next();
 });
 app.use('/auth', authRegisterRouter);
+app.use(errorHandler);
 
 describe('authRegister establishment_admin role grant guard', () => {
   beforeEach(() => {
@@ -98,7 +100,7 @@ describe('authRegister establishment_admin role grant guard', () => {
       .send({ role: 'establishment_admin' });
 
     expect(res.status).toBe(403);
-    expect(res.body.error).toBe('Only system administrators can grant establishment_admin role');
+    expect(res.body.error?.message).toBe('Only system administrators can grant establishment_admin role');
     expect(mocks.updateUserRoleById).not.toHaveBeenCalled();
     expect(mocks.auditLogAction).not.toHaveBeenCalled();
     expect(mocks.logSoftwareEventBestEffort).not.toHaveBeenCalled();

@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import express from 'express';
+import { errorHandler } from '../middleware/errorHandler';
 
 const mocks = vi.hoisted(() => ({
   poolQuery: vi.fn(),
@@ -76,6 +77,7 @@ import authLoginRouter from './authLogin';
 const app = express();
 app.use(express.json());
 app.use('/auth', authLoginRouter);
+app.use(errorHandler);
 
 describe('POST /auth/login admin 2FA enforcement', () => {
   const previousEnforceFlag = process.env.AUTH_ENFORCE_ADMIN_2FA;
@@ -139,7 +141,7 @@ describe('POST /auth/login admin 2FA enforcement', () => {
     });
 
     expect(res.status).toBe(403);
-    expect(res.body.code).toBe('ADMIN_2FA_SETUP_REQUIRED');
+    expect(res.body.error.code).toBe('ADMIN_2FA_SETUP_REQUIRED');
     expect(mocks.createRefreshToken).not.toHaveBeenCalled();
   });
 
@@ -158,7 +160,7 @@ describe('POST /auth/login admin 2FA enforcement', () => {
     });
 
     expect(res.status).toBe(401);
-    expect(res.body.code).toBe('INVALID_2FA_CODE');
+    expect(res.body.error.code).toBe('INVALID_2FA_CODE');
     expect(mocks.createRefreshToken).not.toHaveBeenCalled();
   });
 });

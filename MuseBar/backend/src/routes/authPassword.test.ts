@@ -233,7 +233,7 @@ describe('authPassword routes', () => {
       .send({ token: 'ok-token', newPassword: 'StrongPass1' });
 
     expect(res.status).toBe(400);
-    expect(String(res.body.error)).toContain('known data breaches');
+    expect(String(res.body.error?.message)).toContain('known data breaches');
     expect(mocks.updatePasswordById).not.toHaveBeenCalled();
   });
 });

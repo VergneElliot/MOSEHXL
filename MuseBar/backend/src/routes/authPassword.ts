@@ -8,7 +8,13 @@ import { AuditTrailModel } from '../models/auditTrail';
 import { Logger } from '../utils/logger';
 import { EmailService } from '../services/email/EmailService';
 import { validatePasswordWithBreachCheck } from '../utils/passwordValidation';
-import { AppError, asyncHandler } from '../middleware/errorHandler';
+import {
+  AppError,
+  asyncHandler,
+  AuthenticationError,
+  NotFoundError,
+  ValidationError,
+} from '../middleware/errorHandler';
 import { requireAuth } from '../middleware/auth';
 
 const router = express.Router();
@@ -39,7 +45,7 @@ function buildResetUrl(token: string): string {
 router.post('/password/forgot', asyncHandler(async (req, res) => {
   const { email } = req.body ?? {};
   if (!email || typeof email !== 'string') {
-    return res.status(400).json({ error: 'Email is required' });
+    throw new ValidationError('Email is required');
   }
 
   const normalizedEmail = email.trim().toLowerCase();
@@ -105,12 +111,12 @@ router.post('/password/forgot', asyncHandler(async (req, res) => {
 router.post('/password/reset', asyncHandler(async (req, res) => {
   const { token, newPassword } = req.body ?? {};
   if (!token || typeof token !== 'string' || !newPassword || typeof newPassword !== 'string') {
-    return res.status(400).json({ error: 'Token and newPassword are required' });
+    throw new ValidationError('Token and newPassword are required');
   }
 
   const passwordValidation = await validatePasswordWithBreachCheck(newPassword);
   if (!passwordValidation.isValid) {
-    return res.status(400).json({ error: passwordValidation.error ?? 'Invalid password' });
+    throw new ValidationError(passwordValidation.error ?? 'Invalid password');
   }
 
   const resetRequest = await PasswordResetRequestModel.findValidByTokenHash(hashResetToken(token));
@@ -150,27 +156,27 @@ router.post('/password/change', requireAuth, asyncHandler(async (req, res) => {
     !newPassword ||
     typeof newPassword !== 'string'
   ) {
-    return res.status(400).json({ error: 'currentPassword and newPassword are required' });
+    throw new ValidationError('currentPassword and newPassword are required');
   }
 
   const passwordValidation = await validatePasswordWithBreachCheck(newPassword);
   if (!passwordValidation.isValid) {
-    return res.status(400).json({ error: passwordValidation.error ?? 'Invalid password' });
+    throw new ValidationError(passwordValidation.error ?? 'Invalid password');
   }
 
   const user = await UserModel.findById(req.user!.id);
   if (!user) {
-    throw new AppError('User not found', 404, 'PASSWORD_CHANGE_USER_NOT_FOUND');
+    throw new NotFoundError('User');
   }
 
   const currentPasswordValid = await UserModel.verifyPassword(user, currentPassword);
   if (!currentPasswordValid) {
-    return res.status(401).json({ error: 'Current password is incorrect' });
+    throw new AuthenticationError('Current password is incorrect');
   }
 
   const samePassword = await UserModel.verifyPassword(user, newPassword);
   if (samePassword) {
-    return res.status(400).json({ error: 'New password must be different from current password' });
+    throw new ValidationError('New password must be different from current password');
   }
 
   const updated = await UserModel.updatePasswordById(user.id, newPassword);

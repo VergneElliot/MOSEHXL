@@ -2,7 +2,13 @@ import express from 'express';
 import { UserModel } from '../models/user';
 import { AuditTrailModel } from '../models/auditTrail';
 import { Logger } from '../utils/logger';
-import { AppError, asyncHandler } from '../middleware/errorHandler';
+import {
+  AppError,
+  asyncHandler,
+  AuthorizationError,
+  NotFoundError,
+  ValidationError,
+} from '../middleware/errorHandler';
 import {
   requireAuth,
   requireAdmin,
@@ -54,7 +60,7 @@ router.post('/register', requireAuth, requireAdmin, asyncHandler(async (req, res
       ip_address: ip,
       user_agent: userAgent,
     }, 'REGISTER_SYSTEM_USER_MISSING_FIELDS');
-    return res.status(400).json({ error: 'Email and password required' });
+    throw new ValidationError('Email and password required');
   }
 
   const passwordValidation = await validatePasswordWithBreachCheck(password);
@@ -66,7 +72,7 @@ router.post('/register', requireAuth, requireAdmin, asyncHandler(async (req, res
       ip_address: ip,
       user_agent: userAgent,
     }, 'REGISTER_SYSTEM_USER_PASSWORD_POLICY');
-    return res.status(400).json({ error: passwordValidation.error ?? 'Invalid password' });
+    throw new ValidationError(passwordValidation.error ?? 'Invalid password');
   }
 
   try {
@@ -109,7 +115,7 @@ router.get('/users/:id/permissions', requireAuth, canManageUsers, asyncHandler(a
 
   const owns = await UserModel.userBelongsToEstablishment(userId, establishmentId);
   if (!owns) {
-    return res.status(403).json({ error: 'User does not belong to your establishment' });
+    throw new AuthorizationError('User does not belong to your establishment');
   }
 
   const permissions = await UserModel.getUserPermissions(userId);
@@ -127,12 +133,12 @@ router.post('/users/:id/permissions', requireAuth, canManageUsers, asyncHandler(
   const userAgent = req.headers['user-agent'];
 
   if (!Array.isArray(permissions)) {
-    return res.status(400).json({ error: 'Permissions must be an array' });
+    throw new ValidationError('Permissions must be an array');
   }
 
   const owns = await UserModel.userBelongsToEstablishment(userId, establishmentId);
   if (!owns) {
-    return res.status(403).json({ error: 'User does not belong to your establishment' });
+    throw new AuthorizationError('User does not belong to your establishment');
   }
 
   await UserModel.setUserPermissions(userId, permissions);
@@ -168,12 +174,12 @@ router.put('/users/:id/permissions', requireAuth, canManageUsers, asyncHandler(a
   const { permissions } = req.body;
 
   if (!Array.isArray(permissions)) {
-    return res.status(400).json({ error: 'Permissions must be an array' });
+    throw new ValidationError('Permissions must be an array');
   }
 
   const owns = await UserModel.userBelongsToEstablishment(userId, establishmentId);
   if (!owns) {
-    return res.status(403).json({ error: 'User does not belong to your establishment' });
+    throw new AuthorizationError('User does not belong to your establishment');
   }
 
   await UserModel.setUserPermissions(userId, permissions);
@@ -208,20 +214,20 @@ router.post('/users', requireAuth, canManageUsers, asyncHandler(async (req, res)
   const establishmentId = req.user!.establishment_id;
 
   if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password required' });
+    throw new ValidationError('Email and password required');
   }
 
   const passwordValidation = await validatePasswordWithBreachCheck(password);
   if (!passwordValidation.isValid) {
-    return res.status(400).json({ error: passwordValidation.error ?? 'Invalid password' });
+    throw new ValidationError(passwordValidation.error ?? 'Invalid password');
   }
 
   if (!establishmentId) {
-    return res.status(400).json({ error: 'No establishment associated with your account' });
+    throw new ValidationError('No establishment associated with your account');
   }
 
   if (!ESTABLISHMENT_USER_ROLES.includes(role)) {
-    return res.status(400).json({ error: `Role must be one of: ${ESTABLISHMENT_USER_ROLES.join(', ')}` });
+    throw new ValidationError(`Role must be one of: ${ESTABLISHMENT_USER_ROLES.join(', ')}`);
   }
 
   try {
@@ -264,12 +270,12 @@ router.delete('/users/:id', requireAuth, canManageUsers, asyncHandler(async (req
   const establishmentId = req.user!.establishment_id!;
 
   if (userId === req.user!.id) {
-    return res.status(400).json({ error: 'You cannot delete your own account' });
+    throw new ValidationError('You cannot delete your own account');
   }
 
   const owns = await UserModel.userBelongsToEstablishment(userId, establishmentId);
   if (!owns) {
-    return res.status(403).json({ error: 'User does not belong to your establishment' });
+    throw new AuthorizationError('User does not belong to your establishment');
   }
 
   await UserModel.deleteUserById(userId);
@@ -303,16 +309,16 @@ router.put('/users/:id/role', requireAuth, canManageUsers, asyncHandler(async (r
   const { role } = req.body;
 
   if (!ESTABLISHMENT_USER_ROLES.includes(role)) {
-    return res.status(400).json({ error: `Role must be one of: ${ESTABLISHMENT_USER_ROLES.join(', ')}` });
+    throw new ValidationError(`Role must be one of: ${ESTABLISHMENT_USER_ROLES.join(', ')}`);
   }
 
   const owns = await UserModel.userBelongsToEstablishment(userId, establishmentId);
   if (!owns) {
-    return res.status(403).json({ error: 'User does not belong to your establishment' });
+    throw new AuthorizationError('User does not belong to your establishment');
   }
 
   if (role === 'establishment_admin' && !req.user!.is_admin) {
-    return res.status(403).json({ error: 'Only system administrators can grant establishment_admin role' });
+    throw new AuthorizationError('Only system administrators can grant establishment_admin role');
   }
 
   await UserModel.updateUserRoleById(userId, role);
@@ -347,12 +353,12 @@ router.put('/users/:id/unlock', requireAuth, canManageUsers, asyncHandler(async 
 
   const owns = await UserModel.userBelongsToEstablishment(userId, establishmentId);
   if (!owns) {
-    return res.status(403).json({ error: 'User does not belong to your establishment' });
+    throw new AuthorizationError('User does not belong to your establishment');
   }
 
   const unlocked = await UserModel.unlockUserAccount(userId);
   if (!unlocked) {
-    return res.status(404).json({ error: 'User not found' });
+    throw new NotFoundError('User');
   }
 
   await logAuditOrThrow({
@@ -377,11 +383,11 @@ router.post('/setup', requireSetupSecret, asyncHandler(async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password required' });
+      throw new ValidationError('Email and password required');
     }
     const passwordValidation = await validatePasswordWithBreachCheck(password);
     if (!passwordValidation.isValid) {
-      return res.status(400).json({ error: passwordValidation.error ?? 'Invalid password' });
+      throw new ValidationError(passwordValidation.error ?? 'Invalid password');
     }
 
     const user = await UserModel.bootstrapSystemAdmin(email, password);
@@ -391,6 +397,9 @@ router.post('/setup', requireSetupSecret, asyncHandler(async (req, res) => {
       user: { id: user.id, email: user.email, is_admin: user.is_admin },
     });
   } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
     const e = error as { statusCode?: number; message?: string };
     if (e?.statusCode === 400) {
       throw new AppError(e.message || 'Admin user already exists', 400, 'SETUP_ADMIN_ALREADY_EXISTS');

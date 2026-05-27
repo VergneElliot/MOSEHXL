@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 import { verifyToken } from '../middleware/auth';
+import { errorHandler } from '../middleware/errorHandler';
 
 const mocks = vi.hoisted(() => ({
   poolQuery: vi.fn(),
@@ -51,6 +52,7 @@ import authLoginRouter from './authLogin';
 const app = express();
 app.use(express.json());
 app.use('/auth', authLoginRouter);
+app.use(errorHandler);
 
 describe('POST /auth/refresh token rotation', () => {
   beforeEach(() => {
@@ -143,7 +145,7 @@ describe('POST /auth/refresh token rotation', () => {
       .send({ rememberMe: false });
 
     expect(res.status).toBe(400);
-    expect(String(res.body.error)).toContain('refreshToken is required');
+    expect(String(res.body.error?.message)).toContain('refreshToken is required');
   });
 
   it('rejects unknown refresh tokens', async () => {
@@ -155,6 +157,6 @@ describe('POST /auth/refresh token rotation', () => {
       .send({ rememberMe: false });
 
     expect(res.status).toBe(401);
-    expect(String(res.body.error)).toContain('Invalid or expired refresh token');
+    expect(String(res.body.error?.message)).toContain('Invalid or expired refresh token');
   });
 });
