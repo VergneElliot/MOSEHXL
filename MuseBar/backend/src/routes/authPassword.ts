@@ -16,13 +16,67 @@ import {
   ValidationError,
 } from '../middleware/errorHandler';
 import { requireAuth } from '../middleware/auth';
+import { pool } from '../db/pool';
+import { createAuthRateLimitMiddleware } from '../middleware/security/AuthEndpointRateLimit';
 
 const router = express.Router();
 const RESET_EXPIRATION_MINUTES = 60;
+const authRateLimitBase = process.env.NODE_ENV === 'development' ? 5 : 1;
+const authLimiterPool = process.env.NODE_ENV === 'test' ? undefined : pool;
 
 function hashResetToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
+
+function hashForRateLimit(value: string): string {
+  return crypto.createHash('sha256').update(value).digest('hex').slice(0, 24);
+}
+
+const authPasswordRateLimitLogger = {
+  security: (
+    event: string,
+    severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL',
+    metadata?: Record<string, unknown>,
+    requestId?: string,
+    userId?: number
+  ) => {
+    try {
+      Logger.getInstance().security(event, severity, metadata, requestId, userId);
+    } catch {
+      // Tests can run without full logger initialization.
+    }
+  },
+};
+
+const forgotPasswordRateLimit = createAuthRateLimitMiddleware({
+  logger: authPasswordRateLimitLogger,
+  pool: authLimiterPool,
+  keyPrefix: 'auth_password_forgot',
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 8 * authRateLimitBase,
+  keyResolver: (req) => {
+    const ip = req.ip ?? 'unknown';
+    const rawEmail = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    const emailHash = hashForRateLimit(rawEmail || 'unknown-email');
+    return `ip:${ip}:email:${emailHash}`;
+  },
+  errorMessage: 'Too many password reset requests. Please retry later.',
+});
+
+const resetPasswordRateLimit = createAuthRateLimitMiddleware({
+  logger: authPasswordRateLimitLogger,
+  pool: authLimiterPool,
+  keyPrefix: 'auth_password_reset',
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 12 * authRateLimitBase,
+  keyResolver: (req) => {
+    const ip = req.ip ?? 'unknown';
+    const rawToken = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
+    const tokenHash = hashForRateLimit(rawToken || 'unknown-token');
+    return `ip:${ip}:reset:${tokenHash}`;
+  },
+  errorMessage: 'Too many password reset attempts. Please retry later.',
+});
 
 async function logAuditBestEffort(entry: Parameters<typeof AuditTrailModel.logAction>[0]): Promise<void> {
   try {
@@ -42,7 +96,7 @@ function buildResetUrl(token: string): string {
   return `${baseUrl.replace(/\/+$/, '')}/reset-password?token=${encodeURIComponent(token)}`;
 }
 
-router.post('/password/forgot', asyncHandler(async (req, res) => {
+router.post('/password/forgot', forgotPasswordRateLimit, asyncHandler(async (req, res) => {
   const { email } = req.body ?? {};
   if (!email || typeof email !== 'string') {
     throw new ValidationError('Email is required');
@@ -108,7 +162,7 @@ router.post('/password/forgot', asyncHandler(async (req, res) => {
   return res.json({ message: genericMessage });
 }));
 
-router.post('/password/reset', asyncHandler(async (req, res) => {
+router.post('/password/reset', resetPasswordRateLimit, asyncHandler(async (req, res) => {
   const { token, newPassword } = req.body ?? {};
   if (!token || typeof token !== 'string' || !newPassword || typeof newPassword !== 'string') {
     throw new ValidationError('Token and newPassword are required');
