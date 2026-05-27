@@ -18,9 +18,10 @@ import { PrinterSetup } from '../../PrinterSetup';
 import { HappyHourControl } from '../../HappyHour';
 
 import { Product } from '../../../types';
+import { UseSettingsReturn } from './types';
 
 interface SettingsTabsProps {
-  settingsHook: any; // UseSettingsReturn type
+  settingsHook: UseSettingsReturn;
   isHappyHourActive?: boolean;
   timeUntilHappyHour?: string;
   onHappyHourStatusUpdate?: () => void;

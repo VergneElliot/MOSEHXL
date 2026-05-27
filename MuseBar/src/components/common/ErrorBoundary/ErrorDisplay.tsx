@@ -16,6 +16,7 @@ import {
   AccordionDetails,
   Chip,
 } from '@mui/material';
+import type { ChipProps } from '@mui/material/Chip';
 import {
   Error as ErrorIcon,
   Refresh as RefreshIcon,
@@ -48,7 +49,10 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
    * Render severity chip with appropriate color
    */
   const renderSeverityChip = (severity: ErrorSeverity) => {
-    const severityConfig = {
+    const severityConfig: Record<
+      ErrorSeverity,
+      { color: Extract<ChipProps['color'], 'info' | 'warning' | 'error'>; label: string }
+    > = {
       low: { color: 'info', label: 'Mineur' },
       medium: { color: 'warning', label: 'Modéré' },
       high: { color: 'error', label: 'Élevé' },
@@ -59,7 +63,7 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
     return (
       <Chip
         size="small"
-        color={config.color as any}
+        color={config.color}
         label={`Gravité: ${config.label}`}
       />
     );

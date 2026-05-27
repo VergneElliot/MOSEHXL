@@ -161,9 +161,14 @@ export const useErrorHandler = (): UseErrorHandlerReturn => {
 
 // Type augmentation for external monitoring services
 declare global {
+  interface SentryCaptureContext {
+    tags?: Record<string, string | number | boolean>;
+    extra?: Record<string, unknown>;
+  }
+
   interface Window {
     Sentry?: {
-      captureException: (error: Error, options?: any) => void;
+      captureException: (error: Error, options?: SentryCaptureContext) => void;
     };
   }
 }
