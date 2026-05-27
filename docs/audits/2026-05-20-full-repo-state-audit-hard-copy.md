@@ -40,7 +40,7 @@ The IDs follow the existing audit convention: **P0/P1/P2** = priority, **L/S/Q/D
 | ID | Title | Why it's a P0 | Effort |
 |----|-------|---------------|--------|
 | **P3-L1** | Auto-closure must append `CLOSURE` to the legal journal | **Fixed (2026-05-20):** scheduler closure path now appends `CLOSURE` entries through `LegalJournalModel.logClosure`; patch notes `264/265`, commit `1838995`. | **S** |
-| **P3-L2** | Make closure bulletin + journal atomic (no swallow) | **Fixed (2026-05-20):** closure creation now fails closed: journal append failure triggers open-bulletin rollback and throws `LEGAL_CLOSURE_JOURNAL_APPEND_FAILED`; finalize happens only after successful append (patch notes `268/269`). | **M** |
+| **P3-L2** | Make closure bulletin + journal atomic (no swallow) | **Fixed (2026-05-27 follow-up):** manual and scheduler closure paths now fail closed: journal append failure triggers open-bulletin rollback and aborts closure (`LEGAL_CLOSURE_JOURNAL_APPEND_FAILED` / `AUTO_CLOSURE_JOURNAL_APPEND_FAILED`); finalize happens only after successful append (patch notes `268/269`, `360/361`). | **M** |
 | **P3-L3** | Software events: fail-safe (or mandatory retry queue) for critical types | **Fixed (2026-05-20):** critical software events now use fail-safe journaling with retry semantics; silent swallow path removed for critical event flow. | **M** |
 | **P3-S1** | Production DB TLS: default `rejectUnauthorized: true` | **Fixed (2026-05-20):** production DB TLS verification defaults to `sslRejectUnauthorized=true` unless explicitly overridden for non-production self-signed workflows. | **S** |
 | **P3-S2** | Enforce `validatePassword` on every password-setting path | **Fixed (2026-05-20):** `/api/auth/register`, `/api/auth/users`, and establishment account creation paths enforce shared `validatePassword` policy. | **S** |
@@ -134,7 +134,7 @@ This list is for posterity — verified during this audit, do not re-open.
 | DB-level legal_journal hash-chain insert enforcement missing | **Fixed** — `BEFORE INSERT` trigger now recomputes and validates sequence/previous/current hash (P3-L5) |
 | Register identifier mismatch (journal vs receipts) | **Fixed** — unified to establishment-scoped `CR-<establishment_id>` across journal/printing/archive (P3-L7) |
 | Password reset/change API missing + no global revoke on password lifecycle events | **Fixed** — `/auth/password/forgot|reset|change` implemented with global token cutoff revoke and current-token revocation on change (P3-L9) |
-| `logClosure` dead on manual route | **Fixed** for manual routes and auto scheduler (P3-L1) |
+| `logClosure` dead on manual route | **Fixed** for manual routes and auto scheduler (P3-L1), with scheduler fail-closed atomic follow-up in P3-L2 (`360/361`) |
 | Integrity verifier silently skipped seq 128 / CORRECTION | **Fixed** (P0-L5) |
 | Software events missing | **Fixed** with fail-safe critical-event journaling + retries (P3-L3) |
 | Thermal receipt missing statutory legal mention | **Fixed** (P1-L6) |
