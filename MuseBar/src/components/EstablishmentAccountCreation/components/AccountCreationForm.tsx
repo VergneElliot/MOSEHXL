@@ -16,6 +16,8 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff, Security } from '@mui/icons-material';
 
+type PasswordStrengthColor = 'error' | 'warning' | 'info' | 'success';
+
 interface AccountCreationFormProps {
   password: string;
   confirmPassword: string;
@@ -62,7 +64,7 @@ const AccountCreationForm: React.FC<AccountCreationFormProps> = ({
     return errors;
   };
 
-  const getPasswordStrength = (password: string): { score: number; label: string; color: string } => {
+  const getPasswordStrength = (password: string): { score: number; label: string; color: PasswordStrengthColor } => {
     const errors = validatePassword(password);
     const score = Math.max(0, 5 - errors.length);
     
@@ -76,7 +78,7 @@ const AccountCreationForm: React.FC<AccountCreationFormProps> = ({
   const passwordStrength = getPasswordStrength(password);
   const strengthPercentage = (passwordStrength.score / 5) * 100;
 
-  const getStrengthColor = (color: string) => {
+  const getStrengthColor = (color: PasswordStrengthColor) => {
     switch (color) {
       case 'error': return '#f44336';
       case 'warning': return '#ff9800';
@@ -122,7 +124,7 @@ const AccountCreationForm: React.FC<AccountCreationFormProps> = ({
         {showStrengthIndicator && password && (
           <Box sx={{ mt: 1 }}>
             <Box display="flex" alignItems="center" gap={1} mb={1}>
-              <Security fontSize="small" color={passwordStrength.color as any} />
+              <Security fontSize="small" color={passwordStrength.color} />
               <Typography variant="caption" color={`${passwordStrength.color}.main`}>
                 Password strength: {passwordStrength.label}
               </Typography>
