@@ -42,7 +42,7 @@ MOSEHXL/
 - **Frontend**: React 18, TypeScript, Material-UI 5, React Router 6
 - **Backend**: Node.js 18+, Express 4, TypeScript 5
 - **Database**: PostgreSQL 13+ with **shared-table multi-tenancy** (`establishment_id` scoping)
-- **Auth**: JWT (bcrypt passwords, 12h/7d token expiry)
+- **Auth**: short-lived JWT access tokens + rotating opaque refresh tokens (httpOnly cookies, server-side revocation)
 - **Email**: SendGrid (with Nodemailer fallback)
 - **Security**: PostgreSQL-backed rate limiting, CORS, input sanitization, security headers
 - **Deployment**: Nginx reverse proxy, systemd services
@@ -64,7 +64,7 @@ The codebase is structured for **professional-grade maintainability** and safe e
 ### Separation of concerns
 - **Backend**: Routes only orchestrate; business logic in `services/` and `models/`. Order flows are split into focused modules (`orderCRUD`, `orderPayment`, `orderLegal`, `orderAudit`).
 - **Frontend**: Per-feature hooks (`usePOSState`, `usePOSLogic`, `usePOSAPI`; same pattern for History, Menu, Closure). Containers compose hooks and pass data to presentational components.
-- **No monoliths**: Large files exist but are modularized and being incrementally reduced as part of the audit remediation phases.
+- **Pragmatic modularity**: Most critical flows are now modularized, but a few larger legacy files remain and are tracked explicitly in audit items.
 
 ### Where the rules bend (by design)
 - **PrinterSetup.tsx** uses `fetch(apiConfig.getEndpoint(...))` for printing config/test so the backend URL is correct; auth can be added via headers when printing routes are fully secured.
@@ -119,7 +119,7 @@ This system targets the four **ISCA pillars** required by Article 286-I-3 bis du
 
 > **Important scope note:** this repository does **not** claim NF525/LNE certification yet.
 > For current compliance posture and open items, use
-> `docs/audits/2026-04-29-full-repo-state-audit-hard-copy.md` and `DEVELOPMENT-STATE.md`
+> `docs/audits/2026-05-20-full-repo-state-audit-hard-copy.md` and `DEVELOPMENT-STATE.md`
 > as the source of truth.
 
 ### Certification Requirements
@@ -148,6 +148,7 @@ Every completed sale writes a `SALE` entry to the legal journal. Every refund/ca
 - `MuseBar/backend/src/models/legal-schema.sql` — Legal tables schema
 - `MuseBar/backend/src/models/legalJournal/` — Journal operations, queries, signing, closure
 - `MuseBar/backend/src/routes/legal/` — Legal API routes
+- `MuseBar/backend/src/migrations/files/` — Canonical schema evolution source (snapshots must track migrations)
 
 ---
 
@@ -293,10 +294,10 @@ Full documentation lives in the `docs/` folder:
 
 ## Code Quality Measures Applied
 
-After a comprehensive code audit, 45 fixes were applied covering:
+After successive audit remediation waves (P0/P1/P2/P3), the codebase was hardened across:
 
 - **Security**: Removed hardcoded secrets, fixed SQL injection vectors, secured unauthenticated endpoints, removed server fingerprinting headers, replaced Math.random with crypto.randomUUID
-- **Architecture**: Consolidated error handling into one system, removed dual database pools, retired legacy schema-per-tenant manager, consolidated password validation rules
+- **Architecture**: Consolidated error handling into one active system, migrated pool ownership to `db/pool.ts`, retired legacy schema-per-tenant runtime paths, consolidated password validation rules
 - **Dead Code**: Removed unused controllers, services, shim files, debug console.logs, Mongoose handling remnants
 - **Performance**: Fixed N+1 queries, moved rate limiting to PostgreSQL, fixed infinite React re-render loops, converted per-request service instantiation to singletons
 - **Type Safety**: Replaced `any` types with proper TypeScript types, unified ClosureBulletin type, removed stale type packages

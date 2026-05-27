@@ -92,7 +92,7 @@ The IDs follow the existing audit convention: **P0/P1/P2** = priority, **L/S/Q/D
 | **P3-Q16** | Introduce `react-i18next` (or similar) with `fr`/`en` namespaces | **Fixed (2026-05-27):** integrated `react-i18next` with `fr/en` resources and `common`/`auth` namespaces, added language switcher persistence, and migrated core auth/header/loading UI strings to translation keys. | **L** |
 | **P3-Q17** | Document `legal-schema.sql` vs `migrations/files/` drift policy | **Fixed (2026-05-27):** declared `migrations/files/*.sql` as canonical schema source, documented snapshot refresh/exemption rules, and added CI schema-drift enforcement (`check:schema-drift`) to fail when migration edits are not reconciled with snapshots. | **S** |
 | **P3-Q18** | Backend coverage upload to Codecov | **Fixed (2026-05-27):** backend CI now runs tests with coverage (`vitest --coverage`), emits `coverage/lcov.info`, and uploads backend coverage to Codecov with dedicated backend flags. | **S** |
-| **P3-D1** | Update `README.md` "Code Quality" claims to match reality | README still implies "single pool in `app.ts`" and "no monoliths"; both are partially true. | **S** |
+| **P3-D1** | Update `README.md` "Code Quality" claims to match reality | **Fixed (2026-05-27):** README now reflects current architecture truth (token model, pool ownership in `db/pool.ts`, modularization status with remaining large-file debt, and current audit source references). | **S** |
 | **P3-D2** | Add a "current truth" doc that auto-references the latest patch-notes index | `docs/patch-notes/` is ~256 files now; finding "current truth" needs scanning latest numbers or `DEVELOPMENT-STATE.md`. A generated index would help. | **M** |
 
 ---
