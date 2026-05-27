@@ -25,5 +25,17 @@ export default defineConfig({
           ],
         }
       : {}),
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov'],
+      reportsDirectory: 'coverage',
+      include: ['src/**/*.ts'],
+      exclude: [
+        'src/**/*.test.ts',
+        'src/integration/real-db/**/*.test.ts',
+        'src/test/**',
+        'src/docs/**',
+      ],
+    },
   },
 });

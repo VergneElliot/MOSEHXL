@@ -6,6 +6,7 @@
   "author": "Elliot Vergne <elliot.vergne@gmail.com>",
   "scripts": {
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:real-db": "RUN_REAL_DB_TESTS=true vitest run --project real-db",
     "test:watch": "vitest",
     "lint": "eslint src --ext .ts,.tsx",
@@ -60,6 +61,7 @@
     "@types/swagger-ui-express": "^4.1.8",
     "@typescript-eslint/eslint-plugin": "^8.57.1",
     "@typescript-eslint/parser": "^8.57.1",
+    "@vitest/coverage-v8": "^4.1.5",
     "eslint": "^9.32.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.3",
