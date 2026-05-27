@@ -3,7 +3,7 @@
  * Centralized type definitions for the payment system
  */
 
-import { OrderItem, LocalSubBill } from '../../../types';
+import { OrderItem, LocalSubBill, Order } from '../../../types';
 
 export interface PaymentDialogProps {
   open: boolean;
@@ -12,7 +12,7 @@ export interface PaymentDialogProps {
   orderTotal: number;
   orderTax: number;
   orderSubtotal: number;
-  onOrderComplete: (message: string, createdOrder?: any) => void;
+  onOrderComplete: (message: string, createdOrder?: Order) => void;
   onOrderError: (message: string) => void;
   onDataUpdate: () => void;
   onClearOrder: () => void;

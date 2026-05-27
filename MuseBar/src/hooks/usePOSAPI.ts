@@ -1,10 +1,15 @@
 import { useCallback } from 'react';
 import { ApiService } from '../services/apiService';
-import { OrderItem, LocalSubBill } from '../types';
+import { OrderItem, LocalSubBill, Order } from '../types';
+
+interface ChangeResponse {
+  message?: string;
+  [key: string]: unknown;
+}
 
 export interface POSAPIActions {
-  createOrder: (orderData: CreateOrderData) => Promise<any>;
-  processChange: (changeData: ChangeData) => Promise<any>;
+  createOrder: (orderData: CreateOrderData) => Promise<Order>;
+  processChange: (changeData: ChangeData) => Promise<ChangeResponse>;
 }
 
 export interface CreateOrderData {
@@ -25,7 +30,7 @@ export interface ChangeData {
 }
 
 export const usePOSAPI = (
-  onSuccess: (message: string, order?: any) => void,
+  onSuccess: (message: string, order?: Order) => void,
   onError: (message: string) => void,
   onDataUpdate: () => void
 ): POSAPIActions => {
@@ -70,7 +75,7 @@ export const usePOSAPI = (
   const processChange = useCallback(
     async (changeData: ChangeData) => {
       try {
-        const response = await apiService.post('/orders/payment/change', {
+        const response = await apiService.post<ChangeResponse>('/orders/payment/change', {
           amount: changeData.amount,
           direction: changeData.direction,
         });

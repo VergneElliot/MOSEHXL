@@ -1,4 +1,5 @@
 import { Category, Product, Order, OrderItem } from '../types';
+import type { LiveMonthlyStats } from '../types/api';
 import { apiCore, categoriesApi, productsApi, ordersApi, legalApi } from './api';
 
 export class ApiService {
@@ -83,7 +84,7 @@ export class ApiService {
   async getLatestMonthlyClosureBulletin() { return legalApi.getLatestMonthlyClosureBulletin(); }
 
   // Live monthly stats (not based on closure)
-  async getLiveMonthlyStats() { return legalApi.getLiveMonthlyStats(); }
+  async getLiveMonthlyStats(): Promise<LiveMonthlyStats> { return legalApi.getLiveMonthlyStats(); }
 }
 
 // Export singleton instance

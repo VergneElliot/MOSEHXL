@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useCallback } from 'react';
-import { OrderItem } from '../../../types';
+import { OrderItem, Order } from '../../../types';
 import { UsePaymentLogicReturn } from './types';
 import {
   usePaymentState,
@@ -20,7 +20,7 @@ export const usePaymentLogic = (
   orderItems: OrderItem[],
   orderTotal: number,
   orderTax: number,
-  onOrderComplete: (message: string, createdOrder?: any) => void,
+  onOrderComplete: (message: string, createdOrder?: Order) => void,
   onOrderError: (message: string) => void,
   onDataUpdate: () => void,
   onClearOrder: () => void,
