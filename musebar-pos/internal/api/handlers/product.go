@@ -275,3 +275,75 @@ func (h *ProductHandler) ArchiveProduct(w http.ResponseWriter, r *http.Request) 
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// ReorderProduct updates the display order of a product
+func (h *ProductHandler) ReorderProduct(w http.ResponseWriter, r *http.Request) {
+	schemaName := r.Context().Value("schema_name").(string)
+	idStr := r.PathValue("id")
+	productID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid product ID", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		DisplayOrder int `json:"display_order"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.DisplayOrder < 0 {
+		http.Error(w, "display_order must be >= 0", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.repo.UpdateProductDisplayOrder(r.Context(), schemaName, productID, req.DisplayOrder); err != nil {
+		http.Error(w, "Failed to update display order", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message":       "Display order updated",
+		"product_id":    productID,
+		"display_order": req.DisplayOrder,
+	})
+}
+
+// ReorderCategory updates the display order of a category
+func (h *ProductHandler) ReorderCategory(w http.ResponseWriter, r *http.Request) {
+	schemaName := r.Context().Value("schema_name").(string)
+	idStr := r.PathValue("id")
+	categoryID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid category ID", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		DisplayOrder int `json:"display_order"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.DisplayOrder < 0 {
+		http.Error(w, "display_order must be >= 0", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.repo.UpdateCategoryDisplayOrder(r.Context(), schemaName, categoryID, req.DisplayOrder); err != nil {
+		http.Error(w, "Failed to update display order", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message":       "Display order updated",
+		"category_id":   categoryID,
+		"display_order": req.DisplayOrder,
+	})
+}

@@ -62,6 +62,7 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	mux.HandleFunc("GET /api/categories", authmw.RequireAuth(productHandler.GetCategories))
 	mux.HandleFunc("GET /api/categories/{id}", authmw.RequireAuth(productHandler.GetCategory))
 	mux.HandleFunc("PATCH /api/categories/{id}", authmw.RequireAuth(productHandler.UpdateCategory))
+	mux.HandleFunc("PATCH /api/categories/{id}/reorder", authmw.RequireAdmin(productHandler.ReorderCategory))
 	mux.HandleFunc("DELETE /api/categories/{id}", authmw.RequireAdmin(productHandler.ArchiveCategory))
 
 	// Products
@@ -69,6 +70,7 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	mux.HandleFunc("GET /api/products", authmw.RequireAuth(productHandler.GetProducts))
 	mux.HandleFunc("GET /api/products/{id}", authmw.RequireAuth(productHandler.GetProduct))
 	mux.HandleFunc("PATCH /api/products/{id}", authmw.RequireAuth(productHandler.UpdateProduct))
+	mux.HandleFunc("PATCH /api/products/{id}/reorder", authmw.RequireAdmin(productHandler.ReorderProduct))
 	mux.HandleFunc("DELETE /api/products/{id}", authmw.RequireAdmin(productHandler.ArchiveProduct))
 
 	// Orders

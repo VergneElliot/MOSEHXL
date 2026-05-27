@@ -145,7 +145,7 @@ func (r *ProductRepositoryPostgres) CreateProduct(ctx context.Context, schemaNam
 func (r *ProductRepositoryPostgres) GetProductByID(ctx context.Context, schemaName string, productID int64) (*models.Product, error) {
 	query := fmt.Sprintf(`
 		SELECT id, category_id, name, description, price, tax_rate,
-		       is_active, is_archived, happy_hour_price, happy_hour_active,
+		       display_order, is_active, is_archived, happy_hour_price, happy_hour_active,
 		       created_at, updated_at
 		FROM "%s".products
 		WHERE id = $1
@@ -154,7 +154,7 @@ func (r *ProductRepositoryPostgres) GetProductByID(ctx context.Context, schemaNa
 	var p models.Product
 	err := r.db.QueryRow(ctx, query, productID).Scan(
 		&p.ID, &p.CategoryID, &p.Name, &p.Description, &p.Price, &p.TaxRate,
-		&p.IsActive, &p.IsArchived, &p.HappyHourPrice, &p.HappyHourActive,
+		&p.DisplayOrder, &p.IsActive, &p.IsArchived, &p.HappyHourPrice, &p.HappyHourActive,
 		&p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {
@@ -166,7 +166,7 @@ func (r *ProductRepositoryPostgres) GetProductByID(ctx context.Context, schemaNa
 func (r *ProductRepositoryPostgres) GetAllProducts(ctx context.Context, schemaName string, includeArchived bool) ([]models.Product, error) {
 	query := fmt.Sprintf(`
 		SELECT id, category_id, name, description, price, tax_rate,
-		       is_active, is_archived, happy_hour_price, happy_hour_active,
+		       display_order, is_active, is_archived, happy_hour_price, happy_hour_active,
 		       created_at, updated_at
 		FROM "%s".products
 		WHERE 1=1
@@ -176,7 +176,7 @@ func (r *ProductRepositoryPostgres) GetAllProducts(ctx context.Context, schemaNa
 		query += " AND is_archived = false"
 	}
 
-	query += " ORDER BY name"
+	query += " ORDER BY display_order ASC, name ASC"
 
 	rows, err := r.db.Query(ctx, query)
 	if err != nil {
@@ -189,7 +189,7 @@ func (r *ProductRepositoryPostgres) GetAllProducts(ctx context.Context, schemaNa
 		var p models.Product
 		err := rows.Scan(
 			&p.ID, &p.CategoryID, &p.Name, &p.Description, &p.Price, &p.TaxRate,
-			&p.IsActive, &p.IsArchived, &p.HappyHourPrice, &p.HappyHourActive,
+			&p.DisplayOrder, &p.IsActive, &p.IsArchived, &p.HappyHourPrice, &p.HappyHourActive,
 			&p.CreatedAt, &p.UpdatedAt,
 		)
 		if err != nil {
@@ -204,11 +204,11 @@ func (r *ProductRepositoryPostgres) GetAllProducts(ctx context.Context, schemaNa
 func (r *ProductRepositoryPostgres) GetProductsByCategory(ctx context.Context, schemaName string, categoryID int64) ([]models.Product, error) {
 	query := fmt.Sprintf(`
 		SELECT id, category_id, name, description, price, tax_rate,
-		       is_active, is_archived, happy_hour_price, happy_hour_active,
+		       display_order, is_active, is_archived, happy_hour_price, happy_hour_active,
 		       created_at, updated_at
 		FROM "%s".products
 		WHERE category_id = $1 AND is_archived = false
-		ORDER BY name
+		ORDER BY display_order ASC, name ASC
 	`, schemaName)
 
 	rows, err := r.db.Query(ctx, query, categoryID)
@@ -222,7 +222,7 @@ func (r *ProductRepositoryPostgres) GetProductsByCategory(ctx context.Context, s
 		var p models.Product
 		err := rows.Scan(
 			&p.ID, &p.CategoryID, &p.Name, &p.Description, &p.Price, &p.TaxRate,
-			&p.IsActive, &p.IsArchived, &p.HappyHourPrice, &p.HappyHourActive,
+			&p.DisplayOrder, &p.IsActive, &p.IsArchived, &p.HappyHourPrice, &p.HappyHourActive,
 			&p.CreatedAt, &p.UpdatedAt,
 		)
 		if err != nil {
@@ -308,4 +308,26 @@ func (r *ProductRepositoryPostgres) GetHappyHourStatus(ctx context.Context, sche
 	var active bool
 	err := r.db.QueryRow(ctx, query).Scan(&active)
 	return active, err
+}
+
+// UpdateProductDisplayOrder updates the display order of a product
+func (r *ProductRepositoryPostgres) UpdateProductDisplayOrder(ctx context.Context, schemaName string, productID int64, displayOrder int) error {
+	query := fmt.Sprintf(`
+		UPDATE "%s".products
+		SET display_order = $1, updated_at = NOW()
+		WHERE id = $2
+	`, schemaName)
+	_, err := r.db.Exec(ctx, query, displayOrder, productID)
+	return err
+}
+
+// UpdateCategoryDisplayOrder updates the display order of a category
+func (r *ProductRepositoryPostgres) UpdateCategoryDisplayOrder(ctx context.Context, schemaName string, categoryID int64, displayOrder int) error {
+	query := fmt.Sprintf(`
+		UPDATE "%s".categories
+		SET display_order = $1, updated_at = NOW()
+		WHERE id = $2
+	`, schemaName)
+	_, err := r.db.Exec(ctx, query, displayOrder, categoryID)
+	return err
 }

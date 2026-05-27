@@ -18,6 +18,7 @@ type LegalRepository interface {
 	GetClosureBulletins(ctx context.Context, schemaName string, closureType *string, startDate, endDate *time.Time) ([]models.ClosureBulletin, error)
 	InsertClosureBulletin(ctx context.Context, bulletin *models.ClosureBulletin) error
 	GetClosureBulletin(ctx context.Context, bulletinID int64) (*models.ClosureBulletin, error)
+	ClosureExists(ctx context.Context, establishmentID, closureType string, periodStart, periodEnd time.Time) (bool, error)
 }
 
 // ProductRepository defines operations for products and categories
@@ -35,6 +36,8 @@ type ProductRepository interface {
 	GetAllProducts(ctx context.Context, schemaName string, includeArchived bool) ([]models.Product, error)
 	UpdateProduct(ctx context.Context, schemaName string, productID int64, updates map[string]interface{}) error
 	ArchiveProduct(ctx context.Context, schemaName string, productID int64) error
+	UpdateProductDisplayOrder(ctx context.Context, schemaName string, productID int64, displayOrder int) error
+	UpdateCategoryDisplayOrder(ctx context.Context, schemaName string, categoryID int64, displayOrder int) error
 	GetProductsByCategory(ctx context.Context, schemaName string, categoryID int64) ([]models.Product, error)
 	
 	// Happy Hour operations
