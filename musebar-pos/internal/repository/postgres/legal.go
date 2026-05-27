@@ -614,3 +614,19 @@ func (r *LegalRepositoryPostgres) UpdateArchiveStatus(ctx context.Context, expor
 
 	return nil
 }
+
+// ClosureExists checks if a closure bulletin already exists for a given period
+func (r *LegalRepositoryPostgres) ClosureExists(ctx context.Context, establishmentID, closureType string, periodStart, periodEnd time.Time) (bool, error) {
+	query := `
+		SELECT EXISTS(
+			SELECT 1 FROM closure_bulletins
+			WHERE establishment_id = $1
+			  AND closure_type = $2
+			  AND period_start = $3
+			  AND period_end = $4
+		)
+	`
+	var exists bool
+	err := r.db.QueryRow(ctx, query, establishmentID, closureType, periodStart, periodEnd).Scan(&exists)
+	return exists, err
+}

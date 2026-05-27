@@ -44,6 +44,7 @@ type Product struct {
 	Description     *string   `json:"description,omitempty"`
 	Price           float64   `json:"price"` // TTC (tax included)
 	TaxRate         float64   `json:"tax_rate"`
+	DisplayOrder    int       `json:"display_order"`
 	IsActive        bool      `json:"is_active"`
 	IsArchived      bool      `json:"is_archived"`
 	HappyHourPrice  *float64  `json:"happy_hour_price,omitempty"`

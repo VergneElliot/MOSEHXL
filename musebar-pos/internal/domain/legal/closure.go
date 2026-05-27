@@ -93,6 +93,15 @@ func (s *ClosureService) CreateAnnualClosure(ctx context.Context, schemaName, es
 
 // createPeriodClosure is the generic closure creation method
 func (s *ClosureService) createPeriodClosure(ctx context.Context, schemaName, establishmentID, closureType string, startDate, endDate time.Time, fondDeCaisse float64) (*models.ClosureBulletin, error) {
+	// Check if closure already exists for this period
+	exists, err := s.journalRepo.ClosureExists(ctx, establishmentID, closureType, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check existing closure: %w", err)
+	}
+	if exists {
+		return nil, fmt.Errorf("une clôture %s existe déjà pour cette période", closureType)
+	}
+
 	// Get legal journal entries for the period
 	entries, err := s.journalRepo.GetEntries(ctx, schemaName, &startDate, &endDate, nil, 10000, 0)
 	if err != nil {
