@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   findActiveRefreshToken: vi.fn(),
   rotateRefreshToken: vi.fn(),
   revokeRefreshFamily: vi.fn(),
+  revokeAllRefreshTokensForUser: vi.fn(),
 }));
 
 vi.mock('../db/pool', () => ({
@@ -44,6 +45,7 @@ vi.mock('../models/refreshToken', () => ({
     findActiveByRawToken: mocks.findActiveRefreshToken,
     rotate: mocks.rotateRefreshToken,
     revokeFamily: mocks.revokeRefreshFamily,
+    revokeAllForUser: mocks.revokeAllRefreshTokensForUser,
     create: vi.fn(),
     revokeByRawToken: vi.fn(),
   },
@@ -72,6 +74,7 @@ describe('POST /auth/refresh token rotation', () => {
     mocks.findActiveRefreshToken.mockReset();
     mocks.rotateRefreshToken.mockReset();
     mocks.revokeRefreshFamily.mockReset();
+    mocks.revokeAllRefreshTokensForUser.mockReset();
 
     mocks.logAction.mockResolvedValue({});
     mocks.getAuthRoleState.mockResolvedValue({
@@ -82,6 +85,8 @@ describe('POST /auth/refresh token rotation', () => {
     mocks.findById.mockResolvedValue({
       id: 10,
       email: 'admin@est.example.com',
+      is_active: true,
+      locked_until: null,
     });
     mocks.findActiveRefreshToken.mockResolvedValue({
       user_id: 10,
@@ -89,6 +94,7 @@ describe('POST /auth/refresh token rotation', () => {
     });
     mocks.rotateRefreshToken.mockResolvedValue(undefined);
     mocks.revokeRefreshFamily.mockResolvedValue(undefined);
+    mocks.revokeAllRefreshTokensForUser.mockResolvedValue(undefined);
     mocks.poolConnect.mockResolvedValue({
       query: mocks.lockClientQuery,
       release: mocks.lockClientRelease,
@@ -216,5 +222,46 @@ describe('POST /auth/refresh token rotation', () => {
       '11111111-1111-4111-8111-111111111111',
       'REUSE_DETECTED'
     );
+  });
+
+  it('blocks refresh for inactive users and revokes refresh sessions', async () => {
+    mocks.findById.mockResolvedValueOnce({
+      id: 10,
+      email: 'admin@est.example.com',
+      is_active: false,
+      locked_until: null,
+    });
+
+    const res = await request(app)
+      .post('/auth/refresh')
+      .set('Cookie', [REFRESH_COOKIE, CSRF_COOKIE])
+      .set(CSRF_HEADER)
+      .send({ rememberMe: false });
+
+    expect(res.status).toBe(403);
+    expect(String(res.body.error?.message)).toContain('Account is inactive');
+    expect(mocks.revokeAllRefreshTokensForUser).toHaveBeenCalledWith(10, 'USER_INACTIVE_REFRESH_BLOCK');
+    expect(mocks.rotateRefreshToken).not.toHaveBeenCalled();
+  });
+
+  it('blocks refresh for locked users and revokes refresh sessions', async () => {
+    const lockedUntil = new Date(Date.now() + 60_000);
+    mocks.findById.mockResolvedValueOnce({
+      id: 10,
+      email: 'admin@est.example.com',
+      is_active: true,
+      locked_until: lockedUntil,
+    });
+
+    const res = await request(app)
+      .post('/auth/refresh')
+      .set('Cookie', [REFRESH_COOKIE, CSRF_COOKIE])
+      .set(CSRF_HEADER)
+      .send({ rememberMe: false });
+
+    expect(res.status).toBe(403);
+    expect(String(res.body.error?.message)).toContain('Account is locked');
+    expect(mocks.revokeAllRefreshTokensForUser).toHaveBeenCalledWith(10, 'ACCOUNT_LOCKED_REFRESH_BLOCK');
+    expect(mocks.rotateRefreshToken).not.toHaveBeenCalled();
   });
 });
