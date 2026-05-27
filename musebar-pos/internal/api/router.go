@@ -8,6 +8,7 @@ import (
 	"musebar-pos/internal/config"
 	"musebar-pos/internal/domain/legal"
 	corsmw "musebar-pos/internal/middleware/cors"
+	"musebar-pos/internal/pkg/logger"
 	authmw "musebar-pos/internal/middleware/auth"
 	"musebar-pos/internal/repository/postgres"
 )
@@ -85,8 +86,9 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	mux.HandleFunc("GET /api/happy-hour/status", authmw.RequireAuth(happyHourHandler.GetHappyHourStatus))
 	mux.HandleFunc("PATCH /api/products/{id}/happy-hour", authmw.RequireAdmin(happyHourHandler.SetProductHappyHourPrice))
 
-	// Apply middleware stack (order matters: CORS → DB injection → router)
+	// Apply middleware stack (order matters: CORS → RequestLogger → DB injection → router)
 	handler := authmw.WithDB(db)(mux)
+	handler = logger.RequestLogger(logger.Get())(handler)
 	handler = corsmw.Middleware(corsmw.Config{
 		AllowedOrigins: cfg.CORSOrigins,
 		IsDevelopment:  cfg.Environment == "development",

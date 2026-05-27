@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"musebar-pos/internal/api"
+	"musebar-pos/internal/pkg/logger"
 	"musebar-pos/internal/config"
 )
 
@@ -28,6 +29,9 @@ func main() {
 
 	log.Printf("✅ Connected to PostgreSQL: %s", cfg.DatabaseName)
 
+	// Initialize structured logger
+	logger.Init(cfg.Environment)
+
 	// Pass cfg to router for CORS configuration
 	router := api.NewRouter(db, cfg)
 
@@ -40,10 +44,12 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("🚀 Server starting on port %s", cfg.Port)
-		log.Printf("🌐 Environment: %s", cfg.Environment)
-		log.Printf("📊 Database: %s", cfg.DatabaseName)
-		log.Printf("🔒 CORS origins: %v", cfg.CORSOrigins)
+		logger.Info("🚀 Server starting", map[string]interface{}{
+			"port":        cfg.Port,
+			"environment": cfg.Environment,
+			"database":    cfg.DatabaseName,
+			"cors":        cfg.CORSOrigins,
+		})
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server failed to start: %v", err)
 		}
