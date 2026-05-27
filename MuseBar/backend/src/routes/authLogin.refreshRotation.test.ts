@@ -55,6 +55,10 @@ app.use('/auth', authLoginRouter);
 app.use(errorHandler);
 
 describe('POST /auth/refresh token rotation', () => {
+  const REFRESH_COOKIE = 'musebar_refresh_token=refresh-1';
+  const CSRF_COOKIE = 'musebar_csrf_token=csrf-1';
+  const CSRF_HEADER = { 'x-csrf-token': 'csrf-1' };
+
   beforeEach(() => {
     mocks.poolQuery.mockReset();
     mocks.poolConnect.mockReset();
@@ -101,7 +105,8 @@ describe('POST /auth/refresh token rotation', () => {
   it('reissues access+refresh tokens and rotates refresh session', async () => {
     const res = await request(app)
       .post('/auth/refresh')
-      .set('Cookie', ['musebar_refresh_token=refresh-1'])
+      .set('Cookie', [REFRESH_COOKIE, CSRF_COOKIE])
+      .set(CSRF_HEADER)
       .send({ rememberMe: false });
 
     expect(res.status).toBe(200);
@@ -163,10 +168,32 @@ describe('POST /auth/refresh token rotation', () => {
 
     const res = await request(app)
       .post('/auth/refresh')
-      .set('Cookie', ['musebar_refresh_token=missing-token'])
+      .set('Cookie', ['musebar_refresh_token=missing-token', CSRF_COOKIE])
+      .set(CSRF_HEADER)
       .send({ rememberMe: false });
 
     expect(res.status).toBe(401);
     expect(String(res.body.error?.message)).toContain('Invalid or expired refresh token');
+  });
+
+  it('returns 400 when CSRF token is missing', async () => {
+    const res = await request(app)
+      .post('/auth/refresh')
+      .set('Cookie', [REFRESH_COOKIE])
+      .send({ rememberMe: false });
+
+    expect(res.status).toBe(400);
+    expect(String(res.body.error?.message)).toContain('CSRF token is required');
+  });
+
+  it('returns 401 when CSRF token is invalid', async () => {
+    const res = await request(app)
+      .post('/auth/refresh')
+      .set('Cookie', [REFRESH_COOKIE, CSRF_COOKIE])
+      .set('x-csrf-token', 'wrong-csrf')
+      .send({ rememberMe: false });
+
+    expect(res.status).toBe(401);
+    expect(String(res.body.error?.message)).toContain('Invalid CSRF token');
   });
 });
