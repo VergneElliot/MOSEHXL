@@ -9,7 +9,8 @@
     "dev:backend": "npm run dev --workspace MuseBar/backend",
     "build": "npm run build --workspace MuseBar && npm run build --workspace MuseBar/backend",
     "build:frontend": "npm run build --workspace MuseBar",
-    "build:backend": "npm run build --workspace MuseBar/backend"
+    "build:backend": "npm run build --workspace MuseBar/backend",
+    "docs:patch-notes-index": "node scripts/generate-patch-notes-index.js"
   },
   "workspaces": [
     "MuseBar",
