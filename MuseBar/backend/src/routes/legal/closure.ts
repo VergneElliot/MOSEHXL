@@ -8,7 +8,7 @@ import LegalJournalModel from '../../models/legalJournal';
 import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
 import { P } from '../../permissions/registry';
 import { Logger } from '../../utils/logger';
-import { AppError, asyncHandler } from '../../middleware/errorHandler';
+import { AppError, asyncHandler, ConflictError, NotFoundError, ValidationError } from '../../middleware/errorHandler';
 
 const router = express.Router();
 const logger = Logger.getInstance();
@@ -141,15 +141,15 @@ router.post('/daily', asyncHandler(async (req, res) => {
   try {
     const { date, force, fond_de_caisse } = req.body;
     if (!date) {
-      return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
+      throw new ValidationError('Date is required (YYYY-MM-DD format)');
     }
     const fondDeCaisse = parseFondDeCaisse(fond_de_caisse);
     if (fondDeCaisse === null) {
-      return res.status(400).json({ error: 'fond_de_caisse is required and must be a number >= 0' });
+      throw new ValidationError('fond_de_caisse is required and must be a number >= 0');
     }
     const closureDate = new Date(date);
     if (isNaN(closureDate.getTime())) {
-      return res.status(400).json({ error: 'Invalid date format' });
+      throw new ValidationError('Invalid date format');
     }
 
     const forceCreate = parseForceFlag(force);
@@ -196,15 +196,15 @@ router.post('/weekly', asyncHandler(async (req, res) => {
   try {
     const { date, force, fond_de_caisse } = req.body;
     if (!date) {
-      return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
+      throw new ValidationError('Date is required (YYYY-MM-DD format)');
     }
     const fondDeCaisse = parseFondDeCaisse(fond_de_caisse);
     if (fondDeCaisse === null) {
-      return res.status(400).json({ error: 'fond_de_caisse is required and must be a number >= 0' });
+      throw new ValidationError('fond_de_caisse is required and must be a number >= 0');
     }
     const closureDate = new Date(date);
     if (isNaN(closureDate.getTime())) {
-      return res.status(400).json({ error: 'Invalid date format' });
+      throw new ValidationError('Invalid date format');
     }
     const forceCreate = parseForceFlag(force);
     const userId = req.user ? String(req.user.id) : undefined;
@@ -249,15 +249,15 @@ router.post('/monthly', asyncHandler(async (req, res) => {
   try {
     const { date, force, fond_de_caisse } = req.body;
     if (!date) {
-      return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
+      throw new ValidationError('Date is required (YYYY-MM-DD format)');
     }
     const fondDeCaisse = parseFondDeCaisse(fond_de_caisse);
     if (fondDeCaisse === null) {
-      return res.status(400).json({ error: 'fond_de_caisse is required and must be a number >= 0' });
+      throw new ValidationError('fond_de_caisse is required and must be a number >= 0');
     }
     const closureDate = new Date(date);
     if (isNaN(closureDate.getTime())) {
-      return res.status(400).json({ error: 'Invalid date format' });
+      throw new ValidationError('Invalid date format');
     }
     const forceCreate = parseForceFlag(force);
     const userId = req.user ? String(req.user.id) : undefined;
@@ -302,15 +302,15 @@ router.post('/annual', asyncHandler(async (req, res) => {
   try {
     const { date, force, fond_de_caisse } = req.body;
     if (!date) {
-      return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
+      throw new ValidationError('Date is required (YYYY-MM-DD format)');
     }
     const fondDeCaisse = parseFondDeCaisse(fond_de_caisse);
     if (fondDeCaisse === null) {
-      return res.status(400).json({ error: 'fond_de_caisse is required and must be a number >= 0' });
+      throw new ValidationError('fond_de_caisse is required and must be a number >= 0');
     }
     const closureDate = new Date(date);
     if (isNaN(closureDate.getTime())) {
-      return res.status(400).json({ error: 'Invalid date format' });
+      throw new ValidationError('Invalid date format');
     }
     const forceCreate = parseForceFlag(force);
     const userId = req.user ? String(req.user.id) : undefined;
@@ -356,22 +356,20 @@ router.post('/create', asyncHandler(async (req, res) => {
     const { date, type, force, fond_de_caisse } = req.body;
 
     if (!date) {
-      return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
+      throw new ValidationError('Date is required (YYYY-MM-DD format)');
     }
     if (!type || !['DAILY', 'WEEKLY', 'MONTHLY', 'ANNUAL'].includes(type)) {
-      return res.status(400).json({
-        error: 'Valid closure type is required (DAILY, WEEKLY, MONTHLY, ANNUAL)'
-      });
+      throw new ValidationError('Valid closure type is required (DAILY, WEEKLY, MONTHLY, ANNUAL)');
     }
     const closureDate = new Date(date);
     if (isNaN(closureDate.getTime())) {
-      return res.status(400).json({ error: 'Invalid date format' });
+      throw new ValidationError('Invalid date format');
     }
 
     const forceCreate = parseForceFlag(force);
     const fondDeCaisse = parseFondDeCaisse(fond_de_caisse);
     if (fondDeCaisse === null) {
-      return res.status(400).json({ error: 'fond_de_caisse is required and must be a number >= 0' });
+      throw new ValidationError('fond_de_caisse is required and must be a number >= 0');
     }
 
     let closureCreator!: () => Promise<ClosureJournalPayload>;
@@ -414,7 +412,7 @@ router.post('/create', asyncHandler(async (req, res) => {
           ) as Promise<ClosureJournalPayload>;
         break;
       default:
-        return res.status(400).json({ error: 'Invalid closure type' });
+        throw new ValidationError('Invalid closure type');
     }
     const userId = req.user ? String(req.user.id) : undefined;
     const closure = await createClosureWithFailClosedJournal(
@@ -433,7 +431,7 @@ router.post('/create', asyncHandler(async (req, res) => {
     });
   } catch (error) {
     if (error instanceof Error && error.message.includes('already exists')) {
-      return res.status(409).json({ error: error.message });
+      throw new ConflictError(error.message);
     }
     logger.error(
       `Error creating ${String(req.body.type)} closure`,
@@ -571,11 +569,12 @@ router.get('/monthly-latest', asyncHandler(async (req, res) => {
     });
 
     if (!currentMonthBulletin) {
-      return res.status(404).json({ error: 'No monthly closure bulletin found for the current month.' });
+      throw new NotFoundError('Monthly closure bulletin for the current month');
     }
 
     res.json(currentMonthBulletin);
   } catch (error) {
+    if (error instanceof AppError) throw error;
     logger.error(
       'Error fetching latest monthly closure',
       error instanceof Error ? error : new Error(String(error)),

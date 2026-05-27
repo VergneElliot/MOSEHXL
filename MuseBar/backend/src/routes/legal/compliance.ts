@@ -6,7 +6,7 @@
 import express from 'express';
 import LegalJournalModel from '../../models/legalJournal';
 import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
-import { AppError, asyncHandler } from '../../middleware/errorHandler';
+import { AppError, asyncHandler, ValidationError } from '../../middleware/errorHandler';
 import { Logger } from '../../utils/logger';
 import { P } from '../../permissions/registry';
 
@@ -63,14 +63,14 @@ router.get('/report', requirePermission(P.access_compliance), asyncHandler(async
     const { start_date, end_date } = req.query;
     
     if (!start_date || !end_date) {
-      return res.status(400).json({ error: 'Start date and end date are required' });
+      throw new ValidationError('Start date and end date are required');
     }
     
     const startDate = new Date(start_date as string);
     const endDate = new Date(end_date as string);
     
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-      return res.status(400).json({ error: 'Invalid date format' });
+      throw new ValidationError('Invalid date format');
     }
     
     // Get journal entries for the period
@@ -113,6 +113,7 @@ router.get('/report', requirePermission(P.access_compliance), asyncHandler(async
     
     res.json(report);
   } catch (error: unknown) {
+    if (error instanceof AppError) throw error;
     logger.error(
       'Error generating compliance report',
       error instanceof Error ? error : new Error(String(error)),

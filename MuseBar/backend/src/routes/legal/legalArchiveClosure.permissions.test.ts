@@ -243,7 +243,7 @@ describe('legal archive/closure permission gating', () => {
 
     expect(res.status).toBe(404);
     expect(mocks.getArchiveExportById).toHaveBeenCalledWith(999, EST);
-    expect(res.body.error).toBe('Archive not found');
+    expect(res.body.error?.message).toBe('Archive not found');
   });
 
   it('returns 400 for /archive/:id when archive id is invalid and skips lookup', async () => {
@@ -254,7 +254,7 @@ describe('legal archive/closure permission gating', () => {
       .set('Authorization', `Bearer ${tokenFor('staff')}`);
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe('Invalid archive ID');
+    expect(res.body.error?.message).toBe('Invalid archive ID');
     expect(mocks.getArchiveExportById).not.toHaveBeenCalled();
   });
 
@@ -267,7 +267,7 @@ describe('legal archive/closure permission gating', () => {
       .send({ archiveType: 'DAILY' });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe('Archive type, start date, and end date are required');
+    expect(res.body.error?.message).toBe('Archive type, start date, and end date are required');
   });
 
   it('allows /archive/create with access_closure and sends establishment-scoped export payload', async () => {
@@ -323,7 +323,7 @@ describe('legal archive/closure permission gating', () => {
       .send({ format: 'json' });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe('Invalid archive ID');
+    expect(res.body.error?.message).toBe('Invalid archive ID');
   });
 
   it('verifies archive integrity via /archive/:id/verify', async () => {
@@ -359,7 +359,7 @@ describe('legal archive/closure permission gating', () => {
       .send({});
 
     expect(res.status).toBe(404);
-    expect(res.body.error).toBe('Archive not found');
+    expect(res.body.error?.message).toBe('Archive not found');
   });
 
   it('downloads archive via /archive/:id/download', async () => {
@@ -483,7 +483,7 @@ describe('legal archive/closure permission gating', () => {
 
     expect(res.status).toBe(404);
     expect(mocks.getClosureBulletins).toHaveBeenCalledWith(EST, 'MONTHLY');
-    expect(res.body.error).toBe('No monthly closure bulletin found for the current month.');
+    expect(res.body.error?.message).toBe('Monthly closure bulletin for the current month not found');
   });
 
   it('allows /closure/today-status with access_closure and strips total_transactions from bulletin', async () => {

@@ -121,7 +121,7 @@ describe('printing routes', () => {
       .set('x-test-auth-mode', 'no-est');
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe('Establishment context required');
+    expect(res.body.error?.message).toBe('Establishment context required');
   });
 
   it('returns Epson poll payload when handler succeeds', async () => {
@@ -243,7 +243,7 @@ describe('printing routes', () => {
       .send({ provider: 'invalid-provider', config: {} });
 
     expect(res.status).toBe(400);
-    expect(String(res.body.error)).toContain('Provider must be one of');
+    expect(String(res.body.error?.message ?? '')).toContain('Provider must be one of');
   });
 
   it('returns 400 when provider is missing on configuration update', async () => {
@@ -253,7 +253,7 @@ describe('printing routes', () => {
       .send({ config: {} });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe('Provider is required');
+    expect(res.body.error?.message).toBe('Provider is required');
     expect(mocks.savePrintingConfiguration).not.toHaveBeenCalled();
   });
 
@@ -312,7 +312,7 @@ describe('printing routes', () => {
       .set('x-test-auth-mode', 'no-est');
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe('Establishment context required');
+    expect(res.body.error?.message).toBe('Establishment context required');
     expect(mocks.listPrintingConfigurations).not.toHaveBeenCalled();
   });
 
@@ -416,7 +416,7 @@ describe('printing routes', () => {
       .set('Authorization', 'Bearer test-token');
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe('Invalid order id');
+    expect(res.body.error?.message).toBe('Invalid order id');
     expect(mocks.buildReceiptDataForOrder).not.toHaveBeenCalled();
   });
 
@@ -430,7 +430,7 @@ describe('printing routes', () => {
       .set('Authorization', 'Bearer test-token');
 
     expect(res.status).toBe(404);
-    expect(res.body.error).toBe('Receipt not found');
+    expect(res.body.error?.message).toBe('Receipt not found');
   });
 
   it('maps receipt print not-found errors to 404', async () => {
@@ -443,7 +443,7 @@ describe('printing routes', () => {
       .set('Authorization', 'Bearer test-token');
 
     expect(res.status).toBe(404);
-    expect(res.body.error).toBe('Receipt not found');
+    expect(res.body.error?.message).toBe('Receipt not found');
   });
 
   it('prints receipt successfully and logs printing history metadata', async () => {
@@ -481,7 +481,7 @@ describe('printing routes', () => {
       .set('Authorization', 'Bearer test-token');
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe('Invalid order id');
+    expect(res.body.error?.message).toBe('Invalid order id');
     expect(mocks.buildReceiptDataForOrder).not.toHaveBeenCalled();
   });
 
@@ -495,7 +495,7 @@ describe('printing routes', () => {
       .set('Authorization', 'Bearer test-token');
 
     expect(res.status).toBe(404);
-    expect(res.body.error).toBe('Closure bulletin not found');
+    expect(res.body.error?.message).toBe('Closure bulletin not found');
   });
 
   it('prints closure bulletin successfully and logs printing history metadata', async () => {
@@ -533,7 +533,7 @@ describe('printing routes', () => {
       .set('Authorization', 'Bearer test-token');
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe('Invalid closure bulletin id');
+    expect(res.body.error?.message).toBe('Invalid closure bulletin id');
     expect(mocks.buildClosureBulletinData).not.toHaveBeenCalled();
   });
 });

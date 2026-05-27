@@ -7,7 +7,7 @@ import {
   printReceiptResponse,
   printClosureBulletinResponse
 } from './printing';
-import { AppError, asyncHandler } from '../middleware/errorHandler';
+import { AppError, asyncHandler, NotFoundError, ValidationError } from '../middleware/errorHandler';
 
 const router = Router();
 
@@ -25,8 +25,9 @@ function getPrintingUser(req: AuthenticatedRequest): PrintingUser | null {
 const ensureEstablishment = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   const user = getPrintingUser(req);
   if (!user) {
-    return res.status(400).json({ error: 'Establishment context required' });
+    throw new ValidationError('Establishment context required');
   }
+  void res;
   next();
 };
 
@@ -54,7 +55,7 @@ router.post('/api/legal/receipt/:orderId/thermal-print', authenticateToken, ensu
   } catch (error: unknown) {
     const e = error as { statusCode?: number; message?: string };
     if (e?.statusCode === 404) {
-      return res.status(404).json({ error: 'Receipt not found' });
+      throw new NotFoundError('Receipt');
     }
     throw new AppError(e?.message || 'Printing failed', 500, 'PRINTING_COMPAT_RECEIPT_FAILED');
   }
@@ -77,7 +78,7 @@ router.post('/api/legal/closure/:bulletinId/thermal-print', authenticateToken, e
   } catch (error: unknown) {
     const e = error as { statusCode?: number; message?: string };
     if (e?.statusCode === 404) {
-      return res.status(404).json({ error: 'Closure bulletin not found' });
+      throw new NotFoundError('Closure bulletin');
     }
     throw new AppError(e?.message || 'Printing failed', 500, 'PRINTING_COMPAT_CLOSURE_FAILED');
   }

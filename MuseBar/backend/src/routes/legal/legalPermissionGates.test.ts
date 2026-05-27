@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 import { generateToken } from '../auth';
+import { errorHandler } from '../../middleware/errorHandler';
 
 const EST = '11111111-1111-4111-8111-111111111111';
 
@@ -74,6 +75,7 @@ app.use(express.json());
 app.use('/journal', journalRouter);
 app.use('/compliance', complianceRouter);
 app.use('/stats', statsRouter);
+app.use(errorHandler);
 
 function tokenFor(role: 'system_admin' | 'establishment_admin' | 'staff', establishmentId: string | null = EST) {
   return generateToken(
@@ -294,7 +296,7 @@ describe('legal route compliance permission gates', () => {
       .set('Authorization', `Bearer ${tokenFor('staff')}`);
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe('Start date and end date are required');
+    expect(res.body.error?.message).toBe('Start date and end date are required');
     expect(mocks.getEntriesForPeriod).not.toHaveBeenCalled();
   });
 
@@ -306,7 +308,7 @@ describe('legal route compliance permission gates', () => {
       .set('Authorization', `Bearer ${tokenFor('staff')}`);
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe('Invalid date format');
+    expect(res.body.error?.message).toBe('Invalid date format');
     expect(mocks.getEntriesForPeriod).not.toHaveBeenCalled();
   });
 
