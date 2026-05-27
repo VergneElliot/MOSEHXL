@@ -20,6 +20,8 @@ import {
   Send as SendIcon,
   Lock as LockIcon,
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
+import { LanguageSwitcher } from '../common/LanguageSwitcher';
 
 interface PasswordResetRequestProps {
   onSubmit: (email: string) => Promise<void>;
@@ -34,6 +36,7 @@ export const PasswordResetRequest: React.FC<PasswordResetRequestProps> = ({
   error,
   success,
 }) => {
+  const { t } = useTranslation(['auth']);
   const [email, setEmail] = useState('');
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -46,13 +49,16 @@ export const PasswordResetRequest: React.FC<PasswordResetRequestProps> = ({
   return (
     <Box sx={{ maxWidth: 500, mx: 'auto', mt: 4, p: 2 }}>
       <Paper sx={{ p: 4 }}>
+        <Box display="flex" justifyContent="flex-end" mb={1}>
+          <LanguageSwitcher />
+        </Box>
         <Box sx={{ textAlign: 'center', mb: 4 }}>
           <LockIcon sx={{ fontSize: 64, color: 'primary.main', mb: 2 }} />
           <Typography variant="h4" gutterBottom>
-            Reset Your Password
+            {t('passwordResetRequest.title')}
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Enter your email address and we'll send you a link to reset your password.
+            {t('passwordResetRequest.subtitle')}
           </Typography>
         </Box>
 
@@ -64,7 +70,7 @@ export const PasswordResetRequest: React.FC<PasswordResetRequestProps> = ({
 
         {success && (
           <Alert severity="success" sx={{ mb: 3 }}>
-            Password reset link has been sent to your email address.
+            {t('passwordResetRequest.success')}
           </Alert>
         )}
 
@@ -73,7 +79,7 @@ export const PasswordResetRequest: React.FC<PasswordResetRequestProps> = ({
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Email Address"
+                label={t('passwordResetRequest.emailLabel')}
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -96,7 +102,7 @@ export const PasswordResetRequest: React.FC<PasswordResetRequestProps> = ({
               disabled={!email.trim() || loading}
               startIcon={<SendIcon />}
             >
-              {loading ? 'Sending...' : 'Send Reset Link'}
+              {loading ? t('passwordResetRequest.sending') : t('passwordResetRequest.sendLink')}
             </Button>
           </Box>
         </form>
@@ -104,16 +110,16 @@ export const PasswordResetRequest: React.FC<PasswordResetRequestProps> = ({
         <Card sx={{ mt: 4, bgcolor: 'info.50' }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
-              What happens next?
+              {t('passwordResetRequest.nextTitle')}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              • You'll receive an email with a secure reset link
+              - {t('passwordResetRequest.nextStep1')}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              • Click the link to set a new password
+              - {t('passwordResetRequest.nextStep2')}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              • The link expires in 1 hour for security
+              - {t('passwordResetRequest.nextStep3')}
             </Typography>
           </CardContent>
         </Card>
