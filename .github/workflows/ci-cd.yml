@@ -304,6 +304,11 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Verify patch-notes latest index is up to date
+      run: |
+        npm run docs:patch-notes-index
+        git diff --exit-code -- docs/patch-notes/LATEST-INDEX.md
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:

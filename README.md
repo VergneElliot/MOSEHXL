@@ -286,6 +286,7 @@ Granular permissions (granted per user): `access_pos`, `access_menu`, `access_se
 Full documentation lives in the `docs/` folder:
 
 - **[Table of Contents](docs/00-TABLE-OF-CONTENTS.md)** — Start here for navigation
+- **[Current Truth](docs/CURRENT-TRUTH.md)** — Fastest path to latest audit state + generated latest patch-note index
 - **[Course](docs/course/)** — 10-chapter progressive learning guide (beginner-friendly)
 - **[Patch Notes](docs/patch-notes/)** — Phased remediation history (A/B/C audit work and follow-ups)
 - **[Development State](DEVELOPMENT-STATE.md)** — Current status, resolved/decided critical fixes, known issues

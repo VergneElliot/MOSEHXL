@@ -7,7 +7,7 @@ The documentation is organized into two sections:
 - **Course** — A progressive learning guide that teaches you every aspect of the project, from basic concepts to advanced legal compliance. Start here if you are new.
 - **Patch Notes** — A chronological log of every fix and improvement made to the codebase after the initial audit. Each entry explains what was wrong, why it mattered, and exactly what was changed.
 
-For **current live status**, prioritize `DEVELOPMENT-STATE.md` and the latest `docs/patch-notes/` entries. Some course chapters include historical snapshots for teaching context.
+For **current live status**, start from [CURRENT-TRUTH.md](./CURRENT-TRUTH.md), then use `DEVELOPMENT-STATE.md` and the latest patch-note index.
 
 ---
 
@@ -33,6 +33,8 @@ These chapters are designed to be read in order. Each one builds on the previous
 ## Patch Notes — Fixes & Improvements
 
 These are organized chronologically. Each entry corresponds to one specific issue found during the code audit, explains the problem in depth, and documents the fix. They are grouped by category below for easier navigation, but numbered in the order they were applied.
+
+- Auto-generated latest index: [LATEST-INDEX.md](./patch-notes/LATEST-INDEX.md)
 
 > **Index scope note:** this table is a curated index, not an exhaustive live
 > listing of every patch note file in `docs/patch-notes/`. For complete history,
