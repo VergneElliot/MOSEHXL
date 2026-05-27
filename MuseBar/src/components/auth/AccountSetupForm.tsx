@@ -15,6 +15,7 @@ import {
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
 } from '@mui/icons-material';
+import type { InvitationData } from './types';
 
 interface AccountSetupData {
   firstName: string;
@@ -32,7 +33,7 @@ interface PasswordValidation {
 }
 
 interface AccountSetupFormProps {
-  invitation: any;
+  invitation: InvitationData;
   onSubmit: (data: AccountSetupData) => void;
   onBack: () => void;
   loading: boolean;

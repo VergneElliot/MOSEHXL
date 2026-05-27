@@ -26,18 +26,7 @@ import {
   Security as SecurityIcon,
   Business as BusinessIcon,
 } from '@mui/icons-material';
-
-interface InvitationData {
-  email: string;
-  establishmentName: string;
-  role: string;
-  inviterName: string;
-  expiresAt: string;
-  prefill: {
-    firstName?: string;
-    lastName?: string;
-  };
-}
+import type { InvitationData } from './types';
 
 interface InvitationValidationProps {
   onValidationComplete: (invitation: InvitationData) => void;
