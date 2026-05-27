@@ -119,6 +119,17 @@ export class RefreshTokenModel {
     }
   }
 
+  static async getFamilyIssuedAt(familyId: string): Promise<Date | null> {
+    const result = await pool.query(
+      `SELECT MIN(issued_at) AS first_issued_at
+       FROM auth_refresh_tokens
+       WHERE family_id = $1`,
+      [familyId]
+    );
+    const raw = result.rows[0]?.first_issued_at;
+    return raw ? new Date(raw) : null;
+  }
+
   static async revokeByRawToken(token: string, reason: string): Promise<void> {
     await pool.query(
       `UPDATE auth_refresh_tokens
