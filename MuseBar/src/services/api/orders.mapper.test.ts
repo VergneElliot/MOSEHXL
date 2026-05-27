@@ -54,7 +54,12 @@ describe('orders API DTO mapper', () => {
 
     const orders = await getOrders();
     expect(orders).toHaveLength(1);
-    expect(orders[0]).toEqual(
+    const firstOrder = orders[0];
+    expect(firstOrder).toBeDefined();
+    if (!firstOrder) {
+      throw new Error('Expected first order to be defined');
+    }
+    expect(firstOrder).toEqual(
       expect.objectContaining({
         id: '42',
         totalAmount: 30.5,
@@ -66,7 +71,12 @@ describe('orders API DTO mapper', () => {
         notes: 'table 7',
       })
     );
-    expect(orders[0].items[0]).toEqual(
+    const firstOrderItem = firstOrder.items[0];
+    expect(firstOrderItem).toBeDefined();
+    if (!firstOrderItem) {
+      throw new Error('Expected first order item to be defined');
+    }
+    expect(firstOrderItem).toEqual(
       expect.objectContaining({
         id: '700',
         productId: '5',
@@ -81,7 +91,7 @@ describe('orders API DTO mapper', () => {
         isOffert: false,
       })
     );
-    expect(orders[0].subBills?.[0]).toEqual(
+    expect(firstOrder.subBills?.[0]).toEqual(
       expect.objectContaining({
         id: '1',
         orderId: '42',
@@ -120,10 +130,20 @@ describe('orders API DTO mapper', () => {
 
     const legacy = await getOrdersPaginated({ limit: 1, offset: 0 });
     expect(legacy.total).toBe(1);
-    expect(legacy.orders[0].id).toBe('1');
+    const firstLegacyOrder = legacy.orders[0];
+    expect(firstLegacyOrder).toBeDefined();
+    if (!firstLegacyOrder) {
+      throw new Error('Expected first legacy order to be defined');
+    }
+    expect(firstLegacyOrder.id).toBe('1');
 
     const paginated = await getOrdersPaginated({ limit: 1, offset: 1 });
     expect(paginated.total).toBe(50);
-    expect(paginated.orders[0].id).toBe('2');
+    const firstPaginatedOrder = paginated.orders[0];
+    expect(firstPaginatedOrder).toBeDefined();
+    if (!firstPaginatedOrder) {
+      throw new Error('Expected first paginated order to be defined');
+    }
+    expect(firstPaginatedOrder.id).toBe('2');
   });
 });

@@ -101,7 +101,7 @@ export const useClosureSettings = ({
    */
   const getNextClosureTime = useCallback((): Date => {
     const now = new Date();
-    const [hours, minutes] = closureSettings.daily_closure_time.split(':').map(Number);
+    const [hours = 0, minutes = 0] = closureSettings.daily_closure_time.split(':').map(Number);
     const nextClosure = new Date();
     nextClosure.setHours(hours, minutes, 0, 0);
     

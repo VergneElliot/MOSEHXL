@@ -34,6 +34,14 @@ import { formatCurrency } from '../../../utils/formatCurrency';
 import type { OrderItem } from '../../../types';
 import SplitSummary from './SplitSummary';
 
+function buildPrimaryPayment(
+  bill: { payments: Array<{ method?: 'cash' | 'card' | 'split'; amount: number }> },
+  amount: number
+) {
+  const method: 'cash' | 'card' = bill.payments[0]?.method === 'cash' ? 'cash' : 'card';
+  return [{ amount, method }];
+}
+
 /**
  * Split Payment Component
  */
@@ -73,10 +81,7 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
             ...bill,
             items,
             total,
-            payments:
-              bill.payments.length > 0
-                ? [{ ...bill.payments[0], amount: total }]
-                : [{ amount: total, method: 'card' as const }],
+            payments: buildPrimaryPayment(bill, total),
           };
         }
         const items = [...bill.items, item];
@@ -85,10 +90,7 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
           ...bill,
           items,
           total,
-          payments:
-            bill.payments.length > 0
-              ? [{ ...bill.payments[0], amount: total }]
-              : [{ amount: total, method: 'card' as const }],
+          payments: buildPrimaryPayment(bill, total),
         };
       });
       onSubBillsChange(updated);
@@ -106,10 +108,7 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
           ...bill,
           items,
           total,
-          payments:
-            bill.payments.length > 0
-              ? [{ ...bill.payments[0], amount: total }]
-              : [{ amount: total, method: 'card' as const }],
+          payments: buildPrimaryPayment(bill, total),
         };
       });
       onSubBillsChange(updated);
@@ -124,7 +123,7 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
         ...b,
         items: [],
         total: 0,
-        payments: [{ amount: 0, method: 'card' as const }],
+        payments: buildPrimaryPayment(b, 0),
       }))
     );
   }, [subBills, onSubBillsChange]);
@@ -137,10 +136,7 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
         return {
           ...b,
           total,
-          payments:
-            b.payments.length > 0
-              ? [{ ...b.payments[0], amount: total }]
-              : [{ amount: total, method: 'card' as const }],
+          payments: buildPrimaryPayment(b, total),
         };
       })
     );
@@ -156,10 +152,7 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
             ? {
                 ...bill,
                 total: safeAmount,
-                payments:
-                  bill.payments.length > 0
-                    ? [{ ...bill.payments[0], amount: safeAmount }]
-                    : [{ amount: safeAmount, method: 'card' as const }],
+                payments: buildPrimaryPayment(bill, safeAmount),
               }
         : bill
     );
@@ -170,13 +163,15 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
         .slice(0, lastIndex)
         .reduce((sum, bill) => sum + bill.total, 0);
       const remaining = Math.max(0, orderTotal - othersTotal);
+      const residualBill = updated[lastIndex];
+      if (!residualBill) {
+        onSubBillsChange(updated);
+        return;
+      }
       updated[lastIndex] = {
-          ...updated[lastIndex],
+          ...residualBill,
           total: remaining,
-          payments:
-            updated[lastIndex].payments.length > 0
-              ? [{ ...updated[lastIndex].payments[0], amount: remaining }]
-              : [{ amount: remaining, method: 'card' as const }],
+          payments: buildPrimaryPayment(residualBill, remaining),
         };
     }
 
@@ -309,8 +304,8 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
                         value={String(selectedIndex)}
                         onChange={e => setAddToBillIndex(prev => ({ ...prev, [item.id]: parseInt(e.target.value, 10) }))}
                       >
-                        {subBills.map((_, index) => (
-                          <MenuItem key={subBills[index].id} value={String(index)}>
+                        {subBills.map((bill, index) => (
+                          <MenuItem key={bill.id} value={String(index)}>
                             {`Paiement ${index + 1}`}
                           </MenuItem>
                         ))}
