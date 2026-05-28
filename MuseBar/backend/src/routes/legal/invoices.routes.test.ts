@@ -57,6 +57,7 @@ describe('legal invoices routes', () => {
     mocks.poolQuery.mockReset();
     mocks.poolConnect.mockReset();
     mocks.buildReceiptDataForOrder.mockReset();
+    mocks.poolQuery.mockResolvedValue({ rows: [], rowCount: 0 });
   });
 
   it('returns 400 for invalid order id', async () => {
@@ -75,6 +76,11 @@ describe('legal invoices routes', () => {
       .post('/invoices/from-order/42')
       .send({
         customer: { name: '', address: '' },
+        legal: {
+          payment_due_date: '2026-06-30',
+          payment_terms: 'Paiement à 30 jours',
+          late_penalty_terms: 'Pénalités au taux BCE + 10 points',
+        },
       });
 
     expect(res.status).toBe(400);
@@ -122,6 +128,14 @@ describe('legal invoices routes', () => {
           email: 'facturation@client.fr',
           tax_identification: 'FRXX999999999',
         },
+        legal: {
+          payment_due_date: '2026-06-30',
+          payment_terms: 'Paiement à 30 jours',
+          late_penalty_terms: 'Pénalités au taux BCE + 10 points',
+          recovery_fee_note: 'Indemnité forfaitaire de recouvrement: 40 EUR (C. com. art. L441-10)',
+          seller_legal_form: 'SARL',
+          seller_share_capital_eur: 10000,
+        },
       });
 
     expect(res.status).toBe(201);
@@ -148,18 +162,10 @@ describe('legal invoices routes', () => {
       compliance_info: { receipt_hash: 'hash-15' },
     });
 
-    const txQuery = vi.fn(async (sql: string) => {
-      if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') return { rows: [], rowCount: 0 };
-      if (sql.includes('SELECT *') && sql.includes('WHERE establishment_id = $1 AND order_id = $2')) {
-        return {
-          rows: [{ id: 88, invoice_number: 'FAC-2026-000088', order_id: 42, invoice_mode: 'detailed' }],
-          rowCount: 1,
-        };
-      }
-      return { rows: [], rowCount: 0 };
+    mocks.poolQuery.mockResolvedValueOnce({
+      rows: [{ id: 88, invoice_number: 'FAC-2026-000088', order_id: 42, invoice_mode: 'detailed' }],
+      rowCount: 1,
     });
-    const txRelease = vi.fn();
-    mocks.poolConnect.mockResolvedValue({ query: txQuery, release: txRelease });
 
     const res = await request(app)
       .post('/invoices/from-order/42')
@@ -169,13 +175,39 @@ describe('legal invoices routes', () => {
           name: 'Client déjà facturé',
           address: '3 Rue Victor Hugo',
         },
+        legal: {
+          payment_due_date: '2026-06-30',
+          payment_terms: 'Paiement comptant',
+          late_penalty_terms: 'Pénalités légales',
+        },
       });
 
     expect(res.status).toBe(200);
     expect(res.body.already_exists).toBe(true);
     expect(res.body.invoice.invoice_number).toBe('FAC-2026-000088');
     expect(res.body.invoice.requested_mode).toBe('summary');
-    expect(txRelease).toHaveBeenCalledTimes(1);
+    expect(mocks.poolConnect).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when mandatory legal fields are missing', async () => {
+    const res = await request(app)
+      .post('/invoices/from-order/42')
+      .send({
+        mode: 'detailed',
+        customer: {
+          name: 'Client B2B',
+          address: '12 Avenue de Lyon',
+        },
+        legal: {
+          payment_due_date: '',
+          payment_terms: '',
+          late_penalty_terms: '',
+        },
+      });
+
+    expect(res.status).toBe(400);
+    expect(String(res.body.error?.message ?? '')).toContain('payment_due_date');
+    expect(mocks.buildReceiptDataForOrder).not.toHaveBeenCalled();
   });
 
   it('lists invoices with bounded pagination defaults', async () => {
