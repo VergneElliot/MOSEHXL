@@ -10,6 +10,7 @@ import type { SignOptions } from 'jsonwebtoken';
 import { UserModel } from '../models/user';
 import { runWithTenantContext } from '../rls/tenantContext';
 import { signJwtToken, verifyJwtToken } from '../security/jwtConfig';
+import { Logger } from '../utils/logger';
 
 export interface JwtPayload {
   id: number;
@@ -24,6 +25,59 @@ export interface JwtPayload {
     started_at: string;
     expires_at: string;
   };
+}
+
+type LegacyAdminClaimMetrics = {
+  seenCount: number;
+  rejectedCount: number;
+  lastSeenAt: string | null;
+  lastRejectedAt: string | null;
+};
+
+const legacyAdminClaimMetrics: LegacyAdminClaimMetrics = {
+  seenCount: 0,
+  rejectedCount: 0,
+  lastSeenAt: null,
+  lastRejectedAt: null,
+};
+
+function shouldRejectLegacyAdminClaim(): boolean {
+  const raw = process.env.AUTH_REJECT_LEGACY_IS_ADMIN_CLAIM?.trim().toLowerCase();
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return process.env.NODE_ENV === 'production';
+}
+
+function trackLegacyAdminClaimSeen(payload: JwtPayload, token: string): void {
+  legacyAdminClaimMetrics.seenCount += 1;
+  legacyAdminClaimMetrics.lastSeenAt = new Date().toISOString();
+  try {
+    Logger.getInstance().security(
+      'LEGACY_IS_ADMIN_CLAIM_DETECTED',
+      'HIGH',
+      {
+        role: payload.role,
+        legacy_is_admin_value: payload.is_admin,
+        token_jti: payload.jti ?? null,
+        token_hash_prefix: crypto.createHash('sha256').update(token).digest('hex').slice(0, 12),
+      },
+      undefined,
+      payload.id
+    );
+  } catch {
+    // Metrics + log emission is best-effort and must never break auth handling.
+  }
+}
+
+export function getLegacyAdminClaimMetrics(): LegacyAdminClaimMetrics {
+  return { ...legacyAdminClaimMetrics };
+}
+
+export function resetLegacyAdminClaimMetrics(): void {
+  legacyAdminClaimMetrics.seenCount = 0;
+  legacyAdminClaimMetrics.rejectedCount = 0;
+  legacyAdminClaimMetrics.lastSeenAt = null;
+  legacyAdminClaimMetrics.lastRejectedAt = null;
 }
 
 export function generateToken(
@@ -69,10 +123,17 @@ export async function requireAuth(
     }
 
     const payload = verifyToken(rawToken);
-    const isAdminFromPayload =
-      typeof payload.is_admin === 'boolean'
-        ? payload.is_admin
-        : payload.role === 'system_admin';
+    const hasLegacyIsAdminClaim = typeof payload.is_admin === 'boolean';
+    if (hasLegacyIsAdminClaim) {
+      trackLegacyAdminClaimSeen(payload, rawToken);
+      if (shouldRejectLegacyAdminClaim()) {
+        legacyAdminClaimMetrics.rejectedCount += 1;
+        legacyAdminClaimMetrics.lastRejectedAt = new Date().toISOString();
+        return res.status(401).json({ error: 'Token uses retired legacy admin claim' });
+      }
+    }
+
+    const isAdminFromRole = payload.role === 'system_admin';
     if (payload.support_impersonation?.expires_at) {
       const expiresAt = new Date(payload.support_impersonation.expires_at);
       if (!Number.isNaN(expiresAt.getTime()) && Date.now() > expiresAt.getTime()) {
@@ -82,7 +143,7 @@ export async function requireAuth(
     req.user = {
       id: payload.id,
       email: payload.email,
-      is_admin: isAdminFromPayload,
+      is_admin: isAdminFromRole,
       role: payload.role,
       establishment_id: payload.establishment_id ?? null,
       support_impersonation: payload.support_impersonation,

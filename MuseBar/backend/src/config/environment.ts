@@ -122,6 +122,13 @@ export const validateEnvironment = (): void => {
     invalid.push("AUTH_ENFORCE_ADMIN_2FA must be either 'true' or 'false'");
   }
 
+  if (
+    process.env.AUTH_REJECT_LEGACY_IS_ADMIN_CLAIM &&
+    !isBooleanString(process.env.AUTH_REJECT_LEGACY_IS_ADMIN_CLAIM)
+  ) {
+    invalid.push("AUTH_REJECT_LEGACY_IS_ADMIN_CLAIM must be either 'true' or 'false'");
+  }
+
   const authJwtSignAlgRaw = process.env.AUTH_JWT_SIGN_ALG?.trim().toUpperCase();
   if (authJwtSignAlgRaw && authJwtSignAlgRaw !== 'HS256' && authJwtSignAlgRaw !== 'RS256') {
     invalid.push("AUTH_JWT_SIGN_ALG must be either 'HS256' or 'RS256'");
