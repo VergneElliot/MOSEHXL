@@ -114,6 +114,10 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
   const [businessInfo, setBusinessInfo] = useState<BusinessInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
+  const [customerTaxId, setCustomerTaxId] = useState('');
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
   const autoCloseTimerRef = useRef<number | null>(null);
 
   const normalizedOrderId = useMemo<number | null>(() => {
@@ -135,7 +139,7 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
 
   const hasValidOrderId = useMemo(() => normalizedOrderId !== null, [normalizedOrderId]);
 
-  const isPdfFeatureUnavailable = true;
+  const isInvoiceExportUnavailable = false;
   const receiptType = 'detailed' as const;
 
   const resetAutoClose = useCallback(() => {
@@ -210,6 +214,58 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
     }
   };
 
+  const handleCreateInvoiceExport = async () => {
+    if (!hasValidOrderId || normalizedOrderId === null) {
+      setError('Identifiant de commande invalide: facture impossible.');
+      return;
+    }
+    if (!customerName.trim()) {
+      setError('Nom client requis pour créer une facture.');
+      return;
+    }
+    if (!customerAddress.trim()) {
+      setError('Adresse client requise pour créer une facture.');
+      return;
+    }
+
+    try {
+      setCreatingInvoice(true);
+      setError(null);
+      const result = await apiCore.request<{ invoice: Record<string, unknown> }>(
+        `/legal/invoices/from-order/${normalizedOrderId}`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            mode: 'detailed',
+            customer: {
+              name: customerName,
+              address: customerAddress,
+              email,
+              tax_identification: customerTaxId,
+            },
+          }),
+        }
+      );
+
+      const invoice = result.invoice;
+      const invoiceNumber = String(invoice.invoice_number ?? `invoice-${normalizedOrderId}`);
+      const payload = JSON.stringify(invoice, null, 2);
+      const blob = new Blob([payload], { type: 'application/json;charset=utf-8' });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${invoiceNumber}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Échec de création/export facture');
+    } finally {
+      setCreatingInvoice(false);
+    }
+  };
+
   return (
     <Dialog
       open={open}
@@ -238,27 +294,60 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
             </Alert>
 
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              Export (PDF par email)
+              Facture (système dédié)
             </Typography>
             <TextField
               fullWidth
               size="small"
-              label="Email"
+              label="Nom client"
+              value={customerName}
+              onChange={(e) => {
+                resetAutoClose();
+                setCustomerName(e.target.value);
+              }}
+              sx={{ mb: 1 }}
+            />
+            <TextField
+              fullWidth
+              size="small"
+              label="Adresse client"
+              value={customerAddress}
+              onChange={(e) => {
+                resetAutoClose();
+                setCustomerAddress(e.target.value);
+              }}
+              sx={{ mb: 1 }}
+            />
+            <TextField
+              fullWidth
+              size="small"
+              label="Email client"
               value={email}
               onChange={(e) => {
                 resetAutoClose();
                 setEmail(e.target.value);
               }}
-              placeholder="client@example.com"
+              placeholder="client@exemple.com"
+              sx={{ mb: 1 }}
+            />
+            <TextField
+              fullWidth
+              size="small"
+              label="N TVA client (optionnel)"
+              value={customerTaxId}
+              onChange={(e) => {
+                resetAutoClose();
+                setCustomerTaxId(e.target.value);
+              }}
             />
             <Button
               sx={{ mt: 1 }}
-              variant="outlined"
+              variant="contained"
               fullWidth
-              disabled={isPdfFeatureUnavailable}
-              title="À implémenter: génération PDF + envoi email"
+              disabled={isInvoiceExportUnavailable || creatingInvoice}
+              onClick={handleCreateInvoiceExport}
             >
-              Envoyer PDF
+              {creatingInvoice ? 'Création...' : 'Créer et exporter facture (.json)'}
             </Button>
           </Box>
 
