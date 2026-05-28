@@ -11,6 +11,7 @@ import complianceRouter from './compliance';
 import businessInfoRouter from './businessInfo';
 import businessDayStatsRouter from './businessDayStats';
 import statsRouter from './stats';
+import invoicesRouter from './invoices';
 
 const router = express.Router();
 
@@ -18,6 +19,7 @@ const router = express.Router();
 router.use('/journal', journalRouter);
 router.use('/closure', closureRouter);
 router.use('/archive', archiveRouter);
+router.use('/invoices', invoicesRouter);
 router.use('/compliance', complianceRouter);
 router.use('/stats', statsRouter);
 // Mount `business-day-stats` before `businessInfo` for stable path routing.
