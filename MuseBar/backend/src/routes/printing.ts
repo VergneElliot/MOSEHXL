@@ -303,6 +303,9 @@ router.get('/invoice/:invoiceId/preview', authenticateToken, ensureEstablishment
     if (e?.statusCode === 404) {
       throw new NotFoundError('Invoice');
     }
+    if (e?.statusCode === 422) {
+      throw new ValidationError(e.message ?? 'Invoice compliance validation failed');
+    }
     getLogger().error('Error generating invoice preview', error instanceof Error ? error : undefined);
     throw new AppError(
       e?.message ?? (error instanceof Error ? error.message : 'Unknown error'),
@@ -327,6 +330,9 @@ router.post('/invoice/:invoiceId', authenticateToken, ensureEstablishment, async
     const e = error as { statusCode?: number; message?: string };
     if (e?.statusCode === 404) {
       throw new NotFoundError('Invoice');
+    }
+    if (e?.statusCode === 422) {
+      throw new ValidationError(e.message ?? 'Invoice compliance validation failed');
     }
     getLogger().error('Error printing invoice', error instanceof Error ? error : undefined);
     throw new AppError(

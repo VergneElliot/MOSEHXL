@@ -189,6 +189,79 @@ describe('legal invoices routes', () => {
     expect(mocks.poolConnect).not.toHaveBeenCalled();
   });
 
+  it('blocks existing invoice export when persisted legal fields are incomplete', async () => {
+    mocks.poolQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 90,
+          invoice_number: 'FAC-2026-000090',
+          order_id: 42,
+          invoice_mode: 'detailed',
+          payment_due_date: null,
+          payment_terms: '',
+          late_penalty_terms: '',
+          recovery_fee_note: '',
+          business_info: {
+            name: 'Muse',
+            address: '4 Rue',
+            siret: '123',
+            tax_identification: 'FR123',
+          },
+        },
+      ],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .post('/invoices/from-order/42')
+      .send({
+        mode: 'summary',
+        customer: {
+          name: 'Client',
+          address: '3 Rue Victor Hugo',
+        },
+        legal: {
+          payment_due_date: '2026-06-30',
+          payment_terms: 'Paiement comptant',
+          late_penalty_terms: 'Pénalités légales',
+        },
+      });
+
+    expect(res.status).toBe(400);
+    expect(String(res.body.error?.message ?? '')).toContain('Invoice compliance blocked');
+    expect(mocks.poolConnect).not.toHaveBeenCalled();
+  });
+
+  it('blocks invoice creation when seller legal identity is missing in settings snapshot', async () => {
+    mocks.buildReceiptDataForOrder.mockResolvedValue({
+      total_amount: 120,
+      total_tax: 20,
+      business_info: { name: 'MOSEHXL BAR', address: '', siret: '', tax_identification: '' },
+      items: [],
+      vat_breakdown: [],
+      sequence_number: 99,
+      compliance_info: { receipt_hash: 'abc123' },
+    });
+
+    const res = await request(app)
+      .post('/invoices/from-order/42')
+      .send({
+        mode: 'detailed',
+        customer: {
+          name: 'Client B2B',
+          address: '12 Avenue de Lyon',
+        },
+        legal: {
+          payment_due_date: '2026-06-30',
+          payment_terms: 'Paiement à 30 jours',
+          late_penalty_terms: 'Pénalités au taux BCE + 10 points',
+        },
+      });
+
+    expect(res.status).toBe(400);
+    expect(String(res.body.error?.message ?? '')).toContain('missing seller identity fields');
+  });
+
   it('returns 400 when mandatory legal fields are missing', async () => {
     const res = await request(app)
       .post('/invoices/from-order/42')

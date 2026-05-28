@@ -252,6 +252,36 @@ export async function buildReceiptDataForInvoice(
     row.business_info && typeof row.business_info === 'object'
       ? (row.business_info as Record<string, unknown>)
       : {};
+  const missingLegal: string[] = [];
+  if (!String(row.payment_due_date ?? '').trim()) missingLegal.push('payment_due_date');
+  if (!String(row.payment_terms ?? '').trim()) missingLegal.push('payment_terms');
+  if (!String(row.late_penalty_terms ?? '').trim()) missingLegal.push('late_penalty_terms');
+  if (!String(row.recovery_fee_note ?? '').trim()) missingLegal.push('recovery_fee_note');
+  if (missingLegal.length > 0) {
+    const err = Object.assign(
+      new Error(
+        `Invoice compliance blocked: missing legal fields (${missingLegal.join(', ')}). ` +
+        'Update invoice legal metadata before print/export.'
+      ),
+      { statusCode: 422 }
+    );
+    throw err;
+  }
+  const missingSellerIdentity: string[] = [];
+  if (!String(businessInfoRaw.name ?? '').trim()) missingSellerIdentity.push('business_name');
+  if (!String(businessInfoRaw.address ?? '').trim()) missingSellerIdentity.push('business_address');
+  if (!String(businessInfoRaw.siret ?? '').trim()) missingSellerIdentity.push('business_siret');
+  if (!String(businessInfoRaw.tax_identification ?? '').trim()) missingSellerIdentity.push('business_tax_identification');
+  if (missingSellerIdentity.length > 0) {
+    const err = Object.assign(
+      new Error(
+        `Invoice compliance blocked: missing seller identity fields (${missingSellerIdentity.join(', ')}). ` +
+        'Complete Settings > Establishment legal identity fields before print/export.'
+      ),
+      { statusCode: 422 }
+    );
+    throw err;
+  }
 
   return {
     order_id: parseNumber(row.order_id),
