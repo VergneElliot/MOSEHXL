@@ -1,4 +1,4 @@
--- up
+-- UP
 CREATE TABLE IF NOT EXISTS legal_invoice_counters (
   establishment_id UUID NOT NULL REFERENCES establishments(id) ON DELETE CASCADE,
   invoice_year INTEGER NOT NULL,
@@ -29,9 +29,12 @@ CREATE TABLE IF NOT EXISTS legal_invoices (
   total_ttc DECIMAL(12,2) NOT NULL CHECK (total_ttc >= 0),
   source_receipt_sequence INTEGER,
   source_receipt_hash TEXT,
+  previous_invoice_hash TEXT,
+  invoice_hash TEXT NOT NULL,
   created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (establishment_id, invoice_number),
+  UNIQUE (establishment_id, invoice_year, invoice_sequence),
   UNIQUE (establishment_id, order_id)
 );
 
@@ -41,7 +44,27 @@ CREATE INDEX IF NOT EXISTS idx_legal_invoices_establishment_created
 CREATE INDEX IF NOT EXISTS idx_legal_invoices_order_id
   ON legal_invoices (order_id);
 
--- down
+CREATE INDEX IF NOT EXISTS idx_legal_invoices_hash
+  ON legal_invoices (establishment_id, invoice_hash);
+
+CREATE OR REPLACE FUNCTION block_legal_invoices_update_delete()
+RETURNS trigger AS $$
+BEGIN
+  RAISE EXCEPTION 'Legal invoices are immutable and cannot be modified or deleted';
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS legal_invoices_immutable_trigger ON legal_invoices;
+
+CREATE TRIGGER legal_invoices_immutable_trigger
+BEFORE UPDATE OR DELETE ON legal_invoices
+FOR EACH ROW
+EXECUTE FUNCTION block_legal_invoices_update_delete();
+
+-- DOWN
+DROP TRIGGER IF EXISTS legal_invoices_immutable_trigger ON legal_invoices;
+DROP FUNCTION IF EXISTS block_legal_invoices_update_delete();
+DROP INDEX IF EXISTS idx_legal_invoices_hash;
 DROP INDEX IF EXISTS idx_legal_invoices_order_id;
 DROP INDEX IF EXISTS idx_legal_invoices_establishment_created;
 DROP TABLE IF EXISTS legal_invoices;
