@@ -17,7 +17,7 @@ import { apiCore } from '../../services/api';
 import LegalReceiptContainer from '../Legal/LegalReceipt/LegalReceiptContainer';
 import type { Order as LegalReceiptOrder, ReceiptItem } from '../Legal/LegalReceipt/types';
 
-type PrintDocType = 'receipt' | 'invoice_detailed' | 'invoice_summary';
+type ReceiptPreviewMode = 'detailed' | 'summary';
 
 type BusinessInfo = {
   name: string;
@@ -100,7 +100,8 @@ function normalizeReceiptForPreview(raw: unknown): PreviewPayload | null {
 
 export interface PrintAfterSaleDialogProps {
   open: boolean;
-  orderId: number | null;
+  orderId: number | string | null;
+  defaultReceiptType?: ReceiptPreviewMode;
   autoCloseMs?: number;
   onClose: () => void;
 }
@@ -108,10 +109,11 @@ export interface PrintAfterSaleDialogProps {
 export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
   open,
   orderId,
+  defaultReceiptType = 'detailed',
   autoCloseMs = 8000,
   onClose,
 }) => {
-  const [docType, setDocType] = useState<PrintDocType>('receipt');
+  const [receiptType, setReceiptType] = useState<ReceiptPreviewMode>(defaultReceiptType);
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<PreviewReceiptOrder | null>(null);
   const [businessInfo, setBusinessInfo] = useState<BusinessInfo | null>(null);
@@ -119,10 +121,31 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
   const [email, setEmail] = useState('');
   const autoCloseTimerRef = useRef<number | null>(null);
 
-  const receiptType = useMemo<'detailed' | 'summary'>(() => {
-    if (docType === 'invoice_summary') return 'summary';
-    return 'detailed';
-  }, [docType]);
+  const normalizedOrderId = useMemo<number | null>(() => {
+    if (typeof orderId === 'number' && Number.isFinite(orderId) && orderId > 0) {
+      return orderId;
+    }
+    if (typeof orderId === 'string') {
+      const trimmed = orderId.trim();
+      if (!/^\d+$/.test(trimmed)) {
+        return null;
+      }
+      const parsed = parseInt(trimmed, 10);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return parsed;
+      }
+    }
+    return null;
+  }, [orderId]);
+
+  useEffect(() => {
+    if (!open) return;
+    setReceiptType(defaultReceiptType);
+  }, [open, defaultReceiptType]);
+
+  const hasValidOrderId = useMemo(() => normalizedOrderId !== null, [normalizedOrderId]);
+
+  const isPdfFeatureUnavailable = true;
 
   const resetAutoClose = useCallback(() => {
     if (!open) return;
@@ -144,7 +167,15 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
   }, [open, resetAutoClose]);
 
   useEffect(() => {
-    if (!open || !orderId) return;
+    if (!open) return;
+    if (!hasValidOrderId) {
+      setPreview(null);
+      setBusinessInfo(null);
+      setLoading(false);
+      setError('Identifiant de commande invalide: aperçu impossible.');
+      return;
+    }
+
     setError(null);
     setLoading(true);
     setPreview(null);
@@ -153,7 +184,7 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
       try {
         // Preview-only: does not queue a print job.
         const data = await apiCore.request<{ receipt_data: unknown }>(
-          `/printing/receipt/${orderId}/preview?type=${receiptType}`,
+          `/printing/receipt/${normalizedOrderId}/preview?type=${receiptType}`,
           { method: 'GET' }
         );
         const normalized = normalizeReceiptForPreview(data.receipt_data);
@@ -166,15 +197,18 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
         setLoading(false);
       }
     })();
-  }, [open, orderId, receiptType]);
+  }, [open, hasValidOrderId, normalizedOrderId, receiptType]);
 
   const handleQueuePrint = async () => {
-    if (!orderId) return;
+    if (!hasValidOrderId || normalizedOrderId === null) {
+      setError('Identifiant de commande invalide: impression impossible.');
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
       await apiCore.request(
-        `/printing/receipt/${orderId}?type=${receiptType}`,
+        `/printing/receipt/${normalizedOrderId}?type=${receiptType}`,
         { method: 'POST' }
       );
       onClose();
@@ -204,24 +238,25 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
               Choisir un document
             </Typography>
             <ToggleButtonGroup
-              value={docType}
+              value={receiptType}
               exclusive
               onChange={(_, v) => {
                 resetAutoClose();
-                if (v) setDocType(v);
+                if (v === 'detailed' || v === 'summary') {
+                  setReceiptType(v);
+                }
               }}
               fullWidth
               size="small"
               sx={{ mb: 2 }}
             >
-              <ToggleButton value="receipt">Ticket</ToggleButton>
-              <ToggleButton value="invoice_detailed">Facture détaillée</ToggleButton>
-              <ToggleButton value="invoice_summary">Facture simple</ToggleButton>
+              <ToggleButton value="detailed">Ticket détaillé</ToggleButton>
+              <ToggleButton value="summary">Ticket simplifié</ToggleButton>
             </ToggleButtonGroup>
 
             <Alert severity="info" sx={{ mb: 2 }}>
               La prévisualisation n’imprime rien. Cliquez sur “Imprimer” pour mettre en file un ticket.
-              Les vraies factures + PDF/email seront ajoutées ensuite (backend manquant).
+              Les factures légales dédiées seront livrées dans une étape séparée.
             </Alert>
 
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
@@ -242,7 +277,7 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
               sx={{ mt: 1 }}
               variant="outlined"
               fullWidth
-              disabled
+              disabled={isPdfFeatureUnavailable}
               title="À implémenter: génération PDF + envoi email"
             >
               Envoyer PDF
@@ -278,7 +313,7 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Fermer</Button>
-        <Button onClick={handleQueuePrint} variant="contained" disabled={!orderId || !!error || loading}>
+        <Button onClick={handleQueuePrint} variant="contained" disabled={!hasValidOrderId || !!error || loading}>
           Imprimer
         </Button>
       </DialogActions>
