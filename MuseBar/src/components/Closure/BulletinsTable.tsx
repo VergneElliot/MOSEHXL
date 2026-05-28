@@ -14,7 +14,7 @@ import {
   Typography,
   TablePagination,
 } from '@mui/material';
-import { Visibility, Print, Download } from '@mui/icons-material';
+import { Visibility } from '@mui/icons-material';
 import { ClosureBulletin } from '../../hooks/useClosureState';
 
 interface BulletinsTableProps {
@@ -25,9 +25,7 @@ interface BulletinsTableProps {
   totalCount: number;
   onPageChange: (newPage: number) => void;
   onRowsPerPageChange: (newRowsPerPage: number) => void;
-  onViewDetails: (bulletin: ClosureBulletin) => void;
-  onPrint: (bulletin: ClosureBulletin) => void;
-  onDownload: (bulletin: ClosureBulletin) => void;
+  onOpenBulletinDialog: (bulletin: ClosureBulletin) => void;
   formatCurrency: (amount: number) => string;
   formatDate: (dateString: string) => string;
   getClosureTypeLabel: (type: string) => string;
@@ -41,9 +39,7 @@ const BulletinsTable: React.FC<BulletinsTableProps> = ({
   totalCount,
   onPageChange,
   onRowsPerPageChange,
-  onViewDetails,
-  onPrint,
-  onDownload,
+  onOpenBulletinDialog,
   formatCurrency,
   formatDate,
   getClosureTypeLabel,
@@ -109,19 +105,9 @@ const BulletinsTable: React.FC<BulletinsTableProps> = ({
               </TableCell>
               <TableCell align="center">
                 <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-                  <Tooltip title="Voir les détails">
-                    <IconButton size="small" onClick={() => onViewDetails(bulletin)}>
+                  <Tooltip title="Ouvrir (aperçu, impression, export)">
+                    <IconButton size="small" onClick={() => onOpenBulletinDialog(bulletin)}>
                       <Visibility />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Imprimer">
-                    <IconButton size="small" onClick={() => onPrint(bulletin)}>
-                      <Print />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Télécharger">
-                    <IconButton size="small" onClick={() => onDownload(bulletin)}>
-                      <Download />
                     </IconButton>
                   </Tooltip>
                 </Box>

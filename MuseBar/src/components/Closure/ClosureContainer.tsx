@@ -12,10 +12,11 @@ import {
 import { Add } from '@mui/icons-material';
 import { useClosureState } from '../../hooks/useClosureState';
 import { useClosureAPI } from '../../hooks/useClosureAPI';
+import type { ClosureBulletin } from '../../hooks/useClosureState';
 import ClosureStatusCards from './ClosureStatusCards';
 import BulletinsTable from './BulletinsTable';
 import CreateClosureDialog, { ClosureType } from './CreateClosureDialog';
-import BulletinDetailsDialog from './BulletinDetailsDialog';
+import PrintClosureDialog from './PrintClosureDialog';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { formatDateOnly as formatDate } from '../../utils/formatDate';
 
@@ -82,18 +83,8 @@ const ClosureContainer: React.FC = () => {
     actions.closeSnackbar();
   };
 
-  const handleViewDetails = (bulletin: Parameters<typeof actions.setSelectedBulletin>[0]) => {
-    actions.setSelectedBulletin(bulletin);
-    actions.setShowDetailsDialog(true);
-  };
-
-  const handlePrint = (bulletin: Parameters<typeof actions.setPrintBulletin>[0]) => {
-    actions.setPrintBulletin(bulletin);
-    actions.setPrintDialogOpen(true);
-  };
-
-  const handleDownload = (_bulletin: Parameters<typeof actions.setPrintBulletin>[0]) => {
-    // Future: Implement download functionality
+  const handleOpenBulletinDialog = (bulletin: ClosureBulletin) => {
+    actions.openPrintDialog(bulletin);
   };
 
   const getClosureTypeLabel = (type: string): string => {
@@ -175,9 +166,7 @@ const ClosureContainer: React.FC = () => {
           setBulletinsRowsPerPage(newRowsPerPage);
           setBulletinsPage(0);
         }}
-        onViewDetails={handleViewDetails}
-        onPrint={handlePrint}
-        onDownload={handleDownload}
+        onOpenBulletinDialog={handleOpenBulletinDialog}
         formatCurrency={formatCurrency}
         formatDate={formatDate}
         getClosureTypeLabel={getClosureTypeLabel}
@@ -215,16 +204,17 @@ const ClosureContainer: React.FC = () => {
         defaultFondDeCaisse={state.todayStatus?.last_fond_de_caisse ?? null}
       />
 
-      <BulletinDetailsDialog
-        open={state.showDetailsDialog}
-        bulletin={state.selectedBulletin}
-        onClose={actions.closeBulletinDetails}
+      <PrintClosureDialog
+        open={state.printDialogOpen}
+        bulletinId={state.printBulletin?.id ?? null}
+        onClose={actions.closePrintDialog}
+        onPrintSuccess={actions.showSuccess}
+        onPrintError={actions.showError}
         formatCurrency={formatCurrency}
         formatDate={formatDate}
       />
 
-        {/* Future: Add Print Dialog */}
-        {/* Future: Add Settings Dialog */}
+      {/* Future: Add Settings Dialog */}
     </Box>
   );
 };

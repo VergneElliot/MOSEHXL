@@ -219,6 +219,32 @@ router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, asyncHa
 }));
 
 // POST /api/printing/closure/:bulletinId
+// Preview-only: returns bulletin_data but DOES NOT queue a print job.
+router.get('/closure/:bulletinId/preview', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = getPrintingUser(req)!;
+    const bulletinId = parseInt(req.params.bulletinId ?? '', 10);
+    if (!Number.isFinite(bulletinId) || bulletinId <= 0) {
+      throw new ValidationError('Invalid closure bulletin id');
+    }
+    const bulletinData = await buildClosureBulletinData(pool, user, bulletinId);
+    res.json({ bulletin_data: bulletinData });
+  } catch (error: unknown) {
+    if (error instanceof AppError) throw error;
+    const e = error as { statusCode?: number; message?: string };
+    if (e?.statusCode === 404) {
+      throw new NotFoundError('Closure bulletin');
+    }
+    getLogger().error('Error generating closure preview', error instanceof Error ? error : undefined);
+    throw new AppError(
+      e?.message ?? (error instanceof Error ? error.message : 'Unknown error'),
+      500,
+      'PRINTING_CLOSURE_PREVIEW_FAILED'
+    );
+  }
+}));
+
+// POST /api/printing/closure/:bulletinId
 router.post('/closure/:bulletinId', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
