@@ -17,6 +17,7 @@ import {
 } from '../middleware/errorHandler';
 import {
   generateToken,
+  getLegacyAdminClaimMetrics,
   requireAdmin,
   requireAuth,
 } from '../middleware/auth';
@@ -882,6 +883,20 @@ router.get('/sessions', requireAuth, asyncHandler(async (req, res) => {
       clientId: session.clientId,
       isCurrent: currentFamilyId === session.familyId,
     })),
+  });
+}));
+
+router.get('/legacy-claim-metrics', requireAuth, requireAdmin, asyncHandler(async (_req, res) => {
+  return res.json({
+    metrics: getLegacyAdminClaimMetrics(),
+    policy: {
+      rejectLegacyIsAdminClaim:
+        process.env.AUTH_REJECT_LEGACY_IS_ADMIN_CLAIM?.trim().toLowerCase() === 'true' ||
+        (
+          process.env.AUTH_REJECT_LEGACY_IS_ADMIN_CLAIM == null &&
+          process.env.NODE_ENV === 'production'
+        ),
+    },
   });
 }));
 
