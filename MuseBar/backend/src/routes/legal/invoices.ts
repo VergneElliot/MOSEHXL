@@ -11,6 +11,7 @@ const router = express.Router();
 type InvoiceMode = 'detailed' | 'summary';
 type ReceiptPreviewType = 'detailed' | 'summary';
 const DEFAULT_RECOVERY_FEE_NOTE = 'Indemnité forfaitaire de recouvrement: 40 EUR (C. com. art. L441-10)';
+const SETTINGS_GUIDANCE = 'Complete Settings > Establishment legal identity fields before generating invoices.';
 
 function toNumber(value: unknown): number {
   const n = typeof value === 'number' ? value : parseFloat(String(value ?? 0));
@@ -75,6 +76,43 @@ function parseOptionalNonNegativeDecimal(value: unknown, fieldName: string): num
   return n;
 }
 
+function getMissingSellerIdentityFields(businessInfo: unknown): string[] {
+  const info = businessInfo && typeof businessInfo === 'object'
+    ? (businessInfo as Record<string, unknown>)
+    : {};
+  const missing: string[] = [];
+  if (!String(info.name ?? '').trim()) missing.push('business_name');
+  if (!String(info.address ?? '').trim()) missing.push('business_address');
+  if (!String(info.siret ?? '').trim()) missing.push('business_siret');
+  if (!String(info.tax_identification ?? '').trim()) missing.push('business_tax_identification');
+  return missing;
+}
+
+function getMissingLegalInvoiceFields(row: Record<string, unknown>): string[] {
+  const missing: string[] = [];
+  if (!String(row.payment_due_date ?? '').trim()) missing.push('payment_due_date');
+  if (!String(row.payment_terms ?? '').trim()) missing.push('payment_terms');
+  if (!String(row.late_penalty_terms ?? '').trim()) missing.push('late_penalty_terms');
+  if (!String(row.recovery_fee_note ?? '').trim()) missing.push('recovery_fee_note');
+  return missing;
+}
+
+function assertPersistedInvoiceCompliance(row: Record<string, unknown>) {
+  const missingLegal = getMissingLegalInvoiceFields(row);
+  if (missingLegal.length > 0) {
+    throw new ValidationError(
+      `Invoice compliance blocked: missing legal fields (${missingLegal.join(', ')}). ` +
+      'Update invoice legal metadata before export/print.'
+    );
+  }
+  const missingSellerIdentity = getMissingSellerIdentityFields(row.business_info);
+  if (missingSellerIdentity.length > 0) {
+    throw new ValidationError(
+      `Invoice compliance blocked: missing seller identity fields (${missingSellerIdentity.join(', ')}). ${SETTINGS_GUIDANCE}`
+    );
+  }
+}
+
 router.use(requireAuth, requirePermission(P.access_pos));
 
 // POST /api/legal/invoices/from-order/:orderId
@@ -96,6 +134,7 @@ router.post('/from-order/:orderId', asyncHandler(async (req, res) => {
   );
   if ((existingResult.rowCount ?? 0) > 0) {
     const existingInvoice = existingResult.rows[0] as Record<string, unknown>;
+    assertPersistedInvoiceCompliance(existingInvoice);
     const responseInvoice = {
       ...existingInvoice,
       requested_mode: parseInvoiceMode((req.body as { mode?: unknown })?.mode),
@@ -143,6 +182,12 @@ router.post('/from-order/:orderId', asyncHandler(async (req, res) => {
 
   const currentYear = new Date().getFullYear();
   const subtotalHt = toNumber(receiptData.total_amount) - toNumber(receiptData.total_tax);
+  const missingSellerIdentity = getMissingSellerIdentityFields(receiptData.business_info);
+  if (missingSellerIdentity.length > 0) {
+    throw new ValidationError(
+      `Invoice compliance blocked: missing seller identity fields (${missingSellerIdentity.join(', ')}). ${SETTINGS_GUIDANCE}`
+    );
+  }
 
   const client = await pool.connect();
   try {

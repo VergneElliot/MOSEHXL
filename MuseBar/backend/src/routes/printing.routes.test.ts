@@ -538,6 +538,19 @@ describe('printing routes', () => {
     );
   });
 
+  it('blocks invoice print when compliance validation fails', async () => {
+    mocks.buildReceiptDataForInvoice.mockRejectedValue(
+      Object.assign(new Error('Invoice compliance blocked: missing legal fields'), { statusCode: 422 })
+    );
+
+    const res = await request(app)
+      .post('/printing/invoice/1')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(400);
+    expect(String(res.body.error?.message ?? '')).toContain('Invoice compliance blocked');
+  });
+
   it('prints closure bulletin successfully and logs printing history metadata', async () => {
     mocks.buildClosureBulletinData.mockResolvedValue({
       closure_type: 'DAILY',
