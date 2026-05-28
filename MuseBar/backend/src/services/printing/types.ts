@@ -3,6 +3,8 @@
 export interface ReceiptData {
   order_id: number;
   sequence_number: number;
+  document_kind?: 'ticket' | 'invoice';
+  document_number?: string;
   total_amount: number;
   total_tax: number;
   payment_method: string;
@@ -32,6 +34,7 @@ export interface ReceiptData {
   change?: number;
   compliance_info?: {
     receipt_hash?: string;
+    invoice_hash?: string;
     cash_register_id?: string;
     operator_id?: string;
   };

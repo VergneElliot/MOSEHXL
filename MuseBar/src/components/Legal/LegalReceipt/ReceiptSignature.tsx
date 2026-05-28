@@ -15,13 +15,22 @@ import { formatDate } from './utils';
 export const ReceiptSignature: React.FC<ReceiptSignatureProps> = ({
   businessInfo,
   order,
+  documentKind = 'ticket',
+  documentNumber,
 }) => {
+  const documentLabel = documentKind === 'invoice' ? 'Facture' : 'Ticket';
+  const securedLabel = documentKind === 'invoice' ? 'Facture sécurisée - Inaltérable' : 'Ticket sécurisé - Inaltérable';
+  const legalSentence =
+    documentKind === 'invoice'
+      ? 'Cette facture fait foi selon la législation française'
+      : 'Ce reçu fait foi de paiement selon la législation française';
+
   return (
     <Box sx={{ textAlign: 'center', mt: 3 }}>
       {/* Security Information */}
       <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
         <Security sx={{ fontSize: 12, mr: 0.5, verticalAlign: 'middle' }} />
-        Ticket sécurisé - Inaltérable
+        {securedLabel}
       </Typography>
 
       {/* Legal Compliance Information */}
@@ -64,11 +73,11 @@ export const ReceiptSignature: React.FC<ReceiptSignatureProps> = ({
         </Typography>
         
         <Typography variant="caption" color="text.secondary" display="block">
-          Ticket N°: {order.sequence_number.toString().padStart(6, '0')}
+          {documentLabel} N°: {documentNumber || order.sequence_number.toString().padStart(6, '0')}
         </Typography>
         
         <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-          Ce reçu fait foi de paiement selon la législation française
+          {legalSentence}
         </Typography>
       </Box>
 

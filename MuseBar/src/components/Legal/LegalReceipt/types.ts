@@ -47,12 +47,16 @@ export interface LegalReceiptProps {
   order: Order;
   businessInfo: BusinessInfo;
   receiptType?: 'detailed' | 'summary';
+  documentKind?: 'ticket' | 'invoice';
+  documentNumber?: string;
 }
 
 export interface ReceiptHeaderProps {
   businessInfo: BusinessInfo;
   order: Order;
   receiptType?: 'detailed' | 'summary';
+  documentKind?: 'ticket' | 'invoice';
+  documentNumber?: string;
 }
 
 export interface ReceiptItemsProps {
@@ -66,11 +70,14 @@ export interface ReceiptFooterProps {
   totalVAT: number;
   sousTotalHT: number;
   receiptType?: 'detailed' | 'summary';
+  documentKind?: 'ticket' | 'invoice';
 }
 
 export interface ReceiptSignatureProps {
   businessInfo: BusinessInfo;
   order: Order;
+  documentKind?: 'ticket' | 'invoice';
+  documentNumber?: string;
 }
 
 /**

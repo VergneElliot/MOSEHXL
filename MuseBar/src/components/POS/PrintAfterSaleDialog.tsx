@@ -31,6 +31,8 @@ type PreviewPayload = {
   businessInfo: BusinessInfo;
 };
 
+type DocumentSelection = 'ticket' | 'invoice_detailed' | 'invoice_summary';
+
 function normalizeReceiptForPreview(raw: unknown): PreviewPayload | null {
   if (!raw || typeof raw !== 'object') return null;
   const rawRecord = raw as Record<string, unknown>;
@@ -118,6 +120,8 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
   const [customerAddress, setCustomerAddress] = useState('');
   const [customerTaxId, setCustomerTaxId] = useState('');
   const [invoiceMode, setInvoiceMode] = useState<'detailed' | 'summary'>('detailed');
+  const [selectedDocument, setSelectedDocument] = useState<DocumentSelection>('ticket');
+  const [lastInvoiceNumber, setLastInvoiceNumber] = useState<string | null>(null);
   const [creatingInvoice, setCreatingInvoice] = useState(false);
   const autoCloseTimerRef = useRef<number | null>(null);
 
@@ -141,7 +145,14 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
   const hasValidOrderId = useMemo(() => normalizedOrderId !== null, [normalizedOrderId]);
 
   const isInvoiceExportUnavailable = false;
-  const receiptType = 'detailed' as const;
+  const receiptType = selectedDocument === 'invoice_summary' ? 'summary' : 'detailed';
+  const documentKind = selectedDocument === 'ticket' ? 'ticket' : 'invoice';
+  const isInvoiceDocument = documentKind === 'invoice';
+
+  useEffect(() => {
+    if (selectedDocument === 'invoice_detailed') setInvoiceMode('detailed');
+    if (selectedDocument === 'invoice_summary') setInvoiceMode('summary');
+  }, [selectedDocument]);
 
   const resetAutoClose = useCallback(() => {
     if (!open || !autoCloseEnabled) return;
@@ -164,6 +175,7 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
 
   useEffect(() => {
     if (!open) return;
+    setLastInvoiceNumber(null);
     if (!hasValidOrderId) {
       setPreview(null);
       setBusinessInfo(null);
@@ -193,23 +205,65 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
         setLoading(false);
       }
     })();
-  }, [open, hasValidOrderId, normalizedOrderId]);
+  }, [open, hasValidOrderId, normalizedOrderId, receiptType]);
+
+  const createOrFetchInvoice = async () => {
+    if (!hasValidOrderId || normalizedOrderId === null) {
+      throw new Error('Identifiant de commande invalide: facture impossible.');
+    }
+    if (!customerName.trim()) {
+      throw new Error('Nom client requis pour créer une facture.');
+    }
+    if (!customerAddress.trim()) {
+      throw new Error('Adresse client requise pour créer une facture.');
+    }
+
+    const result = await apiCore.request<{ invoice: Record<string, unknown>; already_exists?: boolean }>(
+      `/legal/invoices/from-order/${normalizedOrderId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          mode: invoiceMode,
+          customer: {
+            name: customerName,
+            address: customerAddress,
+            email,
+            tax_identification: customerTaxId,
+          },
+        }),
+      }
+    );
+
+    const invoice = result.invoice;
+    const invoiceId = Number(invoice.id ?? 0);
+    if (!Number.isFinite(invoiceId) || invoiceId <= 0) {
+      throw new Error('Réponse facture invalide: id manquant');
+    }
+    const invoiceNumber = String(invoice.invoice_number ?? '');
+    if (invoiceNumber) setLastInvoiceNumber(invoiceNumber);
+    return { invoiceId, invoice, alreadyExists: Boolean(result.already_exists) };
+  };
 
   const handleQueuePrint = async () => {
     if (!hasValidOrderId || normalizedOrderId === null) {
-      setError('Identifiant de commande invalide: impression impossible.');
+      setError(`Identifiant de commande invalide: impression ${isInvoiceDocument ? 'facture' : 'ticket'} impossible.`);
       return;
     }
     try {
       setLoading(true);
       setError(null);
-      await apiCore.request(
-        `/printing/receipt/${normalizedOrderId}?type=${receiptType}`,
-        { method: 'POST' }
-      );
+      if (isInvoiceDocument) {
+        const { invoiceId } = await createOrFetchInvoice();
+        await apiCore.request(`/printing/invoice/${invoiceId}`, { method: 'POST' });
+      } else {
+        await apiCore.request(
+          `/printing/receipt/${normalizedOrderId}?type=${receiptType}`,
+          { method: 'POST' }
+        );
+      }
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to queue print');
+      setError(e instanceof Error ? e.message : `Échec d'impression ${isInvoiceDocument ? 'facture' : 'ticket'}`);
     } finally {
       setLoading(false);
     }
@@ -232,23 +286,7 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
     try {
       setCreatingInvoice(true);
       setError(null);
-      const result = await apiCore.request<{ invoice: Record<string, unknown>; already_exists?: boolean }>(
-        `/legal/invoices/from-order/${normalizedOrderId}`,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            mode: invoiceMode,
-            customer: {
-              name: customerName,
-              address: customerAddress,
-              email,
-              tax_identification: customerTaxId,
-            },
-          }),
-        }
-      );
-
-      const invoice = result.invoice;
+      const { invoice, alreadyExists } = await createOrFetchInvoice();
       const invoiceNumber = String(invoice.invoice_number ?? `invoice-${normalizedOrderId}`);
       const payload = JSON.stringify(invoice, null, 2);
       const blob = new Blob([payload], { type: 'application/json;charset=utf-8' });
@@ -260,7 +298,7 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
       anchor.click();
       document.body.removeChild(anchor);
       window.URL.revokeObjectURL(url);
-      if (result.already_exists) {
+      if (alreadyExists) {
         setError('Facture existante retrouvée et exportée (aucune nouvelle numérotation générée).');
       }
     } catch (e) {
@@ -288,95 +326,106 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
               Choisir un document
             </Typography>
-            <Alert severity="info" sx={{ mb: 2 }}>
-              Ticket détaillé (unique format disponible pour le moment).
-            </Alert>
-
-            <Alert severity="info" sx={{ mb: 2 }}>
-              La prévisualisation n’imprime rien. Cliquez sur “Imprimer” pour mettre en file un ticket.
-              La section facture ci-dessous crée ou retrouve une facture légale dédiée.
-            </Alert>
-
-            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              Facture (système dédié)
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
               <Button
-                variant={invoiceMode === 'detailed' ? 'contained' : 'outlined'}
+                size="small"
+                variant={selectedDocument === 'ticket' ? 'contained' : 'outlined'}
                 onClick={() => {
                   resetAutoClose();
-                  setInvoiceMode('detailed');
+                  setSelectedDocument('ticket');
                 }}
-                size="small"
               >
-                Avec détail
+                Ticket détaillé
               </Button>
               <Button
-                variant={invoiceMode === 'summary' ? 'contained' : 'outlined'}
+                size="small"
+                variant={selectedDocument === 'invoice_detailed' ? 'contained' : 'outlined'}
                 onClick={() => {
                   resetAutoClose();
-                  setInvoiceMode('summary');
+                  setSelectedDocument('invoice_detailed');
                 }}
-                size="small"
               >
-                Sans détail
+                Facture avec détail
+              </Button>
+              <Button
+                size="small"
+                variant={selectedDocument === 'invoice_summary' ? 'contained' : 'outlined'}
+                onClick={() => {
+                  resetAutoClose();
+                  setSelectedDocument('invoice_summary');
+                }}
+              >
+                Facture sans détail
               </Button>
             </Box>
-            <TextField
-              fullWidth
-              size="small"
-              label="Nom client"
-              value={customerName}
-              onChange={(e) => {
-                resetAutoClose();
-                setCustomerName(e.target.value);
-              }}
-              sx={{ mb: 1 }}
-            />
-            <TextField
-              fullWidth
-              size="small"
-              label="Adresse client"
-              value={customerAddress}
-              onChange={(e) => {
-                resetAutoClose();
-                setCustomerAddress(e.target.value);
-              }}
-              sx={{ mb: 1 }}
-            />
-            <TextField
-              fullWidth
-              size="small"
-              label="Email client"
-              value={email}
-              onChange={(e) => {
-                resetAutoClose();
-                setEmail(e.target.value);
-              }}
-              placeholder="client@exemple.com"
-              sx={{ mb: 1 }}
-            />
-            <TextField
-              fullWidth
-              size="small"
-              label="N TVA client (optionnel)"
-              value={customerTaxId}
-              onChange={(e) => {
-                resetAutoClose();
-                setCustomerTaxId(e.target.value);
-              }}
-            />
-            <Button
-              sx={{ mt: 1 }}
-              variant="contained"
-              fullWidth
-              disabled={isInvoiceExportUnavailable || creatingInvoice}
-              onClick={handleCreateInvoiceExport}
-            >
-              {creatingInvoice
-                ? 'Création...'
-                : `Créer et exporter facture ${invoiceMode === 'detailed' ? '(avec détail)' : '(sans détail)'}`}
-            </Button>
+
+            <Alert severity="info" sx={{ mb: 2 }}>
+              La prévisualisation n’imprime rien. Cliquez sur “Imprimer” pour lancer
+              {isInvoiceDocument ? ' la facture thermique.' : ' le ticket thermique.'}
+            </Alert>
+
+            {isInvoiceDocument && (
+              <>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                  Facture (système dédié)
+                </Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Nom client"
+                  value={customerName}
+                  onChange={(e) => {
+                    resetAutoClose();
+                    setCustomerName(e.target.value);
+                  }}
+                  sx={{ mb: 1 }}
+                />
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Adresse client"
+                  value={customerAddress}
+                  onChange={(e) => {
+                    resetAutoClose();
+                    setCustomerAddress(e.target.value);
+                  }}
+                  sx={{ mb: 1 }}
+                />
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Email client"
+                  value={email}
+                  onChange={(e) => {
+                    resetAutoClose();
+                    setEmail(e.target.value);
+                  }}
+                  placeholder="client@exemple.com"
+                  sx={{ mb: 1 }}
+                />
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="N TVA client (optionnel)"
+                  value={customerTaxId}
+                  onChange={(e) => {
+                    resetAutoClose();
+                    setCustomerTaxId(e.target.value);
+                  }}
+                />
+                <Button
+                  sx={{ mt: 1 }}
+                  variant="contained"
+                  fullWidth
+                  disabled={isInvoiceExportUnavailable || creatingInvoice}
+                  onClick={handleCreateInvoiceExport}
+                >
+                  {creatingInvoice
+                    ? 'Création...'
+                    : `Créer et exporter facture ${invoiceMode === 'detailed' ? '(avec détail)' : '(sans détail)'}`}
+                </Button>
+              </>
+            )}
           </Box>
 
           <Box sx={{ flex: 2 }}>
@@ -401,6 +450,8 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
                   taxIdentification: businessInfo.taxIdentification ?? '',
                 }}
                 receiptType={receiptType}
+                documentKind={documentKind}
+                documentNumber={documentKind === 'invoice' ? lastInvoiceNumber ?? undefined : undefined}
               />
             )}
           </Box>
@@ -408,8 +459,12 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Fermer</Button>
-        <Button onClick={handleQueuePrint} variant="contained" disabled={!hasValidOrderId || !!error || loading}>
-          Imprimer
+        <Button
+          onClick={handleQueuePrint}
+          variant="contained"
+          disabled={!hasValidOrderId || !!error || loading || creatingInvoice}
+        >
+          {isInvoiceDocument ? 'Créer et imprimer facture' : 'Imprimer ticket'}
         </Button>
       </DialogActions>
     </Dialog>

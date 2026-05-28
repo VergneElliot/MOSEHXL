@@ -17,7 +17,15 @@ export const ReceiptFooter: React.FC<ReceiptFooterProps> = ({
   totalVAT,
   sousTotalHT,
   receiptType = 'detailed',
+  documentKind = 'ticket',
 }) => {
+  const summaryLabel = documentKind === 'invoice'
+    ? 'Facture entreprise - Sans détail des articles'
+    : 'Reçu d\'entreprise - Sans détail des articles';
+  const detailedLabel = documentKind === 'invoice'
+    ? 'Facture détaillée avec breakdown complet des articles et taxes'
+    : 'Ticket détaillé avec breakdown complet des articles et taxes';
+
   return (
     <Box sx={{ mt: 2 }}>
       {/* VAT Breakdown */}
@@ -80,7 +88,7 @@ export const ReceiptFooter: React.FC<ReceiptFooterProps> = ({
             <>
               <Grid item xs={12}>
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-                  Reçu d'entreprise - Sans détail des articles
+                  {summaryLabel}
                 </Typography>
               </Grid>
             </>
@@ -92,7 +100,7 @@ export const ReceiptFooter: React.FC<ReceiptFooterProps> = ({
       {receiptType === 'detailed' && (
         <Box sx={{ textAlign: 'center', mb: 2 }}>
           <Typography variant="caption" color="text.secondary">
-            Ticket détaillé avec breakdown complet des articles et taxes
+            {detailedLabel}
           </Typography>
         </Box>
       )}

@@ -144,6 +144,8 @@ export async function buildReceiptDataForOrder(
   const receiptData: PrintingReceiptData = {
     order_id: Number(receiptRow.order_id),
     sequence_number: safeSequenceNumber,
+    document_kind: 'ticket',
+    document_number: String(safeSequenceNumber).padStart(6, '0'),
     total_amount: parseFloat(receiptRow.total_amount),
     total_tax: safeTotalTax,
     payment_method: String(receiptRow.payment_method ?? ''),
@@ -196,6 +198,89 @@ export async function buildReceiptDataForOrder(
   receiptData.vat_breakdown = vatBreakdown;
 
   return receiptData;
+}
+
+export async function buildReceiptDataForInvoice(
+  pool: Pool,
+  user: PrintingUser,
+  invoiceId: number
+): Promise<PrintingReceiptData> {
+  const invoiceResult = await pool.query(
+    `SELECT
+       i.*,
+       o.payment_method
+     FROM legal_invoices i
+     JOIN orders o
+       ON o.id = i.order_id
+      AND o.establishment_id = i.establishment_id
+     WHERE i.id = $1
+       AND i.establishment_id = $2
+     LIMIT 1`,
+    [invoiceId, user.establishment_id]
+  );
+
+  if (invoiceResult.rows.length === 0) {
+    const err = Object.assign(new Error('Invoice not found'), { statusCode: 404 });
+    throw err;
+  }
+
+  const row = invoiceResult.rows[0] as Record<string, unknown>;
+  const parseNumber = (v: unknown): number => {
+    const n = typeof v === 'number' ? v : parseFloat(String(v ?? 0));
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const lineItemsRaw = Array.isArray(row.line_items) ? (row.line_items as Array<Record<string, unknown>>) : [];
+  const vatRaw = Array.isArray(row.vat_breakdown) ? (row.vat_breakdown as Array<Record<string, unknown>>) : [];
+  const invoiceMode = String(row.invoice_mode ?? 'detailed') === 'summary' ? 'summary' : 'detailed';
+
+  const items = lineItemsRaw.map((item) => ({
+    product_name: String(item.product_name ?? item.name ?? ''),
+    quantity: parseNumber(item.quantity) || 1,
+    unit_price: parseNumber(item.unit_price),
+    total_price: parseNumber(item.total_price),
+    tax_rate: parseNumber(item.tax_rate),
+  }));
+
+  const vatBreakdown = vatRaw.map((vat) => ({
+    rate: parseNumber(vat.rate),
+    subtotal_ht: parseNumber(vat.subtotal_ht),
+    vat: parseNumber(vat.vat),
+  }));
+
+  const businessInfoRaw =
+    row.business_info && typeof row.business_info === 'object'
+      ? (row.business_info as Record<string, unknown>)
+      : {};
+
+  return {
+    order_id: parseNumber(row.order_id),
+    sequence_number: parseNumber(row.invoice_sequence),
+    document_kind: 'invoice',
+    document_number: String(row.invoice_number ?? ''),
+    total_amount: parseNumber(row.total_ttc),
+    total_tax: parseNumber(row.total_vat),
+    payment_method: String(row.payment_method ?? 'Facture'),
+    created_at: new Date(String(row.issued_at ?? row.created_at ?? new Date().toISOString())).toISOString(),
+    items,
+    business_info: {
+      name: String(businessInfoRaw.name ?? ''),
+      address: String(businessInfoRaw.address ?? ''),
+      phone: String(businessInfoRaw.phone ?? ''),
+      email: String(businessInfoRaw.email ?? ''),
+      siret: businessInfoRaw.siret ? String(businessInfoRaw.siret) : undefined,
+      tax_identification: businessInfoRaw.tax_identification
+        ? String(businessInfoRaw.tax_identification)
+        : undefined,
+    },
+    vat_breakdown: vatBreakdown,
+    receipt_type: invoiceMode,
+    compliance_info: {
+      invoice_hash: row.invoice_hash ? String(row.invoice_hash) : undefined,
+      cash_register_id: getRegisterIdForEstablishment(user.establishment_id),
+      operator_id: user.username,
+    },
+  };
 }
 
 export async function buildClosureBulletinData(
@@ -270,7 +355,7 @@ export async function buildClosureBulletinData(
 export async function logPrintingHistory(
   pool: Pool,
   establishmentId: string,
-  printType: 'receipt' | 'closure_bulletin',
+  printType: 'receipt' | 'closure_bulletin' | 'invoice',
   result: PrintResult,
   metadata: Record<string, unknown>
 ) {

@@ -33,6 +33,17 @@ export function receiptToEposPrintXml(data: ReceiptData): string {
   const totalTtc = toNumber(data.total_amount);
   const totalVat = toNumber(data.total_tax);
   const totalHt = totalTtc - totalVat;
+  const documentKind = data.document_kind === 'invoice' ? 'invoice' : 'ticket';
+  const docLabel = documentKind === 'invoice' ? 'Facture' : 'Ticket';
+  const docTypeLabel =
+    documentKind === 'invoice'
+      ? data.receipt_type === 'summary'
+        ? 'Facture sans detail'
+        : 'Facture detaillee'
+      : data.receipt_type === 'summary'
+        ? 'Ticket simplifie'
+        : 'Ticket detaille';
+  const docNumber = data.document_number ?? String(data.sequence_number).padStart(6, '0');
 
   const lines: string[] = [];
   lines.push(`<text align="center" weight="bold">${esc(data.business_info.name)}&#10;</text>`);
@@ -42,10 +53,10 @@ export function receiptToEposPrintXml(data: ReceiptData): string {
   if (data.business_info.siret) lines.push(line(`SIRET: ${data.business_info.siret}`));
   if (data.business_info.tax_identification) lines.push(line(`TVA: ${data.business_info.tax_identification}`));
   lines.push('<text>&#10;</text>');
-  lines.push(line(`Ticket #${String(data.sequence_number).padStart(6, '0')}  Commande #${data.order_id}`));
+  lines.push(line(`${docLabel} #${docNumber}  Commande #${data.order_id}`));
   lines.push(line(`Date: ${new Date(data.created_at).toLocaleString('fr-FR')}`));
   lines.push(line(`Paiement: ${data.payment_method}`));
-  lines.push(line(`Type: Ticket detaille`));
+  lines.push(line(`Type: ${docTypeLabel}`));
   lines.push('<text>&#10;</text>');
 
   if (data.items && data.items.length > 0 && data.receipt_type === 'detailed') {
@@ -81,8 +92,9 @@ export function receiptToEposPrintXml(data: ReceiptData): string {
     lines.push(line(`Monnaie rendue: ${money(toNumber(data.change))}`));
   }
 
-  if (data.compliance_info?.receipt_hash) {
-    lines.push(line(`Hash: ${data.compliance_info.receipt_hash}`));
+  const legalHash = data.compliance_info?.invoice_hash || data.compliance_info?.receipt_hash;
+  if (legalHash) {
+    lines.push(line(`Hash: ${legalHash}`));
   }
   if (data.compliance_info?.cash_register_id) {
     lines.push(line(`Caisse: ${data.compliance_info.cash_register_id}`));
@@ -92,7 +104,7 @@ export function receiptToEposPrintXml(data: ReceiptData): string {
   }
 
   lines.push(line('Ref. legale: Article 286-I-3 bis du CGI'));
-  lines.push(line('Ticket securise - Inalterable'));
+  lines.push(line(documentKind === 'invoice' ? 'Facture securisee - Inalterable' : 'Ticket securise - Inalterable'));
 
   lines.push('<text>&#10;</text>');
   lines.push('<cut type="feed"/>');
