@@ -8,6 +8,7 @@ import SearchBar from './SearchBar';
 import OrdersTable from './OrdersTable';
 import OrderDetailsDialog from './OrderDetailsDialog';
 import ReturnDialog from './ReturnDialog';
+import PrintAfterSaleDialog from '../POS/PrintAfterSaleDialog';
 import { Order } from '../../types';
 
 interface HistoryContainerProps {
@@ -209,6 +210,13 @@ const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn =
         loading={state.returnLoading}
         errorMessage={state.returnError}
         formatDateTime={logic.formatDateTime}
+      />
+
+      <PrintAfterSaleDialog
+        open={state.receiptDialogOpen}
+        orderId={state.currentReceipt?.id ?? null}
+        defaultReceiptType={state.receiptType}
+        onClose={actions.closeReceiptDialog}
       />
     </Box>
   );

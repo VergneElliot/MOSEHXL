@@ -5,6 +5,7 @@ This page is the fastest way to find the current state of the project without sc
 ## Primary live-status sources
 
 - Latest audit state: `docs/audits/2026-05-20-full-repo-state-audit-hard-copy.md`
+- Latest code closure pass: `docs/audits/2026-05-28-code-closure-pass.md`
 - Branch reality and operational notes: `DEVELOPMENT-STATE.md`
 - Latest patch-note index (auto-generated): `docs/patch-notes/LATEST-INDEX.md`
 
