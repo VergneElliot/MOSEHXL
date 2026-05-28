@@ -143,6 +143,32 @@ export const validateEnvironment = (): void => {
     }
   }
 
+  if (process.env.AUTH_JWT_ADDITIONAL_PUBLIC_KEYS_JSON) {
+    try {
+      const parsed = JSON.parse(process.env.AUTH_JWT_ADDITIONAL_PUBLIC_KEYS_JSON);
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        invalid.push(
+          'AUTH_JWT_ADDITIONAL_PUBLIC_KEYS_JSON must be a JSON object of { "<kid>": "<pem>" }'
+        );
+      } else {
+        for (const [kid, pem] of Object.entries(parsed as Record<string, unknown>)) {
+          if (!kid.trim()) {
+            invalid.push('AUTH_JWT_ADDITIONAL_PUBLIC_KEYS_JSON contains an empty key id');
+            break;
+          }
+          if (typeof pem !== 'string' || pem.trim().length === 0) {
+            invalid.push(
+              `AUTH_JWT_ADDITIONAL_PUBLIC_KEYS_JSON key "${kid}" must map to a non-empty PEM string`
+            );
+            break;
+          }
+        }
+      }
+    } catch {
+      invalid.push('AUTH_JWT_ADDITIONAL_PUBLIC_KEYS_JSON must be valid JSON');
+    }
+  }
+
   const establishmentAdminPermissionMode = process.env.ESTABLISHMENT_ADMIN_PERMISSION_MODE;
   if (
     establishmentAdminPermissionMode &&

@@ -58,5 +58,92 @@ describe('jwtConfig', () => {
     expect(typeof jwks.keys[0]?.n).toBe('string');
     expect(typeof jwks.keys[0]?.e).toBe('string');
   });
+
+  it('verifies RS256 tokens using additional verify-only key ring entries', async () => {
+    process.env.JWT_SECRET = 'x'.repeat(32);
+    process.env.AUTH_JWT_SIGN_ALG = 'RS256';
+    process.env.AUTH_JWT_KID = 'kid-active';
+
+    const active = crypto.generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    });
+    const previous = crypto.generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    });
+
+    process.env.JWT_PRIVATE_KEY = active.privateKey;
+    process.env.JWT_PUBLIC_KEY = active.publicKey;
+    process.env.AUTH_JWT_ADDITIONAL_PUBLIC_KEYS_JSON = JSON.stringify({
+      'kid-previous': previous.publicKey,
+    });
+
+    const mod = await loadJwtConfigModule();
+    const previousToken = jwt.sign({ id: 77, role: 'staff' }, previous.privateKey, {
+      algorithm: 'RS256',
+      keyid: 'kid-previous',
+      expiresIn: '15m',
+    });
+    const decoded = mod.verifyJwtToken(previousToken) as { id?: number };
+    const jwks = mod.getJwtJwks();
+
+    expect(decoded.id).toBe(77);
+    expect(jwks.keys.map((k) => k.kid)).toEqual(['kid-active', 'kid-previous']);
+  });
+
+  it('rejects RS256 tokens with unknown kid', async () => {
+    process.env.JWT_SECRET = 'x'.repeat(32);
+    process.env.AUTH_JWT_SIGN_ALG = 'RS256';
+    process.env.AUTH_JWT_KID = 'kid-active';
+
+    const active = crypto.generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    });
+    const unknown = crypto.generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    });
+
+    process.env.JWT_PRIVATE_KEY = active.privateKey;
+    process.env.JWT_PUBLIC_KEY = active.publicKey;
+
+    const mod = await loadJwtConfigModule();
+    const unknownKidToken = jwt.sign({ id: 88 }, unknown.privateKey, {
+      algorithm: 'RS256',
+      keyid: 'kid-unknown',
+      expiresIn: '15m',
+    });
+
+    expect(() => mod.verifyJwtToken(unknownKidToken)).toThrow(/Unknown JWT key id/);
+  });
+
+  it('defaults legacy HS256 verify to false in RS256 production mode', async () => {
+    process.env.JWT_SECRET = 'x'.repeat(32);
+    process.env.NODE_ENV = 'production';
+    process.env.AUTH_JWT_SIGN_ALG = 'RS256';
+    process.env.AUTH_JWT_KID = 'kid-active';
+
+    const active = crypto.generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    });
+    process.env.JWT_PRIVATE_KEY = active.privateKey;
+    process.env.JWT_PUBLIC_KEY = active.publicKey;
+
+    const hsToken = jwt.sign({ id: 1 }, process.env.JWT_SECRET, {
+      algorithm: 'HS256',
+      expiresIn: '15m',
+    });
+    const mod = await loadJwtConfigModule();
+
+    expect(() => mod.verifyJwtToken(hsToken)).toThrow(/HS256 verification is disabled/);
+  });
 });
 
