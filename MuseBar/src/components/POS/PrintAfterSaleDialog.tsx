@@ -13,7 +13,7 @@ import {
 } from '@mui/material';
 import { apiCore } from '../../services/api';
 import LegalReceiptContainer from '../Legal/LegalReceipt/LegalReceiptContainer';
-import type { Order as LegalReceiptOrder, ReceiptItem } from '../Legal/LegalReceipt/types';
+import type { InvoiceLegalInfo, Order as LegalReceiptOrder, ReceiptItem } from '../Legal/LegalReceipt/types';
 
 type BusinessInfo = {
   name: string;
@@ -119,6 +119,12 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
   const [customerName, setCustomerName] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
   const [customerTaxId, setCustomerTaxId] = useState('');
+  const [paymentDueDate, setPaymentDueDate] = useState('');
+  const [paymentTerms, setPaymentTerms] = useState('Paiement à 30 jours');
+  const [latePenaltyTerms, setLatePenaltyTerms] = useState('Pénalités de retard exigibles selon la loi');
+  const [recoveryFeeNote, setRecoveryFeeNote] = useState('Indemnité forfaitaire de recouvrement: 40 EUR (C. com. art. L441-10)');
+  const [sellerLegalForm, setSellerLegalForm] = useState('');
+  const [sellerShareCapitalEur, setSellerShareCapitalEur] = useState('');
   const [invoiceMode, setInvoiceMode] = useState<'detailed' | 'summary'>('detailed');
   const [selectedDocument, setSelectedDocument] = useState<DocumentSelection>('ticket');
   const [lastInvoiceNumber, setLastInvoiceNumber] = useState<string | null>(null);
@@ -148,11 +154,29 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
   const receiptType = selectedDocument === 'invoice_summary' ? 'summary' : 'detailed';
   const documentKind = selectedDocument === 'ticket' ? 'ticket' : 'invoice';
   const isInvoiceDocument = documentKind === 'invoice';
+  const invoiceLegalInfo: InvoiceLegalInfo | undefined = isInvoiceDocument
+    ? {
+        paymentDueDate: paymentDueDate || undefined,
+        paymentTerms: paymentTerms || undefined,
+        latePenaltyTerms: latePenaltyTerms || undefined,
+        recoveryFeeNote: recoveryFeeNote || undefined,
+        sellerLegalForm: sellerLegalForm || undefined,
+        sellerShareCapitalEur: sellerShareCapitalEur || undefined,
+      }
+    : undefined;
 
   useEffect(() => {
     if (selectedDocument === 'invoice_detailed') setInvoiceMode('detailed');
     if (selectedDocument === 'invoice_summary') setInvoiceMode('summary');
   }, [selectedDocument]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (paymentDueDate) return;
+    const due = new Date();
+    due.setDate(due.getDate() + 30);
+    setPaymentDueDate(due.toISOString().slice(0, 10));
+  }, [open, paymentDueDate]);
 
   const resetAutoClose = useCallback(() => {
     if (!open || !autoCloseEnabled) return;
@@ -217,6 +241,15 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
     if (!customerAddress.trim()) {
       throw new Error('Adresse client requise pour créer une facture.');
     }
+    if (!paymentDueDate.trim()) {
+      throw new Error('Échéance paiement requise pour créer une facture.');
+    }
+    if (!paymentTerms.trim()) {
+      throw new Error('Conditions paiement requises pour créer une facture.');
+    }
+    if (!latePenaltyTerms.trim()) {
+      throw new Error('Pénalités retard requises pour créer une facture.');
+    }
 
     const result = await apiCore.request<{ invoice: Record<string, unknown>; already_exists?: boolean }>(
       `/legal/invoices/from-order/${normalizedOrderId}`,
@@ -230,6 +263,14 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
             email,
             tax_identification: customerTaxId,
           },
+          legal: {
+            payment_due_date: paymentDueDate,
+            payment_terms: paymentTerms,
+            late_penalty_terms: latePenaltyTerms,
+            recovery_fee_note: recoveryFeeNote,
+            seller_legal_form: sellerLegalForm,
+            seller_share_capital_eur: sellerShareCapitalEur,
+          },
         }),
       }
     );
@@ -241,6 +282,20 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
     }
     const invoiceNumber = String(invoice.invoice_number ?? '');
     if (invoiceNumber) setLastInvoiceNumber(invoiceNumber);
+    const invoicePaymentDueDate = String(invoice.payment_due_date ?? '').trim();
+    if (invoicePaymentDueDate) setPaymentDueDate(invoicePaymentDueDate);
+    const invoicePaymentTerms = String(invoice.payment_terms ?? '').trim();
+    if (invoicePaymentTerms) setPaymentTerms(invoicePaymentTerms);
+    const invoiceLatePenaltyTerms = String(invoice.late_penalty_terms ?? '').trim();
+    if (invoiceLatePenaltyTerms) setLatePenaltyTerms(invoiceLatePenaltyTerms);
+    const invoiceRecoveryFee = String(invoice.recovery_fee_note ?? '').trim();
+    if (invoiceRecoveryFee) setRecoveryFeeNote(invoiceRecoveryFee);
+    const invoiceSellerLegalForm = String(invoice.seller_legal_form ?? '').trim();
+    setSellerLegalForm(invoiceSellerLegalForm);
+    const invoiceCapital = invoice.seller_share_capital_eur;
+    if (invoiceCapital != null && String(invoiceCapital).trim() !== '') {
+      setSellerShareCapitalEur(String(invoiceCapital));
+    }
     return { invoiceId, invoice, alreadyExists: Boolean(result.already_exists) };
   };
 
@@ -412,6 +467,75 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
                     resetAutoClose();
                     setCustomerTaxId(e.target.value);
                   }}
+                  sx={{ mb: 1 }}
+                />
+                <TextField
+                  fullWidth
+                  size="small"
+                  type="date"
+                  label="Échéance paiement"
+                  value={paymentDueDate}
+                  onChange={(e) => {
+                    resetAutoClose();
+                    setPaymentDueDate(e.target.value);
+                  }}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ mb: 1 }}
+                />
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Conditions paiement"
+                  value={paymentTerms}
+                  onChange={(e) => {
+                    resetAutoClose();
+                    setPaymentTerms(e.target.value);
+                  }}
+                  sx={{ mb: 1 }}
+                />
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Pénalités retard"
+                  value={latePenaltyTerms}
+                  onChange={(e) => {
+                    resetAutoClose();
+                    setLatePenaltyTerms(e.target.value);
+                  }}
+                  sx={{ mb: 1 }}
+                />
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Mention indemnité 40 EUR"
+                  value={recoveryFeeNote}
+                  onChange={(e) => {
+                    resetAutoClose();
+                    setRecoveryFeeNote(e.target.value);
+                  }}
+                  sx={{ mb: 1 }}
+                />
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Forme juridique vendeur (optionnel)"
+                  value={sellerLegalForm}
+                  onChange={(e) => {
+                    resetAutoClose();
+                    setSellerLegalForm(e.target.value);
+                  }}
+                  sx={{ mb: 1 }}
+                />
+                <TextField
+                  fullWidth
+                  size="small"
+                  type="number"
+                  label="Capital social EUR (optionnel)"
+                  value={sellerShareCapitalEur}
+                  onChange={(e) => {
+                    resetAutoClose();
+                    setSellerShareCapitalEur(e.target.value);
+                  }}
                 />
                 <Button
                   sx={{ mt: 1 }}
@@ -452,6 +576,7 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
                 receiptType={receiptType}
                 documentKind={documentKind}
                 documentNumber={documentKind === 'invoice' ? lastInvoiceNumber ?? undefined : undefined}
+                invoiceLegalInfo={invoiceLegalInfo}
               />
             )}
           </Box>

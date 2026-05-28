@@ -275,6 +275,15 @@ export async function buildReceiptDataForInvoice(
     },
     vat_breakdown: vatBreakdown,
     receipt_type: invoiceMode,
+    legal_info: {
+      payment_due_date: row.payment_due_date ? String(row.payment_due_date) : undefined,
+      payment_terms: row.payment_terms ? String(row.payment_terms) : undefined,
+      late_penalty_terms: row.late_penalty_terms ? String(row.late_penalty_terms) : undefined,
+      recovery_fee_note: row.recovery_fee_note ? String(row.recovery_fee_note) : undefined,
+      seller_legal_form: row.seller_legal_form ? String(row.seller_legal_form) : undefined,
+      seller_share_capital_eur:
+        row.seller_share_capital_eur == null ? undefined : parseNumber(row.seller_share_capital_eur),
+    },
     compliance_info: {
       invoice_hash: row.invoice_hash ? String(row.invoice_hash) : undefined,
       cash_register_id: getRegisterIdForEstablishment(user.establishment_id),

@@ -92,6 +92,29 @@ export function receiptToEposPrintXml(data: ReceiptData): string {
     lines.push(line(`Monnaie rendue: ${money(toNumber(data.change))}`));
   }
 
+  if (documentKind === 'invoice' && data.legal_info) {
+    lines.push('<text>&#10;</text>');
+    lines.push(line('MENTIONS FACTURE:'));
+    if (data.legal_info.payment_due_date) {
+      lines.push(line(`Echeance paiement: ${data.legal_info.payment_due_date}`));
+    }
+    if (data.legal_info.payment_terms) {
+      lines.push(line(`Conditions paiement: ${data.legal_info.payment_terms}`));
+    }
+    if (data.legal_info.late_penalty_terms) {
+      lines.push(line(`Penalites retard: ${data.legal_info.late_penalty_terms}`));
+    }
+    if (data.legal_info.recovery_fee_note) {
+      lines.push(line(data.legal_info.recovery_fee_note));
+    }
+    if (data.legal_info.seller_legal_form) {
+      lines.push(line(`Forme juridique: ${data.legal_info.seller_legal_form}`));
+    }
+    if (typeof data.legal_info.seller_share_capital_eur === 'number') {
+      lines.push(line(`Capital social: ${money(data.legal_info.seller_share_capital_eur)}`));
+    }
+  }
+
   const legalHash = data.compliance_info?.invoice_hash || data.compliance_info?.receipt_hash;
   if (legalHash) {
     lines.push(line(`Hash: ${legalHash}`));
