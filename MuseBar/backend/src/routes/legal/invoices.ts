@@ -10,6 +10,7 @@ const router = express.Router();
 
 type InvoiceMode = 'detailed' | 'summary';
 type ReceiptPreviewType = 'detailed' | 'summary';
+const DEFAULT_RECOVERY_FEE_NOTE = 'Indemnité forfaitaire de recouvrement: 40 EUR (C. com. art. L441-10)';
 
 function toNumber(value: unknown): number {
   const n = typeof value === 'number' ? value : parseFloat(String(value ?? 0));
@@ -47,6 +48,33 @@ function buildInvoiceHash(payload: Record<string, unknown>): string {
   return crypto.createHash('sha256').update(JSON.stringify(payload), 'utf8').digest('hex');
 }
 
+function parseIsoDateOnly(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new ValidationError('Legal field payment_due_date is required');
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    throw new ValidationError('Legal field payment_due_date must be YYYY-MM-DD');
+  }
+  const date = new Date(`${trimmed}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) {
+    throw new ValidationError('Legal field payment_due_date is invalid');
+  }
+  return trimmed;
+}
+
+function parseOptionalNonNegativeDecimal(value: unknown, fieldName: string): number | null {
+  if (value === null || value === undefined || String(value).trim() === '') return null;
+  const n = typeof value === 'number' ? value : parseFloat(String(value));
+  if (!Number.isFinite(n)) {
+    throw new ValidationError(`Legal field ${fieldName} must be a valid number`);
+  }
+  if (n < 0) {
+    throw new ValidationError(`Legal field ${fieldName} must be >= 0`);
+  }
+  return n;
+}
+
 router.use(requireAuth, requirePermission(P.access_pos));
 
 // POST /api/legal/invoices/from-order/:orderId
@@ -59,15 +87,44 @@ router.post('/from-order/:orderId', asyncHandler(async (req, res) => {
     throw new ValidationError('Invalid order id');
   }
 
+  const existingResult = await pool.query(
+    `SELECT *
+     FROM legal_invoices
+     WHERE establishment_id = $1 AND order_id = $2
+     LIMIT 1`,
+    [establishmentId, orderId]
+  );
+  if ((existingResult.rowCount ?? 0) > 0) {
+    const existingInvoice = existingResult.rows[0] as Record<string, unknown>;
+    const responseInvoice = {
+      ...existingInvoice,
+      requested_mode: parseInvoiceMode((req.body as { mode?: unknown })?.mode),
+    };
+    res.status(200).json({ invoice: responseInvoice, already_exists: true });
+    return;
+  }
+
   const customer = (req.body as { customer?: Record<string, unknown> })?.customer ?? {};
   const customerName = String(customer.name ?? '').trim();
   const customerAddress = String(customer.address ?? '').trim();
   const customerEmail = String(customer.email ?? '').trim();
   const customerTaxIdentification = String(customer.tax_identification ?? customer.taxIdentification ?? '').trim();
   const invoiceMode = parseInvoiceMode((req.body as { mode?: unknown })?.mode);
+  const legal = (req.body as { legal?: Record<string, unknown> })?.legal ?? {};
+  const paymentDueDate = parseIsoDateOnly(String(legal.payment_due_date ?? ''));
+  const paymentTerms = String(legal.payment_terms ?? '').trim();
+  const latePenaltyTerms = String(legal.late_penalty_terms ?? '').trim();
+  const recoveryFeeNote = String(legal.recovery_fee_note ?? DEFAULT_RECOVERY_FEE_NOTE).trim() || DEFAULT_RECOVERY_FEE_NOTE;
+  const sellerLegalForm = String(legal.seller_legal_form ?? '').trim();
+  const sellerShareCapitalEur = parseOptionalNonNegativeDecimal(
+    legal.seller_share_capital_eur,
+    'seller_share_capital_eur'
+  );
 
   if (!customerName) throw new ValidationError('Customer name is required');
   if (!customerAddress) throw new ValidationError('Customer address is required');
+  if (!paymentTerms) throw new ValidationError('Legal field payment_terms is required');
+  if (!latePenaltyTerms) throw new ValidationError('Legal field late_penalty_terms is required');
 
   const user = req.user as { id?: number; username?: string } | undefined;
   const printingUser = {
@@ -90,23 +147,6 @@ router.post('/from-order/:orderId', asyncHandler(async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-
-    const existing = await client.query(
-      `SELECT *
-       FROM legal_invoices
-       WHERE establishment_id = $1 AND order_id = $2
-       LIMIT 1`,
-      [establishmentId, orderId]
-    );
-    if ((existing.rowCount ?? 0) > 0) {
-      const existingInvoice = existing.rows[0] as Record<string, unknown>;
-      const responseInvoice = {
-        ...existingInvoice,
-        requested_mode: invoiceMode,
-      };
-      res.status(200).json({ invoice: responseInvoice, already_exists: true });
-      return;
-    }
 
     await client.query(
       `INSERT INTO legal_invoice_counters (establishment_id, invoice_year, next_sequence)
@@ -153,6 +193,12 @@ router.post('/from-order/:orderId', asyncHandler(async (req, res) => {
       customer_address: customerAddress,
       customer_email: customerEmail || null,
       customer_tax_identification: customerTaxIdentification || null,
+      payment_due_date: paymentDueDate,
+      payment_terms: paymentTerms,
+      late_penalty_terms: latePenaltyTerms,
+      recovery_fee_note: recoveryFeeNote,
+      seller_legal_form: sellerLegalForm || null,
+      seller_share_capital_eur: sellerShareCapitalEur,
       subtotal_ht: Number(subtotalHt.toFixed(2)),
       total_vat: Number(toNumber(receiptData.total_tax).toFixed(2)),
       total_ttc: Number(toNumber(receiptData.total_amount).toFixed(2)),
@@ -176,14 +222,16 @@ router.post('/from-order/:orderId', asyncHandler(async (req, res) => {
          establishment_id, order_id, invoice_number, invoice_year, invoice_sequence, invoice_mode,
          issued_at,
          customer_name, customer_address, customer_email, customer_tax_identification,
+         payment_due_date, payment_terms, late_penalty_terms, recovery_fee_note, seller_legal_form, seller_share_capital_eur,
          business_info, line_items, vat_breakdown, subtotal_ht, total_vat, total_ttc,
          source_receipt_sequence, source_receipt_hash, previous_invoice_hash, invoice_hash, created_by
        ) VALUES (
          $1, $2, $3, $4, $5, $6,
          $7,
          $8, $9, NULLIF($10, ''), NULLIF($11, ''),
-         $12::jsonb, $13::jsonb, $14::jsonb, $15, $16, $17,
-         $18, $19, NULLIF($20, ''), $21, $22
+         $12, $13, $14, $15, NULLIF($16, ''), $17,
+         $18::jsonb, $19::jsonb, $20::jsonb, $21, $22, $23,
+         $24, $25, NULLIF($26, ''), $27, $28
        )
        RETURNING *`,
       [
@@ -198,6 +246,12 @@ router.post('/from-order/:orderId', asyncHandler(async (req, res) => {
         customerAddress,
         customerEmail,
         customerTaxIdentification,
+        paymentDueDate,
+        paymentTerms,
+        latePenaltyTerms,
+        recoveryFeeNote,
+        sellerLegalForm,
+        sellerShareCapitalEur,
         JSON.stringify(receiptData.business_info ?? {}),
         JSON.stringify(normalizedLineItems),
         JSON.stringify(normalizedVatBreakdown),
