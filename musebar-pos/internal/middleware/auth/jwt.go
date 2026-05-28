@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/joho/godotenv"
 )
 
 var (
@@ -16,6 +17,9 @@ var (
 )
 
 func init() {
+	// Load .env file first (init() runs before main())
+	_ = godotenv.Load()
+
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" || len(secret) < 32 {
 		panic("JWT_SECRET environment variable is required and must be at least 32 characters")
