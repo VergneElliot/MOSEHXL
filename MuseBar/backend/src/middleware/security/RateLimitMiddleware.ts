@@ -6,16 +6,15 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { Pool } from 'pg';
-import jwt from 'jsonwebtoken';
 import { EnvironmentConfig } from '../../config/environment';
 import { Logger } from '../../utils/logger';
 import { RateLimitError } from '../errorHandler';
 import { IRateLimitStoreAdapter, RateLimitStats, SecurityMiddlewareFunction } from './types';
 import { InMemoryRateLimitStore } from './InMemoryRateLimitStore';
 import { PostgresRateLimitStore } from './PostgresRateLimitStore';
+import { verifyJwtToken } from '../../security/jwtConfig';
 
 export class RateLimitMiddleware {
-  private static readonly JWT_VERIFY_OPTIONS: jwt.VerifyOptions = { algorithms: ['HS256'] };
   private store: IRateLimitStoreAdapter;
   private config: EnvironmentConfig;
   private logger: Logger;
@@ -122,11 +121,7 @@ export class RateLimitMiddleware {
       const token = auth.slice(7).trim();
       if (token) {
         try {
-          const decoded = jwt.verify(
-            token,
-            this.config.security.jwtSecret,
-            RateLimitMiddleware.JWT_VERIFY_OPTIONS
-          ) as { id?: number };
+          const decoded = verifyJwtToken(token) as { id?: number };
           if (typeof decoded?.id === 'number' && Number.isFinite(decoded.id)) {
             return `user:${decoded.id}`;
           }

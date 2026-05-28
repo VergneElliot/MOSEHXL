@@ -6,20 +6,10 @@
 
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
-import jwt from 'jsonwebtoken';
+import type { SignOptions } from 'jsonwebtoken';
 import { UserModel } from '../models/user';
 import { runWithTenantContext } from '../rls/tenantContext';
-
-// No fallback: if JWT_SECRET is missing, fail fast so we never run with a default secret.
-const rawSecret = process.env.JWT_SECRET;
-if (!rawSecret || rawSecret.length < 32) {
-  throw new Error(
-    'JWT_SECRET environment variable is required and must be at least 32 characters. ' +
-    'Set it in your .env file and restart the server.'
-  );
-}
-const JWT_SECRET: string = rawSecret;
-const JWT_VERIFY_OPTIONS: jwt.VerifyOptions = { algorithms: ['HS256'] };
+import { signJwtToken, verifyJwtToken } from '../security/jwtConfig';
 
 export interface JwtPayload {
   id: number;
@@ -39,17 +29,17 @@ export interface JwtPayload {
 export function generateToken(
   payload: JwtPayload,
   rememberMe: boolean = false,
-  customExpiresIn?: jwt.SignOptions['expiresIn']
+  customExpiresIn?: SignOptions['expiresIn']
 ): string {
-  const expiration: jwt.SignOptions['expiresIn'] = customExpiresIn ?? '15m';
+  const expiration: SignOptions['expiresIn'] = customExpiresIn ?? '15m';
   const payloadWithJti = payload.jti ? payload : { ...payload, jti: crypto.randomUUID() };
   // One-rollover migration: never emit legacy `is_admin` in new tokens.
   const { is_admin: _legacyIsAdmin, ...signablePayload } = payloadWithJti;
-  return jwt.sign(signablePayload, JWT_SECRET, { expiresIn: expiration });
+  return signJwtToken(signablePayload, expiration);
 }
 
 export function verifyToken(token: string): JwtPayload {
-  return jwt.verify(token, JWT_SECRET, JWT_VERIFY_OPTIONS) as JwtPayload;
+  return verifyJwtToken(token) as JwtPayload;
 }
 
 async function isTokenRevoked(token: string): Promise<boolean> {
