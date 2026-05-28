@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"musebar-pos/internal/api"
-	"musebar-pos/internal/pkg/logger"
 	"musebar-pos/internal/config"
+	"musebar-pos/internal/pkg/logger"
 )
 
 func main() {
@@ -33,7 +33,11 @@ func main() {
 	logger.Init(cfg.Environment)
 
 	// Pass cfg to router for CORS configuration
-	router := api.NewRouter(db, cfg)
+	router, closureScheduler := api.NewRouter(db, cfg)
+
+	// Start auto-closure scheduler
+	closureScheduler.Start()
+	defer closureScheduler.Stop()
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%s", cfg.Port),
