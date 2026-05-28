@@ -24,6 +24,14 @@ export interface ReceiptData {
     siret?: string;
     tax_identification?: string;
   };
+  legal_info?: {
+    payment_due_date?: string;
+    payment_terms?: string;
+    late_penalty_terms?: string;
+    recovery_fee_note?: string;
+    seller_legal_form?: string;
+    seller_share_capital_eur?: number;
+  };
   vat_breakdown?: Array<{
     rate: number;
     subtotal_ht: number;
