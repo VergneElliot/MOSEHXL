@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   managerClearService: vi.fn(),
   buildTestReceiptData: vi.fn(),
   buildReceiptDataForOrder: vi.fn(),
+  buildReceiptDataForInvoice: vi.fn(),
   buildClosureBulletinData: vi.fn(),
   logPrintingHistory: vi.fn(),
   logSoftwareEventBestEffort: vi.fn(),
@@ -69,6 +70,7 @@ vi.mock('../printing/printingConfigRepo', () => ({
 vi.mock('../printing/printDataRepo', () => ({
   buildTestReceiptData: mocks.buildTestReceiptData,
   buildReceiptDataForOrder: mocks.buildReceiptDataForOrder,
+  buildReceiptDataForInvoice: mocks.buildReceiptDataForInvoice,
   buildClosureBulletinData: mocks.buildClosureBulletinData,
   logPrintingHistory: mocks.logPrintingHistory,
 }));
@@ -102,6 +104,7 @@ describe('printing routes', () => {
     mocks.managerClearService.mockReset();
     mocks.buildTestReceiptData.mockReset();
     mocks.buildReceiptDataForOrder.mockReset();
+    mocks.buildReceiptDataForInvoice.mockReset();
     mocks.buildClosureBulletinData.mockReset();
     mocks.logPrintingHistory.mockReset();
     mocks.logSoftwareEventBestEffort.mockReset();
@@ -496,6 +499,43 @@ describe('printing routes', () => {
 
     expect(res.status).toBe(404);
     expect(res.body.error?.message).toBe('Closure bulletin not found');
+  });
+
+  it('prints invoice successfully and logs printing history metadata', async () => {
+    mocks.buildReceiptDataForInvoice.mockResolvedValue({
+      document_kind: 'invoice',
+      document_number: 'FAC-2026-000001',
+      sequence_number: 1,
+      total_amount: 100,
+      total_tax: 20,
+      payment_method: 'card',
+      created_at: new Date().toISOString(),
+      order_id: 42,
+      receipt_type: 'detailed',
+      business_info: { name: 'Muse', address: '', phone: '', email: '' },
+      items: [],
+    });
+    const printReceipt = vi.fn().mockResolvedValue({ success: true, message: 'queued' });
+    mocks.managerGetService.mockResolvedValue({
+      checkPrinterStatus: vi.fn().mockResolvedValue({ connected: true }),
+      listPrinters: vi.fn().mockResolvedValue([{ id: 'p1', name: 'Printer 1' }]),
+      printReceipt,
+      printClosureBulletin: vi.fn(),
+    });
+
+    const res = await request(app)
+      .post('/printing/invoice/1')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(mocks.logPrintingHistory).toHaveBeenCalledWith(
+      expect.anything(),
+      'est-1',
+      'invoice',
+      expect.objectContaining({ success: true }),
+      expect.objectContaining({ invoice_id: 1, invoice_number: 'FAC-2026-000001' })
+    );
   });
 
   it('prints closure bulletin successfully and logs printing history metadata', async () => {

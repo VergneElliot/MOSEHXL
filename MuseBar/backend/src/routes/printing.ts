@@ -14,6 +14,7 @@ import {
 } from '../printing/printingConfigRepo';
 import {
   buildClosureBulletinData,
+  buildReceiptDataForInvoice,
   buildReceiptDataForOrder,
   buildTestReceiptData,
   logPrintingHistory,
@@ -165,6 +166,22 @@ export async function printClosureBulletinResponse(
   return { result, bulletinData };
 }
 
+/** In-process handler: print invoice. */
+export async function printInvoiceResponse(
+  user: PrintingUser,
+  invoiceId: number
+): Promise<{ result: PrintResult; invoiceData: PrintingReceiptData }> {
+  const invoiceData = await buildReceiptDataForInvoice(pool, user, invoiceId);
+  const service = await getPrintingService(user.establishment_id);
+  const result = await service.printReceipt(invoiceData);
+  await logPrintingHistory(pool, user.establishment_id, 'invoice', result, {
+    invoice_id: invoiceId,
+    invoice_number: invoiceData.document_number,
+    invoice_sequence: invoiceData.sequence_number,
+  });
+  return { result, invoiceData };
+}
+
 // GET /api/printing/receipt/:orderId/preview
 // Preview-only: returns receipt_data but DOES NOT queue a print job.
 router.get('/receipt/:orderId/preview', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
@@ -265,6 +282,57 @@ router.post('/closure/:bulletinId', authenticateToken, ensureEstablishment, asyn
       e?.message ?? (error instanceof Error ? error.message : 'Unknown error'),
       500,
       'PRINTING_CLOSURE_FAILED'
+    );
+  }
+}));
+
+// GET /api/printing/invoice/:invoiceId/preview
+// Preview-only: returns invoice_data but DOES NOT queue a print job.
+router.get('/invoice/:invoiceId/preview', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = getPrintingUser(req)!;
+    const invoiceId = parseInt(req.params.invoiceId ?? '', 10);
+    if (!Number.isFinite(invoiceId) || invoiceId <= 0) {
+      throw new ValidationError('Invalid invoice id');
+    }
+    const invoiceData = await buildReceiptDataForInvoice(pool, user, invoiceId);
+    res.json({ invoice_data: invoiceData });
+  } catch (error: unknown) {
+    if (error instanceof AppError) throw error;
+    const e = error as { statusCode?: number; message?: string };
+    if (e?.statusCode === 404) {
+      throw new NotFoundError('Invoice');
+    }
+    getLogger().error('Error generating invoice preview', error instanceof Error ? error : undefined);
+    throw new AppError(
+      e?.message ?? (error instanceof Error ? error.message : 'Unknown error'),
+      500,
+      'PRINTING_INVOICE_PREVIEW_FAILED'
+    );
+  }
+}));
+
+// POST /api/printing/invoice/:invoiceId
+router.post('/invoice/:invoiceId', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = getPrintingUser(req)!;
+    const invoiceId = parseInt(req.params.invoiceId ?? '', 10);
+    if (!Number.isFinite(invoiceId) || invoiceId <= 0) {
+      throw new ValidationError('Invalid invoice id');
+    }
+    const { result, invoiceData } = await printInvoiceResponse(user, invoiceId);
+    res.json({ ...result, invoice_data: invoiceData });
+  } catch (error: unknown) {
+    if (error instanceof AppError) throw error;
+    const e = error as { statusCode?: number; message?: string };
+    if (e?.statusCode === 404) {
+      throw new NotFoundError('Invoice');
+    }
+    getLogger().error('Error printing invoice', error instanceof Error ? error : undefined);
+    throw new AppError(
+      e?.message ?? (error instanceof Error ? error.message : 'Unknown error'),
+      500,
+      'PRINTING_INVOICE_FAILED'
     );
   }
 }));
