@@ -1,13 +1,15 @@
 import express from 'express';
+import crypto from 'crypto';
 import { pool } from '../../db/pool';
 import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
 import { P } from '../../permissions/registry';
-import { AppError, asyncHandler, ConflictError, NotFoundError, ValidationError } from '../../middleware/errorHandler';
+import { AppError, asyncHandler, NotFoundError, ValidationError } from '../../middleware/errorHandler';
 import { buildReceiptDataForOrder } from '../../printing/printDataRepo';
 
 const router = express.Router();
 
 type InvoiceMode = 'detailed' | 'summary';
+type ReceiptPreviewType = 'detailed' | 'summary';
 
 function toNumber(value: unknown): number {
   const n = typeof value === 'number' ? value : parseFloat(String(value ?? 0));
@@ -19,8 +21,30 @@ function parseInvoiceMode(mode: unknown): InvoiceMode {
   return 'detailed';
 }
 
+function toReceiptPreviewType(mode: InvoiceMode): ReceiptPreviewType {
+  return mode === 'summary' ? 'summary' : 'detailed';
+}
+
 function formatInvoiceNumber(year: number, sequence: number): string {
   return `FAC-${year}-${String(sequence).padStart(6, '0')}`;
+}
+
+function normalizeSummaryLineItems(items: unknown): unknown[] {
+  if (!Array.isArray(items)) return [];
+  return items.map((line) => {
+    if (!line || typeof line !== 'object') return {};
+    const row = line as Record<string, unknown>;
+    return {
+      product_name: row.product_name,
+      quantity: row.quantity,
+      total_price: row.total_price,
+      tax_rate: row.tax_rate,
+    };
+  });
+}
+
+function buildInvoiceHash(payload: Record<string, unknown>): string {
+  return crypto.createHash('sha256').update(JSON.stringify(payload), 'utf8').digest('hex');
 }
 
 router.use(requireAuth, requirePermission(P.access_pos));
@@ -52,7 +76,13 @@ router.post('/from-order/:orderId', asyncHandler(async (req, res) => {
     username: typeof user?.username === 'string' ? user.username : undefined,
   };
 
-  const receiptData = await buildReceiptDataForOrder(pool, establishmentId, printingUser, orderId, invoiceMode);
+  const receiptData = await buildReceiptDataForOrder(
+    pool,
+    establishmentId,
+    printingUser,
+    orderId,
+    toReceiptPreviewType(invoiceMode)
+  );
 
   const currentYear = new Date().getFullYear();
   const subtotalHt = toNumber(receiptData.total_amount) - toNumber(receiptData.total_tax);
@@ -62,13 +92,20 @@ router.post('/from-order/:orderId', asyncHandler(async (req, res) => {
     await client.query('BEGIN');
 
     const existing = await client.query(
-      `SELECT id, invoice_number FROM legal_invoices
+      `SELECT *
+       FROM legal_invoices
        WHERE establishment_id = $1 AND order_id = $2
        LIMIT 1`,
       [establishmentId, orderId]
     );
     if ((existing.rowCount ?? 0) > 0) {
-      throw new ConflictError(`Invoice already exists for order ${orderId}`);
+      const existingInvoice = existing.rows[0] as Record<string, unknown>;
+      const responseInvoice = {
+        ...existingInvoice,
+        requested_mode: invoiceMode,
+      };
+      res.status(200).json({ invoice: responseInvoice, already_exists: true });
+      return;
     }
 
     await client.query(
@@ -87,6 +124,45 @@ router.post('/from-order/:orderId', asyncHandler(async (req, res) => {
     );
     const nextSequence = Number(counterRes.rows[0]?.next_sequence ?? 1);
     const invoiceNumber = formatInvoiceNumber(currentYear, nextSequence);
+    const issuedAt = new Date().toISOString();
+
+    const previousHashRes = await client.query(
+      `SELECT invoice_hash
+       FROM legal_invoices
+       WHERE establishment_id = $1 AND invoice_year = $2
+       ORDER BY invoice_sequence DESC
+       LIMIT 1`,
+      [establishmentId, currentYear]
+    );
+    const previousInvoiceHash = String(previousHashRes.rows[0]?.invoice_hash ?? '');
+
+    const normalizedLineItems = invoiceMode === 'summary'
+      ? normalizeSummaryLineItems(receiptData.items)
+      : (receiptData.items ?? []);
+    const normalizedVatBreakdown = Array.isArray(receiptData.vat_breakdown) ? receiptData.vat_breakdown : [];
+
+    const hashPayload = {
+      establishment_id: establishmentId,
+      order_id: orderId,
+      invoice_number: invoiceNumber,
+      invoice_year: currentYear,
+      invoice_sequence: nextSequence,
+      invoice_mode: invoiceMode,
+      issued_at: issuedAt,
+      customer_name: customerName,
+      customer_address: customerAddress,
+      customer_email: customerEmail || null,
+      customer_tax_identification: customerTaxIdentification || null,
+      subtotal_ht: Number(subtotalHt.toFixed(2)),
+      total_vat: Number(toNumber(receiptData.total_tax).toFixed(2)),
+      total_ttc: Number(toNumber(receiptData.total_amount).toFixed(2)),
+      source_receipt_sequence: receiptData.sequence_number ?? null,
+      source_receipt_hash: receiptData.compliance_info?.receipt_hash ?? null,
+      previous_invoice_hash: previousInvoiceHash || null,
+      line_items: normalizedLineItems,
+      vat_breakdown: normalizedVatBreakdown,
+    };
+    const invoiceHash = buildInvoiceHash(hashPayload);
 
     await client.query(
       `UPDATE legal_invoice_counters
@@ -98,14 +174,16 @@ router.post('/from-order/:orderId', asyncHandler(async (req, res) => {
     const insertRes = await client.query(
       `INSERT INTO legal_invoices (
          establishment_id, order_id, invoice_number, invoice_year, invoice_sequence, invoice_mode,
+         issued_at,
          customer_name, customer_address, customer_email, customer_tax_identification,
          business_info, line_items, vat_breakdown, subtotal_ht, total_vat, total_ttc,
-         source_receipt_sequence, source_receipt_hash, created_by
+         source_receipt_sequence, source_receipt_hash, previous_invoice_hash, invoice_hash, created_by
        ) VALUES (
          $1, $2, $3, $4, $5, $6,
-         $7, $8, NULLIF($9, ''), NULLIF($10, ''),
-         $11::jsonb, $12::jsonb, $13::jsonb, $14, $15, $16,
-         $17, $18, $19
+         $7,
+         $8, $9, NULLIF($10, ''), NULLIF($11, ''),
+         $12::jsonb, $13::jsonb, $14::jsonb, $15, $16, $17,
+         $18, $19, NULLIF($20, ''), $21, $22
        )
        RETURNING *`,
       [
@@ -115,24 +193,33 @@ router.post('/from-order/:orderId', asyncHandler(async (req, res) => {
         currentYear,
         nextSequence,
         invoiceMode,
+        issuedAt,
         customerName,
         customerAddress,
         customerEmail,
         customerTaxIdentification,
         JSON.stringify(receiptData.business_info ?? {}),
-        JSON.stringify(receiptData.items ?? []),
-        JSON.stringify(receiptData.vat_breakdown ?? []),
+        JSON.stringify(normalizedLineItems),
+        JSON.stringify(normalizedVatBreakdown),
         subtotalHt.toFixed(2),
         toNumber(receiptData.total_tax).toFixed(2),
         toNumber(receiptData.total_amount).toFixed(2),
         receiptData.sequence_number ?? null,
         receiptData.compliance_info?.receipt_hash ?? null,
+        previousInvoiceHash,
+        invoiceHash,
         typeof user?.id === 'number' ? user.id : null,
       ]
     );
 
     await client.query('COMMIT');
-    res.status(201).json({ invoice: insertRes.rows[0] });
+    res.status(201).json({
+      invoice: {
+        ...insertRes.rows[0],
+        requested_mode: invoiceMode,
+      },
+      already_exists: false,
+    });
   } catch (error) {
     await client.query('ROLLBACK');
     if (error instanceof AppError) throw error;

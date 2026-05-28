@@ -96,8 +96,11 @@ describe('legal invoices routes', () => {
 
     const txQuery = vi.fn(async (sql: string) => {
       if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') return { rows: [], rowCount: 0 };
-      if (sql.includes('SELECT id, invoice_number FROM legal_invoices')) return { rows: [], rowCount: 0 };
+      if (sql.includes('SELECT *') && sql.includes('WHERE establishment_id = $1 AND order_id = $2')) {
+        return { rows: [], rowCount: 0 };
+      }
       if (sql.includes('SELECT next_sequence')) return { rows: [{ next_sequence: 12 }], rowCount: 1 };
+      if (sql.includes('SELECT invoice_hash')) return { rows: [], rowCount: 0 };
       if (sql.includes('INSERT INTO legal_invoices')) {
         return {
           rows: [{ id: 501, invoice_number: `FAC-${invoiceYear}-000012`, order_id: 42, invoice_mode: 'detailed' }],
@@ -123,6 +126,7 @@ describe('legal invoices routes', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.invoice.invoice_number).toBe(`FAC-${invoiceYear}-000012`);
+    expect(res.body.already_exists).toBe(false);
     expect(mocks.buildReceiptDataForOrder).toHaveBeenCalledWith(
       expect.anything(),
       'est-1',
@@ -130,6 +134,47 @@ describe('legal invoices routes', () => {
       42,
       'detailed'
     );
+    expect(txRelease).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns existing invoice for same order without generating a new sequence', async () => {
+    mocks.buildReceiptDataForOrder.mockResolvedValue({
+      total_amount: 60,
+      total_tax: 10,
+      business_info: { name: 'MOSEHXL BAR' },
+      items: [],
+      vat_breakdown: [],
+      sequence_number: 15,
+      compliance_info: { receipt_hash: 'hash-15' },
+    });
+
+    const txQuery = vi.fn(async (sql: string) => {
+      if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') return { rows: [], rowCount: 0 };
+      if (sql.includes('SELECT *') && sql.includes('WHERE establishment_id = $1 AND order_id = $2')) {
+        return {
+          rows: [{ id: 88, invoice_number: 'FAC-2026-000088', order_id: 42, invoice_mode: 'detailed' }],
+          rowCount: 1,
+        };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+    const txRelease = vi.fn();
+    mocks.poolConnect.mockResolvedValue({ query: txQuery, release: txRelease });
+
+    const res = await request(app)
+      .post('/invoices/from-order/42')
+      .send({
+        mode: 'summary',
+        customer: {
+          name: 'Client déjà facturé',
+          address: '3 Rue Victor Hugo',
+        },
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.already_exists).toBe(true);
+    expect(res.body.invoice.invoice_number).toBe('FAC-2026-000088');
+    expect(res.body.invoice.requested_mode).toBe('summary');
     expect(txRelease).toHaveBeenCalledTimes(1);
   });
 

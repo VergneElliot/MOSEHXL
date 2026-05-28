@@ -117,6 +117,7 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
   const [customerName, setCustomerName] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
   const [customerTaxId, setCustomerTaxId] = useState('');
+  const [invoiceMode, setInvoiceMode] = useState<'detailed' | 'summary'>('detailed');
   const [creatingInvoice, setCreatingInvoice] = useState(false);
   const autoCloseTimerRef = useRef<number | null>(null);
 
@@ -231,12 +232,12 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
     try {
       setCreatingInvoice(true);
       setError(null);
-      const result = await apiCore.request<{ invoice: Record<string, unknown> }>(
+      const result = await apiCore.request<{ invoice: Record<string, unknown>; already_exists?: boolean }>(
         `/legal/invoices/from-order/${normalizedOrderId}`,
         {
           method: 'POST',
           body: JSON.stringify({
-            mode: 'detailed',
+            mode: invoiceMode,
             customer: {
               name: customerName,
               address: customerAddress,
@@ -259,6 +260,9 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
       anchor.click();
       document.body.removeChild(anchor);
       window.URL.revokeObjectURL(url);
+      if (result.already_exists) {
+        setError('Facture existante retrouvée et exportée (aucune nouvelle numérotation générée).');
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Échec de création/export facture');
     } finally {
@@ -290,12 +294,34 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
 
             <Alert severity="info" sx={{ mb: 2 }}>
               La prévisualisation n’imprime rien. Cliquez sur “Imprimer” pour mettre en file un ticket.
-              Les factures légales dédiées seront livrées dans une étape séparée.
+              La section facture ci-dessous crée ou retrouve une facture légale dédiée.
             </Alert>
 
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
               Facture (système dédié)
             </Typography>
+            <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+              <Button
+                variant={invoiceMode === 'detailed' ? 'contained' : 'outlined'}
+                onClick={() => {
+                  resetAutoClose();
+                  setInvoiceMode('detailed');
+                }}
+                size="small"
+              >
+                Avec détail
+              </Button>
+              <Button
+                variant={invoiceMode === 'summary' ? 'contained' : 'outlined'}
+                onClick={() => {
+                  resetAutoClose();
+                  setInvoiceMode('summary');
+                }}
+                size="small"
+              >
+                Sans détail
+              </Button>
+            </Box>
             <TextField
               fullWidth
               size="small"
@@ -347,7 +373,9 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
               disabled={isInvoiceExportUnavailable || creatingInvoice}
               onClick={handleCreateInvoiceExport}
             >
-              {creatingInvoice ? 'Création...' : 'Créer et exporter facture (.json)'}
+              {creatingInvoice
+                ? 'Création...'
+                : `Créer et exporter facture ${invoiceMode === 'detailed' ? '(avec détail)' : '(sans détail)'}`}
             </Button>
           </Box>
 
