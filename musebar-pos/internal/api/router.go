@@ -5,19 +5,21 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"musebar-pos/internal/api/handlers"
 	"musebar-pos/internal/config"
+	"musebar-pos/internal/domain/legal"
+	authmw "musebar-pos/internal/middleware/auth"
+	corsmw "musebar-pos/internal/middleware/cors"
 	"musebar-pos/internal/pkg/audit"
 	"musebar-pos/internal/pkg/email"
-	"musebar-pos/internal/domain/legal"
-	corsmw "musebar-pos/internal/middleware/cors"
 	"musebar-pos/internal/pkg/logger"
-	authmw "musebar-pos/internal/middleware/auth"
+	"musebar-pos/internal/pkg/scheduler"
 	"musebar-pos/internal/repository/postgres"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
+func NewRouter(db *pgxpool.Pool, cfg *config.Config) (http.Handler, *scheduler.ClosureScheduler) {
 	mux := http.NewServeMux()
 
 	// Repositories
@@ -43,6 +45,9 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	journalService := legal.NewJournalService(legalRepo)
 	closureService := legal.NewClosureService(legalRepo, orderRepo)
 
+	// Initialize scheduler
+	closureScheduler := scheduler.New(db, closureService, auditService)
+
 	// Handlers
 	legalHandler := handlers.NewLegalHandler(journalService, legalRepo)
 	productHandler := handlers.NewProductHandler(productRepo)
@@ -65,7 +70,45 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	mux.HandleFunc("POST /api/auth/logout", authmw.RequireAuth(authHandler.Logout))
 	mux.HandleFunc("GET /api/auth/me", authmw.RequireAuth(authHandler.Me))
 
-	// Audit trail (admin only)
+	// Scheduler endpoints
+	mux.HandleFunc("GET /api/scheduler/status", authmw.RequireAdmin(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(closureScheduler.Status())
+	}))
+	mux.HandleFunc("POST /api/scheduler/trigger", authmw.RequireAdmin(func(w http.ResponseWriter, r *http.Request) {
+		go closureScheduler.TriggerManual()
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"message":"Manual closure check triggered"}`))
+	}))
+	mux.HandleFunc("PATCH /api/scheduler/settings", authmw.RequireAdmin(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Enabled            *bool   `json:"auto_closure_enabled"`
+			DailyClosureTime   *string `json:"daily_closure_time"`
+			GracePeriodMinutes *int    `json:"grace_period_minutes"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+		estID := r.Context().Value("establishment_id").(string)
+		_, err := db.Exec(r.Context(), `
+			INSERT INTO closure_settings (establishment_id, auto_closure_enabled, daily_closure_time, grace_period_minutes, updated_at)
+			VALUES ($1::uuid, COALESCE($2, false), COALESCE($3, '02:00'), COALESCE($4, 30), NOW())
+			ON CONFLICT (establishment_id) DO UPDATE
+			SET auto_closure_enabled = COALESCE($2, closure_settings.auto_closure_enabled),
+			    daily_closure_time = COALESCE($3, closure_settings.daily_closure_time),
+			    grace_period_minutes = COALESCE($4, closure_settings.grace_period_minutes),
+			    updated_at = NOW()
+		`, estID, req.Enabled, req.DailyClosureTime, req.GracePeriodMinutes)
+		if err != nil {
+			http.Error(w, "Failed to update settings", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"message":"Settings updated"}`))
+	}))
+
+		// Audit trail (admin only)
 	mux.HandleFunc("GET /api/audit", authmw.RequireAdmin(func(w http.ResponseWriter, r *http.Request) {
 		estID := r.Context().Value("establishment_id").(string)
 		entries, err := auditService.GetByEstablishment(r.Context(), estID, 100, 0)
@@ -143,5 +186,5 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 		IsDevelopment:  cfg.Environment == "development",
 	})(handler)
 
-	return handler
+	return handler, closureScheduler
 }
