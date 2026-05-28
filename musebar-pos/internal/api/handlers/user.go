@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"musebar-pos/internal/models"
+	"musebar-pos/internal/pkg/audit"
 	"musebar-pos/internal/repository"
 	"musebar-pos/internal/validation"
 
@@ -13,11 +15,12 @@ import (
 )
 
 type UserHandler struct {
-	userRepo repository.UserRepository
+	userRepo     repository.UserRepository
+	auditService *audit.Service
 }
 
-func NewUserHandler(userRepo repository.UserRepository) *UserHandler {
-	return &UserHandler{userRepo: userRepo}
+func NewUserHandler(userRepo repository.UserRepository, auditService *audit.Service) *UserHandler {
+	return &UserHandler{userRepo: userRepo, auditService: auditService}
 }
 
 var allowedRoles = []string{"establishment_admin", "manager", "cashier"}
@@ -136,6 +139,15 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.auditService.Log(r.Context(), audit.Entry{
+		UserID:          fmt.Sprintf("%d", r.Context().Value("user_id").(int64)),
+		EstablishmentID: establishmentID,
+		ActionType:      audit.ActionCreateUser,
+		ResourceType:    "USER",
+		IPAddress:       r.RemoteAddr,
+		ActionDetails:   map[string]interface{}{"email": req.Email, "role": req.Role},
+	})
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -243,6 +255,15 @@ func (h *UserHandler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to deactivate user", http.StatusInternalServerError)
 		return
 	}
+
+	h.auditService.Log(r.Context(), audit.Entry{
+		UserID:          fmt.Sprintf("%d", currentUserID),
+		EstablishmentID: establishmentID,
+		ActionType:      audit.ActionDeactivateUser,
+		ResourceType:    "USER",
+		ResourceID:      fmt.Sprintf("%d", targetID),
+		IPAddress:       r.RemoteAddr,
+	})
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
