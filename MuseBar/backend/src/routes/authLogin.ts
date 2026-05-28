@@ -35,6 +35,7 @@ const MAX_FAILED_LOGIN_ATTEMPTS = Number(process.env.AUTH_LOCKOUT_MAX_FAILED_ATT
 const BASE_LOCKOUT_MINUTES = Number(process.env.AUTH_LOCKOUT_BASE_MINUTES ?? 15);
 const MAX_LOCKOUT_MINUTES = Number(process.env.AUTH_LOCKOUT_MAX_MINUTES ?? 240);
 const MAX_REFRESH_SESSION_ABSOLUTE_DAYS = Number(process.env.AUTH_REFRESH_ABSOLUTE_MAX_DAYS ?? 30);
+const CLIENT_SESSION_COOKIE_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;
 const authRateLimitBase = process.env.NODE_ENV === 'development' ? 5 : 1;
 const authLimiterPool = process.env.NODE_ENV === 'test' ? undefined : pool;
 const TOTP_ISSUER = 'MOSEHXL';
@@ -111,6 +112,10 @@ function getCsrfCookieName(): string {
   return 'musebar_csrf_token';
 }
 
+function getClientSessionCookieName(): string {
+  return 'musebar_client_session_id';
+}
+
 function getCookieValue(req: express.Request, cookieName: string): string | null {
   const rawCookieHeader = req.headers.cookie;
   if (typeof rawCookieHeader !== 'string' || rawCookieHeader.length === 0) {
@@ -128,6 +133,103 @@ function getCookieValue(req: express.Request, cookieName: string): string | null
 
   const value = cookiePair.slice(cookieName.length + 1).trim();
   return value.length > 0 ? decodeURIComponent(value) : null;
+}
+
+function normalizeClientSessionId(raw: unknown): string | null {
+  if (typeof raw !== 'string') {
+    return null;
+  }
+  const trimmed = raw.trim();
+  if (trimmed.length < 8 || trimmed.length > 128) {
+    return null;
+  }
+  const allowedPattern = /^[a-zA-Z0-9_-]+$/;
+  if (!allowedPattern.test(trimmed)) {
+    return null;
+  }
+  return trimmed;
+}
+
+function resolveClientSessionId(req: express.Request, res: express.Response): string {
+  const fromHeader = normalizeClientSessionId(req.header('x-client-session-id'));
+  const fromCookie = normalizeClientSessionId(getCookieValue(req, getClientSessionCookieName()));
+  const existing = fromHeader ?? fromCookie;
+  if (existing) {
+    return existing;
+  }
+  const minted = crypto.randomUUID();
+  res.cookie(getClientSessionCookieName(), minted, {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/api/auth',
+    maxAge: CLIENT_SESSION_COOKIE_MAX_AGE_MS,
+  });
+  return minted;
+}
+
+function deriveIpSubnet(ipRaw: string | undefined): string | null {
+  if (!ipRaw) {
+    return null;
+  }
+  const trimmed = ipRaw.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const normalized = trimmed.startsWith('::ffff:') ? trimmed.slice(7) : trimmed;
+  if (normalized.includes('.')) {
+    const parts = normalized.split('.');
+    if (parts.length !== 4) {
+      return null;
+    }
+    return `${parts[0]}.${parts[1]}.${parts[2]}.0/24`;
+  }
+  if (normalized.includes(':')) {
+    const sections = normalized.split(':');
+    const firstFour = sections.slice(0, 4).map((section) => section || '0');
+    while (firstFour.length < 4) {
+      firstFour.push('0');
+    }
+    return `${firstFour.join(':')}::/64`;
+  }
+  return null;
+}
+
+function logRefreshSessionAnomalySignal(
+  refreshSession: { client_id?: string | null; ip_subnet?: string | null; user_agent?: string | null; family_id: string },
+  current: { clientId: string; ipSubnet: string | null; userAgent: string | null; userId: number; requestId?: string }
+): void {
+  const drift = {
+    client_id_changed:
+      typeof refreshSession.client_id === 'string' &&
+      refreshSession.client_id.length > 0 &&
+      refreshSession.client_id !== current.clientId,
+    ip_subnet_changed:
+      typeof refreshSession.ip_subnet === 'string' &&
+      refreshSession.ip_subnet.length > 0 &&
+      refreshSession.ip_subnet !== (current.ipSubnet ?? null),
+    user_agent_changed:
+      typeof refreshSession.user_agent === 'string' &&
+      refreshSession.user_agent.length > 0 &&
+      refreshSession.user_agent !== (current.userAgent ?? null),
+  };
+  if (!drift.client_id_changed && !drift.ip_subnet_changed && !drift.user_agent_changed) {
+    return;
+  }
+  try {
+    Logger.getInstance().security(
+      'REFRESH_SESSION_ANOMALY_SIGNAL',
+      'MEDIUM',
+      {
+        family_id: refreshSession.family_id,
+        drift,
+      },
+      current.requestId,
+      current.userId
+    );
+  } catch {
+    // Security signaling is best-effort and must never break refresh flow.
+  }
 }
 
 function getRefreshTokenFromRequest(
@@ -268,6 +370,8 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
   const kickPriorSessions = req.body?.kickPriorSessions === true;
   const ip = req.ip;
   const userAgent = req.headers['user-agent'];
+  const clientSessionId = resolveClientSessionId(req, res);
+  const ipSubnet = deriveIpSubnet(req.ip);
 
   if (!email || !password) {
     throw new ValidationError('Email and password required');
@@ -436,7 +540,9 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
       token: refreshToken,
       expiresAt,
       ipAddress: req.ip,
+      ipSubnet: ipSubnet ?? undefined,
       userAgent: req.headers['user-agent'],
+      clientId: clientSessionId,
     });
     setRefreshTokenCookie(res, refreshToken, !!rememberMe, expiresAt);
     setCsrfTokenCookie(res, csrfToken, !!rememberMe, expiresAt);
@@ -637,6 +743,68 @@ router.get('/me', requireAuth, asyncHandler(async (req, res) => {
   }
 }));
 
+router.get('/sessions', requireAuth, asyncHandler(async (req, res) => {
+  const userId = req.user!.id;
+  const currentRefreshToken = getRefreshTokenFromRequest(req);
+  let currentFamilyId: string | null = null;
+  if (currentRefreshToken) {
+    const currentSession = await RefreshTokenModel.findActiveByRawToken(currentRefreshToken);
+    if (currentSession?.user_id === userId) {
+      currentFamilyId = currentSession.family_id;
+    }
+  }
+
+  const sessions = await RefreshTokenModel.listActiveSessionsByUser(userId);
+  return res.json({
+    sessions: sessions.map((session) => ({
+      id: session.id,
+      familyId: session.familyId,
+      issuedAt: session.issuedAt.toISOString(),
+      expiresAt: session.expiresAt.toISOString(),
+      ipAddress: session.ipAddress,
+      ipSubnet: session.ipSubnet,
+      userAgent: session.userAgent,
+      clientId: session.clientId,
+      isCurrent: currentFamilyId === session.familyId,
+    })),
+  });
+}));
+
+router.post('/sessions/revoke-others', requireAuth, asyncHandler(async (req, res) => {
+  const userId = req.user!.id;
+  const refreshTokenRaw = getRefreshTokenFromRequest(req);
+  if (!refreshTokenRaw) {
+    throw new ValidationError('Refresh token cookie is required to revoke other sessions');
+  }
+
+  const currentSession = await RefreshTokenModel.findActiveByRawToken(refreshTokenRaw);
+  if (!currentSession || currentSession.user_id !== userId) {
+    throw new AuthenticationError('Invalid or expired refresh token');
+  }
+
+  const revokedCount = await RefreshTokenModel.revokeAllForUserExceptFamily(
+    userId,
+    currentSession.family_id,
+    'USER_REVOKE_OTHER_SESSIONS'
+  );
+
+  await logAuditOrThrow({
+    user_id: String(userId),
+    action_type: 'REVOKE_OTHER_SESSIONS',
+    action_details: {
+      revoked_count: revokedCount,
+      preserved_family_id: currentSession.family_id,
+    },
+    ip_address: req.ip,
+    user_agent: req.headers['user-agent'],
+  }, 'REVOKE_OTHER_SESSIONS');
+
+  return res.json({
+    message: 'Other sessions revoked',
+    revokedCount,
+  });
+}));
+
 // ---------------------------------------------------------------------------
 // POST /api/auth/refresh — re-issue token with current DB state
 // ---------------------------------------------------------------------------
@@ -652,6 +820,8 @@ router.post('/refresh', refreshRateLimit, asyncHandler(async (req, res) => {
       throw new ValidationError('Refresh token cookie is required');
     }
     validateRefreshCsrf(req);
+    const clientSessionId = resolveClientSessionId(req, res);
+    const ipSubnet = deriveIpSubnet(req.ip);
 
     const refreshSession = await RefreshTokenModel.findActiveByRawToken(refreshTokenRaw);
     if (!refreshSession) {
@@ -661,6 +831,13 @@ router.post('/refresh', refreshRateLimit, asyncHandler(async (req, res) => {
     refreshFamilyId = refreshSession.family_id;
     const userId = refreshSession.user_id;
     refreshUserId = userId;
+    logRefreshSessionAnomalySignal(refreshSession, {
+      clientId: clientSessionId,
+      ipSubnet,
+      userAgent: req.headers['user-agent'] ?? null,
+      userId,
+      requestId: req.requestId,
+    });
     const familyIssuedAt = await RefreshTokenModel.getFamilyIssuedAt(refreshSession.family_id);
     const refreshSessionStartedAt = familyIssuedAt ?? refreshSession.issued_at ?? new Date();
 
@@ -733,7 +910,9 @@ router.post('/refresh', refreshRateLimit, asyncHandler(async (req, res) => {
       familyId: refreshSession.family_id,
       expiresAt,
       ipAddress: req.ip,
+      ipSubnet: ipSubnet ?? undefined,
       userAgent: req.headers['user-agent'],
+      clientId: clientSessionId,
     });
 
     await logAuditOrThrow({

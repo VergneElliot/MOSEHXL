@@ -128,7 +128,7 @@ describe('POST /auth/refresh token rotation', () => {
     expect(typeof res.body.token).toBe('string');
     expect(res.body.refreshToken).toBeUndefined();
     const setCookieHeader = res.headers['set-cookie'] ?? [];
-    expect(String(setCookieHeader[0] ?? '')).toContain('musebar_refresh_token=');
+    expect(setCookieHeader.some((value: string) => value.includes('musebar_refresh_token='))).toBe(true);
     const decoded = verifyToken(res.body.token);
     expect(decoded.role).toBe('establishment_admin');
     expect(decoded.establishment_id).toBe('11111111-1111-4111-8111-111111111111');

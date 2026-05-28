@@ -7,7 +7,9 @@ type CreateRefreshTokenInput = {
   familyId?: string;
   expiresAt: Date;
   ipAddress?: string;
+  ipSubnet?: string;
   userAgent?: string;
+  clientId?: string;
 };
 
 type RefreshTokenRow = {
@@ -21,6 +23,10 @@ type RefreshTokenRow = {
   revoked_at: Date | null;
   revoke_reason: string | null;
   replaced_by_token_hash: string | null;
+  ip_address: string | null;
+  ip_subnet: string | null;
+  user_agent: string | null;
+  client_id: string | null;
 };
 
 export class RefreshTokenModel {
@@ -32,8 +38,8 @@ export class RefreshTokenModel {
     const tokenHash = this.hashToken(input.token);
     const result = await pool.query(
       `INSERT INTO auth_refresh_tokens
-       (user_id, token_hash, family_id, expires_at, ip_address, user_agent)
-       VALUES ($1, $2, COALESCE($3::uuid, gen_random_uuid()), $4, $5, $6)
+       (user_id, token_hash, family_id, expires_at, ip_address, ip_subnet, user_agent, client_id)
+       VALUES ($1, $2, COALESCE($3::uuid, gen_random_uuid()), $4, $5, $6, $7, $8)
        RETURNING id, family_id`,
       [
         input.userId,
@@ -41,7 +47,9 @@ export class RefreshTokenModel {
         input.familyId ?? null,
         input.expiresAt,
         input.ipAddress ?? null,
+        input.ipSubnet ?? null,
         input.userAgent ?? null,
+        input.clientId ?? null,
       ]
     );
 
@@ -73,7 +81,9 @@ export class RefreshTokenModel {
       familyId: string;
       expiresAt: Date;
       ipAddress?: string;
+      ipSubnet?: string;
       userAgent?: string;
+      clientId?: string;
     }
   ): Promise<void> {
     const currentHash = this.hashToken(currentToken);
@@ -99,15 +109,17 @@ export class RefreshTokenModel {
 
       await client.query(
         `INSERT INTO auth_refresh_tokens
-         (user_id, token_hash, family_id, expires_at, ip_address, user_agent)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+         (user_id, token_hash, family_id, expires_at, ip_address, ip_subnet, user_agent, client_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           opts.userId,
           nextHash,
           opts.familyId,
           opts.expiresAt,
           opts.ipAddress ?? null,
+          opts.ipSubnet ?? null,
           opts.userAgent ?? null,
+          opts.clientId ?? null,
         ]
       );
       await client.query('COMMIT');
@@ -161,5 +173,53 @@ export class RefreshTokenModel {
          AND revoked_at IS NULL`,
       [familyId, reason]
     );
+  }
+
+  static async listActiveSessionsByUser(userId: number): Promise<Array<{
+    id: string;
+    familyId: string;
+    issuedAt: Date;
+    expiresAt: Date;
+    ipAddress: string | null;
+    ipSubnet: string | null;
+    userAgent: string | null;
+    clientId: string | null;
+  }>> {
+    const result = await pool.query(
+      `SELECT id, family_id, issued_at, expires_at, ip_address, ip_subnet, user_agent, client_id
+       FROM auth_refresh_tokens
+       WHERE user_id = $1
+         AND revoked_at IS NULL
+         AND expires_at > CURRENT_TIMESTAMP
+       ORDER BY issued_at DESC`,
+      [userId]
+    );
+    return result.rows.map((row) => ({
+      id: String(row.id),
+      familyId: String(row.family_id),
+      issuedAt: new Date(row.issued_at),
+      expiresAt: new Date(row.expires_at),
+      ipAddress: row.ip_address ? String(row.ip_address) : null,
+      ipSubnet: row.ip_subnet ? String(row.ip_subnet) : null,
+      userAgent: row.user_agent ? String(row.user_agent) : null,
+      clientId: row.client_id ? String(row.client_id) : null,
+    }));
+  }
+
+  static async revokeAllForUserExceptFamily(
+    userId: number,
+    familyId: string,
+    reason: string
+  ): Promise<number> {
+    const result = await pool.query(
+      `UPDATE auth_refresh_tokens
+       SET revoked_at = CURRENT_TIMESTAMP,
+           revoke_reason = $3
+       WHERE user_id = $1
+         AND family_id <> $2
+         AND revoked_at IS NULL`,
+      [userId, familyId, reason]
+    );
+    return Number(result.rowCount ?? 0);
   }
 }
