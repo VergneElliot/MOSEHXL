@@ -122,6 +122,27 @@ export const validateEnvironment = (): void => {
     invalid.push("AUTH_ENFORCE_ADMIN_2FA must be either 'true' or 'false'");
   }
 
+  const authJwtSignAlgRaw = process.env.AUTH_JWT_SIGN_ALG?.trim().toUpperCase();
+  if (authJwtSignAlgRaw && authJwtSignAlgRaw !== 'HS256' && authJwtSignAlgRaw !== 'RS256') {
+    invalid.push("AUTH_JWT_SIGN_ALG must be either 'HS256' or 'RS256'");
+  }
+
+  if (
+    process.env.AUTH_JWT_ALLOW_LEGACY_HS256_VERIFY &&
+    !isBooleanString(process.env.AUTH_JWT_ALLOW_LEGACY_HS256_VERIFY)
+  ) {
+    invalid.push("AUTH_JWT_ALLOW_LEGACY_HS256_VERIFY must be either 'true' or 'false'");
+  }
+
+  if (authJwtSignAlgRaw === 'RS256') {
+    if (!process.env.JWT_PRIVATE_KEY) {
+      missing.push('JWT_PRIVATE_KEY (required when AUTH_JWT_SIGN_ALG=RS256)');
+    }
+    if (!process.env.JWT_PUBLIC_KEY) {
+      missing.push('JWT_PUBLIC_KEY (required when AUTH_JWT_SIGN_ALG=RS256)');
+    }
+  }
+
   const establishmentAdminPermissionMode = process.env.ESTABLISHMENT_ADMIN_PERMISSION_MODE;
   if (
     establishmentAdminPermissionMode &&

@@ -1,11 +1,11 @@
 import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
 import { Pool } from 'pg';
 import { RateLimitError } from '../errorHandler';
 import { InMemoryRateLimitStore } from './InMemoryRateLimitStore';
 import { PostgresRateLimitStore } from './PostgresRateLimitStore';
 import { IRateLimitStoreAdapter, SecurityMiddlewareFunction } from './types';
+import { verifyJwtToken } from '../../security/jwtConfig';
 
 interface SecurityLoggerLike {
   security: (
@@ -60,9 +60,8 @@ export function resolveLoginRateLimitKey(req: Request): string {
   return `ip:${ip}:email:${emailHash}`;
 }
 
-const JWT_VERIFY_OPTIONS: jwt.VerifyOptions = { algorithms: ['HS256'] };
-
-export function createRefreshRateLimitKeyResolver(jwtSecret: string) {
+export function createRefreshRateLimitKeyResolver(_jwtSecret: string) {
+  void _jwtSecret;
   return (req: Request): string => {
     const ip = req.ip ?? 'unknown';
     const auth = req.headers.authorization;
@@ -76,7 +75,7 @@ export function createRefreshRateLimitKeyResolver(jwtSecret: string) {
     }
 
     try {
-      const decoded = jwt.verify(token, jwtSecret, JWT_VERIFY_OPTIONS) as { id?: number };
+      const decoded = verifyJwtToken(token) as { id?: number };
       if (typeof decoded?.id === 'number' && Number.isFinite(decoded.id)) {
         return `ip:${ip}:user:${decoded.id}`;
       }

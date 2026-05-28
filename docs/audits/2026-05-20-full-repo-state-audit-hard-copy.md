@@ -106,14 +106,14 @@ You explicitly requested this as a to-do for this audit. It is now **P3-S4 (P1)*
 | 1 | **Short-lived access tokens (≤15 min) + opaque refresh tokens in DB** | Eliminates the "single JWT is both access and refresh, valid 12h–7d" failure mode. Refresh tokens become rotatable, revocable, and family-tracked. |
 | 2 | **httpOnly `Secure` `SameSite=Strict` cookies (or BFF)** + CSRF double-submit on mutating routes | Removes `localStorage` token theft via XSS. Aligns with the P2-S18 / Swagger `auth_token` cleanup. |
 | 3 | **Algorithm pin on `jwt.verify`** (`algorithms: ['HS256']` now; flip to `['RS256']` after migration) | Closes the algorithm-confusion class on the way to asymmetric signing. |
-| 4 | **Asymmetric signing (RS256 or EdDSA) + `kid` header + JWKS rotation** | Secret compromise no longer forges tokens; supports multi-instance rotation. |
+| 4 | **Asymmetric signing (RS256 or EdDSA) + `kid` header + JWKS rotation** | **Follow-up scaffold landed (2026-05-27):** opt-in RS256 signing + `kid` + JWKS endpoint scaffold is in place (`381`), with compatibility mode preserved. Full production cutover/rotation runbook remains. |
 | 5 | **Global session revoke on password change** | Use `revokeAllUserTokensIssuedBefore(userId, now)`. Mandatory for P3-L9 (reset/change). |
 | 6 | **Sliding refresh with an absolute session cap** (e.g. 30 days max even with `rememberMe`) | Limits "remember me forever" drift. |
 | 7 | **Device/session record** (UA + stable client id; optional IP subnet) | Enables "log out other devices"; surface anomalous reuse. |
 | 8 | **Anomaly signals** (geo/IP/UA delta) for admin endpoints, paired with 2FA | Operational detection. |
 | 9 | **Retire legacy `is_admin` JWT claim** after max TTL elapses (7d) + metrics | Completes the P2-S3 rollover (`auth.ts` L81-84). |
 
-**Current state to be honest about (updated):** phase 1 and cookie transport are in place (15m access JWT + DB-backed opaque rotating refresh tokens + absolute family cap + refresh revoke on password reset/change + httpOnly refresh cookie, no localStorage token persistence), with refresh CSRF double-submit, `HS256` verify-algorithm pinning, and refresh family-revoke on reuse now landed. Remaining roadmap items are asymmetric signing/JWKS rollout and session/device anomaly controls.
+**Current state to be honest about (updated):** phase 1 and cookie transport are in place (15m access JWT + DB-backed opaque rotating refresh tokens + absolute family cap + refresh revoke on password reset/change + httpOnly refresh cookie, no localStorage token persistence), with refresh CSRF double-submit, `HS256` verify-algorithm pinning, refresh family-revoke on reuse, and RS256/JWKS migration scaffold now landed. Remaining roadmap items are production key-rotation cutover and session/device anomaly controls.
 
 ---
 
