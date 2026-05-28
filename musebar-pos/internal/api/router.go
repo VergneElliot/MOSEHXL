@@ -1,12 +1,14 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"musebar-pos/internal/api/handlers"
 	"musebar-pos/internal/config"
+	"musebar-pos/internal/pkg/audit"
 	"musebar-pos/internal/pkg/email"
 	"musebar-pos/internal/domain/legal"
 	corsmw "musebar-pos/internal/middleware/cors"
@@ -25,6 +27,7 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	userRepo := postgres.NewUserRepository(db)
 	refreshRepo := postgres.NewRefreshTokenRepository(db)
 
+	auditService := audit.New(db)
 	inviteRepo := postgres.NewInvitationRepository(db)
 
 	// Email service (non-fatal if not configured)
@@ -44,10 +47,10 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	legalHandler := handlers.NewLegalHandler(journalService, legalRepo)
 	productHandler := handlers.NewProductHandler(productRepo)
 	orderHandler := handlers.NewOrderHandler(orderRepo, productRepo, journalService)
-	authHandler := handlers.NewAuthHandler(userRepo, refreshRepo)
+	authHandler := handlers.NewAuthHandler(userRepo, refreshRepo, auditService)
 	happyHourHandler := handlers.NewHappyHourHandler(productRepo)
 	oauthHandler := handlers.NewOAuthHandler(cfg, userRepo, refreshRepo)
-	userHandler := handlers.NewUserHandler(userRepo)
+	userHandler := handlers.NewUserHandler(userRepo, auditService)
 	invitationHandler := handlers.NewInvitationHandler(cfg, userRepo, inviteRepo, emailSender)
 	closureHandler := handlers.NewClosureHandler(closureService)
 
@@ -61,6 +64,18 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	mux.HandleFunc("POST /api/auth/refresh", authHandler.Refresh)
 	mux.HandleFunc("POST /api/auth/logout", authmw.RequireAuth(authHandler.Logout))
 	mux.HandleFunc("GET /api/auth/me", authmw.RequireAuth(authHandler.Me))
+
+	// Audit trail (admin only)
+	mux.HandleFunc("GET /api/audit", authmw.RequireAdmin(func(w http.ResponseWriter, r *http.Request) {
+		estID := r.Context().Value("establishment_id").(string)
+		entries, err := auditService.GetByEstablishment(r.Context(), estID, 100, 0)
+		if err != nil {
+			http.Error(w, "Failed to fetch audit log", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"entries": entries, "total": len(entries)})
+	}))
 
 	// User management endpoints (admin only)
 	mux.HandleFunc("GET /api/users", authmw.RequireAdmin(userHandler.ListUsers))

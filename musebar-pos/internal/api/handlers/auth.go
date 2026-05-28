@@ -4,12 +4,14 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"sync"
 	"time"
 
 	"musebar-pos/internal/middleware/auth"
+	"musebar-pos/internal/pkg/audit"
 	"musebar-pos/internal/repository"
 	"musebar-pos/internal/validation"
 	"musebar-pos/internal/repository/postgres"
@@ -66,14 +68,16 @@ var (
 )
 
 type AuthHandler struct {
-	userRepo    repository.UserRepository
-	refreshRepo *postgres.RefreshTokenRepository
+	userRepo     repository.UserRepository
+	refreshRepo  *postgres.RefreshTokenRepository
+	auditService *audit.Service
 }
 
-func NewAuthHandler(userRepo repository.UserRepository, refreshRepo *postgres.RefreshTokenRepository) *AuthHandler {
+func NewAuthHandler(userRepo repository.UserRepository, refreshRepo *postgres.RefreshTokenRepository, auditService *audit.Service) *AuthHandler {
 	return &AuthHandler{
-		userRepo:    userRepo,
-		refreshRepo: refreshRepo,
+		userRepo:     userRepo,
+		refreshRepo:  refreshRepo,
+		auditService: auditService,
 	}
 }
 
@@ -175,6 +179,16 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if req.RememberMe {
 		refreshExpiresIn = "7d"
 	}
+
+	// Audit log
+	h.auditService.Log(r.Context(), audit.Entry{
+		UserID:          fmt.Sprintf("%d", user.ID),
+		EstablishmentID: establishmentID,
+		ActionType:      audit.ActionLogin,
+		IPAddress:       r.RemoteAddr,
+		UserAgent:       r.UserAgent(),
+		ActionDetails:   map[string]interface{}{"email": user.Email, "remember_me": req.RememberMe},
+	})
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -306,6 +320,18 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		MaxAge:   -1,
 	})
+
+	// Audit log
+	if userID, ok := r.Context().Value("user_id").(int64); ok {
+		estID, _ := r.Context().Value("establishment_id").(string)
+		h.auditService.Log(r.Context(), audit.Entry{
+			UserID:          fmt.Sprintf("%d", userID),
+			EstablishmentID: estID,
+			ActionType:      audit.ActionLogout,
+			IPAddress:       r.RemoteAddr,
+			UserAgent:       r.UserAgent(),
+		})
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(`{"message": "Logged out successfully"}`))
