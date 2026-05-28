@@ -6,8 +6,6 @@ import {
   DialogActions,
   Button,
   Box,
-  ToggleButtonGroup,
-  ToggleButton,
   Typography,
   CircularProgress,
   Alert,
@@ -16,8 +14,6 @@ import {
 import { apiCore } from '../../services/api';
 import LegalReceiptContainer from '../Legal/LegalReceipt/LegalReceiptContainer';
 import type { Order as LegalReceiptOrder, ReceiptItem } from '../Legal/LegalReceipt/types';
-
-type ReceiptPreviewMode = 'detailed' | 'summary';
 
 type BusinessInfo = {
   name: string;
@@ -101,7 +97,7 @@ function normalizeReceiptForPreview(raw: unknown): PreviewPayload | null {
 export interface PrintAfterSaleDialogProps {
   open: boolean;
   orderId: number | string | null;
-  defaultReceiptType?: ReceiptPreviewMode;
+  autoCloseEnabled?: boolean;
   autoCloseMs?: number;
   onClose: () => void;
 }
@@ -109,11 +105,10 @@ export interface PrintAfterSaleDialogProps {
 export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
   open,
   orderId,
-  defaultReceiptType = 'detailed',
+  autoCloseEnabled = true,
   autoCloseMs = 8000,
   onClose,
 }) => {
-  const [receiptType, setReceiptType] = useState<ReceiptPreviewMode>(defaultReceiptType);
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<PreviewReceiptOrder | null>(null);
   const [businessInfo, setBusinessInfo] = useState<BusinessInfo | null>(null);
@@ -138,25 +133,21 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
     return null;
   }, [orderId]);
 
-  useEffect(() => {
-    if (!open) return;
-    setReceiptType(defaultReceiptType);
-  }, [open, defaultReceiptType]);
-
   const hasValidOrderId = useMemo(() => normalizedOrderId !== null, [normalizedOrderId]);
 
   const isPdfFeatureUnavailable = true;
+  const receiptType = 'detailed' as const;
 
   const resetAutoClose = useCallback(() => {
-    if (!open) return;
+    if (!open || !autoCloseEnabled) return;
     if (autoCloseTimerRef.current != null) {
       window.clearTimeout(autoCloseTimerRef.current);
     }
     autoCloseTimerRef.current = window.setTimeout(() => onClose(), autoCloseMs);
-  }, [open, autoCloseMs, onClose]);
+  }, [open, autoCloseEnabled, autoCloseMs, onClose]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !autoCloseEnabled) return;
     resetAutoClose();
     return () => {
       if (autoCloseTimerRef.current != null) {
@@ -164,7 +155,7 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
       }
       autoCloseTimerRef.current = null;
     };
-  }, [open, resetAutoClose]);
+  }, [open, autoCloseEnabled, resetAutoClose]);
 
   useEffect(() => {
     if (!open) return;
@@ -197,7 +188,7 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
         setLoading(false);
       }
     })();
-  }, [open, hasValidOrderId, normalizedOrderId, receiptType]);
+  }, [open, hasValidOrderId, normalizedOrderId]);
 
   const handleQueuePrint = async () => {
     if (!hasValidOrderId || normalizedOrderId === null) {
@@ -225,10 +216,10 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
       onClose={onClose}
       maxWidth="md"
       fullWidth
-      onMouseMove={resetAutoClose}
-      onMouseDown={resetAutoClose}
-      onKeyDown={resetAutoClose}
-      onFocus={resetAutoClose}
+      onMouseMove={autoCloseEnabled ? resetAutoClose : undefined}
+      onMouseDown={autoCloseEnabled ? resetAutoClose : undefined}
+      onKeyDown={autoCloseEnabled ? resetAutoClose : undefined}
+      onFocus={autoCloseEnabled ? resetAutoClose : undefined}
     >
       <DialogTitle>Imprimer / Envoyer</DialogTitle>
       <DialogContent dividers>
@@ -237,22 +228,9 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
               Choisir un document
             </Typography>
-            <ToggleButtonGroup
-              value={receiptType}
-              exclusive
-              onChange={(_, v) => {
-                resetAutoClose();
-                if (v === 'detailed' || v === 'summary') {
-                  setReceiptType(v);
-                }
-              }}
-              fullWidth
-              size="small"
-              sx={{ mb: 2 }}
-            >
-              <ToggleButton value="detailed">Ticket détaillé</ToggleButton>
-              <ToggleButton value="summary">Ticket simplifié</ToggleButton>
-            </ToggleButtonGroup>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Ticket détaillé (unique format disponible pour le moment).
+            </Alert>
 
             <Alert severity="info" sx={{ mb: 2 }}>
               La prévisualisation n’imprime rien. Cliquez sur “Imprimer” pour mettre en file un ticket.

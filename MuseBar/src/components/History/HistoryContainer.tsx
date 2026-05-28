@@ -68,8 +68,8 @@ const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn =
     actions.setSelectedOrder(order);
   };
 
-  const handlePrintReceipt = (order: Order, type: 'detailed' | 'summary') => {
-    actions.openReceiptDialog(order, type);
+  const handlePrintReceipt = (order: Order) => {
+    actions.openReceiptDialog(order);
   };
 
   const handleReturnOrder = (order: Order) => {
@@ -215,7 +215,7 @@ const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn =
       <PrintAfterSaleDialog
         open={state.receiptDialogOpen}
         orderId={state.currentReceipt?.id ?? null}
-        defaultReceiptType={state.receiptType}
+        autoCloseEnabled={false}
         onClose={actions.closeReceiptDialog}
       />
     </Box>

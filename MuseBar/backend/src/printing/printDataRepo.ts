@@ -15,9 +15,22 @@ export type PrintingUser = {
 
 export async function buildTestReceiptData(pool: Pool, user: PrintingUser): Promise<PrintingReceiptData> {
   const estResult = await pool.query(
-    `SELECT name, address, phone, email, siret, tax_identification
-     FROM establishments
-     WHERE id = $1
+    `SELECT
+       COALESCE(bs.name, e.name) AS name,
+       COALESCE(bs.address, e.address) AS address,
+       COALESCE(bs.phone, e.phone) AS phone,
+       COALESCE(bs.email, e.email) AS email,
+       bs.siret AS siret,
+       bs.tax_identification AS tax_identification
+     FROM establishments e
+     LEFT JOIN LATERAL (
+       SELECT name, address, phone, email, siret, tax_identification
+       FROM business_settings
+       WHERE establishment_id = e.id
+       ORDER BY updated_at DESC
+       LIMIT 1
+     ) bs ON true
+     WHERE e.id = $1
      LIMIT 1`,
     [user.establishment_id]
   );
@@ -31,7 +44,7 @@ export async function buildTestReceiptData(pool: Pool, user: PrintingUser): Prom
     total_tax: 2.0,
     payment_method: 'TEST',
     created_at: new Date().toISOString(),
-    receipt_type: 'summary',
+    receipt_type: 'detailed',
     items: [
       {
         product_name: 'Test Item',
@@ -83,12 +96,12 @@ export async function buildReceiptDataForOrder(
           'tax_rate', p.tax_rate
         )
       ) as items,
-      e.name as business_name,
-      e.address as business_address,
-      e.phone as business_phone,
-      e.email as business_email,
-      e.siret,
-      e.tax_identification
+      MAX(COALESCE(bs.name, e.name)) as business_name,
+      MAX(COALESCE(bs.address, e.address)) as business_address,
+      MAX(COALESCE(bs.phone, e.phone)) as business_phone,
+      MAX(COALESCE(bs.email, e.email)) as business_email,
+      MAX(bs.siret) as siret,
+      MAX(bs.tax_identification) as tax_identification
     FROM public.orders o
     LEFT JOIN LATERAL (
       SELECT sequence_number, current_hash
@@ -100,6 +113,13 @@ export async function buildReceiptDataForOrder(
       LIMIT 1
     ) lj ON true
     JOIN public.establishments e ON e.id = $2
+    LEFT JOIN LATERAL (
+      SELECT name, address, phone, email, siret, tax_identification
+      FROM public.business_settings
+      WHERE establishment_id = e.id
+      ORDER BY updated_at DESC
+      LIMIT 1
+    ) bs ON true
     LEFT JOIN public.order_items oi ON o.id = oi.order_id
     LEFT JOIN public.products p ON oi.product_id = p.id
     WHERE o.id = $1 AND o.establishment_id = $2
@@ -186,14 +206,21 @@ export async function buildClosureBulletinData(
   const bulletinResult = await pool.query(
     `SELECT 
       cb.*,
-      e.name as business_name,
-      e.address as business_address,
-      e.phone as business_phone,
-      e.email as business_email,
-      e.siret,
-      e.tax_identification
+      COALESCE(bs.name, e.name) as business_name,
+      COALESCE(bs.address, e.address) as business_address,
+      COALESCE(bs.phone, e.phone) as business_phone,
+      COALESCE(bs.email, e.email) as business_email,
+      bs.siret,
+      bs.tax_identification
     FROM closure_bulletins cb
     JOIN establishments e ON cb.establishment_id = e.id
+    LEFT JOIN LATERAL (
+      SELECT name, address, phone, email, siret, tax_identification
+      FROM business_settings
+      WHERE establishment_id = e.id
+      ORDER BY updated_at DESC
+      LIMIT 1
+    ) bs ON true
     WHERE cb.id = $1 AND cb.establishment_id = $2`,
     [bulletinId, user.establishment_id]
   );
