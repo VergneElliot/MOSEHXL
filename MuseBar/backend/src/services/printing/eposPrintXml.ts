@@ -25,33 +25,74 @@ function money(value: number): string {
 }
 
 export function receiptToEposPrintXml(data: ReceiptData): string {
+  const toNumber = (value: unknown): number => {
+    const n = typeof value === 'number' ? value : parseFloat(String(value ?? 0));
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const totalTtc = toNumber(data.total_amount);
+  const totalVat = toNumber(data.total_tax);
+  const totalHt = totalTtc - totalVat;
+
   const lines: string[] = [];
   lines.push(`<text align="center" weight="bold">${esc(data.business_info.name)}&#10;</text>`);
-  lines.push(`<text align="center">${esc(data.business_info.address)}&#10;</text>`);
-  lines.push(`<text align="center">${esc(data.business_info.phone)}&#10;</text>`);
+  if (data.business_info.address) lines.push(`<text align="center">${esc(data.business_info.address)}&#10;</text>`);
+  if (data.business_info.phone) lines.push(`<text align="center">Tel: ${esc(data.business_info.phone)}&#10;</text>`);
+  if (data.business_info.email) lines.push(`<text align="center">${esc(data.business_info.email)}&#10;</text>`);
+  if (data.business_info.siret) lines.push(line(`SIRET: ${data.business_info.siret}`));
+  if (data.business_info.tax_identification) lines.push(line(`TVA: ${data.business_info.tax_identification}`));
   lines.push('<text>&#10;</text>');
-  lines.push(line(`Ticket #${data.sequence_number}  Commande #${data.order_id}`));
+  lines.push(line(`Ticket #${String(data.sequence_number).padStart(6, '0')}  Commande #${data.order_id}`));
   lines.push(line(`Date: ${new Date(data.created_at).toLocaleString('fr-FR')}`));
   lines.push(line(`Paiement: ${data.payment_method}`));
+  lines.push(line(`Type: Ticket detaille`));
   lines.push('<text>&#10;</text>');
 
-  if (data.items && data.receipt_type === 'detailed') {
+  if (data.items && data.items.length > 0 && data.receipt_type === 'detailed') {
+    lines.push(line('ARTICLES:'));
     for (const item of data.items) {
       lines.push(
         line(
-          `${item.product_name} x${item.quantity}  ${item.total_price.toFixed(2)} EUR`
+          `${item.product_name} x${item.quantity}  ${money(item.total_price)}`
         )
       );
+      lines.push(line(`  ${money(item.unit_price)} / unite  TVA ${item.tax_rate}%`));
     }
     lines.push('<text>&#10;</text>');
   }
 
-  lines.push(line(`TOTAL TTC: ${data.total_amount.toFixed(2)} EUR`));
-  lines.push(line(`TVA: ${data.total_tax.toFixed(2)} EUR`));
+  if (data.vat_breakdown && data.vat_breakdown.length > 0) {
+    lines.push(line('DETAIL TVA:'));
+    for (const vat of data.vat_breakdown) {
+      lines.push(line(`Base HT ${vat.rate}%: ${money(toNumber(vat.subtotal_ht))}`));
+      lines.push(line(`TVA ${vat.rate}%: ${money(toNumber(vat.vat))}`));
+    }
+    lines.push('<text>&#10;</text>');
+  }
+
+  lines.push(line(`Sous-total HT: ${money(totalHt)}`));
+  lines.push(line(`TVA Totale: ${money(totalVat)}`));
+  lines.push(line(`TOTAL TTC: ${money(totalTtc)}`));
+
+  if (toNumber(data.tips) > 0) {
+    lines.push(line(`Pourboire: ${money(toNumber(data.tips))}`));
+  }
+  if (toNumber(data.change) > 0) {
+    lines.push(line(`Monnaie rendue: ${money(toNumber(data.change))}`));
+  }
 
   if (data.compliance_info?.receipt_hash) {
     lines.push(line(`Hash: ${data.compliance_info.receipt_hash}`));
   }
+  if (data.compliance_info?.cash_register_id) {
+    lines.push(line(`Caisse: ${data.compliance_info.cash_register_id}`));
+  }
+  if (data.compliance_info?.operator_id) {
+    lines.push(line(`Operateur: ${data.compliance_info.operator_id}`));
+  }
+
+  lines.push(line('Ref. legale: Article 286-I-3 bis du CGI'));
+  lines.push(line('Ticket securise - Inalterable'));
 
   lines.push('<text>&#10;</text>');
   lines.push('<cut type="feed"/>');
