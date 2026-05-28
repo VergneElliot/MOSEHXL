@@ -1,11 +1,13 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"musebar-pos/internal/api/handlers"
 	"musebar-pos/internal/config"
+	"musebar-pos/internal/pkg/email"
 	"musebar-pos/internal/domain/legal"
 	corsmw "musebar-pos/internal/middleware/cors"
 	"musebar-pos/internal/pkg/logger"
@@ -23,6 +25,15 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	userRepo := postgres.NewUserRepository(db)
 	refreshRepo := postgres.NewRefreshTokenRepository(db)
 
+	inviteRepo := postgres.NewInvitationRepository(db)
+
+	// Email service (non-fatal if not configured)
+	var emailSender email.EmailSender
+	emailSender, err := email.NewFromConfig(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFrom)
+	if err != nil {
+		fmt.Printf("WARNING: Email service not configured: %v\n", err)
+	}
+
 	healthHandler := handlers.NewHealthHandler(db)
 
 	// Services
@@ -37,6 +48,7 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	happyHourHandler := handlers.NewHappyHourHandler(productRepo)
 	oauthHandler := handlers.NewOAuthHandler(cfg, userRepo, refreshRepo)
 	userHandler := handlers.NewUserHandler(userRepo)
+	invitationHandler := handlers.NewInvitationHandler(cfg, userRepo, inviteRepo, emailSender)
 	closureHandler := handlers.NewClosureHandler(closureService)
 
 	// Public
@@ -56,6 +68,15 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	mux.HandleFunc("PATCH /api/users/{id}", authmw.RequireAdmin(userHandler.UpdateUser))
 	mux.HandleFunc("DELETE /api/users/{id}", authmw.RequireAdmin(userHandler.DeactivateUser))
 	mux.HandleFunc("POST /api/auth/change-password", authmw.RequireAuth(userHandler.ChangePassword))
+
+	// Password reset (public)
+	mux.HandleFunc("POST /api/auth/forgot-password", invitationHandler.ForgotPassword)
+	mux.HandleFunc("POST /api/auth/reset-password", invitationHandler.ResetPassword)
+
+	// Invitation endpoints
+	mux.HandleFunc("POST /api/users/invite", authmw.RequireAdmin(invitationHandler.InviteUser))
+	mux.HandleFunc("GET /api/invitations/info", invitationHandler.GetInvitationInfo)
+	mux.HandleFunc("POST /api/invitations/accept", invitationHandler.AcceptInvitation)
 
 	// Google OAuth endpoints
 	mux.HandleFunc("GET /api/auth/google", oauthHandler.GoogleLogin)
