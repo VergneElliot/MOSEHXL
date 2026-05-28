@@ -110,10 +110,10 @@ You explicitly requested this as a to-do for this audit. It is now **P3-S4 (P1)*
 | 5 | **Global session revoke on password change** | Use `revokeAllUserTokensIssuedBefore(userId, now)`. Mandatory for P3-L9 (reset/change). |
 | 6 | **Sliding refresh with an absolute session cap** (e.g. 30 days max even with `rememberMe`) | Limits "remember me forever" drift. |
 | 7 | **Device/session record** (UA + stable client id; optional IP subnet) | **Follow-up landed (2026-05-28):** refresh sessions now persist `client_id` + `ip_subnet`, expose authenticated session listing, and support "revoke other sessions" while preserving current family (`384/385`). |
-| 8 | **Anomaly signals** (geo/IP/UA delta) for admin endpoints, paired with 2FA | Operational detection. |
+| 8 | **Anomaly signals** (geo/IP/UA delta) for admin endpoints, paired with 2FA | **Follow-up landed (2026-05-28):** admin-sensitive auth endpoints now emit scored anomaly security signals (LOW→CRITICAL) using session fingerprint drift (`client_id`, `ip_subnet`, `user_agent`) with admin-risk weighting (`386/387`). |
 | 9 | **Retire legacy `is_admin` JWT claim** after max TTL elapses (7d) + metrics | Completes the P2-S3 rollover (`auth.ts` L81-84). |
 
-**Current state to be honest about (updated):** phase 1 and cookie transport are in place (15m access JWT + DB-backed opaque rotating refresh tokens + absolute family cap + refresh revoke on password reset/change + httpOnly refresh cookie, no localStorage token persistence), with refresh CSRF double-submit, `HS256` verify-algorithm pinning, refresh family-revoke on reuse, RS256/JWKS cutover+rotation hardening, and session-device records plus revoke-other-sessions controls now landed. Remaining roadmap items are richer anomaly scoring for admin-sensitive endpoints and final legacy-claim retirement metrics.
+**Current state to be honest about (updated):** phase 1 and cookie transport are in place (15m access JWT + DB-backed opaque rotating refresh tokens + absolute family cap + refresh revoke on password reset/change + httpOnly refresh cookie, no localStorage token persistence), with refresh CSRF double-submit, `HS256` verify-algorithm pinning, refresh family-revoke on reuse, RS256/JWKS cutover+rotation hardening, session-device records plus revoke-other-sessions controls, and scored admin-endpoint anomaly signaling now landed. Remaining roadmap item is final legacy-claim retirement metrics/completion.
 
 ---
 
