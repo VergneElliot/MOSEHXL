@@ -23,6 +23,7 @@ import {
   Print as PrintIcon,
   Check as CheckIcon,
   Cloud as CloudIcon,
+  Router as RouterIcon,
 } from '@mui/icons-material';
 import { apiConfig } from '../../config/api';
 import { apiCore } from '../../services/api';
@@ -77,6 +78,17 @@ interface PrintersResponse {
 }
 
 const providerInfo: Record<string, ProviderInfo> = {
+  'network-escpos': {
+    name: 'Network receipt printer (LAN)',
+    icon: <RouterIcon />,
+    description:
+      'Epson TM-m30II and similar: send ESC/POS directly to the printer IP on port 9100. The MuseBar backend must run on the same local network as the printer.',
+    fields: [
+      { name: 'printerHost', label: 'Printer IP address', type: 'text', required: true },
+      { name: 'printerPort', label: 'Port (default 9100)', type: 'number', required: false, default: 9100 },
+      { name: 'printerLabel', label: 'Printer display name (optional)', type: 'text', required: false },
+    ],
+  },
   'epson-server-direct': {
     name: 'Epson Server Direct Print',
     icon: <CloudIcon />,
@@ -88,7 +100,7 @@ const providerInfo: Record<string, ProviderInfo> = {
 
 export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = false }) => {
   const [activeStep, setActiveStep] = useState(0);
-  const [selectedProvider, setSelectedProvider] = useState<string>('epson-server-direct');
+  const [selectedProvider, setSelectedProvider] = useState<string>('network-escpos');
   const [config, setConfig] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

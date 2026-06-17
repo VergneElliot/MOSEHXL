@@ -288,6 +288,14 @@ export async function buildReceiptDataForInvoice(
     sequence_number: parseNumber(row.invoice_sequence),
     document_kind: 'invoice',
     document_number: String(row.invoice_number ?? ''),
+    customer_info: {
+      name: String(row.customer_name ?? ''),
+      address: String(row.customer_address ?? ''),
+      email: row.customer_email ? String(row.customer_email) : undefined,
+      tax_identification: row.customer_tax_identification
+        ? String(row.customer_tax_identification)
+        : undefined,
+    },
     total_amount: parseNumber(row.total_ttc),
     total_tax: parseNumber(row.total_vat),
     payment_method: String(row.payment_method ?? 'Facture'),

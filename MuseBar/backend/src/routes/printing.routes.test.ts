@@ -17,6 +17,17 @@ const mocks = vi.hoisted(() => ({
   buildClosureBulletinData: vi.fn(),
   logPrintingHistory: vi.fn(),
   logSoftwareEventBestEffort: vi.fn(),
+  renderReceiptOrInvoicePdf: vi.fn(),
+  renderClosureBulletinPdf: vi.fn(),
+  buildClosureXlsxAttachment: vi.fn(),
+  isPeriodClosureBulletin: vi.fn(),
+  emailReceiptDocument: vi.fn(),
+  emailClosureBulletinDocument: vi.fn(),
+  validateRecipientEmail: vi.fn((email: unknown) => {
+    const trimmed = String(email ?? '').trim();
+    if (!trimmed.includes('@')) throw Object.assign(new Error('Adresse email destinataire invalide'), { statusCode: 400 });
+    return trimmed;
+  }),
 }));
 
 vi.mock('../db/pool', () => ({
@@ -84,6 +95,22 @@ vi.mock('../printing/printingServiceManager', () => ({
 
 vi.mock('../services/legal/softwareEventJournal', () => ({
   logSoftwareEventBestEffort: mocks.logSoftwareEventBestEffort,
+}));
+
+vi.mock('../services/documents/documentPdfService', () => ({
+  renderReceiptOrInvoicePdf: mocks.renderReceiptOrInvoicePdf,
+  renderClosureBulletinPdf: mocks.renderClosureBulletinPdf,
+}));
+
+vi.mock('../services/documents/closureXlsxService', () => ({
+  buildClosureXlsxAttachment: mocks.buildClosureXlsxAttachment,
+  isPeriodClosureBulletin: mocks.isPeriodClosureBulletin,
+}));
+
+vi.mock('../services/documents/documentEmailService', () => ({
+  emailReceiptDocument: mocks.emailReceiptDocument,
+  emailClosureBulletinDocument: mocks.emailClosureBulletinDocument,
+  validateRecipientEmail: mocks.validateRecipientEmail,
 }));
 
 import printingRouter from './printing';
@@ -588,5 +615,104 @@ describe('printing routes', () => {
     expect(res.status).toBe(400);
     expect(res.body.error?.message).toBe('Invalid closure bulletin id');
     expect(mocks.buildClosureBulletinData).not.toHaveBeenCalled();
+  });
+
+  it('exports receipt PDF', async () => {
+    mocks.buildReceiptDataForOrder.mockResolvedValue({
+      document_number: '000007',
+      sequence_number: 7,
+      total_amount: 10,
+      total_tax: 2,
+      payment_method: 'card',
+      created_at: new Date().toISOString(),
+      order_id: 7,
+      receipt_type: 'detailed',
+      business_info: { name: 'Muse', address: '', phone: '', email: '' },
+      items: [],
+    });
+    mocks.renderReceiptOrInvoicePdf.mockResolvedValue(Buffer.from('%PDF-1.4 test'));
+
+    const res = await request(app)
+      .get('/printing/receipt/7/export-pdf')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('application/pdf');
+    expect(mocks.renderReceiptOrInvoicePdf).toHaveBeenCalled();
+  });
+
+  it('emails invoice and logs history', async () => {
+    mocks.buildReceiptDataForInvoice.mockResolvedValue({
+      document_kind: 'invoice',
+      document_number: 'FAC-2026-000001',
+      sequence_number: 1,
+      total_amount: 100,
+      total_tax: 20,
+      payment_method: 'card',
+      created_at: new Date().toISOString(),
+      order_id: 42,
+      receipt_type: 'detailed',
+      business_info: { name: 'Muse', address: '', phone: '', email: '' },
+      customer_info: { email: 'client@exemple.com' },
+      items: [],
+    });
+    mocks.emailReceiptDocument.mockResolvedValue({
+      trackingId: 'track-1',
+      message: 'Email envoyé à client@exemple.com',
+    });
+
+    const res = await request(app)
+      .post('/printing/invoice/1/email')
+      .set('Authorization', 'Bearer test-token')
+      .send({ to: 'client@exemple.com' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.trackingId).toBe('track-1');
+    expect(mocks.emailReceiptDocument).toHaveBeenCalled();
+    expect(mocks.logPrintingHistory).toHaveBeenCalledWith(
+      expect.anything(),
+      'est-1',
+      'invoice',
+      expect.objectContaining({ success: true }),
+      expect.objectContaining({ action: 'email', recipient: 'client@exemple.com' })
+    );
+  });
+
+  it('blocks invoice email when compliance validation fails', async () => {
+    mocks.buildReceiptDataForInvoice.mockRejectedValue(
+      Object.assign(new Error('Invoice compliance blocked: missing legal fields'), { statusCode: 422 })
+    );
+
+    const res = await request(app)
+      .post('/printing/invoice/1/email')
+      .set('Authorization', 'Bearer test-token')
+      .send({ to: 'client@exemple.com' });
+
+    expect(res.status).toBe(400);
+    expect(String(res.body.error?.message ?? '')).toContain('Invoice compliance blocked');
+  });
+
+  it('exports closure XLSX for period bulletins', async () => {
+    mocks.buildClosureBulletinData.mockResolvedValue({
+      id: 5,
+      closure_type: 'MONTHLY',
+      period_start: '2026-05-01T00:00:00.000Z',
+      period_end: '2026-05-31T23:59:59.000Z',
+      total_amount: 100,
+      total_vat: 20,
+      business_info: { name: 'Muse', address: '', phone: '', email: '' },
+    });
+    mocks.isPeriodClosureBulletin.mockReturnValue(true);
+    mocks.buildClosureXlsxAttachment.mockResolvedValue({
+      buffer: Buffer.from('xlsx'),
+      filename: 'closure-recap-5.xlsx',
+    });
+
+    const res = await request(app)
+      .get('/printing/closure/5/export-xlsx')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('spreadsheetml');
   });
 });

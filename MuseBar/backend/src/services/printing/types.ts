@@ -40,6 +40,12 @@ export interface ReceiptData {
   receipt_type: 'detailed' | 'summary';
   tips?: number;
   change?: number;
+  customer_info?: {
+    name?: string;
+    address?: string;
+    email?: string;
+    tax_identification?: string;
+  };
   compliance_info?: {
     receipt_hash?: string;
     invoice_hash?: string;
@@ -50,7 +56,7 @@ export interface ReceiptData {
 
 export interface ClosureBulletinData {
   id: number;
-  closure_type: 'DAILY' | 'MONTHLY' | 'ANNUAL';
+  closure_type: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL';
   period_start: string;
   period_end: string;
   total_transactions: number;
@@ -112,13 +118,17 @@ export interface Printer {
 
 export interface PrintingConfig {
   /** Epson TM-Intelligent Server Direct Print (printer polls HTTPS, ePOS-Print XML). */
-  provider: 'epson-server-direct' | 'digital';
+  provider: 'epson-server-direct' | 'network-escpos' | 'digital';
   /** Establishment UUID (matches public.establishments.id and JWT payload). */
   establishmentId?: string;
   /** Shown in printer lists / status (optional). */
   printerLabel?: string;
   /** Validated on GET /api/printing/epson/poll — stored in printing_configurations.config */
   pollKey?: string;
+  /** LAN ESC/POS — printer IPv4/hostname (fallback: THERMAL_PRINTER_HOST). */
+  printerHost?: string;
+  /** LAN ESC/POS — raw socket port (default 9100). */
+  printerPort?: number;
   timeout?: number;
 }
 

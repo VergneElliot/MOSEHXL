@@ -14,8 +14,24 @@ function logParseFailure(message: string, error: unknown): void {
 
 export const ALLOWED_PRINT_PROVIDERS: PrintingConfig['provider'][] = [
   'epson-server-direct',
+  'network-escpos',
   'digital',
 ];
+
+function assertNetworkEscPosConfig(mergedConfig: Record<string, unknown>): void {
+  const host = mergedConfig.printerHost ?? process.env.THERMAL_PRINTER_HOST;
+  if (typeof host !== 'string' || !host.trim()) {
+    throw Object.assign(
+      new Error('printerHost is required for network ESC/POS (or set THERMAL_PRINTER_HOST)'),
+      { statusCode: 400 }
+    );
+  }
+  const portRaw = mergedConfig.printerPort ?? process.env.THERMAL_PRINTER_PORT ?? 9100;
+  const port = typeof portRaw === 'number' ? portRaw : parseInt(String(portRaw), 10);
+  if (!Number.isFinite(port) || port < 1 || port > 65535) {
+    throw Object.assign(new Error('printerPort must be between 1 and 65535'), { statusCode: 400 });
+  }
+}
 
 export function parseConfigCell(raw: unknown): Record<string, unknown> {
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
@@ -94,6 +110,13 @@ export async function savePrintingConfiguration(
 
   if (provider === 'epson-server-direct' && typeof mergedConfig.pollKey !== 'string') {
     mergedConfig = { ...mergedConfig, pollKey: randomUUID() };
+  }
+
+  if (provider === 'network-escpos') {
+    assertNetworkEscPosConfig(mergedConfig);
+    if (mergedConfig.printerPort == null) {
+      mergedConfig = { ...mergedConfig, printerPort: 9100 };
+    }
   }
 
   await pool.query(

@@ -197,14 +197,91 @@ Expected:
 
 ---
 
-## 8) Final sign-off criteria
+## 8) Email and PDF export checks
+
+### E-12 - POS ticket email with PDF attachment
+
+Steps:
+
+1. Finalize an order from POS.
+2. Open print dialog, select `Ticket détaillé`.
+3. Enter a valid recipient email.
+4. Click `Envoyer par email`.
+
+Expected:
+
+1. Email send succeeds (success message in dialog).
+2. Recipient receives email with PDF ticket attachment.
+
+### E-13 - POS invoice email with PDF attachment
+
+Steps:
+
+1. From POS print dialog, select `Facture avec détail` or `Facture sans détail`.
+2. Fill required invoice fields including customer email.
+3. Click `Envoyer par email`.
+
+Expected:
+
+1. Invoice is created/reused and email is sent.
+2. PDF attachment contains invoice number and mandatory legal mentions.
+
+### E-14 - History invoice email parity
+
+Steps:
+
+1. Repeat E-13 from History for the same order type.
+
+Expected:
+
+1. Same success behavior as POS.
+
+### E-15 - Closure bulletin email (PDF + optional XLSX)
+
+Steps:
+
+1. Open a closure bulletin print dialog.
+2. Enter recipient email.
+3. Send email for a **monthly** (or weekly/annual) bulletin.
+
+Expected:
+
+1. Email succeeds.
+2. PDF bulletin attached.
+3. For weekly/monthly/annual bulletins, XLSX recap attachment included (one row per daily closure + TOTAL).
+
+### E-16 - Export PDF from dialogs
+
+Steps:
+
+1. Export PDF for ticket, invoice, and closure bulletin from respective dialogs.
+
+Expected:
+
+1. Server-generated PDF downloads (not client JSON only).
+
+### E-17 - Blocked invoice email on missing legal fields
+
+Steps:
+
+1. Attempt invoice email with mandatory legal field intentionally missing (same setup as E-08).
+
+Expected:
+
+1. Email blocked with explicit compliance error (same class as print/export block).
+
+---
+
+## 9) Final sign-off criteria
 
 Sign-off is valid only if:
 
 1. E-01 to E-07 pass,
 2. E-08 and E-09 block as expected,
 3. E-10 passes after correction,
-4. no unresolved FAIL remains in evidence log.
+4. E-12 to E-16 pass (email + PDF export),
+5. E-17 blocks as expected,
+6. no unresolved FAIL remains in evidence log.
 
 Recommended sign-off statement:
 
