@@ -78,9 +78,16 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
       }
       let message = `HTTP error! status: ${res.status}`;
       try {
-        const body = await res.json() as { error?: string };
-        if (body?.error && typeof body.error === 'string') {
+        const body = await res.json() as {
+          error?: string | { message?: string };
+          message?: string;
+        };
+        if (typeof body?.error === 'string') {
           message = body.error;
+        } else if (body?.error && typeof body.error === 'object' && body.error.message) {
+          message = String(body.error.message);
+        } else if (typeof body?.message === 'string') {
+          message = body.message;
         }
       } catch {
         // ignore parse failure

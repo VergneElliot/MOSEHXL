@@ -1,3 +1,8 @@
+/**
+ * @deprecated Use SendGrid via services/documents/documentEmailService.ts and
+ * POST /api/printing/{receipt|invoice|closure}/:id/email routes.
+ * This Nodemailer-based service is not wired to any HTTP route.
+ */
 import * as nodemailer from 'nodemailer';
 import { ReceiptData, ClosureBulletinData } from '../printing/types';
 import * as QRCode from 'qrcode';

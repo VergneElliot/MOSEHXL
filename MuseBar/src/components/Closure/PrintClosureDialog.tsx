@@ -10,9 +10,10 @@ import {
   DialogTitle,
   Divider,
   Grid,
+  TextField,
   Typography,
 } from '@mui/material';
-import { apiCore } from '../../services/api';
+import { apiCore, printingApi } from '../../services/api';
 
 type ClosurePreviewData = {
   id: number;
@@ -71,10 +72,19 @@ const PrintClosureDialog: React.FC<PrintClosureDialogProps> = ({
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [emailing, setEmailing] = useState(false);
+  const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [preview, setPreview] = useState<ClosurePreviewData | null>(null);
 
   const hasValidId = useMemo(() => Number.isFinite(bulletinId) && (bulletinId ?? 0) > 0, [bulletinId]);
+  const isPeriodBulletin = useMemo(() => {
+    const type = String(preview?.closure_type ?? '').toUpperCase();
+    return type === 'WEEKLY' || type === 'MONTHLY' || type === 'ANNUAL';
+  }, [preview?.closure_type]);
 
   useEffect(() => {
     if (!open) return;
@@ -124,7 +134,7 @@ const PrintClosureDialog: React.FC<PrintClosureDialogProps> = ({
     }
   };
 
-  const handleExport = async () => {
+  const handleExportJson = async () => {
     if (!preview) return;
     try {
       setExporting(true);
@@ -146,10 +156,73 @@ const PrintClosureDialog: React.FC<PrintClosureDialogProps> = ({
     }
   };
 
+  const handleExportPdf = async () => {
+    if (!hasValidId || bulletinId == null) return;
+    try {
+      setExportingPdf(true);
+      setError(null);
+      await printingApi.exportClosureBulletinPdf(bulletinId);
+      onPrintSuccess('Export PDF du bulletin téléchargé.');
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Échec export PDF';
+      setError(message);
+      onPrintError(message);
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
+  const handleExportXlsx = async () => {
+    if (!hasValidId || bulletinId == null) return;
+    try {
+      setExportingXlsx(true);
+      setError(null);
+      await printingApi.exportClosureBulletinXlsx(bulletinId);
+      onPrintSuccess('Export Excel du récapitulatif téléchargé.');
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Échec export Excel';
+      setError(message);
+      onPrintError(message);
+    } finally {
+      setExportingXlsx(false);
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (!hasValidId || bulletinId == null) return;
+    if (!email.trim()) {
+      setError('Adresse email destinataire requise.');
+      return;
+    }
+    try {
+      setEmailing(true);
+      setError(null);
+      setSuccess(null);
+      const result = await printingApi.emailClosureBulletin(bulletinId, email.trim());
+      setSuccess(result.message);
+      onPrintSuccess(result.message);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Échec envoi email';
+      setError(message);
+      onPrintError(message);
+    } finally {
+      setEmailing(false);
+    }
+  };
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Impression du bulletin de clôture</DialogTitle>
+      <DialogTitle>Impression / envoi du bulletin de clôture</DialogTitle>
       <DialogContent dividers>
+        <TextField
+          fullWidth
+          size="small"
+          label="Email destinataire"
+          value={email}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+          placeholder="comptable@exemple.com"
+          sx={{ mb: 2 }}
+        />
         {loadingPreview && (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
             <CircularProgress />
@@ -157,6 +230,7 @@ const PrintClosureDialog: React.FC<PrintClosureDialogProps> = ({
         )}
 
         {error && <Alert severity="error">{error}</Alert>}
+        {success && <Alert severity="success">{success}</Alert>}
 
         {!loadingPreview && !error && preview && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -276,12 +350,27 @@ const PrintClosureDialog: React.FC<PrintClosureDialogProps> = ({
           </Box>
         )}
       </DialogContent>
-      <DialogActions>
+      <DialogActions sx={{ flexWrap: 'wrap', gap: 1 }}>
         <Button onClick={onClose}>Fermer</Button>
-        <Button onClick={handleExport} variant="outlined" disabled={loadingPreview || exporting || !preview}>
-          {exporting ? 'Export...' : 'Exporter'}
+        <Button onClick={handleExportJson} variant="outlined" disabled={loadingPreview || exporting || !preview}>
+          {exporting ? 'Export...' : 'JSON'}
         </Button>
-        <Button onClick={handlePrint} variant="contained" disabled={loadingPreview || printing || !!error || !preview}>
+        <Button onClick={handleExportPdf} variant="outlined" disabled={loadingPreview || exportingPdf || !preview}>
+          {exportingPdf ? 'PDF...' : 'PDF'}
+        </Button>
+        {isPeriodBulletin && (
+          <Button onClick={handleExportXlsx} variant="outlined" disabled={loadingPreview || exportingXlsx || !preview}>
+            {exportingXlsx ? 'Excel...' : 'Excel'}
+          </Button>
+        )}
+        <Button
+          onClick={handleSendEmail}
+          variant="outlined"
+          disabled={loadingPreview || emailing || !preview || !email.trim()}
+        >
+          {emailing ? 'Envoi...' : 'Envoyer par email'}
+        </Button>
+        <Button onClick={handlePrint} variant="contained" disabled={loadingPreview || printing || !preview}>
           {printing ? 'Impression...' : 'Imprimer'}
         </Button>
       </DialogActions>

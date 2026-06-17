@@ -11,7 +11,7 @@ import {
   Alert,
   TextField,
 } from '@mui/material';
-import { apiCore } from '../../services/api';
+import { apiCore, printingApi } from '../../services/api';
 import LegalReceiptContainer from '../Legal/LegalReceipt/LegalReceiptContainer';
 import type { InvoiceLegalInfo, Order as LegalReceiptOrder, ReceiptItem } from '../Legal/LegalReceipt/types';
 
@@ -129,6 +129,9 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
   const [selectedDocument, setSelectedDocument] = useState<DocumentSelection>('ticket');
   const [lastInvoiceNumber, setLastInvoiceNumber] = useState<string | null>(null);
   const [creatingInvoice, setCreatingInvoice] = useState(false);
+  const [emailing, setEmailing] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
   const autoCloseTimerRef = useRef<number | null>(null);
 
   const normalizedOrderId = useMemo<number | null>(() => {
@@ -324,6 +327,58 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
     }
   };
 
+  const handleExportPdf = async () => {
+    if (!hasValidOrderId || normalizedOrderId === null) {
+      setError('Identifiant de commande invalide: export PDF impossible.');
+      return;
+    }
+
+    try {
+      setExportingPdf(true);
+      setError(null);
+      setEmailSuccess(null);
+      if (isInvoiceDocument) {
+        const { invoiceId } = await createOrFetchInvoice();
+        await printingApi.exportInvoicePdf(invoiceId);
+      } else {
+        await printingApi.exportReceiptPdf(normalizedOrderId, receiptType);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Échec export PDF');
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (!hasValidOrderId || normalizedOrderId === null) {
+      setError('Identifiant de commande invalide: envoi email impossible.');
+      return;
+    }
+    if (!email.trim()) {
+      setError('Adresse email destinataire requise.');
+      return;
+    }
+
+    try {
+      setEmailing(true);
+      setError(null);
+      setEmailSuccess(null);
+      if (isInvoiceDocument) {
+        const { invoiceId } = await createOrFetchInvoice();
+        const result = await printingApi.emailInvoice(invoiceId, email.trim());
+        setEmailSuccess(result.message);
+      } else {
+        const result = await printingApi.emailReceipt(normalizedOrderId, email.trim(), receiptType);
+        setEmailSuccess(result.message);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Échec envoi email');
+    } finally {
+      setEmailing(false);
+    }
+  };
+
   const handleCreateInvoiceExport = async () => {
     if (!hasValidOrderId || normalizedOrderId === null) {
       setError('Identifiant de commande invalide: facture impossible.');
@@ -419,6 +474,19 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
               {isInvoiceDocument ? ' la facture thermique.' : ' le ticket thermique.'}
             </Alert>
 
+            <TextField
+              fullWidth
+              size="small"
+              label="Email destinataire"
+              value={email}
+              onChange={(e) => {
+                resetAutoClose();
+                setEmail(e.target.value);
+              }}
+              placeholder="client@exemple.com"
+              sx={{ mb: 2 }}
+            />
+
             {isInvoiceDocument && (
               <>
                 <Typography variant="subtitle2" color="text.secondary" gutterBottom>
@@ -444,18 +512,6 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
                     resetAutoClose();
                     setCustomerAddress(e.target.value);
                   }}
-                  sx={{ mb: 1 }}
-                />
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Email client"
-                  value={email}
-                  onChange={(e) => {
-                    resetAutoClose();
-                    setEmail(e.target.value);
-                  }}
-                  placeholder="client@exemple.com"
                   sx={{ mb: 1 }}
                 />
                 <TextField
@@ -562,6 +618,7 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
               </Box>
             )}
             {error && <Alert severity="error">{error}</Alert>}
+            {emailSuccess && <Alert severity="success">{emailSuccess}</Alert>}
             {!loading && !error && preview && businessInfo && (
               <LegalReceiptContainer
                 order={preview}
@@ -585,9 +642,23 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
       <DialogActions>
         <Button onClick={onClose}>Fermer</Button>
         <Button
+          onClick={handleExportPdf}
+          variant="outlined"
+          disabled={!hasValidOrderId || loading || creatingInvoice || exportingPdf || emailing}
+        >
+          {exportingPdf ? 'Export PDF...' : 'Exporter PDF'}
+        </Button>
+        <Button
+          onClick={handleSendEmail}
+          variant="outlined"
+          disabled={!hasValidOrderId || !email.trim() || loading || creatingInvoice || emailing || exportingPdf}
+        >
+          {emailing ? 'Envoi...' : 'Envoyer par email'}
+        </Button>
+        <Button
           onClick={handleQueuePrint}
           variant="contained"
-          disabled={!hasValidOrderId || !!error || loading || creatingInvoice}
+          disabled={!hasValidOrderId || loading || creatingInvoice || emailing || exportingPdf}
         >
           {isInvoiceDocument ? 'Créer et imprimer facture' : 'Imprimer ticket'}
         </Button>

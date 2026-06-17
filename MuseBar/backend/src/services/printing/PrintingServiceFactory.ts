@@ -1,5 +1,6 @@
 import { IPrintingService, PrintingConfig } from './types';
 import { EpsonServerDirectPrintService } from './EpsonServerDirectPrintService';
+import { NetworkEscPosPrintService } from './NetworkEscPosPrintService';
 import { DigitalReceiptService } from '../receipts/DigitalReceiptService';
 
 export class PrintingServiceFactory {
@@ -17,6 +18,9 @@ export class PrintingServiceFactory {
     switch (config.provider) {
       case 'epson-server-direct':
         service = new EpsonServerDirectPrintService(config);
+        break;
+      case 'network-escpos':
+        service = new NetworkEscPosPrintService(config);
         break;
       case 'digital':
         service = new DigitalReceiptService(config);

@@ -1,4 +1,5 @@
 import { Router, Response, NextFunction, Request } from 'express';
+import type { Response as ExpressResponse } from 'express';
 import type { PrintingConfig, IPrintingService } from '../services/printing';
 import type { PrintResult, ReceiptData as PrintingReceiptData, ClosureBulletinData as PrintingClosureBulletinData } from '../services/printing/types';
 import { pool } from '../db/pool';
@@ -23,6 +24,19 @@ import {
 import { createPrintingServiceManager } from '../printing/printingServiceManager';
 import { logSoftwareEventBestEffort } from '../services/legal/softwareEventJournal';
 import { AppError, asyncHandler, NotFoundError, ValidationError } from '../middleware/errorHandler';
+import {
+  renderClosureBulletinPdf,
+  renderReceiptOrInvoicePdf,
+} from '../services/documents/documentPdfService';
+import {
+  buildClosureXlsxAttachment,
+  isPeriodClosureBulletin,
+} from '../services/documents/closureXlsxService';
+import {
+  emailClosureBulletinDocument,
+  emailReceiptDocument,
+  validateRecipientEmail,
+} from '../services/documents/documentEmailService';
 
 const router = Router();
 
@@ -405,6 +419,166 @@ router.post('/configuration', authenticateToken, ensureEstablishment, asyncHandl
       500,
       'PRINTING_CONFIG_UPDATE_FAILED'
     );
+  }
+}));
+
+function sendPdfDownload(res: ExpressResponse, buffer: Buffer, filename: string): void {
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(buffer);
+}
+
+function sendXlsxDownload(res: ExpressResponse, buffer: Buffer, filename: string): void {
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  );
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(buffer);
+}
+
+function mapDocumentRouteError(error: unknown, fallbackCode: string): never {
+  if (error instanceof AppError) throw error;
+  const e = error as { statusCode?: number; message?: string };
+  if (e?.statusCode === 404) throw new NotFoundError('Document');
+  if (e?.statusCode === 400) throw new ValidationError(e.message ?? 'Invalid request');
+  if (e?.statusCode === 422) throw new ValidationError(e.message ?? 'Compliance validation failed');
+  if (e?.statusCode === 503) throw new AppError(e.message ?? 'Email service unavailable', 503, 'EMAIL_SERVICE_NOT_CONFIGURED');
+  const message = e?.message ?? (error instanceof Error ? error.message : 'Unknown error');
+  if (
+    message.includes('SendGrid') ||
+    message.toLowerCase().includes('unauthorized') ||
+    message.toLowerCase().includes('from_email')
+  ) {
+    throw new AppError(message, 503, 'EMAIL_PROVIDER_ERROR');
+  }
+  getLogger().error('Document route error', error instanceof Error ? error : undefined);
+  throw new AppError(message, 500, fallbackCode);
+}
+
+// GET /api/printing/receipt/:orderId/export-pdf
+router.get('/receipt/:orderId/export-pdf', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = getPrintingUser(req)!;
+    const orderId = parseInt(req.params.orderId ?? '', 10);
+    if (!Number.isFinite(orderId) || orderId <= 0) throw new ValidationError('Invalid order id');
+    const type = typeof req.query.type === 'string' ? req.query.type : 'detailed';
+    const receiptData = await buildReceiptDataForOrder(pool, user.establishment_id, user, orderId, type);
+    const pdf = await renderReceiptOrInvoicePdf(receiptData);
+    sendPdfDownload(res, pdf, `ticket-${receiptData.document_number ?? orderId}.pdf`);
+  } catch (error) {
+    mapDocumentRouteError(error, 'PRINTING_RECEIPT_EXPORT_FAILED');
+  }
+}));
+
+// POST /api/printing/receipt/:orderId/email
+router.post('/receipt/:orderId/email', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = getPrintingUser(req)!;
+    const orderId = parseInt(req.params.orderId ?? '', 10);
+    if (!Number.isFinite(orderId) || orderId <= 0) throw new ValidationError('Invalid order id');
+    const type = typeof req.query.type === 'string' ? req.query.type : 'detailed';
+    const receiptData = await buildReceiptDataForOrder(pool, user.establishment_id, user, orderId, type);
+    const to = validateRecipientEmail(req.body?.to);
+    const result = await emailReceiptDocument(receiptData, to);
+    await logPrintingHistory(pool, user.establishment_id, 'receipt', { success: true, message: result.message }, {
+      order_id: orderId,
+      action: 'email',
+      recipient: to,
+      tracking_id: result.trackingId,
+    });
+    res.json({ success: true, ...result });
+  } catch (error) {
+    mapDocumentRouteError(error, 'PRINTING_RECEIPT_EMAIL_FAILED');
+  }
+}));
+
+// GET /api/printing/invoice/:invoiceId/export-pdf
+router.get('/invoice/:invoiceId/export-pdf', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = getPrintingUser(req)!;
+    const invoiceId = parseInt(req.params.invoiceId ?? '', 10);
+    if (!Number.isFinite(invoiceId) || invoiceId <= 0) throw new ValidationError('Invalid invoice id');
+    const invoiceData = await buildReceiptDataForInvoice(pool, user, invoiceId);
+    const pdf = await renderReceiptOrInvoicePdf(invoiceData);
+    sendPdfDownload(res, pdf, `${invoiceData.document_number ?? `invoice-${invoiceId}`}.pdf`);
+  } catch (error) {
+    mapDocumentRouteError(error, 'PRINTING_INVOICE_EXPORT_FAILED');
+  }
+}));
+
+// POST /api/printing/invoice/:invoiceId/email
+router.post('/invoice/:invoiceId/email', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = getPrintingUser(req)!;
+    const invoiceId = parseInt(req.params.invoiceId ?? '', 10);
+    if (!Number.isFinite(invoiceId) || invoiceId <= 0) throw new ValidationError('Invalid invoice id');
+    const invoiceData = await buildReceiptDataForInvoice(pool, user, invoiceId);
+    const to = validateRecipientEmail(req.body?.to ?? invoiceData.customer_info?.email);
+    const result = await emailReceiptDocument(invoiceData, to);
+    await logPrintingHistory(pool, user.establishment_id, 'invoice', { success: true, message: result.message }, {
+      invoice_id: invoiceId,
+      action: 'email',
+      recipient: to,
+      tracking_id: result.trackingId,
+    });
+    res.json({ success: true, ...result });
+  } catch (error) {
+    mapDocumentRouteError(error, 'PRINTING_INVOICE_EMAIL_FAILED');
+  }
+}));
+
+// GET /api/printing/closure/:bulletinId/export-pdf
+router.get('/closure/:bulletinId/export-pdf', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = getPrintingUser(req)!;
+    const bulletinId = parseInt(req.params.bulletinId ?? '', 10);
+    if (!Number.isFinite(bulletinId) || bulletinId <= 0) throw new ValidationError('Invalid closure bulletin id');
+    const bulletinData = await buildClosureBulletinData(pool, user, bulletinId);
+    const pdf = await renderClosureBulletinPdf(bulletinData);
+    sendPdfDownload(res, pdf, `closure-bulletin-${bulletinId}.pdf`);
+  } catch (error) {
+    mapDocumentRouteError(error, 'PRINTING_CLOSURE_EXPORT_FAILED');
+  }
+}));
+
+// GET /api/printing/closure/:bulletinId/export-xlsx
+router.get('/closure/:bulletinId/export-xlsx', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = getPrintingUser(req)!;
+    const bulletinId = parseInt(req.params.bulletinId ?? '', 10);
+    if (!Number.isFinite(bulletinId) || bulletinId <= 0) throw new ValidationError('Invalid closure bulletin id');
+    const bulletinData = await buildClosureBulletinData(pool, user, bulletinId);
+    if (!isPeriodClosureBulletin(bulletinData.closure_type)) {
+      throw new ValidationError('Export Excel disponible uniquement pour les bulletins hebdomadaires, mensuels ou annuels');
+    }
+    const xlsx = await buildClosureXlsxAttachment(pool, user.establishment_id, bulletinData);
+    if (!xlsx) throw new ValidationError('Impossible de générer le récapitulatif Excel');
+    sendXlsxDownload(res, xlsx.buffer, xlsx.filename);
+  } catch (error) {
+    mapDocumentRouteError(error, 'PRINTING_CLOSURE_XLSX_EXPORT_FAILED');
+  }
+}));
+
+// POST /api/printing/closure/:bulletinId/email
+router.post('/closure/:bulletinId/email', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = getPrintingUser(req)!;
+    const bulletinId = parseInt(req.params.bulletinId ?? '', 10);
+    if (!Number.isFinite(bulletinId) || bulletinId <= 0) throw new ValidationError('Invalid closure bulletin id');
+    const bulletinData = await buildClosureBulletinData(pool, user, bulletinId);
+    const to = validateRecipientEmail(req.body?.to);
+    const result = await emailClosureBulletinDocument(pool, user.establishment_id, bulletinData, to);
+    await logPrintingHistory(pool, user.establishment_id, 'closure_bulletin', { success: true, message: result.message }, {
+      bulletin_id: bulletinId,
+      action: 'email',
+      recipient: to,
+      tracking_id: result.trackingId,
+      attachments: result.attachments,
+    });
+    res.json({ success: true, ...result });
+  } catch (error) {
+    mapDocumentRouteError(error, 'PRINTING_CLOSURE_EMAIL_FAILED');
   }
 }));
 
