@@ -50,4 +50,38 @@ describe('NetworkEscPosPrintService', () => {
       port: 9100,
     });
   });
+
+  it('uses ASCII-safe text for thermal receipt payloads', async () => {
+    await service.printReceipt({
+      order_id: 2,
+      sequence_number: 43,
+      total_amount: 12,
+      total_tax: 2,
+      payment_method: 'cash',
+      created_at: new Date().toISOString(),
+      business_info: {
+        name: 'Musé Bar',
+        address: 'Rue de l’Été',
+        phone: '01',
+        email: 'muse@test.fr',
+      },
+      receipt_type: 'detailed',
+      items: [{
+        product_name: 'Café crème',
+        quantity: 1,
+        unit_price: 12,
+        total_price: 12,
+        tax_rate: 20,
+      }],
+    });
+
+    const payload = mocks.sendEscPosToPrinter.mock.calls[0][0] as string;
+    expect(payload).toContain('Muse Bar');
+    expect(payload).toContain('Cafe creme');
+    expect(payload).toContain('12.00 EUR');
+    expect(payload).toContain('Especes');
+    expect(payload).not.toContain('€');
+    expect(payload).not.toContain('é');
+    expect(payload).not.toContain('É');
+  });
 });
