@@ -2,6 +2,7 @@
 export { BasePrintingService } from './BasePrintingService';
 export { EpsonServerDirectPrintService } from './EpsonServerDirectPrintService';
 export { NetworkEscPosPrintService } from './NetworkEscPosPrintService';
+export { BridgePrintService } from './BridgePrintService';
 export { PrintingServiceFactory } from './PrintingServiceFactory';
 export * from './types';
 export { enqueueEposJob, dequeueEposJob, queueLength } from './epsonJobStore';

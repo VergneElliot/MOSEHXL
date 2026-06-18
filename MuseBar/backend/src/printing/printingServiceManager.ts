@@ -30,7 +30,7 @@ export function createPrintingServiceManager(pool: Pool, logger: Logger) {
         config = { provider: 'epson-server-direct', establishmentId };
       }
 
-      const service = await PrintingServiceFactory.create(config);
+      const service = await PrintingServiceFactory.create(config, { pool });
       printingServices.set(establishmentId, service);
       return service;
     } catch (error) {
@@ -39,10 +39,13 @@ export function createPrintingServiceManager(pool: Pool, logger: Logger) {
         error instanceof Error ? error : undefined
       );
 
-      const fallbackService = await PrintingServiceFactory.create({
-        provider: 'epson-server-direct',
-        establishmentId,
-      });
+      const fallbackService = await PrintingServiceFactory.create(
+        {
+          provider: 'epson-server-direct',
+          establishmentId,
+        },
+        { pool }
+      );
       printingServices.set(establishmentId, fallbackService);
       return fallbackService;
     }

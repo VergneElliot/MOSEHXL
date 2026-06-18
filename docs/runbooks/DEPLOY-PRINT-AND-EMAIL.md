@@ -112,7 +112,12 @@ curl -X POST "https://mosehxl.com/api/test-email" \
 
 ---
 
-## 4) Epson Server Direct Print (per establishment)
+## 4) Local Print Bridge / Epson Server Direct
+
+For the current Muse Bar Epson TM-m30II, use the local bridge runbook:
+`docs/runbooks/PRINT-BRIDGE-V1.md`.
+
+For compatible TM-Intelligent Epson printers, Server Direct remains supported:
 
 1. Log into POS as establishment admin.
 2. **Settings → Printer** — run wizard, save `epson-server-direct` config (generates `pollKey`).
@@ -131,7 +136,7 @@ Execute in order:
 
 | # | Action | Expected |
 |---|--------|----------|
-| 1 | Sale → print ticket | Print job queued, printer receives XML |
+| 1 | Sale → print ticket | Bridge job queued and local printer receives ESC/POS, or Epson Server Direct receives XML |
 | 2 | Sale → export PDF ticket | PDF downloads |
 | 3 | Sale → email ticket | SendGrid delivery, PDF attachment |
 | 4 | Create invoice → print / PDF / email | Same safeguards as UAT E-01..E-03 |

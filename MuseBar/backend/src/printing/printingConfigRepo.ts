@@ -15,6 +15,7 @@ function logParseFailure(message: string, error: unknown): void {
 export const ALLOWED_PRINT_PROVIDERS: PrintingConfig['provider'][] = [
   'epson-server-direct',
   'network-escpos',
+  'bridge',
   'digital',
 ];
 
@@ -60,7 +61,31 @@ export function enrichConfigurationRow(row: Record<string, unknown>, establishme
     epson_server_direct_poll_url = `${base}/api/printing/epson/poll?${q.toString()}`;
     epson_server_direct_poll_key_header = 'x-epson-poll-key';
   }
-  return { ...row, config: cfg, epson_server_direct_poll_url, epson_server_direct_poll_key_header };
+  let bridge_env: string | null = null;
+  let bridge_poll_url: string | null = null;
+  let bridge_key_header: string | null = null;
+  if (row.provider === 'bridge' && base && typeof cfg.bridgeKey === 'string') {
+    bridge_poll_url = `${base}/api/printing/bridge/poll?establishment_id=${encodeURIComponent(establishmentId)}`;
+    bridge_key_header = 'x-bridge-key';
+    bridge_env = [
+      `MUSEBAR_API_URL=${base}`,
+      `ESTABLISHMENT_ID=${establishmentId}`,
+      `BRIDGE_KEY=${cfg.bridgeKey}`,
+      'PRINTER_DRIVER=network-escpos',
+      'PRINTER_HOST=192.168.0.95',
+      'PRINTER_PORT=9100',
+      'POLL_INTERVAL_MS=2000',
+    ].join('\n');
+  }
+  return {
+    ...row,
+    config: cfg,
+    epson_server_direct_poll_url,
+    epson_server_direct_poll_key_header,
+    bridge_env,
+    bridge_poll_url,
+    bridge_key_header,
+  };
 }
 
 export async function getActivePrintingConfiguration(
@@ -112,6 +137,10 @@ export async function savePrintingConfiguration(
     mergedConfig = { ...mergedConfig, pollKey: randomUUID() };
   }
 
+  if (provider === 'bridge' && typeof mergedConfig.bridgeKey !== 'string') {
+    mergedConfig = { ...mergedConfig, bridgeKey: randomUUID() };
+  }
+
   if (provider === 'network-escpos') {
     assertNetworkEscPosConfig(mergedConfig);
     if (mergedConfig.printerPort == null) {
@@ -140,5 +169,34 @@ export async function savePrintingConfiguration(
   );
 
   return { configuration, mergedConfig };
+}
+
+export async function getActiveBridgeConfiguration(
+  pool: Pool,
+  establishmentId: string
+): Promise<Record<string, unknown> | null> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SELECT set_config('app.establishment_id', $1, true)", [establishmentId]);
+    const result = await client.query(
+      `SELECT provider, config
+       FROM printing_configurations
+       WHERE establishment_id = $1 AND is_active = true
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [establishmentId]
+    );
+    await client.query('COMMIT');
+
+    const row = result.rows[0] as { provider?: string; config?: unknown } | undefined;
+    if (!row || row.provider !== 'bridge') return null;
+    return parseConfigCell(row.config);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 

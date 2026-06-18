@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'crypto';
 import { Router, Response, NextFunction, Request } from 'express';
 import type { Response as ExpressResponse } from 'express';
 import type { PrintingConfig, IPrintingService } from '../services/printing';
@@ -12,7 +13,14 @@ import {
   listPrintingConfigurations,
   savePrintingConfiguration,
   parseConfigCell,
+  getActiveBridgeConfiguration,
 } from '../printing/printingConfigRepo';
+import {
+  ackBridgePrintJob,
+  claimNextBridgePrintJob,
+  failBridgePrintJob,
+  getBridgeQueueStatus,
+} from '../printing/bridgePrintJobRepo';
 import {
   buildClosureBulletinData,
   buildReceiptDataForInvoice,
@@ -41,6 +49,35 @@ import {
 
 const router = Router();
 
+function safeEquals(a: string, b: string): boolean {
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  if (left.length !== right.length) return false;
+  return timingSafeEqual(left, right);
+}
+
+async function validateBridgeRequest(req: Request): Promise<string> {
+  const establishmentId = typeof req.query.establishment_id === 'string'
+    ? req.query.establishment_id.trim()
+    : '';
+  const bridgeKey = typeof req.headers['x-bridge-key'] === 'string'
+    ? req.headers['x-bridge-key'].trim()
+    : '';
+
+  if (!establishmentId || !bridgeKey) {
+    throw new AppError('Bridge authentication required', 401, 'BRIDGE_AUTH_REQUIRED');
+  }
+
+  const config = await getActiveBridgeConfiguration(pool, establishmentId);
+  const expected = typeof config?.bridgeKey === 'string' ? config.bridgeKey : '';
+  if (!expected || !safeEquals(bridgeKey, expected)) {
+    getLogger().warn('Bridge authentication failed');
+    throw new AppError('Invalid bridge key', 401, 'BRIDGE_AUTH_FAILED');
+  }
+
+  return establishmentId;
+}
+
 /**
  * Epson TM-Intelligent — Server Direct Print poll (no JWT; secured with x-epson-poll-key header).
  * Configure this full URL in the printer TMNet WebConfig.
@@ -52,6 +89,87 @@ router.get('/epson/poll', asyncHandler(async (req: Request, res: Response) => {
     getLogger().error('Epson Server Direct poll error', error instanceof Error ? error : undefined);
     throw new AppError('Internal error', 500, 'EPSON_POLL_FAILED');
   }
+}));
+
+/**
+ * MuseBar Print Bridge — local bridge polls cloud for durable ESC/POS jobs.
+ * Secured by x-bridge-key; no browser JWT required.
+ */
+router.get('/bridge/poll', asyncHandler(async (req: Request, res: Response) => {
+  const establishmentId = await validateBridgeRequest(req);
+  const job = await claimNextBridgePrintJob(pool, establishmentId);
+  if (!job) {
+    return res.json({ job: null });
+  }
+
+  getLogger().info('PRINT_JOB_CLAIMED', {
+    job_id: job.id,
+    establishment_id: establishmentId,
+    document_type: job.document_type,
+  });
+
+  return res.json({
+    job: {
+      id: job.id,
+      document_type: job.document_type,
+      payload_format: job.payload_format,
+      payload_base64: job.payload_base64,
+      attempt_count: job.attempt_count,
+      metadata: job.metadata,
+    },
+  });
+}));
+
+router.post('/bridge/jobs/:jobId/ack', asyncHandler(async (req: Request, res: Response) => {
+  const establishmentId = await validateBridgeRequest(req);
+  const jobId = req.params.jobId;
+  if (!jobId) {
+    throw new ValidationError('Print job id is required');
+  }
+
+  const job = await ackBridgePrintJob(pool, establishmentId, jobId);
+  if (!job) {
+    throw new NotFoundError('Print job');
+  }
+
+  getLogger().info('PRINT_JOB_PRINTED', {
+    job_id: job.id,
+    establishment_id: establishmentId,
+    document_type: job.document_type,
+  });
+
+  return res.json({ success: true, job_id: job.id, status: job.status });
+}));
+
+router.post('/bridge/jobs/:jobId/fail', asyncHandler(async (req: Request, res: Response) => {
+  const establishmentId = await validateBridgeRequest(req);
+  const jobId = req.params.jobId;
+  if (!jobId) {
+    throw new ValidationError('Print job id is required');
+  }
+  const errorMessage = typeof req.body?.error === 'string' && req.body.error.trim()
+    ? req.body.error.trim()
+    : 'Bridge reported print failure';
+
+  const job = await failBridgePrintJob(pool, establishmentId, jobId, errorMessage);
+  if (!job) {
+    throw new NotFoundError('Print job');
+  }
+
+  getLogger().warn('PRINT_JOB_FAILED', {
+    job_id: job.id,
+    establishment_id: establishmentId,
+    document_type: job.document_type,
+    status: job.status,
+  });
+
+  return res.json({ success: true, job_id: job.id, status: job.status });
+}));
+
+router.get('/bridge/status', asyncHandler(async (req: Request, res: Response) => {
+  const establishmentId = await validateBridgeRequest(req);
+  const status = await getBridgeQueueStatus(pool, establishmentId);
+  return res.json({ establishment_id: establishmentId, status });
 }));
 
 const printingServiceManager = createPrintingServiceManager(pool, getLogger());

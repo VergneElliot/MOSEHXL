@@ -121,13 +121,15 @@ export interface Printer {
 
 export interface PrintingConfig {
   /** Epson TM-Intelligent Server Direct Print (printer polls HTTPS, ePOS-Print XML). */
-  provider: 'epson-server-direct' | 'network-escpos' | 'digital';
+  provider: 'epson-server-direct' | 'network-escpos' | 'bridge' | 'digital';
   /** Establishment UUID (matches public.establishments.id and JWT payload). */
   establishmentId?: string;
   /** Shown in printer lists / status (optional). */
   printerLabel?: string;
   /** Validated on GET /api/printing/epson/poll — stored in printing_configurations.config */
   pollKey?: string;
+  /** Validated on /api/printing/bridge/* — stored in printing_configurations.config. */
+  bridgeKey?: string;
   /** LAN ESC/POS — printer IPv4/hostname (fallback: THERMAL_PRINTER_HOST). */
   printerHost?: string;
   /** LAN ESC/POS — raw socket port (default 9100). */
