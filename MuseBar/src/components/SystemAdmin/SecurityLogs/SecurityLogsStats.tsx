@@ -11,7 +11,7 @@ export const SecurityLogsStats: React.FC = () => {
     critical: logs.filter(log => log.severity === 'critical').length,
     high: logs.filter(log => log.severity === 'high').length,
     today: logs.filter(log => {
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toISOString().split('T')[0] ?? '';
       return log.timestamp.startsWith(today);
     }).length
   };

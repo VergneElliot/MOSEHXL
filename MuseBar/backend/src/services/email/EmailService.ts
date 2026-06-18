@@ -6,7 +6,8 @@
 
 import { Logger } from '../../utils/logger';
 import { EnvironmentConfig } from '../../config/environment';
-import { EmailTemplateManager, EmailTemplate } from './EmailTemplateManager';
+import { EmailTemplateManager } from './templates/EmailTemplateManager';
+import { EmailTemplate } from './templates/types';
 import { EmailLogger, EmailLog, EmailStats } from './EmailLogger';
 import { EmailSender, EmailOptions, EmailConfigValidation } from './EmailSender';
 

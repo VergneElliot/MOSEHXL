@@ -12,12 +12,21 @@ import {
 } from '@mui/material';
 import { apiService } from '../../services/apiService';
 import type { User } from '../../types';
+import { useTranslation } from 'react-i18next';
+import { LanguageSwitcher } from '../common/LanguageSwitcher';
 
 interface LoginProps {
-  onLogin: (token: string, user: User, rememberMe: boolean, expiresIn: string) => void;
+  onLogin: (
+    token: string,
+    user: User,
+    rememberMe: boolean,
+    expiresIn: string,
+    refreshExpiresIn?: string
+  ) => void;
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
+  const { t } = useTranslation(['common', 'auth']);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -47,16 +56,23 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         token: string;
         user: User;
         expiresIn: string;
+        refreshExpiresIn?: string;
       }>('/auth/login', {
         email,
         password,
         rememberMe,
       });
       const data = response.data;
-      onLogin(data.token, data.user, rememberMe, data.expiresIn);
+      onLogin(
+        data.token,
+        data.user,
+        rememberMe,
+        data.expiresIn,
+        data.refreshExpiresIn
+      );
     } catch (err: unknown) {
       console.error('Login error:', err);
-      setError(err instanceof Error ? err.message : 'Erreur réseau ou serveur');
+      setError(err instanceof Error ? err.message : t('auth.networkError', { ns: 'common' }));
     } finally {
       setLoading(false);
     }
@@ -78,6 +94,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           width: '100%',
         }}
       >
+        <Box display="flex" justifyContent="flex-end" mb={1}>
+          <LanguageSwitcher />
+        </Box>
         <Typography
           variant="h5"
           gutterBottom
@@ -87,11 +106,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             mb: { xs: 2, sm: 1 },
           }}
         >
-          Connexion
+          {t('login.title', { ns: 'auth' })}
         </Typography>
         <form onSubmit={handleSubmit}>
           <TextField
-            label="Email"
+            label={t('auth.email', { ns: 'common' })}
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
@@ -109,7 +128,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             }}
           />
           <TextField
-            label="Mot de passe"
+            label={t('auth.password', { ns: 'common' })}
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
@@ -139,7 +158,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 }}
               />
             }
-            label="Rester connecté"
+            label={t('auth.rememberMe', { ns: 'common' })}
             sx={{
               mt: { xs: 2, sm: 1 },
               '& .MuiTypography-root': {
@@ -174,7 +193,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 fontWeight: 'bold',
               }}
             >
-              {loading ? <CircularProgress size={24} /> : 'Se connecter'}
+              {loading ? <CircularProgress size={24} /> : t('auth.signIn', { ns: 'common' })}
             </Button>
           </Box>
         </form>

@@ -1,5 +1,7 @@
 # Fix: Printing and Products Routes Query Wrong Schema
 
+> **Legacy note (Phase B1, 2026-04-24):** This patch note documents a schema-per-tenant approach. V2 is committing to **shared-table multi-tenancy** with `establishment_id` scoping and DB guardrails. Keep this doc for history; do not use it as the current architectural reference.
+
 This doc explains **why** the printing and products routes were violating multi-tenant data isolation, **what** “establishment-specific schema” means in this app, and **how** we fixed it so orders and products are always read from the correct tenant schema.
 
 ---

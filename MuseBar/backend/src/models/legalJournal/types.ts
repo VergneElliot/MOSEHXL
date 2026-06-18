@@ -6,6 +6,8 @@
 export interface JournalEntry {
   id: number;
   sequence_number: number;
+  /** Tenant scope — sequence numbers are unique per (establishment_id, sequence_number). */
+  establishment_id: string;
   transaction_type: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE' | 'CHANGE';
   order_id?: number;
   amount: number;
@@ -37,6 +39,11 @@ export interface ClosureBulletin {
   payment_methods_breakdown: Record<string, number>;
   tips_total?: number; // Total pourboires
   change_total?: number; // Total monnaie rendue
+  journal_sales_count?: number;
+  journal_sales_amount?: number;
+  journal_sales_vat?: number;
+  reconciliation_ok?: boolean;
+  reconciliation_details?: Record<string, unknown>;
   first_sequence: number;
   last_sequence: number;
   closure_hash: string;
@@ -77,6 +84,8 @@ export interface PaymentBreakdown {
 
 export interface OrderForJournal {
   id: number;
+  /** Required for per-establishment legal journal chain. */
+  establishment_id: string;
   total_amount?: number | string;
   total_tax?: number | string;
   taxAmount?: number | string;

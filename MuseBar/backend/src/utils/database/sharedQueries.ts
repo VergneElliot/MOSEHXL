@@ -4,7 +4,7 @@
  */
 
 import { PoolClient } from 'pg';
-import { pool } from '../../app';
+import { pool } from '../../db/pool';
 
 /**
  * User-related shared queries

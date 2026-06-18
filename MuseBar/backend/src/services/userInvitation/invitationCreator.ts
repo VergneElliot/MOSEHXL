@@ -4,7 +4,7 @@
  */
 
 import { randomUUID } from 'crypto';
-import { pool } from '../../app';
+import { pool } from '../../db/pool';
 import { Logger } from '../../utils/logger';
 import { InvitationQueries } from '../../utils/database';
 import { 

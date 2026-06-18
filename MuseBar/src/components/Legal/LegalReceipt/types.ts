@@ -32,6 +32,15 @@ export interface BusinessInfo {
   siret: string;
 }
 
+export interface InvoiceLegalInfo {
+  paymentDueDate?: string;
+  paymentTerms?: string;
+  latePenaltyTerms?: string;
+  recoveryFeeNote?: string;
+  sellerLegalForm?: string;
+  sellerShareCapitalEur?: number | string;
+}
+
 export interface Order {
   id: number;
   sequence_number: number;
@@ -47,12 +56,17 @@ export interface LegalReceiptProps {
   order: Order;
   businessInfo: BusinessInfo;
   receiptType?: 'detailed' | 'summary';
+  documentKind?: 'ticket' | 'invoice';
+  documentNumber?: string;
+  invoiceLegalInfo?: InvoiceLegalInfo;
 }
 
 export interface ReceiptHeaderProps {
   businessInfo: BusinessInfo;
   order: Order;
   receiptType?: 'detailed' | 'summary';
+  documentKind?: 'ticket' | 'invoice';
+  documentNumber?: string;
 }
 
 export interface ReceiptItemsProps {
@@ -66,11 +80,15 @@ export interface ReceiptFooterProps {
   totalVAT: number;
   sousTotalHT: number;
   receiptType?: 'detailed' | 'summary';
+  documentKind?: 'ticket' | 'invoice';
+  invoiceLegalInfo?: InvoiceLegalInfo;
 }
 
 export interface ReceiptSignatureProps {
   businessInfo: BusinessInfo;
   order: Order;
+  documentKind?: 'ticket' | 'invoice';
+  documentNumber?: string;
 }
 
 /**

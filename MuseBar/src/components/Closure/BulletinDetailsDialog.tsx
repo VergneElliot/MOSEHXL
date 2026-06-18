@@ -56,8 +56,8 @@ const BulletinDetailsDialog: React.FC<BulletinDetailsDialogProps> = ({
 
   // "Total soumis à TVA X%" must be the exact TTC sum of all items in that VAT bucket.
   // Prefer backend-provided TTC bucket totals (sum of order_items.total_price), fallback to base+vat.
-  const vat10TtcExact = toFiniteNumber((bulletin.vat_breakdown as any)?.vat_10?.ttc) || vat10Base + vat10Amount;
-  const vat20TtcExact = toFiniteNumber((bulletin.vat_breakdown as any)?.vat_20?.ttc) || vat20Base + vat20Amount;
+  const vat10TtcExact = toFiniteNumber(bulletin.vat_breakdown?.vat_10?.ttc) || vat10Base + vat10Amount;
+  const vat20TtcExact = toFiniteNumber(bulletin.vat_breakdown?.vat_20?.ttc) || vat20Base + vat20Amount;
 
   // Round only for display, never "rebalance" buckets (accounting wants the bucket sums themselves).
   const vat10TtcDisplay = roundToCents(vat10TtcExact) / 100;

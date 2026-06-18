@@ -1,4 +1,4 @@
-import { pool } from '../../../app';
+import { pool } from '../../../db/pool';
 
 export async function countUsers(establishmentId: string) {
   const totalMembersResult = await pool.query(

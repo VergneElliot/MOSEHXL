@@ -1,3 +1,9 @@
+> **Status (historical plan):** Superseded by the 2026-04-21 three-part audit remediation program.
+> For current execution order and source-of-truth status, use:
+> - `docs/audits/2026-04-21-repo-audit-and-remediation-plan.part-1.md`
+> - `docs/audits/2026-04-21-repo-audit-and-remediation-plan.part-2.md`
+> - `docs/audits/2026-04-21-repo-audit-and-remediation-plan.part-3.md`
+
 ## Goal
 Bring the repository to a **clean, low-noise state** by eliminating ESLint warnings, addressing security vulnerabilities where safely possible, and updating packages only when risk is low (patch/minor updates). Major upgrades that require migrations are explicitly deferred.
 

@@ -4,12 +4,11 @@
  */
 
 import crypto from 'crypto';
-import { pool } from '../../app';
+import { pool } from '../../db/pool';
 import { IntegrityCheckResult } from './types';
+import { getRegisterIdForEstablishment } from '../../utils/registerId';
 
 export class JournalSigning {
-  private static registerKey = 'MUSEBAR-REG-001'; // Unique register identifier
-
   /**
    * Generate cryptographic hash for transaction integrity
    * @param data - The data to hash
@@ -22,29 +21,19 @@ export class JournalSigning {
   }
 
   /**
-   * Verify journal integrity by checking hash chain with documented issues
-   * This method checks the cryptographic integrity of the legal journal
-   * while accounting for documented historical issues
+   * Verify journal integrity by checking the cryptographic hash chain.
+   * Any mismatch is reported as an integrity error.
    */
-  static async verifyJournalIntegrity(): Promise<IntegrityCheckResult> {
+  static async verifyJournalIntegrity(establishmentId: string): Promise<IntegrityCheckResult> {
     const errors: string[] = [];
-    
-    // First, check if there are any documented integrity issues
-    const documentedIssuesQuery = `
-      SELECT sequence_number, transaction_data 
-      FROM legal_journal 
-      WHERE transaction_type = 'CORRECTION' 
-      AND transaction_data->>'correction_type' = 'HASH_CHAIN_INTEGRITY'
-    `;
-    const documentedIssuesResult = await pool.query(documentedIssuesQuery);
-    const documentedIssues = documentedIssuesResult.rows;
 
-    // Get all entries
+    // Chain is per establishment; sequence numbers start at 1+ per tenant (or 0 bootstrap).
     const query = `
       SELECT * FROM legal_journal 
+      WHERE establishment_id = $1
       ORDER BY sequence_number ASC
     `;
-    const result = await pool.query(query);
+    const result = await pool.query(query, [establishmentId]);
     const entries = result.rows;
 
     if (entries.length === 0) {
@@ -56,24 +45,15 @@ export class JournalSigning {
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i];
       
-      // Check sequence number continuity
-      if (entry.sequence_number !== i + 1) {
-        errors.push(`Sequence break at entry ${entry.sequence_number}: expected ${i + 1}`);
+      if (i > 0 && entry.sequence_number <= entries[i - 1].sequence_number) {
+        errors.push(
+          `Non-monotonic sequence for establishment: ${entry.sequence_number} after ${entries[i - 1].sequence_number}`
+        );
       }
 
-      // Check if this is a documented problematic entry or correction entry
-      const isDocumentedIssue = entry.sequence_number === 128;
-      const isCorrectionEntry = entry.transaction_type === 'CORRECTION';
-      const hasCorrectionEntry = documentedIssues.length > 0;
-
-      // Check previous hash (skip for documented issues and correction entries if correction entry exists)
+      // Check previous hash continuity.
       if (entry.previous_hash !== expectedPreviousHash) {
-        if ((isDocumentedIssue || isCorrectionEntry) && hasCorrectionEntry) {
-          // This is a documented issue or correction entry - don't add to errors
-          // Optional debug log suppressed in production; use logger if needed
-        } else {
-          errors.push(`Hash chain broken at sequence ${entry.sequence_number}: expected previous hash ${expectedPreviousHash}, got ${entry.previous_hash}`);
-        }
+        errors.push(`Hash chain broken at sequence ${entry.sequence_number}: expected previous hash ${expectedPreviousHash}, got ${entry.previous_hash}`);
       }
 
       // Verify current hash by using the same timestamp format as when the hash was created
@@ -93,25 +73,15 @@ export class JournalSigning {
       const expectedCurrentHash = this.generateHash(dataString, entry.previous_hash);
       
       if (entry.current_hash !== expectedCurrentHash) {
-        if ((isDocumentedIssue || isCorrectionEntry) && hasCorrectionEntry) {
-          // This is a documented issue or correction entry - don't add to errors
-          // Optional debug log suppressed in production; use logger if needed
-        } else {
-          errors.push(`Hash verification failed at sequence ${entry.sequence_number}: data may have been tampered with`);
-        }
+        errors.push(`Hash verification failed at sequence ${entry.sequence_number}: data may have been tampered with`);
       }
 
       expectedPreviousHash = entry.current_hash;
     }
-
-    // If we have documented issues but no other errors, consider it compliant
-    const hasOnlyDocumentedIssues = errors.length === 0 && documentedIssues.length > 0;
     
     return { 
       isValid: errors.length === 0,
-      errors: errors.length === 0 && hasOnlyDocumentedIssues 
-        ? [`Legal compliance: ${documentedIssues.length} documented integrity correction(s) found`]
-        : errors
+      errors
     };
   }
 
@@ -128,8 +98,8 @@ export class JournalSigning {
    * Get the register key
    * @returns The unique register identifier
    */
-  static getRegisterKey(): string {
-    return this.registerKey;
+  static getRegisterKey(establishmentId?: string | null): string {
+    return getRegisterIdForEstablishment(establishmentId);
   }
 }
 

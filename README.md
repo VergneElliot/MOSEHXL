@@ -1,6 +1,6 @@
 # MOSEHXL — MuseBar POS System
 
-A point-of-sale and bar management system built for French hospitality businesses, with full legal compliance for French fiscal law (Article 286-I-3 bis du CGI).
+A point-of-sale and bar management system built for French hospitality businesses, currently in advanced pre-certification hardening for French fiscal compliance (Article 286-I-3 bis du CGI).
 
 ## Project Structure
 
@@ -14,7 +14,7 @@ MOSEHXL/
 │   │       ├── models/       # DB models, SQL schemas, legal journal
 │   │       ├── routes/       # Express route handlers (orders/, legal/, etc.)
 │   │       ├── services/     # Business logic (email, printing, setup, establishment)
-│   │       ├── utils/        # Logger, closure scheduler, thermal printing
+│   │       ├── utils/        # Logger, closure scheduler, shared backend utilities
 │   │       └── migrations/   # Database migration CLI and SQL files
 │   └── src/              # React / TypeScript frontend (port 3000)
 │       ├── components/   # UI components (POS, Admin, Settings, Legal, etc.)
@@ -24,7 +24,7 @@ MOSEHXL/
 │       └── utils/        # Utilities (currency formatting, performance)
 ├── docs/                 # Documentation (learning course + patch notes)
 │   ├── course/           # 10-chapter progressive learning guide
-│   └── patch-notes/      # 45 fix/improvement documents from code audit
+│   └── patch-notes/      # Audit trail and remediation history (phased patch notes)
 ├── scripts/              # Deployment & setup scripts
 ├── .github/workflows/    # CI/CD pipeline (GitHub Actions)
 └── backups/              # Database backups (not committed)
@@ -41,8 +41,8 @@ MOSEHXL/
 
 - **Frontend**: React 18, TypeScript, Material-UI 5, React Router 6
 - **Backend**: Node.js 18+, Express 4, TypeScript 5
-- **Database**: PostgreSQL 13+ with schema-based multi-tenancy
-- **Auth**: JWT (bcrypt passwords, 12h/7d token expiry)
+- **Database**: PostgreSQL 13+ with **shared-table multi-tenancy** (`establishment_id` scoping)
+- **Auth**: short-lived JWT access tokens + rotating opaque refresh tokens (httpOnly cookies, server-side revocation)
 - **Email**: SendGrid (with Nodemailer fallback)
 - **Security**: PostgreSQL-backed rate limiting, CORS, input sanitization, security headers
 - **Deployment**: Nginx reverse proxy, systemd services
@@ -56,15 +56,15 @@ The codebase is structured for **professional-grade maintainability** and safe e
 
 ### Single source of truth
 - **Auth & establishment context**: `middleware/auth.ts` defines `requireAuth`, `getEstablishmentId`, and role gates; all route files import from `routes/auth.ts` (re-exports). No duplicated auth helpers.
-- **API layer**: Frontend calls go through `services/api/core.ts` (base URL, auth header, timeout). `ApiService` is the main facade; domain modules (`categoriesApi`, `ordersApi`, `legalApi`, etc.) live under `services/api/`. Establishment-account creation uses the same `request()` from `api/core` via `establishmentAccountApi.ts`.
+- **API layer**: Frontend request plumbing lives in `services/api/core.ts` (base URL, auth header, timeout). Domain modules (`categoriesApi`, `ordersApi`, `legalApi`, etc.) compose this core request layer, and `ApiService` acts as a convenience facade for aggregated calls. Establishment-account creation also uses the same `request()` from `api/core` via `establishmentAccountApi.ts`.
 - **Formatting**: `utils/formatCurrency.ts` for EUR (fr-FR); `utils/formatDate.ts` for date/time and date-only. Components use these instead of inline formatters.
 - **Validation**: Backend uses `middleware/validation.ts` (`validateBody`, `validateParams`, `commonValidations`). No ad-hoc validation in route handlers for shared rules.
 - **Types**: Shared types in `src/types/` (e.g. `User`, `Order`, `Category`); backend types in `models/` and `types/`. Single definition per concept.
 
 ### Separation of concerns
-- **Backend**: Routes only orchestrate; business logic in `services/` and `models/`. No file over ~500 lines; order flows split into `orderCRUD`, `orderPayment`, `orderLegal`, `orderAudit`.
+- **Backend**: Routes only orchestrate; business logic in `services/` and `models/`. Order flows are split into focused modules (`orderCRUD`, `orderPayment`, `orderLegal`, `orderAudit`).
 - **Frontend**: Per-feature hooks (`usePOSState`, `usePOSLogic`, `usePOSAPI`; same pattern for History, Menu, Closure). Containers compose hooks and pass data to presentational components.
-- **No monoliths**: Largest source files are ~560 lines (e.g. printing service, auth routes); most are under 350.
+- **Pragmatic modularity**: Most critical flows are now modularized, but a few larger legacy files remain and are tracked explicitly in audit items.
 
 ### Where the rules bend (by design)
 - **PrinterSetup.tsx** uses `fetch(apiConfig.getEndpoint(...))` for printing config/test so the backend URL is correct; auth can be added via headers when printing routes are fully secured.
@@ -115,16 +115,21 @@ Foundation for future SaaS multi-tenant expansion.
 
 ## Legal Compliance — French Law
 
-This system implements the four **ISCA pillars** required by Article 286-I-3 bis du CGI (French fiscal certification for cashier software).
+This system targets the four **ISCA pillars** required by Article 286-I-3 bis du CGI, with implementation in progress and ongoing hardening.
+
+> **Important scope note:** this repository does **not** claim NF525/LNE certification yet.
+> For current compliance posture and open items, use
+> `docs/audits/2026-05-20-full-repo-state-audit-hard-copy.md` and `DEVELOPMENT-STATE.md`
+> as the source of truth.
 
 ### Certification Requirements
 
 | Pillar | French | Implementation | Status |
 |--------|--------|----------------|--------|
-| **I** — Inaltérabilité | Immutability | Append-only `legal_journal` table with cryptographic SHA-256 hash chain. Each entry's hash includes the previous entry's hash, making the chain tamper-evident. DB trigger prevents UPDATE/DELETE on the table. | ✅ Implemented |
-| **S** — Sécurisation | Security | Audit trail in `audit_trail` table. All logins, logouts, user creation, permission changes, and order operations are logged with IP, user-agent, user ID, and timestamp. | ✅ Implemented |
-| **C** — Conservation | Preservation | Closure bulletins (`closure_bulletins` table) — daily, weekly, monthly, annual. Each bulletin captures total transactions, amounts, VAT breakdown by rate, and payment method breakdown for the period. Automatic daily closure scheduler runs at 02:00 Paris time in production. Bulletins are scoped per-establishment for multi-tenant isolation. | ✅ Implemented |
-| **A** — Archivage | Archiving | Archive export system (`archive_exports` table) with HMAC-SHA256 digital signatures. Export in CSV, XML, JSON formats. Each export has a file hash for integrity verification. Archive secret key is required in production (no hardcoded fallbacks). | ✅ Implemented |
+| **I** — Inaltérabilité | Immutability | Append-only `legal_journal` table with cryptographic SHA-256 hash chain. Each entry's hash includes the previous entry's hash, making the chain tamper-evident. DB trigger prevents UPDATE/DELETE on the table. | Implemented baseline (see audits for remaining hardening) |
+| **S** — Sécurisation | Security | Audit trail in `audit_trail` table. All logins, logouts, user creation, permission changes, and order operations are logged with IP, user-agent, user ID, and timestamp. | Implemented baseline (see audits for remaining hardening) |
+| **C** — Conservation | Preservation | Closure bulletins (`closure_bulletins` table) — daily, weekly, monthly, annual. Each bulletin captures total transactions, amounts, VAT breakdown by rate, and payment method breakdown for the period. Automatic daily closure scheduler runs at 02:00 Paris time in production. Bulletins are scoped per-establishment for multi-tenant isolation. | Implemented baseline (see audits for remaining hardening) |
+| **A** — Archivage | Archiving | Archive export system (`archive_exports` table) with HMAC-SHA256 digital signatures. Export in CSV, XML, JSON formats. Each export has a file hash for integrity verification. Archive secret key is required in production (no hardcoded fallbacks). | Implemented baseline (see audits for remaining hardening) |
 
 ### What Is Logged
 
@@ -134,15 +139,16 @@ Every completed sale writes a `SALE` entry to the legal journal. Every refund/ca
 
 ### Certification Readiness
 
-- **AFNOR NF525** — Ready; critical fixes applied (see `DEVELOPMENT-STATE.md`)
-- **LNE certification** — Ready after the same 7 fixes
-- **Fine risk** — €7,500 per non-compliant register; system is architecturally compliant, fixes needed for runtime correctness
+- **AFNOR NF525** — Not yet certified (implementation aligned to ISCA pillars, certification remains a formal external process)
+- **LNE certification** — Not yet certified (requires dedicated certification campaign)
+- **Fine risk** — €7,500 per non-compliant register; legal controls are implemented but operational discipline and formal certification remain required for production claims
 
 ### Compliance References
 
 - `MuseBar/backend/src/models/legal-schema.sql` — Legal tables schema
 - `MuseBar/backend/src/models/legalJournal/` — Journal operations, queries, signing, closure
 - `MuseBar/backend/src/routes/legal/` — Legal API routes
+- `MuseBar/backend/src/migrations/files/` — Canonical schema evolution source (snapshots must track migrations)
 
 ---
 
@@ -177,7 +183,7 @@ Every completed sale writes a `SALE` entry to the legal journal. Every refund/ca
 ### Multi-Tenant Tables
 | Table | Purpose |
 |-------|---------|
-| `establishments` | Tenant establishments with subscription info and schema isolation |
+| `establishments` | Tenant establishments with subscription info (`schema_name` is legacy metadata; runtime isolation is shared-table + `establishment_id`) |
 | `user_invitations` | Pending user invitations with secure tokens |
 | `password_reset_requests` | Password reset tokens |
 | `email_logs` | Email delivery tracking |
@@ -269,9 +275,9 @@ npm run migration:create   # create a new migration file
 |------|-----------|--------|
 | `system_admin` | System Admin UI | Full system — establishments, users, security logs |
 | `establishment_admin` | Business UI | All POS tabs based on permissions |
-| `cashier` | Business UI | POS tabs granted by admin |
+| `staff` | Business UI | POS tabs granted by admin |
 
-Granular permissions (granted per user): `access_pos`, `access_menu`, `access_happy_hour`, `access_history`, `access_settings`, `access_compliance`. Establishment admins receive all permissions by default.
+Granular permissions (granted per user): `access_pos`, `access_menu`, `access_settings`, `access_closure`, `access_compliance`, `access_user_management`, `pos_happyhour_manual`, `pos_apply_offert`, `pos_apply_perso`, `orders_cancel`. Establishment admins receive all permissions by default.
 
 ---
 
@@ -280,18 +286,19 @@ Granular permissions (granted per user): `access_pos`, `access_menu`, `access_ha
 Full documentation lives in the `docs/` folder:
 
 - **[Table of Contents](docs/00-TABLE-OF-CONTENTS.md)** — Start here for navigation
+- **[Current Truth](docs/CURRENT-TRUTH.md)** — Fastest path to latest audit state + generated latest patch-note index
 - **[Course](docs/course/)** — 10-chapter progressive learning guide (beginner-friendly)
-- **[Patch Notes](docs/patch-notes/)** — 45 documented fixes from the code audit
-- **[Development State](DEVELOPMENT-STATE.md)** — Current status, 7 critical fixes, known issues
+- **[Patch Notes](docs/patch-notes/)** — Phased remediation history (A/B/C audit work and follow-ups)
+- **[Development State](DEVELOPMENT-STATE.md)** — Current status, resolved/decided critical fixes, known issues
 
 ---
 
 ## Code Quality Measures Applied
 
-After a comprehensive code audit, 45 fixes were applied covering:
+After successive audit remediation waves (P0/P1/P2/P3), the codebase was hardened across:
 
 - **Security**: Removed hardcoded secrets, fixed SQL injection vectors, secured unauthenticated endpoints, removed server fingerprinting headers, replaced Math.random with crypto.randomUUID
-- **Architecture**: Consolidated error handling into one system, removed dual database pools, unified schema creation, consolidated password validation rules
+- **Architecture**: Consolidated error handling into one active system, migrated pool ownership to `db/pool.ts`, retired legacy schema-per-tenant runtime paths, consolidated password validation rules
 - **Dead Code**: Removed unused controllers, services, shim files, debug console.logs, Mongoose handling remnants
 - **Performance**: Fixed N+1 queries, moved rate limiting to PostgreSQL, fixed infinite React re-render loops, converted per-request service instantiation to singletons
 - **Type Safety**: Replaced `any` types with proper TypeScript types, unified ClosureBulletin type, removed stale type packages

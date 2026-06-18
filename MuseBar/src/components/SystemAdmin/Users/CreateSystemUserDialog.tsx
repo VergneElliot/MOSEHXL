@@ -18,7 +18,7 @@ interface CreateSystemUserRequest {
   email: string;
   first_name: string;
   last_name: string;
-  role: 'system_admin' | 'system_operator';
+  role: 'system_admin';
   permissions: string[];
 }
 
@@ -33,7 +33,7 @@ export const CreateSystemUserDialog: React.FC<CreateSystemUserDialogProps> = ({
     email: '',
     first_name: '',
     last_name: '',
-    role: 'system_operator',
+    role: 'system_admin',
     permissions: []
   });
 
@@ -52,7 +52,7 @@ export const CreateSystemUserDialog: React.FC<CreateSystemUserDialogProps> = ({
         email: '',
         first_name: '',
         last_name: '',
-        role: 'system_operator',
+        role: 'system_admin',
         permissions: []
       });
       onClose();

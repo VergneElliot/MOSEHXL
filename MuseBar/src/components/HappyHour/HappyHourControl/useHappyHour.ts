@@ -10,10 +10,11 @@ import { useEffect, useCallback } from 'react';
 import { UseHappyHourReturn, EditForm } from './types';
 import { HappyHourService } from '../../../services/happyHourService';
 import { useHappyHourState, useHappyHourSettings, useHappyHourProducts } from './hooks';
+import { formatCurrency } from '../../../utils/formatCurrency';
 
 import { Product } from '../../../types';
 
-export const useHappyHour = (
+export const useHappyHourControl = (
   onStatusUpdate: () => void,
   products: Product[] = []
 ): UseHappyHourReturn => {
@@ -128,7 +129,7 @@ export const useHappyHour = (
     
     // Utility functions
     getCurrentTime: () => new Date().toLocaleTimeString(),
-    formatCurrency: (amount: number) => `€${amount.toFixed(2)}`,
+    formatCurrency,
     calculateHappyHourPrice: (product) => {
       const discount = productsHook.getEffectiveDiscount(product, state.settings);
       const discountedPrice = productsHook.calculateHappyHourPrice(product.price, discount.type, discount.value);
@@ -140,7 +141,7 @@ export const useHappyHour = (
     },
     getDiscountLabel: (product) => {
       const discount = productsHook.getEffectiveDiscount(product, state.settings);
-      return discount.type === 'percentage' ? `${discount.value}%` : `€${discount.value}`;
+      return discount.type === 'percentage' ? `${discount.value}%` : formatCurrency(discount.value);
     },
   };
 };

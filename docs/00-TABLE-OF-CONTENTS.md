@@ -7,6 +7,8 @@ The documentation is organized into two sections:
 - **Course** — A progressive learning guide that teaches you every aspect of the project, from basic concepts to advanced legal compliance. Start here if you are new.
 - **Patch Notes** — A chronological log of every fix and improvement made to the codebase after the initial audit. Each entry explains what was wrong, why it mattered, and exactly what was changed.
 
+For **current live status**, start from [CURRENT-TRUTH.md](./CURRENT-TRUTH.md), then use `DEVELOPMENT-STATE.md` and the latest patch-note index.
+
 ---
 
 ## Course — Learning Guide
@@ -23,7 +25,7 @@ These chapters are designed to be read in order. Each one builds on the previous
 | 06 | [Auth and Security](./course/06-AUTH-AND-SECURITY.md) | JWT, bcrypt, CORS, rate limiting — how users are authenticated and the system is protected |
 | 07 | [Legal Compliance](./course/07-LEGAL-COMPLIANCE.md) | Hash chains, ISCA pillars, French law — how the legal system works technically |
 | 08 | [Audit & Full Course](./course/08-AUDIT-AND-FULL-COURSE.md) | Code audit results, architecture assessment, and a complete file-by-file walkthrough |
-| 09 | [Database Architecture Compatibility](./course/09-DATABASE-ARCHITECTURE-COMPATIBILITY.md) | What the database must contain for the code to work; migration CLI vs reference schemas; verification queries |
+| 09 | [Database Architecture Compatibility](./course/09-DATABASE-ARCHITECTURE-COMPATIBILITY.md) | Historical compatibility baseline + migration-first verification checklist for current environments |
 | 10 | [Multi-Tenant and Muse POS Access](./course/10-MULTI-TENANT-AND-MUSE-POS-ACCESS.md) | How user–establishment links work; how to log in to Muse POS; script to fix lost links |
 
 ---
@@ -31,6 +33,12 @@ These chapters are designed to be read in order. Each one builds on the previous
 ## Patch Notes — Fixes & Improvements
 
 These are organized chronologically. Each entry corresponds to one specific issue found during the code audit, explains the problem in depth, and documents the fix. They are grouped by category below for easier navigation, but numbered in the order they were applied.
+
+- Auto-generated latest index: [LATEST-INDEX.md](./patch-notes/LATEST-INDEX.md)
+
+> **Index scope note:** this table is a curated index, not an exhaustive live
+> listing of every patch note file in `docs/patch-notes/`. For complete history,
+> browse the folder directly and prioritize the most recent entries.
 
 ### Security Fixes
 
@@ -52,7 +60,7 @@ These are organized chronologically. Each entry corresponds to one specific issu
 
 | # | File | Summary |
 |---|------|---------|
-| 15 | [Schema Creation Divergence](./patch-notes/15-SCHEMA-CREATION-DIVERGENCE-FIX.md) | Unified two schema creation paths into a single SchemaManager |
+| 15 | [Schema Creation Divergence](./patch-notes/15-SCHEMA-CREATION-DIVERGENCE-FIX.md) | Historical fix that unified schema creation paths during the pre-shared-table phase |
 | 20 | [Dual Database Pool](./patch-notes/20-DUAL-DATABASE-POOL-REMOVAL.md) | Removed unused config/database module — single pool in app.ts |
 | 21 | [Triple Error Handling](./patch-notes/21-TRIPLE-ERROR-HANDLING-CONSOLIDATION.md) | Merged three error handling systems into one unified AppError hierarchy |
 | 22 | [Setup Flow Consolidation](./patch-notes/22-ESTABLISHMENT-SETUP-FLOWS-AND-INVITATION-CONSOLIDATION.md) | Documented the five overlapping setup/invitation flows and consolidated the invitation query |
@@ -93,7 +101,7 @@ These are organized chronologically. Each entry corresponds to one specific issu
 | # | File | Summary |
 |---|------|---------|
 | 17 | [Legal Journal Multi-Tenancy](./patch-notes/17-LEGAL-JOURNAL-MULTI-TENANCY-FIX.md) | Closure bulletins now scoped per-establishment; scheduler, archive, and routes updated |
-| 18 | [Printing and Products Schema](./patch-notes/18-PRINTING-PRODUCTS-SCHEMA-FIX.md) | Printing and product queries now use the establishment's schema |
+| 18 | [Printing and Products Schema](./patch-notes/18-PRINTING-PRODUCTS-SCHEMA-FIX.md) | Historical schema-era fix; current runtime uses shared-table establishment scoping |
 | 26 | [Product isActive Hardcoded](./patch-notes/26-PRODUCT-ISACTIVE-HARDCODED-FIX.md) | Products API now uses the real database is_active value instead of hardcoding true |
 | 27 | [Double API Call on Mount](./patch-notes/27-DOUBLE-API-CALL-LEGAL-COMPLIANCE-FIX.md) | Fixed duplicate useEffect causing two identical API calls on component mount |
 | 40 | [Moment Timezone Strategy](./patch-notes/40-MOMENT-TIMEZONE-AND-TIMEZONE-STRATEGY-AUDIT-33.md) | Single DEFAULT_APP_TIMEZONE constant; configurable closure timezone |
@@ -129,4 +137,4 @@ These are organized chronologically. Each entry corresponds to one specific issu
 - **Want the big picture?** Read [Chapter 02 — Architecture Overview](./course/02-ARCHITECTURE.md).
 - **Need to understand a specific fix?** Use the categorized patch notes list above.
 - **Setting up the project?** See the [root README](../README.md) for quick start instructions.
-- **Checking development status?** See [DEVELOPMENT-STATE.md](../DEVELOPMENT-STATE.md) for what's complete and what still needs work.
+- **Checking development status?** See [DEVELOPMENT-STATE.md](../DEVELOPMENT-STATE.md) for current completion state and active priorities.

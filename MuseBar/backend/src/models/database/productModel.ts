@@ -3,7 +3,7 @@
  * Multi-tenant via establishment_id column — same pattern as OrderModel.
  */
 
-import { pool } from '../../app';
+import { pool } from '../../db/pool';
 import { Product, Category } from '../interfaces';
 
 /** Only these columns may be set by ProductModel.update(); prevents SQL injection via object keys. */

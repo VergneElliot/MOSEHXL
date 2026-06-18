@@ -23,6 +23,7 @@ import {
   Alert,
 } from '@mui/material';
 import { apiService } from '../../services/apiService';
+import type { AuditTrailEntry } from '../../types/system';
 
 const ACTION_TYPES = [
   'LOGIN',
@@ -47,7 +48,8 @@ const ACTION_TYPES = [
 ];
 
 const AuditTrailDashboard: React.FC<{ token: string }> = ({ token }) => {
-  const [logs, setLogs] = useState<any[]>([]);
+  void token;
+  const [logs, setLogs] = useState<AuditTrailEntry[]>([]);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [total, setTotal] = useState(0);
@@ -60,7 +62,7 @@ const AuditTrailDashboard: React.FC<{ token: string }> = ({ token }) => {
   });
   const [, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<any | null>(null);
+  const [selected, setSelected] = useState<AuditTrailEntry | null>(null);
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -71,7 +73,7 @@ const AuditTrailDashboard: React.FC<{ token: string }> = ({ token }) => {
         limit: pageSize.toString(),
         offset: (page * pageSize).toString(),
       });
-      const response = await apiService.get<{ audit_entries: any[]; total: number }>(
+      const response = await apiService.get<{ audit_entries: AuditTrailEntry[]; total: number }>(
         `/legal/audit/trail?${params.toString()}`
       );
       setLogs(response.data.audit_entries);

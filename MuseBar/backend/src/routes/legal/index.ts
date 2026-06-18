@@ -11,6 +11,7 @@ import complianceRouter from './compliance';
 import businessInfoRouter from './businessInfo';
 import businessDayStatsRouter from './businessDayStats';
 import statsRouter from './stats';
+import invoicesRouter from './invoices';
 
 const router = express.Router();
 
@@ -18,9 +19,12 @@ const router = express.Router();
 router.use('/journal', journalRouter);
 router.use('/closure', closureRouter);
 router.use('/archive', archiveRouter);
+router.use('/invoices', invoicesRouter);
 router.use('/compliance', complianceRouter);
 router.use('/stats', statsRouter);
-router.use('/', businessInfoRouter);
+// Mount `business-day-stats` before `businessInfo` for stable path routing.
+// business-day-stats is now permission-gated (`access_compliance`) like other legal data surfaces.
 router.use('/', businessDayStatsRouter);
+router.use('/', businessInfoRouter);
 
 export default router; 

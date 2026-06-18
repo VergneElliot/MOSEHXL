@@ -6,7 +6,7 @@
 import express from 'express';
 import { EnvironmentConfig } from '../../config/environment';
 import { Logger } from '../../utils/logger';
-import { UserInvitationService } from '../../services/userInvitationService';
+import { UserInvitationService } from '../../services/userInvitation';
 import { ServiceInitialization } from './types';
 
 // Import modular routes.

@@ -1,93 +1,41 @@
 /**
- * Legal Journal Database Queries
- * Database operations for legal journal entries
+ * Legal Journal Database Queries Facade
+ * Keeps the legacy JournalQueries API stable while implementations are split by concern.
  */
 
-import { pool } from '../../app';
 import { JournalEntry, ClosureBulletin } from './types';
-
-function parseJsonField<T>(value: unknown, fallback: T): T {
-  if (value == null) return fallback;
-  if (typeof value === 'string') {
-    try {
-      return JSON.parse(value) as T;
-    } catch {
-      return fallback;
-    }
-  }
-  return value as T;
-}
+import * as journalAppend from './journalAppend';
+import * as journalRead from './journalRead';
+import * as journalStats from './journalStats';
+import * as journalDevReset from './journalDevReset';
 
 export class JournalQueries {
-  /**
-   * Get the next sequence number for a new journal entry
-   * @returns The next sequence number
-   */
-  static async getNextSequenceNumber(): Promise<number> {
-    const query = 'SELECT COALESCE(MAX(sequence_number), 0) + 1 as next_sequence FROM legal_journal';
-    const result = await pool.query(query);
-    return result.rows[0].next_sequence;
+  static async getNextSequenceNumber(establishmentId: string): Promise<number> {
+    return await journalAppend.getNextSequenceNumber(establishmentId);
   }
 
-  /**
-   * Get the last journal entry for hash chaining
-   * @returns The last journal entry or null if none exists
-   */
-  static async getLastEntry(): Promise<JournalEntry | null> {
-    const query = `
-      SELECT * FROM legal_journal 
-      ORDER BY sequence_number DESC 
-      LIMIT 1
-    `;
-    const result = await pool.query(query);
-    return result.rows[0] || null;
+  static async getLastEntry(establishmentId: string): Promise<JournalEntry | null> {
+    return await journalAppend.getLastEntry(establishmentId);
   }
 
-  /**
-   * Get journal entries for a specific period
-   * @param start - Start date
-   * @param end - End date
-   * @returns Array of journal entries
-   */
-  static async getEntriesForPeriod(start: Date, end: Date): Promise<JournalEntry[]> {
-    const query = `
-      SELECT * FROM legal_journal 
-      WHERE timestamp >= $1 AND timestamp <= $2 
-      ORDER BY sequence_number ASC
-    `;
-    const result = await pool.query(query, [start, end]);
-    return result.rows;
+  static async getEntriesForPeriod(establishmentId: string, start: Date, end: Date): Promise<JournalEntry[]> {
+    return await journalRead.getEntriesForPeriod(establishmentId, start, end);
   }
 
-  /**
-   * Get all journal entries with pagination
-   * @param limit - Number of entries to return
-   * @param offset - Number of entries to skip
-   * @returns Array of journal entries
-   */
-  static async getEntries(limit?: number, offset?: number): Promise<JournalEntry[]> {
-    let query = 'SELECT * FROM legal_journal ORDER BY sequence_number DESC';
-    const values: number[] = [];
-    
-    if (limit) {
-      query += ` LIMIT $${values.length + 1}`;
-      values.push(limit);
-    }
-    
-    if (offset) {
-      query += ` OFFSET $${values.length + 1}`;
-      values.push(offset);
-    }
-    
-    const result = await pool.query(query, values);
-    return result.rows;
+  static async getSaleSummaryForPeriod(
+    establishmentId: string,
+    start: Date,
+    end: Date
+  ): Promise<{ count: number; amount: number; vat: number }> {
+    return await journalStats.getSaleSummaryForPeriod(establishmentId, start, end);
   }
 
-  /**
-   * Entries retrieval with a total count for pagination UI.
-   * Mirrors the logic previously implemented directly in routes/legal/journal.ts.
-   */
+  static async getEntries(establishmentId: string, limit?: number, offset?: number): Promise<JournalEntry[]> {
+    return await journalRead.getEntries(establishmentId, limit, offset);
+  }
+
   static async getEntriesWithCountForPeriod(params: {
+    establishment_id: string;
     start_date?: string;
     end_date?: string;
     limit: number;
@@ -98,123 +46,32 @@ export class JournalQueries {
     limit: number;
     offset: number;
   }> {
-    const { start_date, end_date, limit, offset } = params;
-
-    let query = 'SELECT * FROM legal_journal ORDER BY sequence_number DESC';
-    const values: Array<string | number> = [];
-
-    if (start_date && end_date) {
-      query = `
-        SELECT * FROM legal_journal
-        WHERE timestamp >= $1 AND timestamp <= $2
-        ORDER BY sequence_number DESC
-      `;
-      values.push(start_date, end_date);
-    }
-
-    query += ` LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
-    values.push(limit, offset);
-
-    const result = await pool.query(query, values);
-
-    const countQuery =
-      start_date && end_date
-        ? 'SELECT COUNT(*) FROM legal_journal WHERE timestamp >= $1 AND timestamp <= $2'
-        : 'SELECT COUNT(*) FROM legal_journal';
-
-    const countValues = start_date && end_date ? [start_date, end_date] : [];
-    const countResult = await pool.query(countQuery, countValues);
-
-    return {
-      entries: result.rows,
-      total: parseInt(countResult.rows[0].count),
-      limit,
-      offset,
-    };
+    return await journalRead.getEntriesWithCountForPeriod(params);
   }
 
-  /**
-   * Summary stats for the legal journal.
-   * Mirrors the SQL previously implemented directly in routes/legal/journal.ts.
-   */
-  static async getJournalStatsSummary(): Promise<Record<string, unknown>> {
-    const statsQuery = `
-      SELECT
-        COUNT(*) as total_entries,
-        MIN(sequence_number) as first_sequence,
-        MAX(sequence_number) as last_sequence,
-        MIN(timestamp) as first_entry_date,
-        MAX(timestamp) as last_entry_date,
-        SUM(CASE WHEN transaction_type = 'SALE' THEN 1 ELSE 0 END) as sales_count,
-        SUM(CASE WHEN transaction_type = 'REFUND' THEN 1 ELSE 0 END) as refunds_count,
-        SUM(CASE WHEN transaction_type = 'CORRECTION' THEN 1 ELSE 0 END) as corrections_count,
-        SUM(CASE WHEN transaction_type = 'CLOSURE' THEN 1 ELSE 0 END) as closures_count,
-        SUM(CASE WHEN transaction_type = 'CHANGE' THEN 1 ELSE 0 END) as change_count
-      FROM legal_journal
-    `;
-
-    const statsResult = await pool.query(statsQuery);
-    return statsResult.rows[0] ?? {};
+  static async getJournalStatsSummary(establishmentId: string): Promise<Record<string, unknown>> {
+    return await journalStats.getJournalStatsSummary(establishmentId);
   }
 
-  /**
-   * Development-only destructive reset.
-   * Mirrors the SQL previously implemented directly in routes/legal/journal.ts.
-   */
-  static async resetJournalDevOnly(): Promise<void> {
-    if (process.env.NODE_ENV === 'production') {
-      throw Object.assign(new Error('Journal reset not allowed in production'), { statusCode: 403 });
-    }
-
-    // Use TRUNCATE instead of DELETE so dev reset remains compatible with
-    // legal immutability triggers that block row-level DELETE operations.
-    await pool.query('TRUNCATE TABLE legal_journal RESTART IDENTITY');
+  static async resetJournalDevOnly(establishmentId: string): Promise<void> {
+    return await journalDevReset.resetJournalDevOnly(establishmentId);
   }
 
-  /**
-   * Get journal entries by transaction type
-   * @param transactionType - The type of transaction
-   * @param limit - Optional limit
-   * @returns Array of journal entries
-   */
   static async getEntriesByType(
+    establishmentId: string,
     transactionType: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE' | 'CHANGE',
     limit?: number
   ): Promise<JournalEntry[]> {
-    let query = 'SELECT * FROM legal_journal WHERE transaction_type = $1 ORDER BY sequence_number DESC';
-    const values: Array<string | number> = [transactionType];
-    
-    if (limit) {
-      query += ` LIMIT $2`;
-      values.push(limit);
-    }
-    
-    const result = await pool.query(query, values);
-    return result.rows;
+    return await journalRead.getEntriesByType(establishmentId, transactionType, limit);
   }
 
-  /**
-   * Get journal entries for a specific order
-   * @param orderId - The order ID
-   * @returns Array of journal entries
-   */
-  static async getEntriesForOrder(orderId: number): Promise<JournalEntry[]> {
-    const query = `
-      SELECT * FROM legal_journal 
-      WHERE order_id = $1 
-      ORDER BY sequence_number ASC
-    `;
-    const result = await pool.query(query, [orderId]);
-    return result.rows;
+  static async getEntriesForOrder(establishmentId: string, orderId: number): Promise<JournalEntry[]> {
+    return await journalRead.getEntriesForOrder(establishmentId, orderId);
   }
 
-  /**
-   * Insert a new journal entry
-   * @param entry - Journal entry data
-   * @returns The created journal entry
-   */
   static async insertEntry(
     sequenceNumber: number,
+    establishmentId: string,
     transactionType: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE' | 'CHANGE',
     orderId: number | null,
     amount: number,
@@ -227,174 +84,66 @@ export class JournalQueries {
     userId?: string,
     registerId?: string
   ): Promise<JournalEntry> {
-    const query = `
-      INSERT INTO legal_journal (
-        sequence_number, transaction_type, order_id, amount, vat_amount, 
-        payment_method, transaction_data, previous_hash, current_hash, 
-        timestamp, user_id, register_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-      RETURNING *
-    `;
-
-    const values = [
+    return await journalAppend.insertEntry(
       sequenceNumber,
+      establishmentId,
       transactionType,
       orderId,
       amount,
       vatAmount,
       paymentMethod,
-      JSON.stringify(transactionData),
+      transactionData,
       previousHash,
       currentHash,
       timestamp,
       userId,
       registerId
-    ];
-
-    const result = await pool.query(query, values);
-    return result.rows[0];
+    );
   }
 
-  /**
-   * Get closure bulletins (optionally filtered by type and/or establishment for multi-tenancy).
-   */
+  static async appendEntryTransactional(
+    establishmentId: string,
+    transactionType: 'SALE' | 'REFUND' | 'CORRECTION' | 'CLOSURE' | 'ARCHIVE' | 'CHANGE',
+    orderId: number | null,
+    amount: number,
+    vatAmount: number,
+    paymentMethod: string,
+    transactionData: Record<string, unknown>,
+    userId?: string,
+    registerId?: string
+  ): Promise<JournalEntry> {
+    return await journalAppend.appendEntryTransactional(
+      establishmentId,
+      transactionType,
+      orderId,
+      amount,
+      vatAmount,
+      paymentMethod,
+      transactionData,
+      userId,
+      registerId
+    );
+  }
+
   static async getClosureBulletins(
-    type?: 'DAILY' | 'MONTHLY' | 'ANNUAL',
-    establishmentId?: string
+    establishmentId: string,
+    type?: 'DAILY' | 'MONTHLY' | 'ANNUAL'
   ): Promise<ClosureBulletin[]> {
-    let query = 'SELECT * FROM closure_bulletins';
-    const values: Array<string | number> = [];
-    const conditions: string[] = [];
-
-    if (type) {
-      conditions.push(`closure_type = $${values.length + 1}`);
-      values.push(type);
-    }
-    if (establishmentId !== undefined && establishmentId !== null) {
-      conditions.push(`(establishment_id IS NOT DISTINCT FROM $${values.length + 1})`);
-      values.push(establishmentId);
-    }
-    if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ');
-    }
-
-    query += ' ORDER BY period_start DESC, created_at DESC, id DESC';
-
-    const result = await pool.query(query, values);
-    // Parse JSON fields and ensure tips_total/change_total are present
-    return result.rows.map((row) => {
-      const r = row as Record<string, unknown> & {
-        vat_breakdown?: unknown;
-        payment_methods_breakdown?: unknown;
-        fond_de_caisse?: number;
-        tips_total?: number;
-        change_total?: number;
-      };
-      return {
-        ...(r as Record<string, unknown>),
-        vat_breakdown: parseJsonField(r.vat_breakdown, {}),
-        payment_methods_breakdown: parseJsonField(r.payment_methods_breakdown, {}),
-        fond_de_caisse: r.fond_de_caisse ?? 0,
-        tips_total: r.tips_total || 0,
-        change_total: r.change_total || 0
-      } as ClosureBulletin;
-    });
+    return await journalRead.getClosureBulletins(establishmentId, type);
   }
 
-  /**
-   * Get closure bulletins with pagination.
-   * Returns only the requested page plus the total matching count.
-   */
   static async getClosureBulletinsPaginated(
+    establishmentId: string,
     type?: 'DAILY' | 'MONTHLY' | 'ANNUAL',
-    establishmentId?: string,
     opts?: { limit?: number; offset?: number }
   ): Promise<{ bulletins: ClosureBulletin[]; total: number }> {
-    const values: Array<string | number> = [];
-    const conditions: string[] = [];
-
-    if (type) {
-      conditions.push(`closure_type = $${values.length + 1}`);
-      values.push(type);
-    }
-
-    if (establishmentId !== undefined && establishmentId !== null) {
-      conditions.push(`(establishment_id IS NOT DISTINCT FROM $${values.length + 1})`);
-      values.push(establishmentId);
-    }
-
-    const whereClause = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
-
-    // Total matching count (no LIMIT/OFFSET)
-    const countResult = await pool.query(
-      `SELECT COUNT(*)::int AS total FROM closure_bulletins${whereClause}`,
-      values
-    );
-    const total = countResult.rows[0]?.total ?? 0;
-
-    // Page query (applies LIMIT/OFFSET after conditions)
-    const pageValues = [...values];
-    let pageQuery = `SELECT * FROM closure_bulletins${whereClause} ORDER BY period_start DESC, created_at DESC, id DESC`;
-
-    if (opts?.limit != null && Number.isFinite(opts.limit) && opts.limit > 0) {
-      pageValues.push(opts.limit);
-      pageQuery += ` LIMIT $${pageValues.length}`;
-    }
-
-    if (opts?.offset != null && Number.isFinite(opts.offset) && opts.offset >= 0) {
-      pageValues.push(opts.offset);
-      pageQuery += ` OFFSET $${pageValues.length}`;
-    }
-
-    const result = await pool.query(pageQuery, pageValues);
-
-    // Parse JSON fields and ensure tips_total/change_total are present
-    const bulletins = result.rows.map((row) => {
-      const r = row as Record<string, unknown> & {
-        vat_breakdown?: unknown;
-        payment_methods_breakdown?: unknown;
-        fond_de_caisse?: number;
-        tips_total?: number;
-        change_total?: number;
-      };
-      return {
-        ...(r as Record<string, unknown>),
-        vat_breakdown: parseJsonField(r.vat_breakdown, {}),
-        payment_methods_breakdown: parseJsonField(r.payment_methods_breakdown, {}),
-        fond_de_caisse: r.fond_de_caisse ?? 0,
-        tips_total: r.tips_total || 0,
-        change_total: r.change_total || 0,
-      } as ClosureBulletin;
-    });
-
-    return { bulletins, total };
+    return await journalRead.getClosureBulletinsPaginated(establishmentId, type, opts);
   }
 
-  /**
-   * Get the most recently used "fond de caisse" value for an establishment.
-   * Informational only (must not affect accounting totals).
-   */
   static async getLastFondDeCaisse(establishmentId: string): Promise<number | null> {
-    const result = await pool.query(
-      `
-        SELECT fond_de_caisse
-        FROM closure_bulletins
-        WHERE (establishment_id IS NOT DISTINCT FROM $1)
-        ORDER BY created_at DESC, id DESC
-        LIMIT 1
-      `,
-      [establishmentId]
-    );
-    const row = result.rows[0] as { fond_de_caisse?: unknown } | undefined;
-    if (!row) return null;
-    const n = typeof row.fond_de_caisse === 'number' ? row.fond_de_caisse : parseFloat(String(row.fond_de_caisse ?? ''));
-    return Number.isFinite(n) ? n : null;
+    return await journalRead.getLastFondDeCaisse(establishmentId);
   }
 
-  /**
-   * Insert a closure bulletin (scoped to one establishment for multi-tenancy).
-   * @param establishmentId - UUID of the establishment this bulletin belongs to
-   */
   static async insertClosureBulletin(
     closureType: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL',
     startDate: Date,
@@ -407,21 +156,18 @@ export class JournalQueries {
     paymentBreakdown: Record<string, number>,
     tipsTotal: number,
     changeTotal: number,
+    journalSalesCount: number,
+    journalSalesAmount: number,
+    journalSalesVat: number,
+    reconciliationOk: boolean,
+    reconciliationDetails: Record<string, unknown>,
     firstSequence: number,
     lastSequence: number,
     closureHash: string,
-    establishmentId: string
+    establishmentId: string,
+    isClosed = true
   ): Promise<ClosureBulletin> {
-    const query = `
-      INSERT INTO closure_bulletins (
-        closure_type, period_start, period_end, total_transactions, fond_de_caisse, total_amount, 
-        total_vat, vat_breakdown, payment_methods_breakdown, tips_total, change_total, first_sequence, 
-        last_sequence, closure_hash, is_closed, closed_at, establishment_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-      RETURNING *
-    `;
-
-    const values = [
+    return await journalAppend.insertClosureBulletin(
       closureType,
       startDate,
       endDate,
@@ -429,38 +175,43 @@ export class JournalQueries {
       fondDeCaisse,
       totalAmount,
       totalVat,
-      JSON.stringify(vatBreakdown),
-      JSON.stringify(paymentBreakdown),
+      vatBreakdown,
+      paymentBreakdown,
       tipsTotal,
       changeTotal,
+      journalSalesCount,
+      journalSalesAmount,
+      journalSalesVat,
+      reconciliationOk,
+      reconciliationDetails,
       firstSequence,
       lastSequence,
       closureHash,
-      true,
-      new Date(),
-      establishmentId
-    ];
-
-    const result = await pool.query(query, values);
-    return result.rows[0];
+      establishmentId,
+      isClosed
+    );
   }
 
-  /**
-   * Check if a closure bulletin already exists for a period and establishment (multi-tenant).
-   */
+  static async closeOpenClosureBulletin(
+    closureBulletinId: number,
+    establishmentId: string
+  ): Promise<ClosureBulletin | null> {
+    return await journalAppend.closeOpenClosureBulletin(closureBulletinId, establishmentId);
+  }
+
+  static async deleteOpenClosureBulletin(
+    closureBulletinId: number,
+    establishmentId: string
+  ): Promise<boolean> {
+    return await journalAppend.deleteOpenClosureBulletin(closureBulletinId, establishmentId);
+  }
+
   static async closureBulletinExists(
     type: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL',
     startDate: Date,
     endDate: Date,
     establishmentId: string
   ): Promise<boolean> {
-    const query = `
-      SELECT id FROM closure_bulletins 
-      WHERE closure_type = $1 AND period_start = $2 AND period_end = $3
-        AND (establishment_id IS NOT DISTINCT FROM $4)
-    `;
-    const result = await pool.query(query, [type, startDate, endDate, establishmentId]);
-    return result.rows.length > 0;
+    return await journalRead.closureBulletinExists(type, startDate, endDate, establishmentId);
   }
 }
-

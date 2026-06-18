@@ -5,7 +5,7 @@
 
 import { useCallback, useMemo } from 'react';
 import { apiService } from '../../../../services/apiService';
-import { EstablishmentMember as User } from '../../../../types/auth';
+import { EstablishmentAssignableRole, EstablishmentMember as User } from '../../../../types/auth';
 
 /** Raw shape returned by the backend (snake_case). */
 interface ApiUser {
@@ -23,7 +23,8 @@ function mapApiUser(raw: ApiUser): User {
   return {
     id: raw.id,
     email: raw.email,
-    isAdmin: raw.is_admin,
+    // Establishment "admin" is role-based; is_admin is system-only legacy.
+    isAdmin: raw.role === 'establishment_admin',
     role: raw.role,
     establishment_id: raw.establishment_id,
     permissions: raw.permissions,
@@ -59,13 +60,12 @@ export const useUserActions = ({
   }, [onUsersUpdate, onLoading, onError]);
 
   /**
-   * Create a new user in the establishment.
-   * isAdmin=true maps to role 'establishment_admin'; false maps to 'cashier'.
+   * Create a new user in the establishment (establishment_admin or staff only).
    */
   const createUser = useCallback(async (
     email: string,
     password: string,
-    isAdmin: boolean
+    role: EstablishmentAssignableRole
   ): Promise<boolean> => {
     onError(null);
     
@@ -73,13 +73,13 @@ export const useUserActions = ({
       const response = await apiService.post<ApiUser>('/auth/users', {
         email,
         password,
-        role: isAdmin ? 'establishment_admin' : 'cashier',
+        role,
       });
       
       onUserAdd(mapApiUser(response.data));
       return true;
-    } catch {
-      onError('Failed to create user');
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Failed to create user');
       return false;
     }
   }, [onUserAdd, onError]);
@@ -96,19 +96,15 @@ export const useUserActions = ({
     }
   }, [onError]);
 
-  /**
-   * Update user role.
-   * isAdmin=true sets role to 'establishment_admin'; false sets role to 'cashier'.
-   */
   const updateUserRole = useCallback(async (
     userId: number,
-    isAdmin: boolean
+    role: EstablishmentAssignableRole
   ): Promise<boolean> => {
     onError(null);
     
     try {
       await apiService.put(`/auth/users/${userId}/role`, {
-        role: isAdmin ? 'establishment_admin' : 'cashier',
+        role,
       });
       return true;
     } catch {

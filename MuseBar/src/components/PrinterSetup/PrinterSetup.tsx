@@ -22,11 +22,11 @@ import {
 import {
   Print as PrintIcon,
   Check as CheckIcon,
-  Computer as ComputerIcon,
   Cloud as CloudIcon,
-  Wifi as WifiIcon,
+  Router as RouterIcon,
 } from '@mui/icons-material';
 import { apiConfig } from '../../config/api';
+import { apiCore } from '../../services/api';
 
 interface Printer {
   id: string;
@@ -40,7 +40,7 @@ interface Printer {
 
 interface PrintingConfig {
   provider: string;
-  config: any;
+  config: Record<string, unknown>;
   is_active: boolean;
 }
 
@@ -64,43 +64,44 @@ interface PrinterSetupProps {
   embedded?: boolean;
 }
 
+interface PrintingConfigurationsResponse {
+  configurations?: Array<PrintingConfig & { is_active?: boolean }>;
+}
+
+interface PrintingTestResponse {
+  success?: boolean;
+  message?: string;
+}
+
+interface PrintersResponse {
+  printers?: Printer[];
+}
+
 const providerInfo: Record<string, ProviderInfo> = {
-  browser: {
-    name: 'Browser Printing',
-    icon: <ComputerIcon />,
-    description: 'Print using browser print dialog. Works with any printer.',
-    fields: []
-  },
-  network: {
-    name: 'Network Printer',
-    icon: <WifiIcon />,
-    description: 'Direct network printing to ESC/POS thermal printers.',
+  'network-escpos': {
+    name: 'Network receipt printer (LAN)',
+    icon: <RouterIcon />,
+    description:
+      'Epson TM-m30II and similar: send ESC/POS directly to the printer IP on port 9100. The MuseBar backend must run on the same local network as the printer.',
     fields: [
-      { name: 'networkPrinterIp', label: 'Printer IP Address', type: 'text', required: true },
-      { name: 'networkPrinterPort', label: 'Printer Port', type: 'number', default: 9100 }
-    ]
+      { name: 'printerHost', label: 'Printer IP address', type: 'text', required: true },
+      { name: 'printerPort', label: 'Port (default 9100)', type: 'number', required: false, default: 9100 },
+      { name: 'printerLabel', label: 'Printer display name (optional)', type: 'text', required: false },
+    ],
   },
-  printnode: {
-    name: 'PrintNode Cloud',
+  'epson-server-direct': {
+    name: 'Epson Server Direct Print',
     icon: <CloudIcon />,
-    description: 'Universal cloud printing service. Works with any printer.',
-    fields: [
-      { name: 'apiKey', label: 'PrintNode API Key', type: 'password', required: true },
-      { name: 'defaultPrinter', label: 'Default Printer Name', type: 'text' }
-    ]
+    description:
+      'TM-Intelligent Epson printers poll your MuseBar cloud URL for ePOS-Print jobs. Configure poll URL + x-epson-poll-key header in TMNet WebConfig.',
+    fields: [{ name: 'printerLabel', label: 'Printer display name (optional)', type: 'text', required: false }],
   },
-  'star-cloudprnt': {
-    name: 'Star CloudPRNT',
-    icon: <CloudIcon />,
-    description: 'Cloud printing for Star Micronics printers.',
-    fields: []
-  }
 };
 
 export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = false }) => {
   const [activeStep, setActiveStep] = useState(0);
-  const [selectedProvider, setSelectedProvider] = useState<string>('browser');
-  const [config, setConfig] = useState<any>({});
+  const [selectedProvider, setSelectedProvider] = useState<string>('network-escpos');
+  const [config, setConfig] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -114,14 +115,16 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
 
   const loadCurrentConfiguration = async () => {
     try {
+      const token = apiCore.getToken();
       const response = await fetch(apiConfig.getEndpoint('/api/printing/configuration'), {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        credentials: 'include',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       
       if (response.ok) {
-        const data = await response.json();
+        const data = (await response.json()) as PrintingConfigurationsResponse;
         if (data.configurations && data.configurations.length > 0) {
-          const active = data.configurations.find((c: any) => c.is_active);
+          const active = data.configurations.find((c) => c.is_active);
           if (active) {
             setCurrentConfig(active);
             setSelectedProvider(active.provider);
@@ -129,8 +132,8 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
           }
         }
       }
-    } catch (error) {
-      console.error('Error loading configuration:', error);
+    } catch {
+      // Non-blocking: setup UI remains usable with default state.
     }
   };
 
@@ -141,7 +144,7 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
     setSuccess(null);
   };
 
-  const handleConfigChange = (field: string, value: any) => {
+  const handleConfigChange = (field: string, value: unknown) => {
     setConfig({ ...config, [field]: value });
   };
 
@@ -166,12 +169,14 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
     setError(null);
 
     try {
+      const token = apiCore.getToken();
       // First save the configuration
       const saveResponse = await fetch(apiConfig.getEndpoint('/api/printing/configuration'), {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
           provider: selectedProvider,
@@ -186,13 +191,14 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
       // Then test print
       const testResponse = await fetch(apiConfig.getEndpoint('/api/printing/test'), {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         }
       });
 
-      const result = await testResponse.json();
+      const result = (await testResponse.json()) as PrintingTestResponse;
       
       if (result.success) {
         setSuccess('Test print successful!');
@@ -210,16 +216,18 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
 
   const loadPrinters = async () => {
     try {
+      const token = apiCore.getToken();
       const response = await fetch(apiConfig.getEndpoint('/api/printing/printers'), {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        credentials: 'include',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       
       if (response.ok) {
-        const data = await response.json();
+        const data = (await response.json()) as PrintersResponse;
         setPrinters(data.printers || []);
       }
-    } catch (error) {
-      console.error('Error loading printers:', error);
+    } catch {
+      // Non-blocking: printer list is optional in setup wizard.
     }
   };
 
@@ -230,11 +238,13 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
     setError(null);
 
     try {
+      const token = apiCore.getToken();
       const response = await fetch(apiConfig.getEndpoint('/api/printing/configuration'), {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
           provider: selectedProvider,
@@ -329,9 +339,6 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
                 value={config[field.name] || field.default || ''}
                 onChange={(e) => handleConfigChange(field.name, e.target.value)}
                 required={field.required}
-                helperText={field.name === 'apiKey' && 
-                  'Get your API key from printnode.com'
-                }
               />
             ))}
           </Box>
@@ -472,9 +479,10 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
   ];
 
   if (embedded) {
+    const activeContent = steps[activeStep]?.content;
     return (
       <Box>
-        {steps[activeStep].content()}
+        {activeContent ? activeContent() : null}
       </Box>
     );
   }

@@ -25,6 +25,7 @@ const LazyComponent: React.FC<LazyComponentProps> = ({
 
     const observer = new IntersectionObserver(
       ([entry]) => {
+        if (!entry) return;
         if (entry.isIntersecting) {
           setIsVisible(true);
           observer.unobserve(ref);

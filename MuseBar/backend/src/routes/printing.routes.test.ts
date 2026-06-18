@@ -1,0 +1,732 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import request from 'supertest';
+import express from 'express';
+import { errorHandler } from '../middleware/errorHandler';
+
+const mocks = vi.hoisted(() => ({
+  poolQuery: vi.fn(),
+  loggerError: vi.fn(),
+  epsonHandler: vi.fn(),
+  listPrintingConfigurations: vi.fn(),
+  savePrintingConfiguration: vi.fn(),
+  managerGetService: vi.fn(),
+  managerClearService: vi.fn(),
+  buildTestReceiptData: vi.fn(),
+  buildReceiptDataForOrder: vi.fn(),
+  buildReceiptDataForInvoice: vi.fn(),
+  buildClosureBulletinData: vi.fn(),
+  logPrintingHistory: vi.fn(),
+  logSoftwareEventBestEffort: vi.fn(),
+  renderReceiptOrInvoicePdf: vi.fn(),
+  renderClosureBulletinPdf: vi.fn(),
+  buildClosureExportData: vi.fn(),
+  buildClosurePdfFilename: vi.fn(),
+  buildClosureXlsxAttachment: vi.fn(),
+  emailReceiptDocument: vi.fn(),
+  emailClosureBulletinDocument: vi.fn(),
+  validateRecipientEmail: vi.fn((email: unknown) => {
+    const trimmed = String(email ?? '').trim();
+    if (!trimmed.includes('@')) throw Object.assign(new Error('Adresse email destinataire invalide'), { statusCode: 400 });
+    return trimmed;
+  }),
+}));
+
+vi.mock('../db/pool', () => ({
+  pool: {
+    query: mocks.poolQuery,
+  },
+}));
+
+vi.mock('../middleware/auth', () => ({
+  authenticateToken: (req: express.Request, _res: express.Response, next: express.NextFunction) => {
+    const mode = req.header('x-test-auth-mode');
+    if (mode === 'no-est') {
+      (req as express.Request & { user?: unknown }).user = {
+        id: 7,
+        email: 'staff@example.com',
+        role: 'staff',
+        is_admin: false,
+        establishment_id: null,
+      };
+      return next();
+    }
+
+    (req as express.Request & { user?: unknown }).user = {
+      id: 8,
+      email: 'staff@example.com',
+      role: 'staff',
+      is_admin: false,
+      establishment_id: 'est-1',
+    };
+    return next();
+  },
+}));
+
+vi.mock('../utils/logger', () => ({
+  getLogger: () => ({
+    error: mocks.loggerError,
+  }),
+}));
+
+vi.mock('../printing/epsonPollHandler', () => ({
+  epsonServerDirectPollHandler: mocks.epsonHandler,
+}));
+
+vi.mock('../printing/printingConfigRepo', () => ({
+  ALLOWED_PRINT_PROVIDERS: ['epson-server-direct', 'digital'],
+  listPrintingConfigurations: mocks.listPrintingConfigurations,
+  savePrintingConfiguration: mocks.savePrintingConfiguration,
+  parseConfigCell: vi.fn(),
+}));
+
+vi.mock('../printing/printDataRepo', () => ({
+  buildTestReceiptData: mocks.buildTestReceiptData,
+  buildReceiptDataForOrder: mocks.buildReceiptDataForOrder,
+  buildReceiptDataForInvoice: mocks.buildReceiptDataForInvoice,
+  buildClosureBulletinData: mocks.buildClosureBulletinData,
+  logPrintingHistory: mocks.logPrintingHistory,
+}));
+
+vi.mock('../printing/printingServiceManager', () => ({
+  createPrintingServiceManager: () => ({
+    getPrintingService: mocks.managerGetService,
+    clearPrintingService: mocks.managerClearService,
+  }),
+}));
+
+vi.mock('../services/legal/softwareEventJournal', () => ({
+  logSoftwareEventBestEffort: mocks.logSoftwareEventBestEffort,
+}));
+
+vi.mock('../services/documents/documentPdfService', () => ({
+  renderReceiptOrInvoicePdf: mocks.renderReceiptOrInvoicePdf,
+  renderClosureBulletinPdf: mocks.renderClosureBulletinPdf,
+}));
+
+vi.mock('../services/documents/closureXlsxService', () => ({
+  buildClosureExportData: mocks.buildClosureExportData,
+  buildClosurePdfFilename: mocks.buildClosurePdfFilename,
+  buildClosureXlsxAttachment: mocks.buildClosureXlsxAttachment,
+}));
+
+vi.mock('../services/documents/documentEmailService', () => ({
+  emailReceiptDocument: mocks.emailReceiptDocument,
+  emailClosureBulletinDocument: mocks.emailClosureBulletinDocument,
+  validateRecipientEmail: mocks.validateRecipientEmail,
+}));
+
+import printingRouter from './printing';
+
+const app = express();
+app.use(express.json());
+app.use('/printing', printingRouter);
+app.use(errorHandler);
+
+describe('printing routes', () => {
+  beforeEach(() => {
+    mocks.poolQuery.mockReset();
+    mocks.loggerError.mockReset();
+    mocks.epsonHandler.mockReset();
+    mocks.listPrintingConfigurations.mockReset();
+    mocks.savePrintingConfiguration.mockReset();
+    mocks.managerGetService.mockReset();
+    mocks.managerClearService.mockReset();
+    mocks.buildTestReceiptData.mockReset();
+    mocks.buildReceiptDataForOrder.mockReset();
+    mocks.buildReceiptDataForInvoice.mockReset();
+    mocks.buildClosureBulletinData.mockReset();
+    mocks.logPrintingHistory.mockReset();
+    mocks.logSoftwareEventBestEffort.mockReset();
+    mocks.renderReceiptOrInvoicePdf.mockReset();
+    mocks.renderClosureBulletinPdf.mockReset();
+    mocks.buildClosureExportData.mockReset();
+    mocks.buildClosurePdfFilename.mockReset();
+    mocks.buildClosureXlsxAttachment.mockReset();
+
+    mocks.managerGetService.mockResolvedValue({
+      checkPrinterStatus: vi.fn().mockResolvedValue({ connected: true }),
+      listPrinters: vi.fn().mockResolvedValue([{ id: 'p1', name: 'Printer 1' }]),
+      printReceipt: vi.fn(),
+      printClosureBulletin: vi.fn(),
+    });
+  });
+
+  it('returns 400 when establishment context is missing', async () => {
+    const res = await request(app)
+      .get('/printing/status')
+      .set('Authorization', 'Bearer test-token')
+      .set('x-test-auth-mode', 'no-est');
+
+    expect(res.status).toBe(400);
+    expect(res.body.error?.message).toBe('Establishment context required');
+  });
+
+  it('returns Epson poll payload when handler succeeds', async () => {
+    mocks.epsonHandler.mockImplementation(async (_poolArg, _req, res) =>
+      res.status(200).type('text/plain').send('epson-ok')
+    );
+
+    const res = await request(app)
+      .get('/printing/epson/poll');
+
+    expect(res.status).toBe(200);
+    expect(res.text).toBe('epson-ok');
+    expect(mocks.epsonHandler).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns 500 for Epson poll when handler throws', async () => {
+    mocks.epsonHandler.mockRejectedValue(new Error('poll failure'));
+
+    const res = await request(app)
+      .get('/printing/epson/poll');
+
+    expect(res.status).toBe(500);
+    expect(res.body?.error?.message).toBe('Internal error');
+    expect(mocks.loggerError).toHaveBeenCalled();
+  });
+
+  it('returns status payload for authenticated establishment user', async () => {
+    const res = await request(app)
+      .get('/printing/status')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(200);
+    expect(res.body.establishment_id).toBe('est-1');
+    expect(res.body.status).toEqual({ connected: true });
+    expect(res.body.printers).toEqual([{ id: 'p1', name: 'Printer 1' }]);
+    expect(mocks.managerGetService).toHaveBeenCalledWith('est-1');
+  });
+
+  it('returns 500 when checking printer status fails unexpectedly', async () => {
+    mocks.managerGetService.mockRejectedValue(new Error('status probe failed'));
+
+    const res = await request(app)
+      .get('/printing/status')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(500);
+    expect(res.body?.error?.message).toBe('Failed to check printer status');
+    expect(mocks.loggerError).toHaveBeenCalled();
+  });
+
+  it('returns printers payload for authenticated establishment user', async () => {
+    const res = await request(app)
+      .get('/printing/printers')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(200);
+    expect(res.body.establishment_id).toBe('est-1');
+    expect(res.body.printers).toEqual([{ id: 'p1', name: 'Printer 1' }]);
+    expect(mocks.managerGetService).toHaveBeenCalledWith('est-1');
+  });
+
+  it('returns 500 when listing printers fails unexpectedly', async () => {
+    mocks.managerGetService.mockRejectedValue(new Error('printer service unavailable'));
+
+    const res = await request(app)
+      .get('/printing/printers')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(500);
+    expect(res.body?.error?.message).toBe('Failed to list printers');
+    expect(mocks.loggerError).toHaveBeenCalled();
+  });
+
+  it('queues test print and returns success message', async () => {
+    mocks.buildTestReceiptData.mockResolvedValue({ sequence_number: 999, items: [] });
+    const printReceipt = vi.fn().mockResolvedValue({ success: true, message: 'ok' });
+    mocks.managerGetService.mockResolvedValue({
+      checkPrinterStatus: vi.fn().mockResolvedValue({ connected: true }),
+      listPrinters: vi.fn().mockResolvedValue([{ id: 'p1', name: 'Printer 1' }]),
+      printReceipt,
+      printClosureBulletin: vi.fn(),
+    });
+
+    const res = await request(app)
+      .post('/printing/test')
+      .set('Authorization', 'Bearer test-token')
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.message).toBe('Test print queued successfully');
+    expect(mocks.buildTestReceiptData).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ establishment_id: 'est-1' })
+    );
+    expect(printReceipt).toHaveBeenCalledWith(expect.objectContaining({ sequence_number: 999 }));
+  });
+
+  it('returns 500 when test print fails unexpectedly', async () => {
+    mocks.managerGetService.mockRejectedValue(new Error('service unavailable'));
+
+    const res = await request(app)
+      .post('/printing/test')
+      .set('Authorization', 'Bearer test-token')
+      .send({});
+
+    expect(res.status).toBe(500);
+    expect(res.body?.error?.message).toBe('Test print failed');
+  });
+
+  it('returns 400 for invalid provider on configuration update', async () => {
+    mocks.savePrintingConfiguration.mockRejectedValue(
+      Object.assign(new Error('Provider must be one of: epson-server-direct, digital'), { statusCode: 400 })
+    );
+
+    const res = await request(app)
+      .post('/printing/configuration')
+      .set('Authorization', 'Bearer test-token')
+      .send({ provider: 'invalid-provider', config: {} });
+
+    expect(res.status).toBe(400);
+    expect(String(res.body.error?.message ?? '')).toContain('Provider must be one of');
+  });
+
+  it('returns 400 when provider is missing on configuration update', async () => {
+    const res = await request(app)
+      .post('/printing/configuration')
+      .set('Authorization', 'Bearer test-token')
+      .send({ config: {} });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error?.message).toBe('Provider is required');
+    expect(mocks.savePrintingConfiguration).not.toHaveBeenCalled();
+  });
+
+  it('updates configuration and clears cached service on success', async () => {
+    mocks.savePrintingConfiguration.mockResolvedValue({
+      configuration: {
+        id: 10,
+        provider: 'epson-server-direct',
+        is_active: true,
+        config: { pollKey: 'abc' },
+      },
+    });
+
+    const res = await request(app)
+      .post('/printing/configuration')
+      .set('Authorization', 'Bearer test-token')
+      .send({ provider: 'epson-server-direct', config: {} });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Printing configuration updated successfully');
+    expect(mocks.savePrintingConfiguration).toHaveBeenCalledWith(
+      expect.anything(),
+      'est-1',
+      'epson-server-direct',
+      {}
+    );
+    expect(mocks.managerClearService).toHaveBeenCalledWith('est-1');
+    expect(mocks.logSoftwareEventBestEffort).toHaveBeenCalledWith(
+      expect.objectContaining({
+        establishmentId: 'est-1',
+        eventType: 'PRINTING_CONFIGURATION_UPDATED',
+        userId: '8',
+      })
+    );
+  });
+
+  it('returns printing configuration list scoped to caller establishment', async () => {
+    mocks.listPrintingConfigurations.mockResolvedValue([
+      { id: 2, provider: 'epson-server-direct', is_active: true, config: {} },
+    ]);
+
+    const res = await request(app)
+      .get('/printing/configuration')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(200);
+    expect(res.body.establishment_id).toBe('est-1');
+    expect(res.body.configurations).toHaveLength(1);
+    expect(mocks.listPrintingConfigurations).toHaveBeenCalledWith(expect.anything(), 'est-1');
+  });
+
+  it('returns 400 for configuration read when establishment context is missing', async () => {
+    const res = await request(app)
+      .get('/printing/configuration')
+      .set('Authorization', 'Bearer test-token')
+      .set('x-test-auth-mode', 'no-est');
+
+    expect(res.status).toBe(400);
+    expect(res.body.error?.message).toBe('Establishment context required');
+    expect(mocks.listPrintingConfigurations).not.toHaveBeenCalled();
+  });
+
+  it('returns 500 when fetching printing configuration fails unexpectedly', async () => {
+    mocks.listPrintingConfigurations.mockRejectedValue(new Error('config read failed'));
+
+    const res = await request(app)
+      .get('/printing/configuration')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(500);
+    expect(res.body?.error?.message).toBe('Failed to get printing configuration');
+    expect(mocks.loggerError).toHaveBeenCalled();
+  });
+
+  it('returns tenant-scoped printing history with bounded pagination', async () => {
+    mocks.poolQuery
+      .mockResolvedValueOnce({
+        rows: [{ id: 1, establishment_id: 'est-1', print_type: 'receipt' }],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ count: '1' }],
+      });
+
+    const res = await request(app)
+      .get('/printing/history?limit=999&offset=2')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(200);
+    expect(res.body.history).toHaveLength(1);
+    expect(res.body.total).toBe(1);
+    expect(res.body.limit).toBe(500);
+    expect(res.body.offset).toBe(2);
+    expect(mocks.poolQuery).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('WHERE establishment_id = $1'),
+      ['est-1', 500, 2]
+    );
+    expect(mocks.poolQuery).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('COUNT(*) FROM printing_history WHERE establishment_id = $1'),
+      ['est-1']
+    );
+  });
+
+  it('falls back to safe defaults for invalid printing history pagination params', async () => {
+    mocks.poolQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ count: '0' }] });
+
+    const res = await request(app)
+      .get('/printing/history?limit=-10&offset=abc')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(200);
+    expect(res.body.limit).toBe(50);
+    expect(res.body.offset).toBe(0);
+    expect(mocks.poolQuery).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('LIMIT $2 OFFSET $3'),
+      ['est-1', 50, 0]
+    );
+  });
+
+  it('returns 500 for printing history when query fails', async () => {
+    mocks.poolQuery.mockRejectedValue(new Error('db down'));
+
+    const res = await request(app)
+      .get('/printing/history')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(500);
+    expect(res.body?.error?.message).toBe('Failed to get printing history');
+    expect(mocks.loggerError).toHaveBeenCalled();
+  });
+
+  it('returns receipt preview and scopes data build to caller establishment', async () => {
+    mocks.buildReceiptDataForOrder.mockResolvedValue({
+      sequence_number: 456,
+      items: [],
+    });
+
+    const res = await request(app)
+      .get('/printing/receipt/42/preview?type=simplified')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(200);
+    expect(res.body.receipt_data.sequence_number).toBe(456);
+    expect(mocks.buildReceiptDataForOrder).toHaveBeenCalledWith(
+      expect.anything(),
+      'est-1',
+      expect.objectContaining({ establishment_id: 'est-1' }),
+      42,
+      'simplified'
+    );
+  });
+
+  it('returns 400 for invalid preview order id and skips data building', async () => {
+    const res = await request(app)
+      .get('/printing/receipt/not-a-number/preview')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(400);
+    expect(res.body.error?.message).toBe('Invalid order id');
+    expect(mocks.buildReceiptDataForOrder).not.toHaveBeenCalled();
+  });
+
+  it('maps preview not-found errors to 404', async () => {
+    mocks.buildReceiptDataForOrder.mockRejectedValue(
+      Object.assign(new Error('Not found'), { statusCode: 404 })
+    );
+
+    const res = await request(app)
+      .get('/printing/receipt/42/preview')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(404);
+    expect(res.body.error?.message).toBe('Receipt not found');
+  });
+
+  it('maps receipt print not-found errors to 404', async () => {
+    mocks.buildReceiptDataForOrder.mockRejectedValue(
+      Object.assign(new Error('Not found'), { statusCode: 404 })
+    );
+
+    const res = await request(app)
+      .post('/printing/receipt/42')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(404);
+    expect(res.body.error?.message).toBe('Receipt not found');
+  });
+
+  it('prints receipt successfully and logs printing history metadata', async () => {
+    mocks.buildReceiptDataForOrder.mockResolvedValue({
+      sequence_number: 321,
+      items: [],
+    });
+    const printReceipt = vi.fn().mockResolvedValue({ success: true, message: 'queued' });
+    mocks.managerGetService.mockResolvedValue({
+      checkPrinterStatus: vi.fn().mockResolvedValue({ connected: true }),
+      listPrinters: vi.fn().mockResolvedValue([{ id: 'p1', name: 'Printer 1' }]),
+      printReceipt,
+      printClosureBulletin: vi.fn(),
+    });
+
+    const res = await request(app)
+      .post('/printing/receipt/42')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.receipt_data.sequence_number).toBe(321);
+    expect(mocks.logPrintingHistory).toHaveBeenCalledWith(
+      expect.anything(),
+      'est-1',
+      'receipt',
+      expect.objectContaining({ success: true }),
+      expect.objectContaining({ order_id: 42, receipt_number: 321 })
+    );
+  });
+
+  it('returns 400 for invalid receipt print order id and skips receipt data build', async () => {
+    const res = await request(app)
+      .post('/printing/receipt/not-a-number')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(400);
+    expect(res.body.error?.message).toBe('Invalid order id');
+    expect(mocks.buildReceiptDataForOrder).not.toHaveBeenCalled();
+  });
+
+  it('maps closure print not-found errors to 404', async () => {
+    mocks.buildClosureBulletinData.mockRejectedValue(
+      Object.assign(new Error('Not found'), { statusCode: 404 })
+    );
+
+    const res = await request(app)
+      .post('/printing/closure/19')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(404);
+    expect(res.body.error?.message).toBe('Closure bulletin not found');
+  });
+
+  it('prints invoice successfully and logs printing history metadata', async () => {
+    mocks.buildReceiptDataForInvoice.mockResolvedValue({
+      document_kind: 'invoice',
+      document_number: 'FAC-2026-000001',
+      sequence_number: 1,
+      total_amount: 100,
+      total_tax: 20,
+      payment_method: 'card',
+      created_at: new Date().toISOString(),
+      order_id: 42,
+      receipt_type: 'detailed',
+      business_info: { name: 'Muse', address: '', phone: '', email: '' },
+      items: [],
+    });
+    const printReceipt = vi.fn().mockResolvedValue({ success: true, message: 'queued' });
+    mocks.managerGetService.mockResolvedValue({
+      checkPrinterStatus: vi.fn().mockResolvedValue({ connected: true }),
+      listPrinters: vi.fn().mockResolvedValue([{ id: 'p1', name: 'Printer 1' }]),
+      printReceipt,
+      printClosureBulletin: vi.fn(),
+    });
+
+    const res = await request(app)
+      .post('/printing/invoice/1')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(mocks.logPrintingHistory).toHaveBeenCalledWith(
+      expect.anything(),
+      'est-1',
+      'invoice',
+      expect.objectContaining({ success: true }),
+      expect.objectContaining({ invoice_id: 1, invoice_number: 'FAC-2026-000001' })
+    );
+  });
+
+  it('blocks invoice print when compliance validation fails', async () => {
+    mocks.buildReceiptDataForInvoice.mockRejectedValue(
+      Object.assign(new Error('Invoice compliance blocked: missing legal fields'), { statusCode: 422 })
+    );
+
+    const res = await request(app)
+      .post('/printing/invoice/1')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(400);
+    expect(String(res.body.error?.message ?? '')).toContain('Invoice compliance blocked');
+  });
+
+  it('prints closure bulletin successfully and logs printing history metadata', async () => {
+    mocks.buildClosureBulletinData.mockResolvedValue({
+      closure_type: 'DAILY',
+      bulletin_number: 'BUL-123',
+    });
+    const printClosureBulletin = vi.fn().mockResolvedValue({ success: true, message: 'queued' });
+    mocks.managerGetService.mockResolvedValue({
+      checkPrinterStatus: vi.fn().mockResolvedValue({ connected: true }),
+      listPrinters: vi.fn().mockResolvedValue([{ id: 'p1', name: 'Printer 1' }]),
+      printReceipt: vi.fn(),
+      printClosureBulletin,
+    });
+
+    const res = await request(app)
+      .post('/printing/closure/19')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.bulletin_data.closure_type).toBe('DAILY');
+    expect(mocks.logPrintingHistory).toHaveBeenCalledWith(
+      expect.anything(),
+      'est-1',
+      'closure_bulletin',
+      expect.objectContaining({ success: true }),
+      expect.objectContaining({ bulletin_id: 19, closure_type: 'DAILY' })
+    );
+  });
+
+  it('returns 400 for invalid closure print bulletin id and skips bulletin data build', async () => {
+    const res = await request(app)
+      .post('/printing/closure/not-a-number')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(400);
+    expect(res.body.error?.message).toBe('Invalid closure bulletin id');
+    expect(mocks.buildClosureBulletinData).not.toHaveBeenCalled();
+  });
+
+  it('exports receipt PDF', async () => {
+    mocks.buildReceiptDataForOrder.mockResolvedValue({
+      document_number: '000007',
+      sequence_number: 7,
+      total_amount: 10,
+      total_tax: 2,
+      payment_method: 'card',
+      created_at: new Date().toISOString(),
+      order_id: 7,
+      receipt_type: 'detailed',
+      business_info: { name: 'Muse', address: '', phone: '', email: '' },
+      items: [],
+    });
+    mocks.renderReceiptOrInvoicePdf.mockResolvedValue(Buffer.from('%PDF-1.4 test'));
+
+    const res = await request(app)
+      .get('/printing/receipt/7/export-pdf')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('application/pdf');
+    expect(mocks.renderReceiptOrInvoicePdf).toHaveBeenCalled();
+  });
+
+  it('emails invoice and logs history', async () => {
+    mocks.buildReceiptDataForInvoice.mockResolvedValue({
+      document_kind: 'invoice',
+      document_number: 'FAC-2026-000001',
+      sequence_number: 1,
+      total_amount: 100,
+      total_tax: 20,
+      payment_method: 'card',
+      created_at: new Date().toISOString(),
+      order_id: 42,
+      receipt_type: 'detailed',
+      business_info: { name: 'Muse', address: '', phone: '', email: '' },
+      customer_info: { email: 'client@exemple.com' },
+      items: [],
+    });
+    mocks.emailReceiptDocument.mockResolvedValue({
+      trackingId: 'track-1',
+      message: 'Email envoyé à client@exemple.com',
+    });
+
+    const res = await request(app)
+      .post('/printing/invoice/1/email')
+      .set('Authorization', 'Bearer test-token')
+      .send({ to: 'client@exemple.com' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.trackingId).toBe('track-1');
+    expect(mocks.emailReceiptDocument).toHaveBeenCalled();
+    expect(mocks.logPrintingHistory).toHaveBeenCalledWith(
+      expect.anything(),
+      'est-1',
+      'invoice',
+      expect.objectContaining({ success: true }),
+      expect.objectContaining({ action: 'email', recipient: 'client@exemple.com' })
+    );
+  });
+
+  it('blocks invoice email when compliance validation fails', async () => {
+    mocks.buildReceiptDataForInvoice.mockRejectedValue(
+      Object.assign(new Error('Invoice compliance blocked: missing legal fields'), { statusCode: 422 })
+    );
+
+    const res = await request(app)
+      .post('/printing/invoice/1/email')
+      .set('Authorization', 'Bearer test-token')
+      .send({ to: 'client@exemple.com' });
+
+    expect(res.status).toBe(400);
+    expect(String(res.body.error?.message ?? '')).toContain('Invoice compliance blocked');
+  });
+
+  it('exports closure XLSX with accountant breakdown data', async () => {
+    mocks.buildClosureBulletinData.mockResolvedValue({
+      id: 5,
+      closure_type: 'DAILY',
+      period_start: '2026-05-01T00:00:00.000Z',
+      period_end: '2026-05-31T23:59:59.000Z',
+      total_amount: 100,
+      total_vat: 20,
+      business_info: { name: 'Muse', address: '', phone: '', email: '' },
+    });
+    mocks.buildClosureExportData.mockResolvedValue({ kind: 'daily', orderRows: [] });
+    mocks.buildClosureXlsxAttachment.mockResolvedValue({
+      buffer: Buffer.from('xlsx'),
+      filename: 'bilan-cloture-daily-2026-05-01-2026-05-31.xlsx',
+    });
+
+    const res = await request(app)
+      .get('/printing/closure/5/export-xlsx')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('spreadsheetml');
+    expect(mocks.buildClosureExportData).toHaveBeenCalled();
+    expect(mocks.buildClosureXlsxAttachment).toHaveBeenCalledWith(
+      expect.anything(),
+      'est-1',
+      expect.objectContaining({ id: 5 }),
+      { kind: 'daily', orderRows: [] }
+    );
+  });
+});

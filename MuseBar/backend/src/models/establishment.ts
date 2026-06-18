@@ -1,12 +1,14 @@
 /**
  * Establishment Model
- * Handles multi-tenant establishment management with schema-based isolation
+ *
+ * Phase B1 (2026-04): The app commits to **shared-table multi-tenancy**.
+ * `establishments.schema_name` is legacy metadata and is not used for runtime isolation.
  */
 
-import { pool } from '../app';
+import { pool } from '../db/pool';
 import { randomUUID } from 'crypto';
 import { Logger } from '../utils/logger';
-import { SchemaManager } from '../services/SchemaManager';
+import { logSoftwareEventBestEffort } from '../services/legal/softwareEventJournal';
 
 /**
  * Establishment interface
@@ -17,6 +19,7 @@ export interface Establishment {
   email: string;
   phone?: string;
   address?: string;
+  /** Legacy metadata (not a runtime isolation boundary). */
   schema_name: string;
   subscription_plan: 'basic' | 'premium' | 'enterprise';
   subscription_status: 'active' | 'suspended' | 'cancelled';
@@ -48,10 +51,12 @@ export interface UpdateEstablishmentData {
 }
 
 /**
- * Schema names are generated as establishment_<uuid> or establishment_<id>.
- * Only this format is safe to interpolate into SQL (no semicolons, quotes, or SQL keywords).
+ * Legacy: schema name safety.
+ *
+ * Even though schema-per-tenant is no longer the runtime model, `schema_name` is still stored
+ * in DB rows for backward compatibility with older installs and migrations.
  */
-const SAFE_SCHEMA_NAME_REGEX = /^establishment_[a-zA-Z0-9_]{1,64}$/;
+const SAFE_SCHEMA_NAME_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]{0,63}$/;
 
 function assertValidSchemaName(schemaName: string): void {
   if (!SAFE_SCHEMA_NAME_REGEX.test(schemaName)) {
@@ -73,7 +78,7 @@ export class EstablishmentModel {
   }
 
   /**
-   * Create a new establishment with schema isolation
+   * Create a new establishment (shared-table multi-tenancy).
    */
   public static async createEstablishment(data: CreateEstablishmentData): Promise<Establishment> {
     const client = await pool.connect();
@@ -81,7 +86,7 @@ export class EstablishmentModel {
     try {
       await client.query('BEGIN');
 
-      // Generate unique schema name
+      // Legacy metadata: keep a unique schema_name value but do not create per-tenant schemas.
       const schemaName = `establishment_${randomUUID().replace(/-/g, '_')}`;
       
       // Create establishment record
@@ -106,10 +111,6 @@ export class EstablishmentModel {
 
       const establishmentResult = await client.query(establishmentQuery, establishmentValues);
       const establishment = establishmentResult.rows[0];
-
-      // Create isolated schema and tables for this establishment
-      SchemaManager.initialize(EstablishmentModel.logger);
-      await SchemaManager.createEstablishmentSchema(client, schemaName);
 
       await client.query('COMMIT');
 
@@ -282,6 +283,18 @@ export class EstablishmentModel {
         'ESTABLISHMENT_MODEL'
       );
 
+      if (data.subscription_plan !== undefined || data.subscription_status !== undefined) {
+        await logSoftwareEventBestEffort({
+          establishmentId: id,
+          eventType: 'ESTABLISHMENT_SUBSCRIPTION_UPDATED',
+          eventData: {
+            update_type: 'subscription_change',
+            subscription_plan: data.subscription_plan,
+            subscription_status: data.subscription_status,
+          },
+        });
+      }
+
       return result.rows[0];
     } catch (error) {
       EstablishmentModel.logger?.error(
@@ -298,7 +311,10 @@ export class EstablishmentModel {
   }
 
   /**
-   * Delete establishment (with schema cleanup)
+   * Delete establishment.
+   *
+   * Phase B1: no schema-per-tenant cleanup. Tenant data lives in shared tables and is removed
+   * by deleting (or detaching) establishment-scoped rows via FK cleanup / cascades.
    */
   public static async deleteEstablishment(id: string): Promise<void> {
     const client = await pool.connect();
@@ -316,6 +332,7 @@ export class EstablishmentModel {
       if (!establishment) {
         throw new Error('Establishment not found');
       }
+      // Keep legacy schema_name only as metadata; no per-tenant schema is dropped.
       assertValidSchemaName(establishment.schema_name);
 
       // 1) Clean dependent records to satisfy foreign keys
@@ -340,8 +357,7 @@ export class EstablishmentModel {
       // 2) Delete establishment record
       await client.query('DELETE FROM establishments WHERE id = $1', [id]);
 
-      // 3) Drop establishment schema (this will delete all data) using SchemaManager
-      await SchemaManager.dropEstablishmentSchema(client, establishment.schema_name);
+      // 3) Legacy: schema-per-tenant is not used; do not drop schemas here.
 
       await client.query('COMMIT');
 

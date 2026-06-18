@@ -14,13 +14,14 @@ import {
 import { SettingsTab } from './types';
 import { EstablishmentSettings } from './EstablishmentSettings';
 import { ClosureSettings } from './ClosureSettings';
-import { PrinterSettings } from './PrinterSettings';
+import { PrinterSetup } from '../../PrinterSetup';
 import { HappyHourControl } from '../../HappyHour';
 
 import { Product } from '../../../types';
+import { UseSettingsReturn } from './types';
 
 interface SettingsTabsProps {
-  settingsHook: any; // UseSettingsReturn type
+  settingsHook: UseSettingsReturn;
   isHappyHourActive?: boolean;
   timeUntilHappyHour?: string;
   onHappyHourStatusUpdate?: () => void;
@@ -128,10 +129,7 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
       label: 'Imprimante',
       icon: <PrintIcon />,
       component: (
-        <PrinterSettings
-          onTestPrinter={settingsHook.testPrinter}
-          onCheckStatus={settingsHook.checkPrinterStatus}
-        />
+        <PrinterSetup embedded />
       ),
     },
   ];

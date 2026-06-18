@@ -16,7 +16,19 @@ export const ReceiptHeader: React.FC<ReceiptHeaderProps> = ({
   businessInfo,
   order,
   receiptType = 'detailed',
+  documentKind = 'ticket',
+  documentNumber,
 }) => {
+  const documentLabel = documentKind === 'invoice' ? 'Facture' : 'Ticket';
+  const typeLabel =
+    documentKind === 'invoice'
+      ? receiptType === 'summary'
+        ? 'Facture sans détail'
+        : 'Facture détaillée'
+      : receiptType === 'summary'
+        ? 'Reçu d’entreprise'
+        : 'Ticket détaillé';
+
   return (
     <>
       {/* Business Information Header */}
@@ -43,12 +55,12 @@ export const ReceiptHeader: React.FC<ReceiptHeaderProps> = ({
         <Grid container spacing={1}>
           <Grid item xs={6}>
             <Typography variant="body2" fontWeight="bold">
-              N° Ticket:
+              N° {documentLabel}:
             </Typography>
           </Grid>
           <Grid item xs={6}>
             <Typography variant="body2">
-              {order.sequence_number.toString().padStart(6, '0')}
+              {documentNumber || order.sequence_number.toString().padStart(6, '0')}
             </Typography>
           </Grid>
 
@@ -82,7 +94,7 @@ export const ReceiptHeader: React.FC<ReceiptHeaderProps> = ({
                 </Typography>
               </Grid>
               <Grid item xs={6}>
-                <Typography variant="body2">Ticket détaillé</Typography>
+                <Typography variant="body2">{typeLabel}</Typography>
               </Grid>
             </>
           )}
@@ -95,7 +107,7 @@ export const ReceiptHeader: React.FC<ReceiptHeaderProps> = ({
                 </Typography>
               </Grid>
               <Grid item xs={6}>
-                <Typography variant="body2">Reçu d'entreprise</Typography>
+                <Typography variant="body2">{typeLabel}</Typography>
               </Grid>
             </>
           )}

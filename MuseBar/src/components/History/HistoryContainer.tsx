@@ -8,9 +8,15 @@ import SearchBar from './SearchBar';
 import OrdersTable from './OrdersTable';
 import OrderDetailsDialog from './OrderDetailsDialog';
 import ReturnDialog from './ReturnDialog';
+import PrintAfterSaleDialog from '../POS/PrintAfterSaleDialog';
 import { Order } from '../../types';
 
-const HistoryContainer: React.FC = () => {
+interface HistoryContainerProps {
+  /** Backend permission `orders_cancel` (establishment admin has all permissions from API). */
+  canCancelOrReturn?: boolean;
+}
+
+const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn = true }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -62,8 +68,8 @@ const HistoryContainer: React.FC = () => {
     actions.setSelectedOrder(order);
   };
 
-  const handlePrintReceipt = (order: Order, type: 'detailed' | 'summary') => {
-    actions.openReceiptDialog(order, type);
+  const handlePrintReceipt = (order: Order) => {
+    actions.openReceiptDialog(order);
   };
 
   const handleReturnOrder = (order: Order) => {
@@ -128,6 +134,7 @@ const HistoryContainer: React.FC = () => {
         onViewOrder={handleViewOrder}
         onPrintReceipt={handlePrintReceipt}
         onReturnOrder={handleReturnOrder}
+        canReturnOrCancel={canCancelOrReturn}
         formatCurrency={logic.formatCurrency}
         formatDateTime={logic.formatDateTime}
         getPaymentMethodLabel={logic.getPaymentMethodLabel}
@@ -203,6 +210,13 @@ const HistoryContainer: React.FC = () => {
         loading={state.returnLoading}
         errorMessage={state.returnError}
         formatDateTime={logic.formatDateTime}
+      />
+
+      <PrintAfterSaleDialog
+        open={state.receiptDialogOpen}
+        orderId={state.currentReceipt?.id ?? null}
+        autoCloseEnabled={false}
+        onClose={actions.closeReceiptDialog}
       />
     </Box>
   );

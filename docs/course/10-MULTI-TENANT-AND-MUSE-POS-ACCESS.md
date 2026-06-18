@@ -9,10 +9,11 @@
 | Type | Who | `is_admin` | `role` | `establishment_id` | What they see after login |
 |------|-----|------------|--------|--------------------|----------------------------|
 | **System admin** | You (elliot.vergne@gmail.com) | `true` | `system_admin` | `null` | System Admin UI: establishments, system users, security logs. No POS. |
-| **Establishment user** | Bar staff (e.g. elliotpokerpro, hugo) | `false` | `establishment_admin` or `cashier` | UUID of the establishment | Business UI: POS, Menu, History, Settings, etc. for that establishment only. |
+| **Establishment user** | Bar staff (e.g. elliotpokerpro, hugo) | `false` | `establishment_admin` or `staff` | UUID of the establishment | Business UI: POS, Menu, History, Settings, etc. for that establishment only. |
 
 - **System admin** is determined by `users.is_admin = true`. The login code then forces `role = 'system_admin'` and does not use `establishment_id` for routing. These users never see the POS; they see the System Admin interface.
 - **Establishment users** must have `establishment_id` set to the establishment’s UUID (e.g. Muse). The backend uses this for every POS request (categories, products, orders are all filtered by `establishment_id`). So if `establishment_id` is `null`, the API returns 403 for categories/products and the POS cannot load.
+- **Role vocabulary migration note:** legacy rows may still contain `role = 'cashier'`, but canonical auth role is now `staff` (`cashier -> staff` normalization in auth logic). New SQL examples in this chapter use `staff`.
 
 So: **to use the Muse POS, you must log in with a user that has `establishment_id` = Muse’s UUID and `is_admin` = false.** Typically that user also has `role = 'establishment_admin'` so they see all tabs (including User Management and Audit Trail).
 
@@ -47,7 +48,7 @@ So “we lost the user attached to Muse” usually means: the **user row** for e
 - To log in to the Muse POS you need a **user** in the `users` table with:
   - `establishment_id` = Muse’s UUID  
   - `is_admin` = false  
-  - `role` = `establishment_admin` (for full tabs) or `cashier` (limited by permissions)
+  - `role` = `establishment_admin` (for full tabs) or `staff` (limited by permissions)
 
 So: **muse.rouen@gmail.com** may only exist as the establishment’s contact email. If there is no `users` row with that email and `establishment_id` = Muse, you cannot log in with it until you create that user (or attach an existing user to Muse).
 
@@ -69,9 +70,9 @@ UPDATE users
 SET establishment_id = '<MUSE_UUID>', role = 'establishment_admin', is_admin = false, updated_at = CURRENT_TIMESTAMP
 WHERE email = 'elliotpokerpro@gmail.com';
 
--- Muse cashier (permissions can be set via POS “Gestion utilisateurs” after login)
+-- Muse staff user (permissions can be set via POS “Gestion utilisateurs” after login)
 UPDATE users
-SET establishment_id = '<MUSE_UUID>', role = 'cashier', is_admin = false, updated_at = CURRENT_TIMESTAMP
+SET establishment_id = '<MUSE_UUID>', role = 'staff', is_admin = false, updated_at = CURRENT_TIMESTAMP
 WHERE email = 'hugo.martins.76000@gmail.com';
 ```
 
@@ -86,13 +87,13 @@ After that, log in with **elliotpokerpro@gmail.com** to use the Muse POS.
 Conceptually:
 
 - For **elliotpokerpro@gmail.com**: set `establishment_id` to Muse’s UUID, `role = 'establishment_admin'`, `is_admin = false`.  
-- For **hugo.martins.76000@gmail.com**: set `establishment_id` to Muse’s UUID, `role = 'cashier'`, `is_admin = false`.  
+- For **hugo.martins.76000@gmail.com**: set `establishment_id` to Muse’s UUID, `role = 'staff'`, `is_admin = false`.  
 
 So:
 
 - **elliot.vergne@gmail.com** is unchanged (stays system admin, no establishment).  
 - **elliotpokerpro@gmail.com** becomes the Muse establishment admin and can use the full POS and user management for Muse.  
-- **hugo.martins.76000@gmail.com** becomes a Muse cashier; you can then refine his permissions via the POS “Gestion utilisateurs” if needed.
+- **hugo.martins.76000@gmail.com** becomes a Muse staff user; you can then refine his permissions via the POS “Gestion utilisateurs” if needed.
 
 ---
 
@@ -109,4 +110,4 @@ Then there is no `users` row for that email. Create a user (e.g. via System Admi
 - Run the **user–establishment SQL** from §4 (or a one-off migration) on the production DB so at least one user has `establishment_id` = Muse and `is_admin` = false.  
 - Ensure the Muse establishment row exists; then you can log in to the Muse POS in production.
 
-The email/SendGrid and “create new establishment” flows are out of scope for this doc; the priority here is a working V2 cashier for Muse in line with French regulation and a clear way to get there from your current DB state.
+The email/SendGrid and “create new establishment” flows are out of scope for this doc; the priority here is a working V2 Muse POS access path in line with French regulation and a clear way to get there from your current DB state.

@@ -13,29 +13,40 @@ interface AuthState {
 }
 
 interface AuthActions {
-  login: (jwt: string, userObj: User, rememberMeFlag: boolean, expiresIn: string) => void;
+  login: (
+    jwt: string,
+    userObj: User,
+    rememberMeFlag: boolean,
+    expiresIn: string,
+    refreshExpiresIn?: string
+  ) => void;
   logout: () => void;
   refreshToken: () => Promise<void>;
 }
 
+type RefreshResponse = {
+  token: string;
+  expiresIn?: string;
+  refreshExpiresIn?: string;
+};
+
+let inFlightRefresh: Promise<RefreshResponse> | null = null;
+
 export const useAuth = (): AuthState & AuthActions => {
+  const REFRESH_BOOTSTRAP_HINT_KEY = 'auth_refresh_bootstrap_hint';
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [rememberMe, setRememberMe] = useState<boolean>(false);
-  const [tokenExpiresIn, setTokenExpiresIn] = useState<string>('12h');
+  const [tokenExpiresIn, setTokenExpiresIn] = useState<string>('15m');
 
   // Initialize authentication from localStorage
   useEffect(() => {
-    const storedToken = localStorage.getItem('auth_token');
     const storedRememberMe = localStorage.getItem('remember_me') === 'true';
-    const storedExpiresIn = localStorage.getItem('token_expires_in') || '12h';
+    const storedExpiresIn = localStorage.getItem('token_expires_in') || '15m';
 
-    if (storedToken) {
-      setToken(storedToken);
-      setRememberMe(storedRememberMe);
-      setTokenExpiresIn(storedExpiresIn);
-    }
+    setRememberMe(storedRememberMe);
+    setTokenExpiresIn(storedExpiresIn);
   }, []);
 
   // Declare functions first
@@ -44,13 +55,13 @@ export const useAuth = (): AuthState & AuthActions => {
     setUser(null);
     setPermissions([]);
     setRememberMe(false);
-    setTokenExpiresIn('12h');
+    setTokenExpiresIn('15m');
 
     // Clear localStorage
-    localStorage.removeItem('auth_token');
     localStorage.removeItem('remember_me');
     localStorage.removeItem('token_expires_in');
-  }, []);
+    localStorage.removeItem(REFRESH_BOOTSTRAP_HINT_KEY);
+  }, [REFRESH_BOOTSTRAP_HINT_KEY]);
 
   const checkAuthStatus = useCallback(async () => {
     try {
@@ -63,7 +74,12 @@ export const useAuth = (): AuthState & AuthActions => {
       const data = response.data;
       setUser(data);
       setPermissions(data.permissions || []);
-    } catch {
+    } catch (e) {
+      // Do not log out on 429: keeps session; avoids cascading failures when global rate limit trips.
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/\b429\b/i.test(msg) || /trop de requ[êe]tes/i.test(msg) || /rate limit/i.test(msg)) {
+        return;
+      }
       logout();
     }
   }, [logout]);
@@ -75,16 +91,31 @@ export const useAuth = (): AuthState & AuthActions => {
         await apiConfig.initialize();
       }
 
-      const response = await apiService.post<{ token: string }>('/auth/refresh');
-      const newToken = response.data.token;
+      const rememberMeForRefresh =
+        rememberMe || localStorage.getItem('remember_me') === 'true';
+      if (!inFlightRefresh) {
+        inFlightRefresh = apiService
+          .post<RefreshResponse>('/auth/refresh', { rememberMe: rememberMeForRefresh })
+          .then((response) => response.data)
+          .finally(() => {
+            inFlightRefresh = null;
+          });
+      }
+      const response = await inFlightRefresh;
+      const newToken = response.token;
+      const refreshedExpiresIn = response.expiresIn || '15m';
       
       setToken(newToken);
-      localStorage.setItem('auth_token', newToken);
+      setRememberMe(rememberMeForRefresh);
+      setTokenExpiresIn(refreshedExpiresIn);
+      localStorage.setItem('remember_me', rememberMeForRefresh.toString());
+      localStorage.setItem('token_expires_in', refreshedExpiresIn);
+      localStorage.setItem(REFRESH_BOOTSTRAP_HINT_KEY, 'true');
     } catch (error) {
       // Refresh failed, logout required
       logout();
     }
-  }, [logout]);
+  }, [logout, rememberMe, REFRESH_BOOTSTRAP_HINT_KEY]);
 
   // Check authentication status when token changes
   useEffect(() => {
@@ -103,16 +134,22 @@ export const useAuth = (): AuthState & AuthActions => {
     if (!token || !user) return;
 
     const refreshInterval =
-      tokenExpiresIn === '7d'
-        ? 6 * 24 * 60 * 60 * 1000 // Refresh every 6 days for 7-day tokens
-        : 10 * 60 * 60 * 1000; // Refresh every 10 hours for 12-hour tokens
+      tokenExpiresIn === '15m'
+        ? 12 * 60 * 1000
+        : 12 * 60 * 1000;
 
     const intervalId = setInterval(refreshToken, refreshInterval);
 
     return () => clearInterval(intervalId);
   }, [token, user, tokenExpiresIn, refreshToken]);
 
-  const login = useCallback((jwt: string, userObj: User, rememberMeFlag: boolean, expiresIn: string) => {
+  const login = useCallback((
+    jwt: string,
+    userObj: User,
+    rememberMeFlag: boolean,
+    expiresIn: string,
+    _refreshExpiresIn?: string
+  ) => {
     // Set token on API client immediately so any request after this (e.g. /auth/me, /auth/users)
     // has the Bearer header before React re-renders and child effects run.
     ApiService.setToken(jwt);
@@ -123,10 +160,19 @@ export const useAuth = (): AuthState & AuthActions => {
     setTokenExpiresIn(expiresIn);
 
     // Store in localStorage
-    localStorage.setItem('auth_token', jwt);
     localStorage.setItem('remember_me', rememberMeFlag.toString());
     localStorage.setItem('token_expires_in', expiresIn);
-  }, []);
+    localStorage.setItem(REFRESH_BOOTSTRAP_HINT_KEY, 'true');
+  }, [REFRESH_BOOTSTRAP_HINT_KEY]);
+
+  // Attempt bootstrap refresh on initial mount when refresh cookie exists.
+  useEffect(() => {
+    if (token) return;
+    const shouldAttemptBootstrapRefresh =
+      localStorage.getItem(REFRESH_BOOTSTRAP_HINT_KEY) === 'true';
+    if (!shouldAttemptBootstrapRefresh) return;
+    void refreshToken();
+  }, [token, refreshToken, REFRESH_BOOTSTRAP_HINT_KEY]);
 
   return {
     token,

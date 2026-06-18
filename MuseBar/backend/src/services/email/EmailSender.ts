@@ -33,6 +33,17 @@ export interface EmailConfigValidation {
   issues: string[];
 }
 
+function normalizeSendGridErrorMessage(rawMessage: string): string {
+  const lower = rawMessage.toLowerCase();
+  if (lower.includes('unauthorized') || lower.includes('permission denied')) {
+    return 'SendGrid a refusé la connexion (clé API invalide ou expirée). Vérifiez SENDGRID_API_KEY.';
+  }
+  if (lower.includes('does not contain a valid address') || lower.includes('from address')) {
+    return 'Adresse expéditeur SendGrid invalide. Vérifiez FROM_EMAIL (domaine vérifié dans SendGrid).';
+  }
+  return rawMessage;
+}
+
 /**
  * Email Sender Class
  */
@@ -141,7 +152,20 @@ export class EmailSender {
       };
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const sgError = error as {
+        message?: string;
+        response?: { body?: { errors?: Array<{ message?: string }> } };
+      };
+      const sgMessages = sgError.response?.body?.errors
+        ?.map((entry) => entry.message)
+        .filter((msg): msg is string => Boolean(msg));
+      const rawMessage =
+        sgMessages && sgMessages.length > 0
+          ? sgMessages.join('; ')
+          : error instanceof Error
+            ? error.message
+            : String(error);
+      const errorMessage = normalizeSendGridErrorMessage(rawMessage);
 
       this.logger.error(
         'Failed to send email via provider',

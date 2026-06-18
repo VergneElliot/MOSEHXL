@@ -114,7 +114,7 @@ export class SetupValidator {
     // First validate token format
     const tokenErrors = this.validateInvitationToken(invitationToken);
     if (tokenErrors.length > 0) {
-      throw new Error(tokenErrors[0].message);
+      throw new Error(tokenErrors[0]?.message ?? 'Invalid invitation token');
     }
 
     // Check invitation in database (shared InvitationQueries.getInvitationByToken)
@@ -150,7 +150,7 @@ export class SetupValidator {
   static validateSetupDataStrict(setupData: BusinessSetupRequest): void {
     const errors = this.validateSetupData(setupData);
     if (errors.length > 0) {
-      throw new Error(errors[0].message);
+      throw new Error(errors[0]?.message ?? 'Invalid setup data');
     }
   }
 

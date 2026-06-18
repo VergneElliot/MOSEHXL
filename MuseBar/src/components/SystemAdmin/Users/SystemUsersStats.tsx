@@ -20,14 +20,12 @@ export const SystemUsersStats: React.FC = () => {
   const stats = {
     total: users.length,
     admins: users.filter(u => u.role === 'system_admin').length,
-    operators: users.filter(u => u.role === 'system_operator').length,
     active: users.filter(u => u.is_active).length
   };
 
   const statCards = [
     { label: 'Total Utilisateurs', value: stats.total },
     { label: 'Administrateurs', value: stats.admins },
-    { label: 'Opérateurs', value: stats.operators },
     { label: 'Actifs', value: stats.active }
   ];
 

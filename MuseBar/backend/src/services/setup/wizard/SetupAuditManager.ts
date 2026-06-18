@@ -13,6 +13,12 @@ import { SetupAuditEntry } from './types';
  */
 export class SetupAuditManager {
   private static logger = Logger.getInstance();
+  private static uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+  private static normalizeEstablishmentId(raw: string): string | null {
+    const value = typeof raw === 'string' ? raw.trim() : '';
+    return this.uuidRegex.test(value) ? value : null;
+  }
 
   /**
    * Create setup audit trail entry
@@ -27,25 +33,22 @@ export class SetupAuditManager {
     try {
       const auditEntry: SetupAuditEntry = {
         user_id: userId,
-        establishment_id: establishmentId,
-        action: 'business_setup_completed',
-        entity_type: 'establishment',
-        entity_id: establishmentId,
-        old_values: {},
-        new_values: {
+        establishment_id: this.normalizeEstablishmentId(establishmentId),
+        action_type: 'BUSINESS_SETUP_COMPLETED',
+        resource_type: 'ESTABLISHMENT',
+        resource_id: establishmentId,
+        action_details: {
           business_name: setupData.business_name,
           contact_email: setupData.contact_email,
           phone: setupData.phone,
           address: setupData.address,
-          setup_completed: true
-        },
+          setup_completed: true,
+          setup_timestamp: context.timestamp,
+          setup_version: '1.0'
+        } as Record<string, unknown>,
         ip_address: context.ipAddress,
         user_agent: context.userAgent,
-        metadata: {
-          setup_timestamp: context.timestamp,
-          invitation_token: setupData.invitation_token.substring(0, 8) + '...',
-          setup_version: '1.0'
-        }
+        session_id: context.sessionId
       };
 
       await this.insertAuditEntry(client, auditEntry);
@@ -55,7 +58,7 @@ export class SetupAuditManager {
         { 
           userId, 
           establishmentId, 
-          action: auditEntry.action 
+          action: auditEntry.action_type
         },
         'SETUP_AUDIT'
       );
@@ -83,20 +86,19 @@ export class SetupAuditManager {
   ): Promise<void> {
     await client.query(`
       INSERT INTO audit_trail (
-        user_id, establishment_id, action, entity_type, entity_id,
-        old_values, new_values, ip_address, user_agent, metadata, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
+        user_id, action_type, resource_type, resource_id, action_details,
+        ip_address, user_agent, session_id, establishment_id, timestamp
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
     `, [
-      entry.user_id,
-      entry.establishment_id,
-      entry.action,
-      entry.entity_type,
-      entry.entity_id,
-      JSON.stringify(entry.old_values),
-      JSON.stringify(entry.new_values),
+      String(entry.user_id),
+      entry.action_type,
+      entry.resource_type,
+      entry.resource_id,
+      JSON.stringify(entry.action_details),
       entry.ip_address,
       entry.user_agent,
-      JSON.stringify(entry.metadata)
+      entry.session_id,
+      entry.establishment_id
     ]);
   }
 
@@ -114,18 +116,18 @@ export class SetupAuditManager {
     try {
       const auditEntry: SetupAuditEntry = {
         user_id: userId,
-        establishment_id: establishmentId,
-        action: `setup_step_${stepId}`,
-        entity_type: 'setup_step',
-        entity_id: stepId,
-        old_values: {},
-        new_values: stepData,
-        ip_address: context.ipAddress,
-        user_agent: context.userAgent,
-        metadata: {
+        establishment_id: this.normalizeEstablishmentId(establishmentId),
+        action_type: `SETUP_STEP_${stepId.toUpperCase()}`,
+        resource_type: 'SETUP_STEP',
+        resource_id: stepId,
+        action_details: {
+          ...stepData,
           step_timestamp: new Date(),
           step_id: stepId
-        }
+        },
+        ip_address: context.ipAddress,
+        user_agent: context.userAgent,
+        session_id: context.sessionId
       };
 
       await this.insertAuditEntry(client, auditEntry);
@@ -162,23 +164,20 @@ export class SetupAuditManager {
     try {
       const auditEntry: SetupAuditEntry = {
         user_id: userId || 0,
-        establishment_id: establishmentId,
-        action: 'setup_failure',
-        entity_type: 'setup_process',
-        entity_id: establishmentId,
-        old_values: {},
-        new_values: {
+        establishment_id: this.normalizeEstablishmentId(establishmentId),
+        action_type: 'SETUP_FAILURE',
+        resource_type: 'SETUP_PROCESS',
+        resource_id: establishmentId,
+        action_details: {
           error_message: error.message,
           error_stack: error.stack,
-          failed_step: stepId
-        },
+          failed_step: stepId,
+          failure_timestamp: new Date(),
+          error_type: error.constructor.name
+        } as Record<string, unknown>,
         ip_address: context?.ipAddress,
         user_agent: context?.userAgent,
-        metadata: {
-          failure_timestamp: new Date(),
-          failed_step: stepId,
-          error_type: error.constructor.name
-        }
+        session_id: context?.sessionId
       };
 
       await this.insertAuditEntry(client, auditEntry);
@@ -209,8 +208,13 @@ export class SetupAuditManager {
       const result = await pool.query(`
         SELECT * FROM audit_trail 
         WHERE establishment_id = $1 
-        AND action LIKE 'setup%' OR action = 'business_setup_completed'
-        ORDER BY created_at DESC 
+          AND (
+            action_type = 'BUSINESS_SETUP_COMPLETED'
+            OR action_type = 'SETUP_FAILURE'
+            OR action_type = 'SETUP_CLEANUP'
+            OR action_type LIKE 'SETUP_STEP_%'
+          )
+        ORDER BY timestamp DESC 
         LIMIT $2
       `, [establishmentId, limit]);
 
@@ -237,16 +241,13 @@ export class SetupAuditManager {
     try {
       const auditEntry: SetupAuditEntry = {
         user_id: userId || 0,
-        establishment_id: establishmentId,
-        action: 'setup_cleanup',
-        entity_type: 'establishment',
-        entity_id: establishmentId,
-        old_values: {},
-        new_values: {
+        establishment_id: this.normalizeEstablishmentId(establishmentId),
+        action_type: 'SETUP_CLEANUP',
+        resource_type: 'ESTABLISHMENT',
+        resource_id: establishmentId,
+        action_details: {
           cleanup_actions: cleanupActions,
-          cleanup_completed: true
-        },
-        metadata: {
+          cleanup_completed: true,
           cleanup_timestamp: new Date(),
           actions_performed: cleanupActions.length
         }

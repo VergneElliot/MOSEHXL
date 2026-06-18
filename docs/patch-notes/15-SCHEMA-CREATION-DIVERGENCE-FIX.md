@@ -1,5 +1,13 @@
 # Fix: Schema Creation Divergence (Data Integrity)
 
+> **HISTORICAL — SUPERSEDED CONTEXT**
+>
+> This patch note documents a past architecture stage when the project still had
+> per-establishment schema creation paths. The runtime model has since converged
+> to shared-table multi-tenancy with `establishment_id` isolation and RLS.
+> Keep this file for historical traceability, not as present-tense architecture
+> guidance.
+
 This doc explains **what “schema” means here**, **why having two different creators was a problem**, and **how we fixed it** so every establishment gets the same tables no matter which flow created it.
 
 ---

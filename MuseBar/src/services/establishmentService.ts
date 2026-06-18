@@ -26,6 +26,36 @@ export interface GetEstablishmentsResponse {
   total: number;
 }
 
+type EstablishmentSearchFilters = {
+  name?: string;
+  email?: string;
+  status?: string;
+  business_type?: string;
+  subscription_plan?: string;
+  created_after?: string;
+  created_before?: string;
+  page?: number;
+  limit?: number;
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
+};
+
+interface EstablishmentSearchData {
+  establishments: SystemEstablishment[];
+  total: number;
+  page: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+}
+
+interface EstablishmentSearchResponse {
+  success: boolean;
+  data: EstablishmentSearchData;
+  filters: Record<string, unknown>;
+  options: Record<string, unknown>;
+}
+
 export class EstablishmentService {
   static async createEstablishment(data: CreateEstablishmentRequest): Promise<CreateEstablishmentResponse> {
     const response = await apiService.post<CreateEstablishmentResponse>('/establishments', data);
@@ -67,39 +97,15 @@ export class EstablishmentService {
     return response.data.data;
   }
 
-  static async getDashboardMetrics(): Promise<any> {
+  static async getDashboardMetrics(): Promise<Record<string, unknown>> {
     const response = await apiService.get<{
       success: boolean;
-      data: any;
+      data: Record<string, unknown>;
     }>('/admin-dashboard/metrics');
     return response.data.data;
   }
 
-  static async searchEstablishments(filters?: {
-    name?: string;
-    email?: string;
-    status?: string;
-    business_type?: string;
-    subscription_plan?: string;
-    created_after?: string;
-    created_before?: string;
-    page?: number;
-    limit?: number;
-    sort_by?: string;
-    sort_order?: 'asc' | 'desc';
-  }): Promise<{
-    success: boolean;
-    data: {
-      establishments: SystemEstablishment[];
-      total: number;
-      page: number;
-      totalPages: number;
-      hasNext: boolean;
-      hasPrevious: boolean;
-    };
-    filters: any;
-    options: any;
-  }> {
+  static async searchEstablishments(filters?: EstablishmentSearchFilters): Promise<EstablishmentSearchResponse> {
     const params = new URLSearchParams();
     if (filters) {
       Object.entries(filters).forEach(([key, value]) => {
@@ -109,19 +115,7 @@ export class EstablishmentService {
       });
     }
     
-    const response = await apiService.get<{
-      success: boolean;
-      data: {
-        establishments: SystemEstablishment[];
-        total: number;
-        page: number;
-        totalPages: number;
-        hasNext: boolean;
-        hasPrevious: boolean;
-      };
-      filters: any;
-      options: any;
-    }>(`/establishment-search?${params.toString()}`);
+    const response = await apiService.get<EstablishmentSearchResponse>(`/establishment-search?${params.toString()}`);
     return response.data;
   }
 }

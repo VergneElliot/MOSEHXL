@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { Box, Snackbar, Alert } from '@mui/material';
-import { Category, Product, OrderItem } from '../../types';
+import { Category, Product, OrderItem, Order } from '../../types';
 import { usePOSState } from '../../hooks/usePOSState';
 import { usePOSLogic } from '../../hooks/usePOSLogic';
 import { usePOSAPI } from '../../hooks/usePOSAPI';
@@ -11,12 +11,19 @@ import OrderSummary from './OrderSummary';
 import POSLayout from './POSLayout';
 import PaymentDialog from './PaymentDialog';
 import { DiversDialog, DiversFormData } from './DiversDialog';
+import PrintAfterSaleDialog from './PrintAfterSaleDialog';
 
 interface POSContainerProps {
   categories: Category[];
   products: Product[];
   isHappyHourActive: boolean;
   onDataUpdate: () => void;
+  /** Server-enforced POS line actions (buttons hidden if false). */
+  posLinePermissions?: {
+    happyHourManual: boolean;
+    offert: boolean;
+    perso: boolean;
+  };
 }
 
 const POSContainer: React.FC<POSContainerProps> = ({
@@ -24,10 +31,17 @@ const POSContainer: React.FC<POSContainerProps> = ({
   products,
   isHappyHourActive,
   onDataUpdate,
+  posLinePermissions = {
+    happyHourManual: true,
+    offert: true,
+    perso: true,
+  },
 }) => {
   // Custom hooks for state management
   const [state, actions] = usePOSState();
   const [diversDialogOpen, setDiversDialogOpen] = useState(false);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [lastOrderId, setLastOrderId] = useState<number | null>(null);
 
   // Custom hook for business logic
   const logic = usePOSLogic(
@@ -39,8 +53,19 @@ const POSContainer: React.FC<POSContainerProps> = ({
     isHappyHourActive
   );
 
-  const handlePaymentComplete = (message: string) => {
+  const handlePaymentComplete = (message: string, createdOrder?: Order) => {
     actions.setSnackbar({ open: true, message, severity: 'success' });
+    const rawId = createdOrder?.id;
+    const parsedId =
+      typeof rawId === 'number'
+        ? rawId
+        : typeof rawId === 'string'
+          ? parseInt(rawId, 10)
+          : NaN;
+    if (Number.isFinite(parsedId) && parsedId > 0) {
+      setLastOrderId(parsedId);
+      setPrintDialogOpen(true);
+    }
   };
   const handlePaymentError = (message: string) => {
     actions.setSnackbar({ open: true, message, severity: 'error' });
@@ -170,9 +195,9 @@ const POSContainer: React.FC<POSContainerProps> = ({
       onQuickCard={() => handleQuickPayment('card')}
       onQuickCash={() => handleQuickPayment('cash')}
       onFaireDeLaMonnaie={handleFaireDeLaMonnaie}
-      onApplyHappyHour={handleApplyHappyHour}
-      onApplyOffert={handleApplyOffert}
-      onApplyPerso={handleApplyPerso}
+      onApplyHappyHour={posLinePermissions.happyHourManual ? handleApplyHappyHour : undefined}
+      onApplyOffert={posLinePermissions.offert ? handleApplyOffert : undefined}
+      onApplyPerso={posLinePermissions.perso ? handleApplyPerso : undefined}
       formatCurrency={logic.formatCurrency}
     />
   );
@@ -216,6 +241,12 @@ const POSContainer: React.FC<POSContainerProps> = ({
         onOrderError={handlePaymentError}
         onDataUpdate={onDataUpdate}
         onClearOrder={actions.clearOrder}
+      />
+
+      <PrintAfterSaleDialog
+        open={printDialogOpen}
+        orderId={lastOrderId}
+        onClose={() => setPrintDialogOpen(false)}
       />
 
       <DiversDialog

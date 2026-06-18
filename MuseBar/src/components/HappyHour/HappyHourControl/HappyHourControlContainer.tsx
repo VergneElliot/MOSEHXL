@@ -23,7 +23,7 @@ import { HappyHourControlProps } from './types';
 import { HappyHourStatus } from './HappyHourStatus';
 import { HappyHourForm } from './HappyHourForm';
 import { HappyHourSchedule } from './HappyHourSchedule';
-import { useHappyHour } from './useHappyHour';
+import { useHappyHourControl } from './useHappyHour';
 
 /**
  * Happy Hour Control Container Component
@@ -34,7 +34,7 @@ export const HappyHourControlContainer: React.FC<HappyHourControlProps> = ({
   onStatusUpdate,
   products = [],
 }) => {
-  const happyHour = useHappyHour(onStatusUpdate, products);
+  const happyHour = useHappyHourControl(onStatusUpdate, products);
 
   return (
     <Box>

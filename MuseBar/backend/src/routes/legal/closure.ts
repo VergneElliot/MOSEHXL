@@ -5,9 +5,110 @@
 
 import express from 'express';
 import LegalJournalModel from '../../models/legalJournal';
-import { requireAuth } from '../auth';
+import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
+import { P } from '../../permissions/registry';
+import { Logger } from '../../utils/logger';
+import { AppError, asyncHandler, ConflictError, NotFoundError, ValidationError } from '../../middleware/errorHandler';
 
 const router = express.Router();
+const logger = Logger.getInstance();
+
+type ClosureJournalPayload = {
+  id?: number;
+  closure_type?: string;
+  total_amount?: number | string;
+  total_vat?: number | string;
+  period_start?: Date | string;
+  period_end?: Date | string;
+  closure_hash?: string;
+  first_sequence?: number;
+  last_sequence?: number;
+  is_closed?: boolean;
+};
+
+async function appendClosureJournalEntry(
+  establishmentId: string,
+  closureType: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL',
+  closure: ClosureJournalPayload,
+  forceCreate: boolean,
+  userId?: string
+) {
+  const rawAmount =
+    typeof closure.total_amount === 'number'
+      ? closure.total_amount
+      : parseFloat(String(closure.total_amount ?? 0));
+  const rawVat =
+    typeof closure.total_vat === 'number'
+      ? closure.total_vat
+      : parseFloat(String(closure.total_vat ?? 0));
+
+  const totalAmount = Number.isFinite(rawAmount) ? rawAmount : 0;
+  const totalVat = Number.isFinite(rawVat) ? rawVat : 0;
+
+  return await LegalJournalModel.logClosure(
+    establishmentId,
+    closureType,
+    totalAmount,
+    totalVat,
+    {
+      closure_bulletin_id: closure.id ?? null,
+      closure_type: closureType,
+      period_start: closure.period_start ?? null,
+      period_end: closure.period_end ?? null,
+      closure_hash: closure.closure_hash ?? null,
+      first_sequence: closure.first_sequence ?? null,
+      last_sequence: closure.last_sequence ?? null,
+      force: forceCreate,
+    },
+    userId
+  );
+}
+
+async function createClosureWithFailClosedJournal(
+  establishmentId: string,
+  closureType: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL',
+  forceCreate: boolean,
+  userId: string | undefined,
+  createOpenClosure: () => Promise<ClosureJournalPayload>
+): Promise<ClosureJournalPayload> {
+  const closure = await createOpenClosure();
+  const closureId = Number(closure.id);
+  if (!Number.isFinite(closureId)) {
+    throw new AppError('Failed to create closure bulletin', 500, 'LEGAL_CLOSURE_BULLETIN_CREATE_FAILED');
+  }
+
+  try {
+    await appendClosureJournalEntry(establishmentId, closureType, closure, forceCreate, userId);
+  } catch (error) {
+    logger.error(
+      `Legal journal closure append failed (${closureType}) for bulletin ${String(closure.id ?? 'unknown')}`,
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_JOURNAL'
+    );
+
+    const rolledBack = await LegalJournalModel.deleteOpenClosureBulletin(closureId, establishmentId);
+    if (!rolledBack) {
+      logger.error(
+        `Failed to rollback open closure bulletin ${closureId} after journal append failure`,
+        new Error('Open closure bulletin rollback affected 0 rows'),
+        'LEGAL_CLOSURE'
+      );
+    }
+
+    throw new AppError(
+      'Failed to persist legal journal entry for closure bulletin',
+      500,
+      'LEGAL_CLOSURE_JOURNAL_APPEND_FAILED'
+    );
+  }
+
+  const finalized = await LegalJournalModel.closeOpenClosureBulletin(closureId, establishmentId);
+  if (!finalized) {
+    throw new AppError('Failed to finalize closure bulletin', 500, 'LEGAL_CLOSURE_FINALIZE_FAILED');
+  }
+
+  return finalized as unknown as ClosureJournalPayload;
+}
 
 function parseForceFlag(force: unknown): boolean {
   if (force === true || force === 1) return true;
@@ -26,36 +127,47 @@ function parseFondDeCaisse(value: unknown): number | null {
   return n;
 }
 
-// All closure routes require authentication.
+// All closure routes require authentication and clôture access.
 // Closure bulletins are legally binding fiscal documents (NF 525).
-router.use(requireAuth);
+router.use(requireAuth, requirePermission(P.access_closure));
 
 /**
  * POST create daily closure bulletin (scoped to the authenticated user's establishment).
  * POST /api/legal/closure/daily
  */
-router.post('/daily', async (req, res) => {
+router.post('/daily', asyncHandler(async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
-    const establishmentId = req.user?.establishment_id;
-    if (!establishmentId) {
-      return res.status(400).json({ error: 'Closure must be scoped to an establishment. Only establishment users can create closures.' });
-    }
-
     const { date, force, fond_de_caisse } = req.body;
     if (!date) {
-      return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
+      throw new ValidationError('Date is required (YYYY-MM-DD format)');
     }
     const fondDeCaisse = parseFondDeCaisse(fond_de_caisse);
     if (fondDeCaisse === null) {
-      return res.status(400).json({ error: 'fond_de_caisse is required and must be a number >= 0' });
+      throw new ValidationError('fond_de_caisse is required and must be a number >= 0');
     }
     const closureDate = new Date(date);
     if (isNaN(closureDate.getTime())) {
-      return res.status(400).json({ error: 'Invalid date format' });
+      throw new ValidationError('Invalid date format');
     }
 
     const forceCreate = parseForceFlag(force);
-    const closure = await LegalJournalModel.createDailyClosure(closureDate, establishmentId, undefined, forceCreate, fondDeCaisse);
+    const userId = req.user ? String(req.user.id) : undefined;
+    const closure = await createClosureWithFailClosedJournal(
+      establishmentId,
+      'DAILY',
+      forceCreate,
+      userId,
+      () =>
+        LegalJournalModel.createDailyClosureOpen(
+          closureDate,
+          establishmentId,
+          undefined,
+          forceCreate,
+          fondDeCaisse
+        ) as Promise<ClosureJournalPayload>
+    );
 
     res.status(201).json({
       ...closure,
@@ -64,35 +176,51 @@ router.post('/daily', async (req, res) => {
         : 'Daily closure bulletin created per French fiscal requirements'
     });
   } catch (error) {
-    process.stderr.write(`Error creating daily closure: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to create daily closure' });
+    logger.error(
+      'Error creating daily closure',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_CLOSURE'
+    );
+    if (error instanceof AppError) throw error;
+    throw new AppError('Failed to create daily closure', 500, 'LEGAL_CLOSURE_DAILY_CREATE_FAILED');
   }
-});
+}));
 
 /**
  * POST create weekly closure bulletin (scoped to the authenticated user's establishment).
  * POST /api/legal/closure/weekly
  */
-router.post('/weekly', async (req, res) => {
+router.post('/weekly', asyncHandler(async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
-    const establishmentId = req.user?.establishment_id;
-    if (!establishmentId) {
-      return res.status(400).json({ error: 'Closure must be scoped to an establishment. Only establishment users can create closures.' });
-    }
     const { date, force, fond_de_caisse } = req.body;
     if (!date) {
-      return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
+      throw new ValidationError('Date is required (YYYY-MM-DD format)');
     }
     const fondDeCaisse = parseFondDeCaisse(fond_de_caisse);
     if (fondDeCaisse === null) {
-      return res.status(400).json({ error: 'fond_de_caisse is required and must be a number >= 0' });
+      throw new ValidationError('fond_de_caisse is required and must be a number >= 0');
     }
     const closureDate = new Date(date);
     if (isNaN(closureDate.getTime())) {
-      return res.status(400).json({ error: 'Invalid date format' });
+      throw new ValidationError('Invalid date format');
     }
     const forceCreate = parseForceFlag(force);
-    const closure = await LegalJournalModel.createWeeklyClosure(closureDate, establishmentId, forceCreate, fondDeCaisse);
+    const userId = req.user ? String(req.user.id) : undefined;
+    const closure = await createClosureWithFailClosedJournal(
+      establishmentId,
+      'WEEKLY',
+      forceCreate,
+      userId,
+      () =>
+        LegalJournalModel.createWeeklyClosureOpen(
+          closureDate,
+          establishmentId,
+          forceCreate,
+          fondDeCaisse
+        ) as Promise<ClosureJournalPayload>
+    );
     
     res.status(201).json({
       ...closure,
@@ -101,35 +229,51 @@ router.post('/weekly', async (req, res) => {
         : 'Weekly closure bulletin created per French fiscal requirements'
     });
   } catch (error) {
-    process.stderr.write(`Error creating weekly closure: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to create weekly closure' });
+    logger.error(
+      'Error creating weekly closure',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_CLOSURE'
+    );
+    if (error instanceof AppError) throw error;
+    throw new AppError('Failed to create weekly closure', 500, 'LEGAL_CLOSURE_WEEKLY_CREATE_FAILED');
   }
-});
+}));
 
 /**
  * POST create monthly closure bulletin (scoped to the authenticated user's establishment).
  * POST /api/legal/closure/monthly
  */
-router.post('/monthly', async (req, res) => {
+router.post('/monthly', asyncHandler(async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
-    const establishmentId = req.user?.establishment_id;
-    if (!establishmentId) {
-      return res.status(400).json({ error: 'Closure must be scoped to an establishment. Only establishment users can create closures.' });
-    }
     const { date, force, fond_de_caisse } = req.body;
     if (!date) {
-      return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
+      throw new ValidationError('Date is required (YYYY-MM-DD format)');
     }
     const fondDeCaisse = parseFondDeCaisse(fond_de_caisse);
     if (fondDeCaisse === null) {
-      return res.status(400).json({ error: 'fond_de_caisse is required and must be a number >= 0' });
+      throw new ValidationError('fond_de_caisse is required and must be a number >= 0');
     }
     const closureDate = new Date(date);
     if (isNaN(closureDate.getTime())) {
-      return res.status(400).json({ error: 'Invalid date format' });
+      throw new ValidationError('Invalid date format');
     }
     const forceCreate = parseForceFlag(force);
-    const closure = await LegalJournalModel.createMonthlyClosure(closureDate, establishmentId, forceCreate, fondDeCaisse);
+    const userId = req.user ? String(req.user.id) : undefined;
+    const closure = await createClosureWithFailClosedJournal(
+      establishmentId,
+      'MONTHLY',
+      forceCreate,
+      userId,
+      () =>
+        LegalJournalModel.createMonthlyClosureOpen(
+          closureDate,
+          establishmentId,
+          forceCreate,
+          fondDeCaisse
+        ) as Promise<ClosureJournalPayload>
+    );
     
     res.status(201).json({
       ...closure,
@@ -138,35 +282,51 @@ router.post('/monthly', async (req, res) => {
         : 'Monthly closure bulletin created per French fiscal requirements'
     });
   } catch (error) {
-    process.stderr.write(`Error creating monthly closure: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to create monthly closure' });
+    logger.error(
+      'Error creating monthly closure',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_CLOSURE'
+    );
+    if (error instanceof AppError) throw error;
+    throw new AppError('Failed to create monthly closure', 500, 'LEGAL_CLOSURE_MONTHLY_CREATE_FAILED');
   }
-});
+}));
 
 /**
  * POST create annual closure bulletin (scoped to the authenticated user's establishment).
  * POST /api/legal/closure/annual
  */
-router.post('/annual', async (req, res) => {
+router.post('/annual', asyncHandler(async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
-    const establishmentId = req.user?.establishment_id;
-    if (!establishmentId) {
-      return res.status(400).json({ error: 'Closure must be scoped to an establishment. Only establishment users can create closures.' });
-    }
     const { date, force, fond_de_caisse } = req.body;
     if (!date) {
-      return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
+      throw new ValidationError('Date is required (YYYY-MM-DD format)');
     }
     const fondDeCaisse = parseFondDeCaisse(fond_de_caisse);
     if (fondDeCaisse === null) {
-      return res.status(400).json({ error: 'fond_de_caisse is required and must be a number >= 0' });
+      throw new ValidationError('fond_de_caisse is required and must be a number >= 0');
     }
     const closureDate = new Date(date);
     if (isNaN(closureDate.getTime())) {
-      return res.status(400).json({ error: 'Invalid date format' });
+      throw new ValidationError('Invalid date format');
     }
     const forceCreate = parseForceFlag(force);
-    const closure = await LegalJournalModel.createAnnualClosure(closureDate, establishmentId, forceCreate, fondDeCaisse);
+    const userId = req.user ? String(req.user.id) : undefined;
+    const closure = await createClosureWithFailClosedJournal(
+      establishmentId,
+      'ANNUAL',
+      forceCreate,
+      userId,
+      () =>
+        LegalJournalModel.createAnnualClosureOpen(
+          closureDate,
+          establishmentId,
+          forceCreate,
+          fondDeCaisse
+        ) as Promise<ClosureJournalPayload>
+    );
     
     res.status(201).json({
       ...closure,
@@ -175,59 +335,93 @@ router.post('/annual', async (req, res) => {
         : 'Annual closure bulletin created per French fiscal requirements'
     });
   } catch (error) {
-    process.stderr.write(`Error creating annual closure: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to create annual closure' });
+    logger.error(
+      'Error creating annual closure',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_CLOSURE'
+    );
+    if (error instanceof AppError) throw error;
+    throw new AppError('Failed to create annual closure', 500, 'LEGAL_CLOSURE_ANNUAL_CREATE_FAILED');
   }
-});
+}));
 
 /**
  * POST create closure bulletin (generic)
  * POST /api/legal/closure/create
  */
-router.post('/create', async (req, res) => {
+router.post('/create', asyncHandler(async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
-    const establishmentId = req.user?.establishment_id;
-    if (!establishmentId) {
-      return res.status(400).json({ error: 'Closure must be scoped to an establishment. Only establishment users can create closures.' });
-    }
     const { date, type, force, fond_de_caisse } = req.body;
 
     if (!date) {
-      return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
+      throw new ValidationError('Date is required (YYYY-MM-DD format)');
     }
     if (!type || !['DAILY', 'WEEKLY', 'MONTHLY', 'ANNUAL'].includes(type)) {
-      return res.status(400).json({
-        error: 'Valid closure type is required (DAILY, WEEKLY, MONTHLY, ANNUAL)'
-      });
+      throw new ValidationError('Valid closure type is required (DAILY, WEEKLY, MONTHLY, ANNUAL)');
     }
     const closureDate = new Date(date);
     if (isNaN(closureDate.getTime())) {
-      return res.status(400).json({ error: 'Invalid date format' });
+      throw new ValidationError('Invalid date format');
     }
 
     const forceCreate = parseForceFlag(force);
     const fondDeCaisse = parseFondDeCaisse(fond_de_caisse);
     if (fondDeCaisse === null) {
-      return res.status(400).json({ error: 'fond_de_caisse is required and must be a number >= 0' });
+      throw new ValidationError('fond_de_caisse is required and must be a number >= 0');
     }
 
-    let closure;
+    let closureCreator!: () => Promise<ClosureJournalPayload>;
     switch (type) {
       case 'DAILY':
-        closure = await LegalJournalModel.createDailyClosure(closureDate, establishmentId, undefined, forceCreate, fondDeCaisse);
+        closureCreator = () =>
+          LegalJournalModel.createDailyClosureOpen(
+            closureDate,
+            establishmentId,
+            undefined,
+            forceCreate,
+            fondDeCaisse
+          ) as Promise<ClosureJournalPayload>;
         break;
       case 'WEEKLY':
-        closure = await LegalJournalModel.createWeeklyClosure(closureDate, establishmentId, forceCreate, fondDeCaisse);
+        closureCreator = () =>
+          LegalJournalModel.createWeeklyClosureOpen(
+            closureDate,
+            establishmentId,
+            forceCreate,
+            fondDeCaisse
+          ) as Promise<ClosureJournalPayload>;
         break;
       case 'MONTHLY':
-        closure = await LegalJournalModel.createMonthlyClosure(closureDate, establishmentId, forceCreate, fondDeCaisse);
+        closureCreator = () =>
+          LegalJournalModel.createMonthlyClosureOpen(
+            closureDate,
+            establishmentId,
+            forceCreate,
+            fondDeCaisse
+          ) as Promise<ClosureJournalPayload>;
         break;
       case 'ANNUAL':
-        closure = await LegalJournalModel.createAnnualClosure(closureDate, establishmentId, forceCreate, fondDeCaisse);
+        closureCreator = () =>
+          LegalJournalModel.createAnnualClosureOpen(
+            closureDate,
+            establishmentId,
+            forceCreate,
+            fondDeCaisse
+          ) as Promise<ClosureJournalPayload>;
         break;
       default:
-        return res.status(400).json({ error: 'Invalid closure type' });
+        throw new ValidationError('Invalid closure type');
     }
+    const userId = req.user ? String(req.user.id) : undefined;
+    const closure = await createClosureWithFailClosedJournal(
+      establishmentId,
+      type as 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL',
+      forceCreate,
+      userId,
+      closureCreator
+    );
 
     res.status(201).json({
       closure,
@@ -237,21 +431,27 @@ router.post('/create', async (req, res) => {
     });
   } catch (error) {
     if (error instanceof Error && error.message.includes('already exists')) {
-      return res.status(409).json({ error: error.message });
+      throw new ConflictError(error.message);
     }
-    process.stderr.write(`Error creating ${String(req.body.type)} closure: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: `Failed to create ${req.body.type} closure` });
+    logger.error(
+      `Error creating ${String(req.body.type)} closure`,
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_CLOSURE'
+    );
+    if (error instanceof AppError) throw error;
+    throw new AppError(`Failed to create ${String(req.body.type)} closure`, 500, 'LEGAL_CLOSURE_CREATE_FAILED');
   }
-});
+}));
 
 /**
  * GET closure bulletins (scoped to the authenticated user's establishment when applicable).
  * GET /api/legal/closure/bulletins
  */
-router.get('/bulletins', async (req, res) => {
+router.get('/bulletins', asyncHandler(async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
     const { type } = req.query;
-    const establishmentId = req.user?.establishment_id ?? undefined;
 
     const limitRaw = req.query.limit;
     const offsetRaw = req.query.offset;
@@ -266,8 +466,8 @@ router.get('/bulletins', async (req, res) => {
 
     if (shouldPaginate) {
       const { bulletins, total } = await LegalJournalModel.getClosureBulletinsPaginated(
-        closureType,
         establishmentId,
+        closureType,
         { limit, offset }
       );
 
@@ -280,8 +480,8 @@ router.get('/bulletins', async (req, res) => {
     }
 
     const bulletins = await LegalJournalModel.getClosureBulletins(
-      closureType,
-      establishmentId
+      establishmentId,
+      closureType
     );
 
     res.json({
@@ -290,20 +490,25 @@ router.get('/bulletins', async (req, res) => {
       compliance_note: 'Closure bulletins for regulatory reporting',
     });
   } catch (error) {
-    process.stderr.write(`Error fetching closure bulletins: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to fetch closure bulletins' });
+    logger.error(
+      'Error fetching closure bulletins',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_CLOSURE'
+    );
+    throw new AppError('Failed to fetch closure bulletins', 500, 'LEGAL_CLOSURE_BULLETINS_FETCH_FAILED');
   }
-});
+}));
 
 /**
  * GET today's closure status (scoped to the user's establishment when applicable).
  * GET /api/legal/closure/today-status
  */
-router.get('/today-status', async (req, res) => {
+router.get('/today-status', asyncHandler(async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
-    const establishmentId = req.user?.establishment_id ?? undefined;
     const today = new Date();
-    const bulletins = await LegalJournalModel.getClosureBulletins('DAILY', establishmentId);
+    const bulletins = await LegalJournalModel.getClosureBulletins(establishmentId, 'DAILY');
     
     const todayBulletin = bulletins.find(bulletin => {
       const bulletinDate = new Date(bulletin.period_start);
@@ -319,7 +524,7 @@ router.get('/today-status', async (req, res) => {
           })(todayBulletin as unknown as { total_transactions?: number } & Record<string, unknown>)
         : null;
 
-    const lastFondDeCaisse = establishmentId ? await LegalJournalModel.getLastFondDeCaisse(establishmentId) : null;
+    const lastFondDeCaisse = await LegalJournalModel.getLastFondDeCaisse(establishmentId);
 
     res.json({
       date: today.toISOString().split('T')[0],
@@ -330,23 +535,28 @@ router.get('/today-status', async (req, res) => {
       compliance_note: 'Daily closure status for regulatory compliance'
     });
   } catch (error) {
-    process.stderr.write(`Error fetching today's closure status: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to fetch today\'s closure status' });
+    logger.error(
+      'Error fetching today closure status',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_CLOSURE'
+    );
+    throw new AppError('Failed to fetch today\'s closure status', 500, 'LEGAL_CLOSURE_TODAY_STATUS_FETCH_FAILED');
   }
-});
+}));
 
 /**
  * GET latest monthly closure bulletin (scoped to the user's establishment when applicable).
  * GET /api/legal/closure/monthly-latest
  */
-router.get('/monthly-latest', async (req, res) => {
+router.get('/monthly-latest', asyncHandler(async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
-    const establishmentId = req.user?.establishment_id ?? undefined;
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-    const bulletins = await LegalJournalModel.getClosureBulletins('MONTHLY', establishmentId);
+    const bulletins = await LegalJournalModel.getClosureBulletins(establishmentId, 'MONTHLY');
     const currentMonthBulletin = bulletins.find(bulletin => {
       const start = new Date(bulletin.period_start);
       const end = new Date(bulletin.period_end);
@@ -359,14 +569,19 @@ router.get('/monthly-latest', async (req, res) => {
     });
 
     if (!currentMonthBulletin) {
-      return res.status(404).json({ error: 'No monthly closure bulletin found for the current month.' });
+      throw new NotFoundError('Monthly closure bulletin for the current month');
     }
 
     res.json(currentMonthBulletin);
   } catch (error) {
-    process.stderr.write(`Error fetching latest monthly closure: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to fetch latest monthly closure' });
+    if (error instanceof AppError) throw error;
+    logger.error(
+      'Error fetching latest monthly closure',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_CLOSURE'
+    );
+    throw new AppError('Failed to fetch latest monthly closure', 500, 'LEGAL_CLOSURE_MONTHLY_LATEST_FETCH_FAILED');
   }
-});
+}));
 
 export default router; 

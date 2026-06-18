@@ -1,11 +1,14 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { pool } from '../app';
+import PDFDocument from 'pdfkit';
+import { pool } from '../db/pool';
 import LegalJournalModel from './legalJournal';
+import { getRegisterIdForEstablishment } from '../utils/registerId';
 
 export interface ArchiveExport {
   id: number;
+  establishment_id?: string | null;
   export_type: 'DAILY' | 'MONTHLY' | 'ANNUAL' | 'FULL';
   period_start: Date;
   period_end: Date;
@@ -34,6 +37,10 @@ export class ArchiveService {
   private static readonly EXPORT_DIR = path.join(process.cwd(), 'exports');
   // No hardcoded fallback: use ARCHIVE_SECRET_KEY from env; throw if missing when signing/verifying.
 
+  private static resolveRegisterId(establishmentId?: string): string {
+    return getRegisterIdForEstablishment(establishmentId);
+  }
+
   // Initialize export directory
   static async initialize(): Promise<void> {
     if (!fs.existsSync(this.EXPORT_DIR)) {
@@ -42,7 +49,7 @@ export class ArchiveService {
   }
 
   // Create HMAC signature for file integrity
-  private static createDigitalSignature(data: string): string {
+  private static createDigitalSignature(data: string | Buffer): string {
     const key = process.env.ARCHIVE_SECRET_KEY;
     if (!key || key.length < 32) {
       throw new Error(
@@ -54,7 +61,7 @@ export class ArchiveService {
   }
 
   // Verify HMAC signature (throws if ARCHIVE_SECRET_KEY is not set)
-  static verifyDigitalSignature(data: string, signature: string): boolean {
+  static verifyDigitalSignature(data: string | Buffer, signature: string): boolean {
     const expectedSignature = this.createDigitalSignature(data);
     return crypto.timingSafeEqual(
       Buffer.from(signature, 'hex'),
@@ -63,7 +70,7 @@ export class ArchiveService {
   }
 
   // Generate file hash for integrity verification
-  private static generateFileHash(data: string): string {
+  private static generateFileHash(data: string | Buffer): string {
     return crypto.createHash('sha256').update(data).digest('hex');
   }
 
@@ -74,9 +81,9 @@ export class ArchiveService {
     // Create archive export record
     const query = `
       INSERT INTO archive_exports (
-        export_type, period_start, period_end, file_path, file_hash, 
-        file_size, format, digital_signature, export_status, created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        export_type, period_start, period_end, file_path, file_hash,
+        file_size, format, digital_signature, export_status, created_by, establishment_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
     `;
 
@@ -91,7 +98,8 @@ export class ArchiveService {
       exportData.format,
       '', // Will be updated after file creation
       'PENDING',
-      exportData.created_by
+      exportData.created_by,
+      exportData.establishment_id ?? null
     ];
 
     const result = await pool.query(query, values);
@@ -137,44 +145,76 @@ export class ArchiveService {
   }
 
   // Generate export content based on format and type
-  private static async generateExportContent(exportData: ExportData): Promise<string> {
+  private static async generateExportContent(exportData: ExportData): Promise<string | Buffer> {
     let data: Record<string, unknown> = {};
 
     switch (exportData.export_type) {
       case 'DAILY':
-        if (exportData.period_start) {
-          if (!exportData.establishment_id) {
-            throw new Error('DAILY export requires establishment_id for multi-tenant legal journal.');
-          }
-          const closure = await LegalJournalModel.createDailyClosure(exportData.period_start, exportData.establishment_id);
+        if (!exportData.establishment_id) {
+          throw new Error('DAILY export requires establishment_id for multi-tenant legal journal.');
+        }
+        if (!exportData.period_start) {
+          throw new Error('DAILY export requires period_start.');
+        }
+        {
+          const dayStart = new Date(exportData.period_start);
+          dayStart.setUTCHours(0, 0, 0, 0);
+          const dayEnd = exportData.period_end ? new Date(exportData.period_end) : new Date(dayStart);
+          dayEnd.setUTCHours(23, 59, 59, 999);
+
+          const dailyEntries = await LegalJournalModel.getEntriesForPeriod(
+            exportData.establishment_id,
+            dayStart,
+            dayEnd
+          );
+          const dailySales = dailyEntries.filter(e => e.transaction_type === 'SALE');
+          const dailyClosures = await LegalJournalModel.getClosureBulletins(exportData.establishment_id, 'DAILY');
+          const matchingClosure = dailyClosures.find((closure) =>
+            new Date(closure.period_start).getTime() === dayStart.getTime() &&
+            new Date(closure.period_end).getTime() === dayEnd.getTime()
+          ) ?? null;
+
           data = {
             export_type: 'DAILY',
             period: {
-              start: exportData.period_start.toISOString(),
-              end: exportData.period_end?.toISOString()
+              start: dayStart.toISOString(),
+              end: dayEnd.toISOString()
             },
-            closure_data: closure,
+            summary: {
+              total_transactions: dailySales.length,
+              total_amount: dailySales.reduce((sum, e) => sum + parseFloat(e.amount.toString()), 0),
+              total_vat: dailySales.reduce((sum, e) => sum + parseFloat(e.vat_amount.toString()), 0)
+            },
+            transactions: dailySales,
+            closure_data: matchingClosure,
             compliance_info: {
               legal_reference: 'Article 286-I-3 bis du CGI',
               export_timestamp: new Date().toISOString(),
-              register_id: 'MUSEBAR-REG-001'
+              register_id: this.resolveRegisterId(exportData.establishment_id)
             }
           };
         }
         break;
 
-      case 'MONTHLY':
+      case 'MONTHLY': {
+        if (!exportData.establishment_id) {
+          throw new Error('MONTHLY export requires establishment_id for legal journal scoping.');
+        }
         // Get monthly data
         const monthStart = exportData.period_start || new Date();
-        monthStart.setDate(1);
-        monthStart.setHours(0, 0, 0, 0);
+        monthStart.setUTCDate(1);
+        monthStart.setUTCHours(0, 0, 0, 0);
         
         const monthEnd = new Date(monthStart);
-        monthEnd.setMonth(monthEnd.getMonth() + 1);
-        monthEnd.setDate(0);
-        monthEnd.setHours(23, 59, 59, 999);
+        monthEnd.setUTCMonth(monthEnd.getUTCMonth() + 1);
+        monthEnd.setUTCDate(0);
+        monthEnd.setUTCHours(23, 59, 59, 999);
 
-        const monthlyEntries = await LegalJournalModel.getEntriesForPeriod(monthStart, monthEnd);
+        const monthlyEntries = await LegalJournalModel.getEntriesForPeriod(
+          exportData.establishment_id,
+          monthStart,
+          monthEnd
+        );
         const monthlySales = monthlyEntries.filter(e => e.transaction_type === 'SALE');
         
         data = {
@@ -192,15 +232,65 @@ export class ArchiveService {
           compliance_info: {
             legal_reference: 'Article 286-I-3 bis du CGI',
             export_timestamp: new Date().toISOString(),
-            register_id: 'MUSEBAR-REG-001'
+            register_id: this.resolveRegisterId(exportData.establishment_id)
           }
         };
         break;
+      }
 
-      case 'FULL':
-        // Get all journal entries
-        const allEntries = await pool.query('SELECT * FROM legal_journal ORDER BY sequence_number ASC');
-        const allClosures = await LegalJournalModel.getClosureBulletins();
+      case 'ANNUAL': {
+        if (!exportData.establishment_id) {
+          throw new Error('ANNUAL export requires establishment_id for legal journal scoping.');
+        }
+        const annualStart = exportData.period_start || new Date();
+        const year = annualStart.getUTCFullYear();
+        const yearStart = new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0));
+        const yearEnd = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
+
+        const annualEntries = await LegalJournalModel.getEntriesForPeriod(
+          exportData.establishment_id,
+          yearStart,
+          yearEnd
+        );
+        const annualSales = annualEntries.filter(e => e.transaction_type === 'SALE');
+        const annualClosures = await LegalJournalModel.getClosureBulletins(exportData.establishment_id, 'ANNUAL');
+        const matchingAnnualClosure = annualClosures.find((closure) =>
+          new Date(closure.period_start).getTime() === yearStart.getTime() &&
+          new Date(closure.period_end).getTime() === yearEnd.getTime()
+        ) ?? null;
+
+        data = {
+          export_type: 'ANNUAL',
+          period: {
+            start: yearStart.toISOString(),
+            end: yearEnd.toISOString()
+          },
+          summary: {
+            total_transactions: annualSales.length,
+            total_amount: annualSales.reduce((sum, e) => sum + parseFloat(e.amount.toString()), 0),
+            total_vat: annualSales.reduce((sum, e) => sum + parseFloat(e.vat_amount.toString()), 0)
+          },
+          transactions: annualSales,
+          closure_data: matchingAnnualClosure,
+          compliance_info: {
+            legal_reference: 'Article 286-I-3 bis du CGI',
+            export_timestamp: new Date().toISOString(),
+            register_id: this.resolveRegisterId(exportData.establishment_id)
+          }
+        };
+        break;
+      }
+
+      case 'FULL': {
+        if (!exportData.establishment_id) {
+          throw new Error('FULL export requires establishment_id for legal journal scoping.');
+        }
+        const eid = exportData.establishment_id;
+        const allEntries = await pool.query(
+          'SELECT * FROM legal_journal WHERE establishment_id = $1 ORDER BY sequence_number ASC',
+          [eid]
+        );
+        const allClosures = await LegalJournalModel.getClosureBulletins(eid);
         
         data = {
           export_type: 'FULL',
@@ -209,12 +299,13 @@ export class ArchiveService {
           closure_bulletins: allClosures,
           compliance_info: {
             legal_reference: 'Article 286-I-3 bis du CGI',
-            register_id: 'MUSEBAR-REG-001',
+            register_id: this.resolveRegisterId(eid),
             total_entries: allEntries.rows.length,
-            integrity_verification: await LegalJournalModel.verifyJournalIntegrity()
+            integrity_verification: await LegalJournalModel.verifyJournalIntegrity(eid)
           }
         };
         break;
+      }
     }
 
     // Format data according to specified format
@@ -229,7 +320,7 @@ export class ArchiveService {
         return this.convertToCSV(data);
       
       case 'PDF':
-        return this.convertToPDF(data);
+        return await this.convertToPDF(data);
       
       default:
         return JSON.stringify(data, null, 2);
@@ -254,7 +345,7 @@ export class ArchiveService {
     xmlContent += '  <compliance_info>\n';
     xmlContent += `    <legal_reference>${data.compliance_info?.legal_reference || 'Article 286-I-3 bis du CGI'}</legal_reference>\n`;
     xmlContent += `    <export_timestamp>${data.compliance_info?.export_timestamp || new Date().toISOString()}</export_timestamp>\n`;
-    xmlContent += `    <register_id>${data.compliance_info?.register_id || 'MUSEBAR-REG-001'}</register_id>\n`;
+    xmlContent += `    <register_id>${data.compliance_info?.register_id || getRegisterIdForEstablishment()}</register_id>\n`;
     xmlContent += '  </compliance_info>\n';
     
     // Add export data
@@ -287,33 +378,95 @@ export class ArchiveService {
       csvContent += `${data.export_type},${data.closure_data.period_start},${data.closure_data.period_end},${data.closure_data.total_transactions},${data.closure_data.total_amount},${data.closure_data.total_vat},${exportTimestamp}\n`;
     } else if (data.export_type === 'MONTHLY') {
       csvContent += `${data.export_type},${data.period?.start ?? ''},${data.period?.end ?? ''},${data.summary?.total_transactions ?? ''},${data.summary?.total_amount ?? ''},${data.summary?.total_vat ?? ''},${exportTimestamp}\n`;
+    } else if (data.export_type === 'ANNUAL') {
+      csvContent += `${data.export_type},${data.period?.start ?? ''},${data.period?.end ?? ''},${data.summary?.total_transactions ?? ''},${data.summary?.total_amount ?? ''},${data.summary?.total_vat ?? ''},${exportTimestamp}\n`;
     }
     
     return csvContent;
   }
 
-  /** PDF export: placeholder until a real PDF library is integrated. */
-  private static convertToPDF(data: { export_type?: string }): string {
-    return `MuseBar export (${data.export_type ?? 'unknown'}) — PDF generation not implemented.`;
+  /** Generate a real PDF binary for legal archive exports. */
+  private static async convertToPDF(data: Record<string, unknown>): Promise<Buffer> {
+    return await new Promise<Buffer>((resolve, reject) => {
+      const doc = new PDFDocument({
+        size: 'A4',
+        margin: 48,
+        info: {
+          Title: `MuseBar ${String(data.export_type ?? 'UNKNOWN')} archive export`,
+          Author: 'MuseBar',
+          Subject: 'Fiscal legal archive export',
+          Creator: 'MOSEHXL backend',
+        },
+      });
+      const chunks: Buffer[] = [];
+
+      doc.on('data', (chunk: Buffer | string) => {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      });
+      doc.on('error', reject);
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+
+      const compliance = data.compliance_info && typeof data.compliance_info === 'object'
+        ? data.compliance_info as Record<string, unknown>
+        : null;
+      const period = data.period && typeof data.period === 'object'
+        ? data.period as Record<string, unknown>
+        : null;
+
+      doc.fontSize(18).text('MuseBar Legal Archive Export', { align: 'center' });
+      doc.moveDown(0.7);
+      doc.fontSize(12).text(`Export type: ${String(data.export_type ?? 'UNKNOWN')}`);
+      doc.text(`Generated at: ${String(compliance?.export_timestamp ?? new Date().toISOString())}`);
+      doc.text(`Legal reference: ${String(compliance?.legal_reference ?? 'Article 286-I-3 bis du CGI')}`);
+      if (period?.start && period?.end) {
+        doc.text(`Period: ${String(period.start)} -> ${String(period.end)}`);
+      }
+
+      doc.moveDown();
+      doc.fontSize(11).text('Serialized payload', { underline: true });
+      doc.moveDown(0.4);
+      doc.font('Courier').fontSize(8);
+
+      const serialized = JSON.stringify(data, null, 2);
+      for (const line of serialized.split('\n')) {
+        doc.text(line, {
+          width: 500,
+        });
+      }
+
+      doc.end();
+    });
   }
 
-  // Get all archive exports
-  static async getArchiveExports(): Promise<ArchiveExport[]> {
-    const query = 'SELECT * FROM archive_exports ORDER BY created_at DESC';
-    const result = await pool.query(query);
+  /**
+   * List exports for one establishment only. Callers must pass a real tenant id —
+   * no global listing (fiscal / GDPR isolation).
+   */
+  static async getArchiveExports(establishmentId: string): Promise<ArchiveExport[]> {
+    const result = await pool.query(
+      'SELECT * FROM archive_exports WHERE establishment_id = $1 ORDER BY created_at DESC',
+      [establishmentId]
+    );
     return result.rows;
   }
 
-  // Get archive export by ID
-  static async getArchiveExportById(id: number): Promise<ArchiveExport | null> {
-    const query = 'SELECT * FROM archive_exports WHERE id = $1';
-    const result = await pool.query(query, [id]);
+  /**
+   * Fetch a single export only if it belongs to the given establishment.
+   */
+  static async getArchiveExportById(id: number, establishmentId: string): Promise<ArchiveExport | null> {
+    const result = await pool.query(
+      'SELECT * FROM archive_exports WHERE id = $1 AND establishment_id = $2',
+      [id, establishmentId]
+    );
     return result.rows[0] || null;
   }
 
-  // Verify archive export integrity
-  static async verifyArchiveExport(id: number): Promise<{ isValid: boolean; errors: string[] }> {
-    const exportRecord = await this.getArchiveExportById(id);
+  // Verify archive export integrity (tenant-scoped: cannot verify another tenant's file by id alone)
+  static async verifyArchiveExport(
+    id: number,
+    establishmentId: string
+  ): Promise<{ isValid: boolean; errors: string[] }> {
+    const exportRecord = await this.getArchiveExportById(id, establishmentId);
     if (!exportRecord) {
       return { isValid: false, errors: ['Archive export not found'] };
     }
@@ -328,7 +481,7 @@ export class ArchiveService {
       }
 
       // Read file content
-      const fileContent = fs.readFileSync(exportRecord.file_path, 'utf8');
+      const fileContent = fs.readFileSync(exportRecord.file_path);
       
       // Verify file hash
       const currentHash = this.generateFileHash(fileContent);
@@ -350,8 +503,8 @@ export class ArchiveService {
       // Update verification timestamp if valid
       if (errors.length === 0) {
         await pool.query(
-          'UPDATE archive_exports SET export_status = $1, verified_at = $2 WHERE id = $3',
-          ['VERIFIED', new Date(), id]
+          'UPDATE archive_exports SET export_status = $1, verified_at = $2 WHERE id = $3 AND establishment_id = $4',
+          ['VERIFIED', new Date(), id, establishmentId]
         );
       }
 
@@ -362,9 +515,12 @@ export class ArchiveService {
     }
   }
 
-  // Download archive export file
-  static async downloadArchiveExport(id: number): Promise<{ filePath: string; fileName: string } | null> {
-    const exportRecord = await this.getArchiveExportById(id);
+  // Download archive export file (tenant-scoped)
+  static async downloadArchiveExport(
+    id: number,
+    establishmentId: string
+  ): Promise<{ filePath: string; fileName: string } | null> {
+    const exportRecord = await this.getArchiveExportById(id, establishmentId);
     if (!exportRecord || !fs.existsSync(exportRecord.file_path)) {
       return null;
     }

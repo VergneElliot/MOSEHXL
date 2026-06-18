@@ -37,6 +37,7 @@ export type {
 import { Logger } from '../../utils/logger';
 import { EmailService } from '../email';
 import { EnvironmentConfig } from '../../config/environment';
+import { validatePasswordWithBreachCheck } from '../../utils/passwordValidation';
 
 /**
  * Main User Invitation Service - Legacy compatibility wrapper
@@ -217,6 +218,14 @@ export class UserInvitationService {
           emailSent: false
         };
       }
+      const breachValidation = await validatePasswordWithBreachCheck(password);
+      if (!breachValidation.isValid) {
+        return {
+          success: false,
+          message: breachValidation.error ?? 'Invalid password',
+          emailSent: false
+        };
+      }
 
       // Accept invitation
       return await this.acceptance.acceptEstablishmentInvitation({ token, password });
@@ -262,6 +271,14 @@ export class UserInvitationService {
         return {
           success: false,
           message: passwordValidation.message,
+          emailSent: false
+        };
+      }
+      const breachValidation = await validatePasswordWithBreachCheck(password);
+      if (!breachValidation.isValid) {
+        return {
+          success: false,
+          message: breachValidation.error ?? 'Invalid password',
           emailSent: false
         };
       }

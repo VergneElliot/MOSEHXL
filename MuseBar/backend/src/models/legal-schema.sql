@@ -1,6 +1,9 @@
 -- Legal compliance tables for French fiscal requirements
 -- Source of truth: migrations in migrations/files/. Types/precision aligned with post-migration state (audit #42).
 -- These tables implement the ISCA pillars (Inaltérabilité, Sécurisation, Conservation, Archivage)
+-- Multi-tenant: `legal_journal` is scoped with `establishment_id` and sequence uniqueness is per
+-- establishment (see migration `2026_04_23_00_00_00_legal_journal_per_establishment.sql`).
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- Append-only legal journal for transaction immutability
 CREATE TABLE IF NOT EXISTS legal_journal (
@@ -38,6 +41,11 @@ CREATE TABLE IF NOT EXISTS closure_bulletins (
     payment_methods_breakdown JSONB NOT NULL, -- Totals by payment method
     tips_total DECIMAL(12,4) NOT NULL DEFAULT 0, -- Aggregate tips in closure period
     change_total DECIMAL(12,4) NOT NULL DEFAULT 0, -- Aggregate change in closure period
+    journal_sales_count INTEGER NOT NULL DEFAULT 0, -- SALE entries found in legal journal for this period
+    journal_sales_amount DECIMAL(12,4) NOT NULL DEFAULT 0, -- SUM(legal_journal.amount) for SALE entries
+    journal_sales_vat DECIMAL(12,4) NOT NULL DEFAULT 0, -- SUM(legal_journal.vat_amount) for SALE entries
+    reconciliation_ok BOOLEAN NOT NULL DEFAULT TRUE, -- Whether closure totals reconcile against legal journal
+    reconciliation_details JSONB NOT NULL DEFAULT '{}'::jsonb, -- Delta details when reconciliation fails
     first_sequence INTEGER, -- First transaction sequence in period
     last_sequence INTEGER, -- Last transaction sequence in period
     closure_hash VARCHAR(64) NOT NULL, -- Closure integrity hash
@@ -126,6 +134,98 @@ CREATE TRIGGER trigger_prevent_legal_journal_modification
     FOR EACH ROW
     EXECUTE FUNCTION prevent_legal_journal_modification();
 
+-- Statement-level trigger to prevent table-wide purge by TRUNCATE
+CREATE OR REPLACE FUNCTION prevent_legal_journal_truncate()
+RETURNS TRIGGER AS $$
+BEGIN
+    RAISE EXCEPTION 'TRUNCATE of legal journal is forbidden for legal compliance (Article 286-I-3 bis du CGI)';
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_prevent_legal_journal_truncate ON legal_journal;
+CREATE TRIGGER trigger_prevent_legal_journal_truncate
+    BEFORE TRUNCATE ON legal_journal
+    FOR EACH STATEMENT
+    EXECUTE FUNCTION prevent_legal_journal_truncate();
+
+-- Trigger to enforce hash-chain correctness on every INSERT (belt-and-braces)
+CREATE OR REPLACE FUNCTION enforce_legal_journal_insert_integrity()
+RETURNS TRIGGER AS $$
+DECLARE
+    last_sequence INTEGER;
+    last_hash TEXT;
+    expected_sequence INTEGER;
+    expected_previous_hash TEXT;
+    timestamp_for_hash TEXT;
+    order_id_for_hash TEXT;
+    payload TEXT;
+    expected_current_hash TEXT;
+BEGIN
+    SELECT lj.sequence_number, lj.current_hash
+      INTO last_sequence, last_hash
+    FROM legal_journal lj
+    WHERE lj.establishment_id = NEW.establishment_id
+    ORDER BY lj.sequence_number DESC
+    LIMIT 1;
+
+    expected_sequence := COALESCE(last_sequence, 0) + 1;
+    expected_previous_hash := COALESCE(
+      last_hash,
+      '0000000000000000000000000000000000000000000000000000000000000000'
+    );
+
+    IF NEW.sequence_number IS DISTINCT FROM expected_sequence THEN
+      RAISE EXCEPTION 'Invalid legal journal sequence number %, expected % for establishment %',
+        NEW.sequence_number, expected_sequence, NEW.establishment_id;
+    END IF;
+
+    IF NEW.previous_hash IS DISTINCT FROM expected_previous_hash THEN
+      RAISE EXCEPTION 'Invalid legal journal previous_hash for sequence % (expected %, got %)',
+        NEW.sequence_number, expected_previous_hash, NEW.previous_hash;
+    END IF;
+
+    timestamp_for_hash := to_char(
+      NEW.timestamp AT TIME ZONE 'UTC',
+      'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+    );
+    order_id_for_hash := CASE
+      WHEN NEW.order_id IS NULL THEN 'null'
+      WHEN NEW.order_id = 0 THEN ''
+      ELSE NEW.order_id::text
+    END;
+
+    payload := concat_ws(
+      '|',
+      NEW.sequence_number::text,
+      NEW.transaction_type::text,
+      order_id_for_hash,
+      NEW.amount::text,
+      NEW.vat_amount::text,
+      NEW.payment_method::text,
+      timestamp_for_hash,
+      NEW.register_id::text
+    );
+
+    expected_current_hash := encode(
+      digest(expected_previous_hash || '|' || payload, 'sha256'),
+      'hex'
+    );
+
+    IF NEW.current_hash IS DISTINCT FROM expected_current_hash THEN
+      RAISE EXCEPTION 'Invalid legal journal current_hash for sequence % (expected %, got %)',
+        NEW.sequence_number, expected_current_hash, NEW.current_hash;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_enforce_legal_journal_insert_integrity ON legal_journal;
+CREATE TRIGGER trigger_enforce_legal_journal_insert_integrity
+    BEFORE INSERT ON legal_journal
+    FOR EACH ROW
+    EXECUTE FUNCTION enforce_legal_journal_insert_integrity();
+
 -- Trigger to prevent modification of closed closure bulletins
 CREATE OR REPLACE FUNCTION prevent_closed_bulletin_modification()
 RETURNS TRIGGER AS $$
@@ -157,7 +257,7 @@ INSERT INTO legal_journal (
     '0000000000000000000000000000000000000000000000000000000000000000',
     'a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3', -- SHA-256 of "hello"
     CURRENT_TIMESTAMP,
-    'MUSEBAR-REG-001'
+    'CR-UNKNOWN'
 ) ON CONFLICT (sequence_number) DO NOTHING;
 
 -- Grant appropriate permissions

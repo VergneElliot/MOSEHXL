@@ -60,7 +60,7 @@ export const validateParams = (paramRules: ParamValidationRule[]) => {
     for (const rule of paramRules) {
       const value = req.params[rule.param];
       
-      if (!rule.validator(value)) {
+      if (!rule.validator(value ?? '')) {
         errors.push(rule.message || `Paramètre '${rule.param}' invalide`);
       }
     }

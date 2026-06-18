@@ -6,7 +6,7 @@
 import { ClosureBulletin, VATBreakdown, ClosureType } from './types';
 import { JournalQueries } from './journalQueries';
 import { JournalSigning } from './journalSigning';
-import { pool } from '../../app';
+import { pool } from '../../db/pool';
 import { DEFAULT_APP_TIMEZONE } from '../../config/timezone';
 import { getBusinessDayPeriod } from './businessDayPeriod';
 import { computePaymentBreakdownFromOrders } from './paymentBreakdown';
@@ -27,6 +27,32 @@ function vatFromTtc(ttc: number, rate: 0.1 | 0.2): number {
   return roundTo4(ttc / denom);
 }
 
+function computeReconciliation(
+  closureTotals: { transactions: number; amount: number; vat: number },
+  journalTotals: { count: number; amount: number; vat: number }
+): { ok: boolean; details: Record<string, unknown> } {
+  const txDelta = closureTotals.transactions - journalTotals.count;
+  const amountDelta = roundTo4(closureTotals.amount - journalTotals.amount);
+  const vatDelta = roundTo4(closureTotals.vat - journalTotals.vat);
+  const ok = txDelta === 0 && Math.abs(amountDelta) < 0.0001 && Math.abs(vatDelta) < 0.0001;
+
+  return {
+    ok,
+    details: {
+      closure_transactions: closureTotals.transactions,
+      journal_sale_transactions: journalTotals.count,
+      transaction_delta: txDelta,
+      closure_total_amount: roundTo4(closureTotals.amount),
+      journal_sale_amount: roundTo4(journalTotals.amount),
+      amount_delta: amountDelta,
+      closure_total_vat: roundTo4(closureTotals.vat),
+      journal_sale_vat: roundTo4(journalTotals.vat),
+      vat_delta: vatDelta,
+      compared_at: new Date().toISOString(),
+    },
+  };
+}
+
 export class ClosureOperations {
   /**
    * Create daily closure bulletin for one establishment (multi-tenant: only that establishment's orders).
@@ -40,7 +66,8 @@ export class ClosureOperations {
     establishmentId: string,
     timezone: string = DEFAULT_APP_TIMEZONE,
     force = false,
-    fondDeCaisse?: number
+    fondDeCaisse?: number,
+    closeImmediately = true
   ): Promise<ClosureBulletin> {
     // Business day period uses configurable timezone (Paris for France)
     const { start, end } = getBusinessDayPeriod(date, '02:00', timezone);
@@ -85,9 +112,18 @@ export class ClosureOperations {
     const changeTotal = Math.max(0, netChangeTotal);
 
     // Get legal journal entries for sequence calculation
-    const entries = await JournalQueries.getEntriesForPeriod(start.toDate(), end.toDate());
+    const entries = await JournalQueries.getEntriesForPeriod(establishmentId, start.toDate(), end.toDate());
     const firstSequence = entries.length > 0 ? Math.min(...entries.map((e) => e.sequence_number)) : 0;
     const lastSequence = entries.length > 0 ? Math.max(...entries.map((e) => e.sequence_number)) : 0;
+    const journalSaleSummary = await JournalQueries.getSaleSummaryForPeriod(
+      establishmentId,
+      start.toDate(),
+      end.toDate()
+    );
+    const reconciliation = computeReconciliation(
+      { transactions: totalTransactions, amount: computedTotalAmount, vat: computedTotalVat },
+      journalSaleSummary
+    );
 
     // Generate closure hash
     const closureData = `DAILY|${date.toISOString().split('T')[0]}|${totalTransactions}|${computedTotalAmount}|${computedTotalVat}|${firstSequence}|${lastSequence}`;
@@ -109,10 +145,16 @@ export class ClosureOperations {
       paymentBreakdown,
       tipsTotal,
       changeTotal,
+      journalSaleSummary.count,
+      journalSaleSummary.amount,
+      journalSaleSummary.vat,
+      reconciliation.ok,
+      reconciliation.details,
       firstSequence,
       lastSequence,
       closureHash,
-      establishmentId
+      establishmentId,
+      closeImmediately
     );
   }
 
@@ -123,7 +165,8 @@ export class ClosureOperations {
     date: Date,
     establishmentId: string,
     force = false,
-    fondDeCaisse?: number
+    fondDeCaisse?: number,
+    closeImmediately = true
   ): Promise<ClosureBulletin> {
     // Get the start of the week (Monday) and end of the week (Sunday)
     const startOfWeek = new Date(date);
@@ -136,7 +179,16 @@ export class ClosureOperations {
     endOfWeek.setDate(endOfWeek.getDate() + 6);
     endOfWeek.setHours(23, 59, 59, 999);
 
-    return await this.createPeriodClosure('WEEKLY', startOfWeek, endOfWeek, date, establishmentId, force, fondDeCaisse);
+    return await this.createPeriodClosure(
+      'WEEKLY',
+      startOfWeek,
+      endOfWeek,
+      date,
+      establishmentId,
+      force,
+      fondDeCaisse,
+      closeImmediately
+    );
   }
 
   /**
@@ -146,13 +198,23 @@ export class ClosureOperations {
     date: Date,
     establishmentId: string,
     force = false,
-    fondDeCaisse?: number
+    fondDeCaisse?: number,
+    closeImmediately = true
   ): Promise<ClosureBulletin> {
     // Get the start and end of the month
     const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
     const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
 
-    return await this.createPeriodClosure('MONTHLY', startOfMonth, endOfMonth, date, establishmentId, force, fondDeCaisse);
+    return await this.createPeriodClosure(
+      'MONTHLY',
+      startOfMonth,
+      endOfMonth,
+      date,
+      establishmentId,
+      force,
+      fondDeCaisse,
+      closeImmediately
+    );
   }
 
   /**
@@ -162,13 +224,23 @@ export class ClosureOperations {
     date: Date,
     establishmentId: string,
     force = false,
-    fondDeCaisse?: number
+    fondDeCaisse?: number,
+    closeImmediately = true
   ): Promise<ClosureBulletin> {
     // Get the start and end of the year
     const startOfYear = new Date(date.getFullYear(), 0, 1);
     const endOfYear = new Date(date.getFullYear(), 11, 31, 23, 59, 59, 999);
 
-    return await this.createPeriodClosure('ANNUAL', startOfYear, endOfYear, date, establishmentId, force, fondDeCaisse);
+    return await this.createPeriodClosure(
+      'ANNUAL',
+      startOfYear,
+      endOfYear,
+      date,
+      establishmentId,
+      force,
+      fondDeCaisse,
+      closeImmediately
+    );
   }
 
   /**
@@ -181,7 +253,8 @@ export class ClosureOperations {
     referenceDate: Date,
     establishmentId: string,
     force = false,
-    fondDeCaisse?: number
+    fondDeCaisse?: number,
+    closeImmediately = true
   ): Promise<ClosureBulletin> {
     // Check if closure already exists for this establishment
     const exists = await JournalQueries.closureBulletinExists(closureType, startDate, endDate, establishmentId);
@@ -220,9 +293,18 @@ export class ClosureOperations {
     const changeTotal = Math.max(0, orders.reduce((sum: number, order: { change?: string | number }) => sum + parseFloat(String(order.change || '0')), 0));
 
     // Get journal sequence range
-    const entries = await JournalQueries.getEntriesForPeriod(startDate, endDate);
+    const entries = await JournalQueries.getEntriesForPeriod(establishmentId, startDate, endDate);
     const firstSequence = entries.length > 0 ? Math.min(...entries.map(e => e.sequence_number)) : 0;
     const lastSequence = entries.length > 0 ? Math.max(...entries.map(e => e.sequence_number)) : 0;
+    const journalSaleSummary = await JournalQueries.getSaleSummaryForPeriod(
+      establishmentId,
+      startDate,
+      endDate
+    );
+    const reconciliation = computeReconciliation(
+      { transactions: totalTransactions, amount: computedTotalAmount, vat: computedTotalVat },
+      journalSaleSummary
+    );
 
     // Generate closure hash
     const closureData = `${closureType}|${startDate.toISOString()}|${endDate.toISOString()}|${totalTransactions}|${computedTotalAmount}|${computedTotalVat}|${firstSequence}|${lastSequence}`;
@@ -243,29 +325,49 @@ export class ClosureOperations {
       paymentBreakdown,
       tipsTotal,
       changeTotal,
+      journalSaleSummary.count,
+      journalSaleSummary.amount,
+      journalSaleSummary.vat,
+      reconciliation.ok,
+      reconciliation.details,
       firstSequence,
       lastSequence,
       closureHash,
-      establishmentId
+      establishmentId,
+      closeImmediately
     );
   }
 
+  static async closeOpenClosureBulletin(
+    closureBulletinId: number,
+    establishmentId: string
+  ): Promise<ClosureBulletin | null> {
+    return await JournalQueries.closeOpenClosureBulletin(closureBulletinId, establishmentId);
+  }
+
+  static async deleteOpenClosureBulletin(
+    closureBulletinId: number,
+    establishmentId: string
+  ): Promise<boolean> {
+    return await JournalQueries.deleteOpenClosureBulletin(closureBulletinId, establishmentId);
+  }
+
   /**
-   * Get closure bulletins (optionally filtered by type and/or establishment).
+   * Get closure bulletins for one establishment (optionally filtered by type).
    */
   static async getClosureBulletins(
-    type?: 'DAILY' | 'MONTHLY' | 'ANNUAL',
-    establishmentId?: string
+    establishmentId: string,
+    type?: 'DAILY' | 'MONTHLY' | 'ANNUAL'
   ): Promise<ClosureBulletin[]> {
-    return await JournalQueries.getClosureBulletins(type, establishmentId);
+    return await JournalQueries.getClosureBulletins(establishmentId, type);
   }
 
   static async getClosureBulletinsPaginated(
+    establishmentId: string,
     type?: 'DAILY' | 'MONTHLY' | 'ANNUAL',
-    establishmentId?: string,
     opts?: { limit?: number; offset?: number }
   ): Promise<{ bulletins: ClosureBulletin[]; total: number }> {
-    return await JournalQueries.getClosureBulletinsPaginated(type, establishmentId, opts);
+    return await JournalQueries.getClosureBulletinsPaginated(establishmentId, type, opts);
   }
 }
 

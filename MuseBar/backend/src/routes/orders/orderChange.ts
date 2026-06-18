@@ -8,8 +8,10 @@ import { OrderModel } from '../../models';
 import LegalJournalModel from '../../models/legalJournal';
 import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';
-import { getEstablishmentId, requireAuth } from '../auth';
+import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
+import { P } from '../../permissions/registry';
 import { validateBody } from '../../middleware/validation';
+import { AppError, asyncHandler } from '../../middleware/errorHandler';
 
 const router = express.Router();
 const logger = Logger.getInstance();
@@ -17,8 +19,9 @@ const logger = Logger.getInstance();
 router.post(
   '/change',
   requireAuth,
+  requirePermission(P.access_pos),
   validateBody([{ field: 'amount', required: true }]),
-  async (req, res) => {
+  asyncHandler(async (req, res) => {
     const establishmentId = getEstablishmentId(req, res);
     if (!establishmentId) return;
     try {
@@ -57,12 +60,26 @@ router.post(
       const changeUserId = req.user ? String(req.user.id) : undefined;
 
       try {
-        await LegalJournalModel.logChange(order.id, amount, changeUserId);
+        await LegalJournalModel.logChange(establishmentId, order.id, amount, changeUserId);
       } catch (journalError: unknown) {
         logger.error(
           `Legal journal error (change) for order ${order.id}`,
           journalError instanceof Error ? journalError : new Error(String(journalError)),
           'LEGAL_JOURNAL'
+        );
+        try {
+          await OrderModel.delete(order.id, establishmentId);
+        } catch (cleanupError: unknown) {
+          logger.error(
+            `Compensating delete failed after change journal error for order ${order.id}`,
+            cleanupError instanceof Error ? cleanupError : new Error(String(cleanupError)),
+            'ORDER_PAYMENT'
+          );
+        }
+        throw new AppError(
+          'Failed to persist legal journal entry for cash register change',
+          500,
+          'ORDER_CHANGE_JOURNAL_FAILED'
         );
       }
 
@@ -85,11 +102,15 @@ router.post(
       res.status(201).json({ message: 'Changement de caisse enregistré', order });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      res
-        .status(500)
-        .json({ error: 'Erreur lors du changement de caisse', details: message });
+      if (error instanceof AppError) throw error;
+      throw new AppError(
+        'Erreur lors du changement de caisse',
+        500,
+        'ORDER_CHANGE_FAILED',
+        { details: message }
+      );
     }
-  }
+  })
 );
 
 export default router;

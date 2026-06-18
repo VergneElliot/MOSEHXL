@@ -1,4 +1,4 @@
-import { pool } from '../../app';
+import { pool } from '../../db/pool';
 
 export interface BusinessInfoRow {
   name: string;

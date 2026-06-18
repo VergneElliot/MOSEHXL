@@ -34,7 +34,7 @@ export interface EstablishmentAccountCreationResponse {
   };
   token?: string;
   error?: string;
-  details?: any;
+  details?: Record<string, unknown>;
 }
 
 export interface InvitationValidationResult {
@@ -44,15 +44,25 @@ export interface InvitationValidationResult {
     id: string;
     establishmentId: string;
     email: string;
-    expiresAt: Date;
+    expiresAt: string | Date;
   };
 }
 
 export interface BusinessInfoValidationResult {
   isValid: boolean;
   error?: string;
-  details?: any;
+  details?: Record<string, unknown>;
 }
+
+export interface AccountCreationStepData {
+  password: string;
+}
+
+export interface BusinessInfoStepData {
+  businessInfo: BusinessInfo;
+}
+
+export type SetupStepPayload = AccountCreationStepData | BusinessInfoStepData;
 
 export interface SetupStep {
   id: number;

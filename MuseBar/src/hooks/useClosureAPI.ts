@@ -49,9 +49,9 @@ export const useClosureAPI = (
       const endpoint = `/legal/closure/bulletins${query.toString() ? `?${query.toString()}` : ''}`;
 
       const { data } = await apiService.get<{ bulletins: ClosureBulletin[]; total?: number }>(endpoint);
-      const bulletins = Array.isArray((data as any)?.bulletins) ? (data as any).bulletins : [];
+      const bulletins = Array.isArray(data?.bulletins) ? data.bulletins : [];
       setBulletins(bulletins);
-      setTotalBulletins(typeof (data as any)?.total === 'number' ? (data as any).total : bulletins.length);
+      setTotalBulletins(typeof data?.total === 'number' ? data.total : bulletins.length);
     } catch (err) {
       const errorMessage = 'Erreur lors du chargement des bulletins de clôture';
       setError(errorMessage);
@@ -83,9 +83,9 @@ export const useClosureAPI = (
     try {
       setMonthlyStatsError(null);
       const stats = await apiService.getLiveMonthlyStats();
-      setMonthlyStats(stats as LiveMonthlyStats);
+      setMonthlyStats(stats);
     } catch (err) {
-      setMonthlyStats({} as LiveMonthlyStats);
+      setMonthlyStats(null);
       setMonthlyStatsError('Impossible de charger les statistiques mensuelles en direct.');
     }
   }, [apiService, setMonthlyStats, setMonthlyStatsError]);
@@ -106,7 +106,7 @@ export const useClosureAPI = (
         );
         addBulletin(result.closure ?? (result as unknown as ClosureBulletin));
         setShowCreateDialog(false);
-        setSelectedDate(new Date().toISOString().split('T')[0]);
+        setSelectedDate(new Date().toISOString().split('T')[0] ?? '');
         showSuccess('Bulletin de clôture créé avec succès');
 
         // Refresh today status

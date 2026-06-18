@@ -42,7 +42,7 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
   disableForceCreation = true,
   defaultFondDeCaisse = null,
 }) => {
-  const todayISO = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayISO = useMemo(() => new Date().toISOString().split('T')[0] ?? '', []);
   const [forceCreation, setForceCreation] = useState(false);
   const [fondDeCaisse, setFondDeCaisse] = useState<string>('');
 

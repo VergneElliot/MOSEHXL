@@ -19,6 +19,7 @@ import { UserManagement, AuditTrailDashboard } from '../Admin';
 
 // Types
 import { Category, Product, User } from '../../types';
+import { PERMISSIONS, type PermissionName } from '@mosehxl/types';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -79,8 +80,12 @@ interface TabConfig {
   label: string;
   icon?: React.ReactElement;
   value: string;
-  permission?: string;
+  /** If set, user must have this permission (establishment admin always has all, server-side). */
+  permission?: PermissionName;
+  /** Only establishment_admin (e.g. security journal). */
   adminOnly?: boolean;
+  /** Tab visible to any logged-in establishment user (e.g. Historique, Conformité légale). */
+  establishmentWide?: boolean;
 }
 
 const AppRouter: React.FC<AppRouterProps> = ({
@@ -98,35 +103,44 @@ const AppRouter: React.FC<AppRouterProps> = ({
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
 
   const TABS: TabConfig[] = [
-    { label: 'Caisse', icon: <POSIcon />, value: 'pos', permission: 'access_pos' },
-    { label: 'Menu', icon: <MenuIcon />, value: 'menu', permission: 'access_menu' },
-    { label: 'Historique', icon: <HistoryIcon />, value: 'history', permission: 'access_history' },
+    { label: 'Caisse', icon: <POSIcon />, value: 'pos', permission: PERMISSIONS.access_pos },
+    { label: 'Menu', icon: <MenuIcon />, value: 'menu', permission: PERMISSIONS.access_menu },
+    { label: 'Historique', icon: <HistoryIcon />, value: 'history', establishmentWide: true },
     {
       label: 'Paramètres',
       icon: <SettingsIcon />,
       value: 'settings',
-      permission: 'access_settings',
+      permission: PERMISSIONS.access_settings,
     },
     {
       label: 'Conformité Légale',
       icon: <GavelIcon />,
       value: 'compliance',
-      permission: 'access_compliance',
+      establishmentWide: true,
     },
     {
       label: 'Bulletins de Clôture',
       icon: <GavelIcon />,
       value: 'closures',
-      permission: 'access_compliance',
+      permission: PERMISSIONS.access_closure,
     },
-    { label: 'Gestion utilisateurs', value: 'user_management', adminOnly: true },
+    { label: 'Gestion utilisateurs', value: 'user_management', permission: PERMISSIONS.access_user_management },
     { label: 'Journal de Sécurité', value: 'audit_trail', adminOnly: true },
   ];
 
   const filteredTabs = TABS.filter(tab => {
-    // Filter out system admin tabs - they should only see business admin tabs
     if (tab.adminOnly) return user?.role === 'establishment_admin';
-    if (tab.permission) return user?.permissions?.includes(tab.permission);
+    if (tab.establishmentWide) {
+      return !!user?.establishment_id;
+    }
+    // Same rule as the tab content: owner/admin always, or staff with explicit grant.
+    if (tab.value === 'user_management') {
+      return (
+        user?.role === 'establishment_admin' ||
+        (user?.permissions?.includes(PERMISSIONS.access_user_management) ?? false)
+      );
+    }
+    if (tab.permission) return user?.permissions?.includes(tab.permission) ?? false;
     return true;
   });
 
@@ -211,6 +225,11 @@ const AppRouter: React.FC<AppRouterProps> = ({
                 products={products}
                 isHappyHourActive={isHappyHourActive}
                 onDataUpdate={onDataUpdate}
+                posLinePermissions={{
+                  happyHourManual: user.permissions?.includes(PERMISSIONS.pos_happyhour_manual) ?? false,
+                  offert: user.permissions?.includes(PERMISSIONS.pos_apply_offert) ?? false,
+                  perso: user.permissions?.includes(PERMISSIONS.pos_apply_perso) ?? false,
+                }}
               />
             )}
             {tab.value === 'menu' && (
@@ -220,7 +239,11 @@ const AppRouter: React.FC<AppRouterProps> = ({
                 onDataUpdate={onDataUpdate}
               />
             )}
-            {tab.value === 'history' && <HistoryContainer />}
+            {tab.value === 'history' && (
+              <HistoryContainer
+                canCancelOrReturn={user?.permissions?.includes(PERMISSIONS.orders_cancel) ?? false}
+              />
+            )}
             {tab.value === 'settings' && (
               <Settings
                 isHappyHourActive={isHappyHourActive}
@@ -231,7 +254,9 @@ const AppRouter: React.FC<AppRouterProps> = ({
             )}
             {tab.value === 'compliance' && <LegalComplianceDashboard />}
             {tab.value === 'closures' && <ClosureContainer />}
-            {tab.value === 'user_management' && user?.role === 'establishment_admin' && <UserManagement token={token} />}
+            {tab.value === 'user_management' && (user?.role === 'establishment_admin' || user?.permissions?.includes(PERMISSIONS.access_user_management)) && (
+              <UserManagement token={token} />
+            )}
             {tab.value === 'audit_trail' && user?.role === 'establishment_admin' && <AuditTrailDashboard token={token} />}
           </TabPanel>
         ))}

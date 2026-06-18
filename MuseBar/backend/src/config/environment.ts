@@ -37,11 +37,13 @@ const REQUIRED_ENV_VARS: Record<string, string> = {
 export const validateEnvironment = (): void => {
   const missing: string[] = [];
   const invalid: string[] = [];
+  const isBooleanString = (value: string): boolean => ['true', 'false'].includes(value.trim().toLowerCase());
 
   // In production, archive signing requires a secret key (no hardcoded fallback)
   const requiredVars = { ...REQUIRED_ENV_VARS };
   if (process.env.NODE_ENV === 'production') {
     requiredVars.ARCHIVE_SECRET_KEY = 'Archive HMAC key for legal/export signing';
+    requiredVars.SETUP_SECRET = 'Setup secret key (protects one-time bootstrap endpoints)';
   }
 
   // Check required variables
@@ -79,6 +81,112 @@ export const validateEnvironment = (): void => {
     }
   });
 
+  // Optional-but-security-sensitive variables.
+  // If provided, validate format/length; if omitted, features that depend on them must fail closed.
+  if (process.env.SETUP_SECRET && process.env.SETUP_SECRET.length < 32) {
+    invalid.push('SETUP_SECRET must be at least 32 characters long for security');
+  }
+
+  if (
+    process.env.DB_SSL_REJECT_UNAUTHORIZED &&
+    !isBooleanString(process.env.DB_SSL_REJECT_UNAUTHORIZED)
+  ) {
+    invalid.push("DB_SSL_REJECT_UNAUTHORIZED must be either 'true' or 'false'");
+  }
+
+  if (
+    process.env.DB_SSL_ALLOW_SELF_SIGNED &&
+    !isBooleanString(process.env.DB_SSL_ALLOW_SELF_SIGNED)
+  ) {
+    invalid.push("DB_SSL_ALLOW_SELF_SIGNED must be either 'true' or 'false'");
+  }
+
+  if (
+    process.env.PASSWORD_BREACH_CHECK_ENABLED &&
+    !isBooleanString(process.env.PASSWORD_BREACH_CHECK_ENABLED)
+  ) {
+    invalid.push("PASSWORD_BREACH_CHECK_ENABLED must be either 'true' or 'false'");
+  }
+
+  if (process.env.PASSWORD_BREACH_CHECK_TIMEOUT_MS) {
+    const timeout = Number(process.env.PASSWORD_BREACH_CHECK_TIMEOUT_MS);
+    if (!Number.isFinite(timeout) || timeout <= 0) {
+      invalid.push('PASSWORD_BREACH_CHECK_TIMEOUT_MS must be a positive number');
+    }
+  }
+
+  if (
+    process.env.AUTH_ENFORCE_ADMIN_2FA &&
+    !isBooleanString(process.env.AUTH_ENFORCE_ADMIN_2FA)
+  ) {
+    invalid.push("AUTH_ENFORCE_ADMIN_2FA must be either 'true' or 'false'");
+  }
+
+  if (
+    process.env.AUTH_REJECT_LEGACY_IS_ADMIN_CLAIM &&
+    !isBooleanString(process.env.AUTH_REJECT_LEGACY_IS_ADMIN_CLAIM)
+  ) {
+    invalid.push("AUTH_REJECT_LEGACY_IS_ADMIN_CLAIM must be either 'true' or 'false'");
+  }
+
+  const authJwtSignAlgRaw = process.env.AUTH_JWT_SIGN_ALG?.trim().toUpperCase();
+  if (authJwtSignAlgRaw && authJwtSignAlgRaw !== 'HS256' && authJwtSignAlgRaw !== 'RS256') {
+    invalid.push("AUTH_JWT_SIGN_ALG must be either 'HS256' or 'RS256'");
+  }
+
+  if (
+    process.env.AUTH_JWT_ALLOW_LEGACY_HS256_VERIFY &&
+    !isBooleanString(process.env.AUTH_JWT_ALLOW_LEGACY_HS256_VERIFY)
+  ) {
+    invalid.push("AUTH_JWT_ALLOW_LEGACY_HS256_VERIFY must be either 'true' or 'false'");
+  }
+
+  if (authJwtSignAlgRaw === 'RS256') {
+    if (!process.env.JWT_PRIVATE_KEY) {
+      missing.push('JWT_PRIVATE_KEY (required when AUTH_JWT_SIGN_ALG=RS256)');
+    }
+    if (!process.env.JWT_PUBLIC_KEY) {
+      missing.push('JWT_PUBLIC_KEY (required when AUTH_JWT_SIGN_ALG=RS256)');
+    }
+  }
+
+  if (process.env.AUTH_JWT_ADDITIONAL_PUBLIC_KEYS_JSON) {
+    try {
+      const parsed = JSON.parse(process.env.AUTH_JWT_ADDITIONAL_PUBLIC_KEYS_JSON);
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        invalid.push(
+          'AUTH_JWT_ADDITIONAL_PUBLIC_KEYS_JSON must be a JSON object of { "<kid>": "<pem>" }'
+        );
+      } else {
+        for (const [kid, pem] of Object.entries(parsed as Record<string, unknown>)) {
+          if (!kid.trim()) {
+            invalid.push('AUTH_JWT_ADDITIONAL_PUBLIC_KEYS_JSON contains an empty key id');
+            break;
+          }
+          if (typeof pem !== 'string' || pem.trim().length === 0) {
+            invalid.push(
+              `AUTH_JWT_ADDITIONAL_PUBLIC_KEYS_JSON key "${kid}" must map to a non-empty PEM string`
+            );
+            break;
+          }
+        }
+      }
+    } catch {
+      invalid.push('AUTH_JWT_ADDITIONAL_PUBLIC_KEYS_JSON must be valid JSON');
+    }
+  }
+
+  const establishmentAdminPermissionMode = process.env.ESTABLISHMENT_ADMIN_PERMISSION_MODE;
+  if (
+    establishmentAdminPermissionMode &&
+    establishmentAdminPermissionMode !== 'implicit_all' &&
+    establishmentAdminPermissionMode !== 'explicit_only'
+  ) {
+    invalid.push(
+      "ESTABLISHMENT_ADMIN_PERMISSION_MODE must be either 'implicit_all' or 'explicit_only'"
+    );
+  }
+
   // Report errors
   if (missing.length > 0) {
     process.stderr.write('❌ Missing required environment variables:\n');
@@ -113,7 +221,7 @@ export interface EnvironmentConfig {
     ssl: boolean;
     /**
      * When ssl is enabled, controls certificate chain verification.
-     * Some managed Postgres providers use a self-signed chain; in that case set to false.
+     * Production defaults to true; use explicit env overrides for self-signed chains.
      */
     sslRejectUnauthorized: boolean;
     maxConnections: number;
@@ -133,6 +241,8 @@ export interface EnvironmentConfig {
     jwtSecret: string;
     jwtExpiresIn: string;
     archiveSecretKey: string | undefined; // Required in production, optional in dev
+    setupSecret: string | undefined; // Used to protect bootstrap endpoints (optional; must fail closed if unset)
+    establishmentAdminPermissionMode: 'implicit_all' | 'explicit_only';
     bcryptRounds: number;
     rateLimitWindowMs: number;
     rateLimitMaxRequests: number;
@@ -168,11 +278,25 @@ export const getEnvironmentConfig = (): EnvironmentConfig => {
   const nodeEnv = process.env.NODE_ENV as 'development' | 'production' | 'test';
   const isProduction = nodeEnv === 'production';
   const isDevelopment = nodeEnv === 'development';
+  const resolveEstablishmentAdminPermissionMode = (): 'implicit_all' | 'explicit_only' => {
+    const raw = process.env.ESTABLISHMENT_ADMIN_PERMISSION_MODE?.trim().toLowerCase();
+    if (raw === 'explicit_only') return 'explicit_only';
+    if (raw === 'implicit_all') return 'implicit_all';
+    return isProduction ? 'explicit_only' : 'implicit_all';
+  };
 
-  const sslRejectUnauthorized =
+  const allowSelfSigned =
+    process.env.DB_SSL_ALLOW_SELF_SIGNED != null
+      ? process.env.DB_SSL_ALLOW_SELF_SIGNED.trim().toLowerCase() === 'true'
+      : false;
+
+  const explicitSslRejectUnauthorized =
     process.env.DB_SSL_REJECT_UNAUTHORIZED != null
       ? process.env.DB_SSL_REJECT_UNAUTHORIZED.trim().toLowerCase() === 'true'
-      : false;
+      : null;
+
+  const resolvedProductionSslRejectUnauthorized =
+    explicitSslRejectUnauthorized !== null ? explicitSslRejectUnauthorized : !allowSelfSigned;
 
   return {
     database: {
@@ -183,7 +307,7 @@ export const getEnvironmentConfig = (): EnvironmentConfig => {
       // No fallback: validateEnvironment() ensures DB_PASSWORD is set before we get here
       password: process.env.DB_PASSWORD!,
       ssl: isProduction,
-      sslRejectUnauthorized: isProduction ? sslRejectUnauthorized : true,
+      sslRejectUnauthorized: isProduction ? resolvedProductionSslRejectUnauthorized : true,
       maxConnections: parseInt(process.env.DB_MAX_CONNECTIONS || '20'),
       idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '30000'),
     },
@@ -204,6 +328,8 @@ export const getEnvironmentConfig = (): EnvironmentConfig => {
       jwtSecret: process.env.JWT_SECRET!,
       jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
       archiveSecretKey: process.env.ARCHIVE_SECRET_KEY,
+      setupSecret: process.env.SETUP_SECRET,
+      establishmentAdminPermissionMode: resolveEstablishmentAdminPermissionMode(),
       bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS || '12'),
       rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
       // Default tuned for POS: menus, history, orders, change ops, refetches — almost all traffic is authenticated

@@ -1,5 +1,6 @@
-import { pool } from '../app';
+import { pool } from '../db/pool';
 import bcrypt from 'bcrypt';
+import { validatePasswordWithBreachCheck } from '../utils/passwordValidation';
 
 /**
  * Full database row from the `users` table.
@@ -17,6 +18,12 @@ export interface UserRow {
   last_name: string | null;
   email_verified: boolean;
   is_active: boolean;
+  failed_login_attempts: number;
+  lockout_count: number;
+  locked_until: Date | null;
+  mfa_totp_enabled?: boolean;
+  mfa_totp_secret?: string | null;
+  mfa_totp_enabled_at?: Date | null;
   last_login: Date | null;
   created_at: Date;
   updated_at: Date;
@@ -39,7 +46,27 @@ export interface AuthenticatedUser {
 export type User = UserRow;
 
 export class UserModel {
+  private static async assertPasswordPolicy(password: string): Promise<void> {
+    const passwordValidation = await validatePasswordWithBreachCheck(password);
+    if (!passwordValidation.isValid) {
+      throw Object.assign(
+        new Error(passwordValidation.error ?? 'Invalid password'),
+        { statusCode: 400 }
+      );
+    }
+  }
+
+  private static getEstablishmentAdminPermissionMode(): 'implicit_all' | 'explicit_only' {
+    const raw = process.env.ESTABLISHMENT_ADMIN_PERMISSION_MODE?.trim().toLowerCase();
+    if (raw === 'explicit_only') return 'explicit_only';
+    if (raw === 'implicit_all') return 'implicit_all';
+    return process.env.NODE_ENV?.trim().toLowerCase() === 'production'
+      ? 'explicit_only'
+      : 'implicit_all';
+  }
+
   static async createUser(email: string, password: string, is_admin: boolean = false): Promise<UserRow> {
+    await this.assertPasswordPolicy(password);
     const password_hash = await bcrypt.hash(password, 12);
     const result = await pool.query(
       `INSERT INTO users (email, password_hash, is_admin) VALUES ($1, $2, $3) RETURNING *`,
@@ -54,6 +81,7 @@ export class UserModel {
     role: string,
     establishmentId: string
   ): Promise<UserRow> {
+    await this.assertPasswordPolicy(password);
     const password_hash = await bcrypt.hash(password, 12);
     const result = await pool.query(
       `INSERT INTO users (email, password_hash, is_admin, role, establishment_id, email_verified)
@@ -92,10 +120,117 @@ export class UserModel {
     return bcrypt.compare(password, user.password_hash);
   }
 
+  static async incrementFailedLoginAttempts(userId: number): Promise<number> {
+    const result = await pool.query(
+      `UPDATE users
+       SET failed_login_attempts = COALESCE(failed_login_attempts, 0) + 1,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING failed_login_attempts`,
+      [userId]
+    );
+    return Number(result.rows[0]?.failed_login_attempts ?? 0);
+  }
+
+  static async applyLoginLockout(userId: number, lockedUntil: Date): Promise<number> {
+    const result = await pool.query(
+      `UPDATE users
+       SET locked_until = $2,
+           lockout_count = COALESCE(lockout_count, 0) + 1,
+           failed_login_attempts = 0,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING lockout_count`,
+      [userId, lockedUntil]
+    );
+    return Number(result.rows[0]?.lockout_count ?? 0);
+  }
+
+  static async clearLoginLockoutState(userId: number): Promise<void> {
+    await pool.query(
+      `UPDATE users
+       SET failed_login_attempts = 0,
+           locked_until = NULL,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [userId]
+    );
+  }
+
+  static async getMfaTotpState(userId: number): Promise<{
+    mfa_totp_enabled: boolean;
+    mfa_totp_secret: string | null;
+  } | null> {
+    const result = await pool.query(
+      'SELECT mfa_totp_enabled, mfa_totp_secret FROM users WHERE id = $1',
+      [userId]
+    );
+    return result.rows[0] || null;
+  }
+
+  static async setMfaTotpSecret(userId: number, secret: string): Promise<void> {
+    await pool.query(
+      `UPDATE users
+       SET mfa_totp_secret = $2,
+           mfa_totp_enabled = false,
+           mfa_totp_enabled_at = NULL,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [userId, secret]
+    );
+  }
+
+  static async enableMfaTotp(userId: number): Promise<void> {
+    await pool.query(
+      `UPDATE users
+       SET mfa_totp_enabled = true,
+           mfa_totp_enabled_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [userId]
+    );
+  }
+
+  static async disableMfaTotp(userId: number): Promise<void> {
+    await pool.query(
+      `UPDATE users
+       SET mfa_totp_enabled = false,
+           mfa_totp_secret = NULL,
+           mfa_totp_enabled_at = NULL,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [userId]
+    );
+  }
+
+  static async unlockUserAccount(userId: number): Promise<boolean> {
+    const result = await pool.query(
+      `UPDATE users
+       SET failed_login_attempts = 0,
+           lockout_count = 0,
+           locked_until = NULL,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [userId]
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
   // Permission management.
   // Returns explicit permissions from user_permissions, falling back to role-based defaults
   // so newly created establishment users always get the correct access without manual seeding.
   static async getUserPermissions(userId: number): Promise<string[]> {
+    const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [userId]);
+    const role: string = userResult.rows[0]?.role || '';
+    const establishmentAdminPermissionMode = this.getEstablishmentAdminPermissionMode();
+
+    // Default mode in production (`explicit_only`): establishment_admin must have explicit rows.
+    // Non-production default (`implicit_all`) remains available to avoid local lockout during setup.
+    if (role === 'establishment_admin' && establishmentAdminPermissionMode === 'implicit_all') {
+      const allPerms = await pool.query('SELECT name FROM permissions');
+      return allPerms.rows.map((row) => (row as { name: string }).name);
+    }
+
     const result = await pool.query(
       `SELECT p.name FROM permissions p
        JOIN user_permissions up ON up.permission_id = p.id
@@ -107,18 +242,7 @@ export class UserModel {
       return result.rows.map((row) => (row as { name: string }).name);
     }
 
-    // No explicit permissions — derive from the user's role.
-    const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [userId]);
-    const role: string = userResult.rows[0]?.role || '';
-
-    // Only establishment_admin gets automatic full access.
-    // All other roles (cashier, manager, etc.) must have permissions explicitly granted
-    // by the establishment admin — no assumptions are made on their behalf.
-    if (role === 'establishment_admin') {
-      const allPerms = await pool.query('SELECT name FROM permissions');
-      return allPerms.rows.map((row) => (row as { name: string }).name);
-    }
-
+    // No explicit permissions for non–establishment_admin roles: none granted.
     return [];
   }
 
@@ -247,6 +371,16 @@ export class UserModel {
    */
   static async updateUserRoleById(userId: number, role: string): Promise<boolean> {
     const result = await pool.query('UPDATE users SET role = $1 WHERE id = $2', [role, userId]);
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  static async updatePasswordById(userId: number, password: string): Promise<boolean> {
+    await this.assertPasswordPolicy(password);
+    const password_hash = await bcrypt.hash(password, 12);
+    const result = await pool.query(
+      'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [password_hash, userId]
+    );
     return (result.rowCount ?? 0) > 0;
   }
 

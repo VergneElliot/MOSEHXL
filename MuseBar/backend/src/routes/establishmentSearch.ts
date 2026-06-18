@@ -9,13 +9,15 @@ import { EstablishmentSearchService } from '../services/establishment';
 import { Logger } from '../utils/logger';
 import { getEnvironmentConfig } from '../config/environment';
 import type { EstablishmentStatus } from '../services/establishment/types';
+import { pool } from '../db/pool';
+import { AppError, asyncHandler } from '../middleware/errorHandler';
 
 const router = express.Router();
 const config = getEnvironmentConfig();
 const logger = Logger.getInstance(config);
 
 // GET /api/establishment-search - Search establishments with filters and pagination
-router.get('/', requireAuth, requireAdmin, async (req, res) => {
+router.get('/', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
   try {
     const searchService = new EstablishmentSearchService(logger);
     
@@ -48,8 +50,6 @@ router.get('/', requireAuth, requireAdmin, async (req, res) => {
       options.sortOrder = 'desc';
     }
 
-    // Get database client
-    const { pool } = await import('../app');
     const client = await pool.connect();
     
     try {
@@ -75,16 +75,12 @@ router.get('/', requireAuth, requireAdmin, async (req, res) => {
       },
       'ESTABLISHMENT_SEARCH_ROUTE'
     );
-
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to search establishments'
-    });
+    throw new AppError('Failed to search establishments', 500, 'ESTABLISHMENT_SEARCH_FAILED');
   }
-});
+}));
 
 // GET /api/establishment-search/suggestions - Get search suggestions for autocomplete
-router.get('/suggestions', requireAuth, requireAdmin, async (req, res) => {
+router.get('/suggestions', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
   try {
     const searchService = new EstablishmentSearchService(logger);
     const query = req.query.q as string;
@@ -98,8 +94,6 @@ router.get('/suggestions', requireAuth, requireAdmin, async (req, res) => {
       });
     }
 
-    // Get database client
-    const { pool } = await import('../app');
     const client = await pool.connect();
     
     try {
@@ -125,13 +119,13 @@ router.get('/suggestions', requireAuth, requireAdmin, async (req, res) => {
       },
       'ESTABLISHMENT_SEARCH_ROUTE'
     );
-
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to get search suggestions'
-    });
+    throw new AppError(
+      'Failed to get search suggestions',
+      500,
+      'ESTABLISHMENT_SUGGESTIONS_FAILED'
+    );
   }
-});
+}));
 
 // GET /api/establishment-search/health - Health check for search service
 router.get('/health', (req, res) => {
