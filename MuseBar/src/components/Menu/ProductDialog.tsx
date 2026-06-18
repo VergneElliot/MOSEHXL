@@ -21,12 +21,14 @@ import {
 import { Product, Category } from '../../types';
 import { ProductFormData } from '../../hooks/useMenuState';
 
+type ProductFormValue = ProductFormData[keyof ProductFormData];
+
 interface ProductDialogProps {
   open: boolean;
   onClose: () => void;
   onSubmit: () => void;
   form: ProductFormData;
-  onFormChange: (field: keyof ProductFormData, value: any) => void;
+  onFormChange: (field: keyof ProductFormData, value: ProductFormValue) => void;
   editingProduct: Product | null;
   categories: Category[];
   loading: boolean;

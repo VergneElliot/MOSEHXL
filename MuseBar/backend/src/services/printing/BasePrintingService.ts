@@ -8,6 +8,7 @@ import {
   PrintingConfig,
   ESC_POS 
 } from './types';
+import { formatEuroAmount } from '../../utils/formatCurrency';
 
 export abstract class BasePrintingService implements IPrintingService {
   protected config: PrintingConfig;
@@ -107,8 +108,8 @@ export abstract class BasePrintingService implements IPrintingService {
       content += ESC_POS.BOLD_ON + 'ARTICLES\n' + ESC_POS.BOLD_OFF;
       
       for (const item of data.items) {
-        const itemLine = `${item.product_name} (${item.quantity} x ${item.unit_price.toFixed(2)} €)`;
-        const totalLine = `${item.total_price.toFixed(2)} €`;
+        const itemLine = `${item.product_name} (${item.quantity} x ${formatEuroAmount(item.unit_price)})`;
+        const totalLine = formatEuroAmount(item.total_price);
         content += this.padLine(itemLine, totalLine, 32) + '\n';
       }
       
@@ -120,28 +121,28 @@ export abstract class BasePrintingService implements IPrintingService {
       content += ESC_POS.BOLD_ON + 'TVA\n' + ESC_POS.BOLD_OFF;
       
       for (const vat of data.vat_breakdown) {
-        const baseLine = `Base HT (${vat.rate}%): ${vat.subtotal_ht.toFixed(2)} €`;
-        const vatLine = `TVA ${vat.rate}%: ${vat.vat.toFixed(2)} €`;
+        const baseLine = `Base HT (${vat.rate}%): ${formatEuroAmount(vat.subtotal_ht)}`;
+        const vatLine = `TVA ${vat.rate}%: ${formatEuroAmount(vat.vat)}`;
         content += baseLine + '\n';
         content += vatLine + '\n';
       }
       
-      content += `TVA Totale: ${data.total_tax.toFixed(2)} €\n`;
-      content += `Sous-total HT: ${(data.total_amount - data.total_tax).toFixed(2)} €\n`;
+      content += `TVA Totale: ${formatEuroAmount(data.total_tax)}\n`;
+      content += `Sous-total HT: ${formatEuroAmount(data.total_amount - data.total_tax)}\n`;
       content += '================================\n';
     }
     
     // Tips and Change
     if (data.tips && data.tips > 0) {
-      content += `Pourboire: ${data.tips.toFixed(2)} €\n`;
+      content += `Pourboire: ${formatEuroAmount(data.tips)}\n`;
     }
     if (data.change && data.change > 0) {
-      content += `Monnaie: ${data.change.toFixed(2)} €\n`;
+      content += `Monnaie: ${formatEuroAmount(data.change)}\n`;
     }
     
     // Total
     content += ESC_POS.BOLD_ON + ESC_POS.DOUBLE_HEIGHT;
-    content += `TOTAL TTC: ${data.total_amount.toFixed(2)} €\n`;
+    content += `TOTAL TTC: ${formatEuroAmount(data.total_amount)}\n`;
     content += ESC_POS.NORMAL_SIZE + ESC_POS.BOLD_OFF;
     
     // Compliance Info
@@ -159,6 +160,8 @@ export abstract class BasePrintingService implements IPrintingService {
     }
     
     // Footer
+    content += ESC_POS.LEFT;
+    content += `Ref. legale: Article 286-I-3 bis du CGI\n`;
     content += ESC_POS.CENTER;
     content += '\nMerci de votre visite!\n\n';
     
@@ -212,14 +215,14 @@ export abstract class BasePrintingService implements IPrintingService {
     content += ESC_POS.BOLD_ON + 'RESUME PERIODE:\n' + ESC_POS.BOLD_OFF;
     content += '--------------------------------\n';
     content += this.padLine('Transactions:', `${data.total_transactions}`, 32) + '\n';
-    content += this.padLine('Total TTC:', `${data.total_amount.toFixed(2)} EUR`, 32) + '\n';
+    content += this.padLine('Total TTC:', formatEuroAmount(data.total_amount, 'EUR'), 32) + '\n';
     // Tie-out display: total VAT shown equals sum of displayed buckets.
     const vat10Shown = Math.round((data.vat_breakdown.vat_10?.vat ?? 0) * 100) / 100;
     const vat20Shown = Math.round((data.vat_breakdown.vat_20?.vat ?? 0) * 100) / 100;
     const vatTotalShown = vat10Shown + vat20Shown;
     const htTotalShown = Math.round((data.total_amount - vatTotalShown) * 100) / 100;
-    content += this.padLine('Total HT:', `${htTotalShown.toFixed(2)} EUR`, 32) + '\n';
-    content += this.padLine('Montant total TVA:', `${vatTotalShown.toFixed(2)} EUR`, 32) + '\n';
+    content += this.padLine('Total HT:', formatEuroAmount(htTotalShown, 'EUR'), 32) + '\n';
+    content += this.padLine('Montant total TVA:', formatEuroAmount(vatTotalShown, 'EUR'), 32) + '\n';
     
     // VAT Breakdown
     content += '--------------------------------\n';
@@ -228,30 +231,30 @@ export abstract class BasePrintingService implements IPrintingService {
       const ttc10 =
         (data.vat_breakdown.vat_10 as { ttc?: number }).ttc ??
         (data.vat_breakdown.vat_10.amount + data.vat_breakdown.vat_10.vat);
-      content += this.padLine('Soumis TVA 10%:', `${ttc10.toFixed(2)} EUR`, 32) + '\n';
-      content += this.padLine('Montant TVA 10%:', `${vat10Shown.toFixed(2)} EUR`, 32) + '\n';
+      content += this.padLine('Soumis TVA 10%:', formatEuroAmount(ttc10, 'EUR'), 32) + '\n';
+      content += this.padLine('Montant TVA 10%:', formatEuroAmount(vat10Shown, 'EUR'), 32) + '\n';
     }
     if (data.vat_breakdown.vat_20) {
       const ttc20 =
         (data.vat_breakdown.vat_20 as { ttc?: number }).ttc ??
         (data.vat_breakdown.vat_20.amount + data.vat_breakdown.vat_20.vat);
-      content += this.padLine('Soumis TVA 20%:', `${ttc20.toFixed(2)} EUR`, 32) + '\n';
-      content += this.padLine('Montant TVA 20%:', `${vat20Shown.toFixed(2)} EUR`, 32) + '\n';
+      content += this.padLine('Soumis TVA 20%:', formatEuroAmount(ttc20, 'EUR'), 32) + '\n';
+      content += this.padLine('Montant TVA 20%:', formatEuroAmount(vat20Shown, 'EUR'), 32) + '\n';
     }
     
     // Payment Methods Breakdown
     content += '--------------------------------\n';
     content += ESC_POS.BOLD_ON + 'MODES DE PAIEMENT:\n' + ESC_POS.BOLD_OFF;
     for (const [method, amount] of Object.entries(data.payment_methods_breakdown)) {
-      content += this.padLine(this.formatPaymentMethod(method) + ':', `${amount.toFixed(2)} EUR`, 32) + '\n';
+      content += this.padLine(this.formatPaymentMethod(method) + ':', formatEuroAmount(amount, 'EUR'), 32) + '\n';
     }
     
     // Tips and Change
     if (data.tips_total && data.tips_total > 0) {
-      content += this.padLine('Pourboires:', `${data.tips_total.toFixed(2)} EUR`, 32) + '\n';
+      content += this.padLine('Pourboires:', formatEuroAmount(data.tips_total, 'EUR'), 32) + '\n';
     }
     if (data.change_total && data.change_total > 0) {
-      content += this.padLine('Monnaie rendue:', `${data.change_total.toFixed(2)} EUR`, 32) + '\n';
+      content += this.padLine('Monnaie rendue:', formatEuroAmount(data.change_total, 'EUR'), 32) + '\n';
     }
     
     // Sequences
@@ -270,7 +273,9 @@ export abstract class BasePrintingService implements IPrintingService {
     // Legal compliance info
     content += ESC_POS.LEFT;
     content += `Ref. legale: Article 286-I-3 bis du CGI\n`;
-    content += `Registre: MUSEBAR-REG-001\n`;
+    if (data.compliance_info?.cash_register_id) {
+      content += `Registre: ${data.compliance_info.cash_register_id}\n`;
+    }
     content += `Hash: ${data.closure_hash.substring(0, 16)}...\n`;
     
     // Cut paper

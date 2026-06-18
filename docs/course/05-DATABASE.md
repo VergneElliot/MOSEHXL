@@ -232,18 +232,42 @@ Migration files live in `src/migrations/files/` and are named with timestamps to
 
 The migration manager (`migration-manager.ts`) tracks which migrations have been applied in a `migrations` table in the database. Running `migrate` applies any migration not yet in that table.
 
+### Schema source-of-truth policy (audit P3-Q17)
+
+Canonical source of schema truth is:
+- `backend/src/migrations/files/*.sql`
+
+Snapshot/reference files:
+- `backend/src/models/legal-schema.sql`
+- `backend/src/models/multi-tenant-schema.sql`
+
+Policy:
+1. **Never** treat snapshot SQL files as the deploy mechanism.
+2. Every schema-changing migration must be followed by a snapshot refresh in the same change set.
+3. If a migration is data-only or otherwise does not affect snapshots, it must include:
+
+```sql
+-- SCHEMA_SNAPSHOT_NOT_REQUIRED
+```
+
+CI enforces this policy through `npm run check:schema-drift` in the backend workflow.
+
 ### Why migrations instead of editing schema.sql?
 
 Because the production database already has data. You can't DROP and re-CREATE a table without losing everything. Migrations add/modify columns **in place** without losing data:
 
 ```sql
 -- This is a migration — it modifies the existing table
-ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'cashier';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'staff';
 
 -- This is NOT a migration — it destroys data
 DROP TABLE users;
 CREATE TABLE users ( ... );
 ```
+
+Role note: older samples used `DEFAULT 'cashier'` before the auth-role normalization
+wave. Current canonical establishment role is `staff` (`cashier` is legacy and is
+normalized during auth/migration compatibility flows).
 
 ---
 
@@ -366,34 +390,39 @@ For **display**, amounts are rounded to 2 decimal places (e.g., `12.50 €`). Fo
 
 ---
 
-## Schema-Based Multi-Tenancy
+## Multi-Tenancy Model (V2): Shared tables + `establishment_id`
 
-This is an advanced concept, but important to understand. Each establishment (bar/restaurant) gets its own **PostgreSQL schema** — a namespace for tables. Think of it like folders on a computer:
+As of Phase **B1** of the April 2026 audit remediation, V2 uses **shared tables** (single schema) for multi-tenancy.
+
+- Each tenant-owned row carries **`establishment_id`**
+- The application scopes every read/write to the authenticated establishment
+- Legal/fiscal tables are also per-establishment (journal chain, closures, archives)
+
+This model is compatible with French fiscal compliance because what matters is **per legal entity evidence** (no cross-tenant mixing), not the physical schema layout.
+
+### Legacy note (historical)
+
+Earlier versions of the project experimented with **schema-per-tenant** (`establishment_<uuid>` schemas created by `SchemaManager`). The audit found this was **not used at runtime** and created documentation drift. The current (V2) reference model is shared tables with strict tenant isolation.
 
 ```
 Database: mosehxl_development
-├── public schema (shared tables)
-│   ├── users
-│   ├── establishments
-│   ├── permissions
-│   ├── user_permissions
-│   ├── legal_journal
-│   └── rate_limit_store
-│
-├── establishment_abc123 schema (MuseBar's tables)
-│   ├── categories
-│   ├── products
-│   ├── orders
-│   └── business_settings
-│
-└── establishment_def456 schema (another bar's tables)
+└── public schema (shared tables)
+    ├── establishments
+    ├── users
+    ├── permissions
+    ├── user_permissions
     ├── categories
     ├── products
     ├── orders
-    └── business_settings
+    ├── order_items
+    ├── sub_bills
+    ├── legal_journal
+    ├── closure_bulletins
+    ├── audit_trail
+    └── rate_limit_store
 ```
 
-This isolation means that Bar A's products and orders are completely separate from Bar B's. It's the database-level equivalent of having separate databases, but within one PostgreSQL instance (easier to manage). The `SchemaManager` service creates these schemas automatically when a new establishment is set up.
+This isolation means that Bar A's products and orders are completely separate from Bar B's through strict `establishment_id` scoping and DB guardrails (including RLS policies on tenant-owned tables).
 
 ---
 
@@ -410,4 +439,4 @@ This isolation means that Bar A's products and orders are completely separate fr
 | Connection pool | Reuses DB connections for performance | `new Pool({...})` in `app.ts` |
 | Parameterized query | Prevents SQL injection | `$1`, `$2` in every `pool.query()` |
 | DECIMAL(12,4) | Exact monetary arithmetic (no floating point drift) | All monetary columns |
-| Schema-based multi-tenancy | Each establishment gets its own table namespace | `SchemaManager.ts`, `establishment.ts` |
+| Shared-table multi-tenancy | All tenants share tables; rows are scoped by `establishment_id` | Models + routes; Phase B1 adds DB guardrails |

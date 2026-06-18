@@ -1,4 +1,5 @@
 import { request } from './core';
+import type { ClosureBulletin, LiveMonthlyStats } from '../../types/api';
 
 export async function getBusinessInfo() {
   return request<{ name?: string; address?: string; phone?: string; email?: string; siret?: string; tax_identification?: string }>('/legal/business-info');
@@ -9,11 +10,11 @@ export async function updateBusinessInfo(data: Record<string, unknown>) {
 }
 
 export async function getLatestMonthlyClosureBulletin() {
-  return request('/legal/closure/monthly-latest');
+  return request<ClosureBulletin>('/legal/closure/monthly-latest');
 }
 
 export async function getLiveMonthlyStats() {
-  return request('/legal/stats/monthly-live');
+  return request<LiveMonthlyStats>('/legal/stats/monthly-live');
 }
 
 /** Live business-day stats for the History tab (closure-aligned totals). */

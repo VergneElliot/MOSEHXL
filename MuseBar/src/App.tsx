@@ -9,12 +9,13 @@ import AppRouter from './components/common/AppRouter';
 import SystemAdminRouter from './components/common/SystemAdminRouter';
 import { Login } from './components/auth';
 import type { User } from './types';
-import InvitationAcceptance from './components/InvitationAcceptance';
 import { AppHeader } from './components/common/AppHeader';
 import { BusinessSetupWizard } from './components/Setup';
 import EstablishmentAccountCreation from './components/EstablishmentAccountCreation';
+import { useTranslation } from 'react-i18next';
 
 function App() {
+  const { t } = useTranslation('common');
   const {
     user,
     token,
@@ -57,9 +58,15 @@ function App() {
     initializeApp();
   }, []);
 
-  const handleLogin = (jwt: string, userObj: User, rememberMeFlag: boolean, expiresIn: string) => {
+  const handleLogin = (
+    jwt: string,
+    userObj: User,
+    rememberMeFlag: boolean,
+    expiresIn: string,
+    refreshExpiresIn?: string
+  ) => {
     // Persist auth
-    login(jwt, userObj, rememberMeFlag, expiresIn);
+    login(jwt, userObj, rememberMeFlag, expiresIn, refreshExpiresIn);
     // After login, if not system admin, ensure POS loads fresh data for user's establishment
     // Nothing else here; POS view will load based on isSystemAdmin below
   };
@@ -72,7 +79,7 @@ function App() {
   if (!isSystemAdmin && isLoading) {
     return (
       <Container maxWidth="xl" sx={{ mt: 2 }}>
-        <div>Loading...</div>
+        <div>{t('loading')}</div>
       </Container>
     );
   }
@@ -81,7 +88,7 @@ function App() {
   if (!isSystemAdmin && error) {
     return (
       <Container maxWidth="xl" sx={{ mt: 2 }}>
-        <div>Error: {error}</div>
+        <div>{t('errorPrefix')} {error}</div>
       </Container>
     );
   }
@@ -100,7 +107,6 @@ function App() {
           {!isAuthenticated ? (
             <Container maxWidth="xl" sx={{ mt: 2 }}>
               <Login onLogin={handleLogin} />
-              <InvitationAcceptance />
             </Container>
           ) : isSystemAdmin ? (
             // System Admin Interface - Full screen, no container

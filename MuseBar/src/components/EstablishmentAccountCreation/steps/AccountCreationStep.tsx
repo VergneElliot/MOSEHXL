@@ -17,6 +17,7 @@ import {
   OutlinedInput
 } from '@mui/material';
 import { Visibility, VisibilityOff, Lock, Security } from '@mui/icons-material';
+type PasswordStrengthColor = 'error' | 'warning' | 'info' | 'success';
 
 interface AccountCreationStepProps {
   onComplete: (data: { password: string }) => void;
@@ -65,7 +66,7 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({
     const passwordErrors = validatePassword(value);
     setErrors(prev => ({
       ...prev,
-      password: passwordErrors.length > 0 ? passwordErrors[0] : ''
+      password: passwordErrors[0] ?? ''
     }));
   };
 
@@ -93,7 +94,7 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({
     // Validate passwords
     const passwordErrors = validatePassword(password);
     if (passwordErrors.length > 0) {
-      setErrors({ password: passwordErrors[0] });
+      setErrors({ password: passwordErrors[0] ?? 'Password validation failed' });
       setIsSubmitting(false);
       return;
     }
@@ -116,7 +117,7 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({
     }
   };
 
-  const getPasswordStrength = (password: string): { score: number; label: string; color: string } => {
+  const getPasswordStrength = (password: string): { score: number; label: string; color: PasswordStrengthColor } => {
     const errors = validatePassword(password);
     const score = Math.max(0, 5 - errors.length);
     
@@ -194,7 +195,7 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({
           )}
           {password && (
             <Box display="flex" alignItems="center" gap={1} mt={1}>
-              <Security fontSize="small" color={passwordStrength.color as any} />
+              <Security fontSize="small" color={passwordStrength.color} />
               <Typography variant="caption" color={`${passwordStrength.color}.main`}>
                 Password strength: {passwordStrength.label}
               </Typography>

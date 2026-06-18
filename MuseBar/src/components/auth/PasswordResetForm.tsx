@@ -23,6 +23,8 @@ import {
   VisibilityOff as VisibilityOffIcon,
   CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
+import { LanguageSwitcher } from '../common/LanguageSwitcher';
 
 interface PasswordValidation {
   length: boolean;
@@ -47,6 +49,7 @@ export const PasswordResetForm: React.FC<PasswordResetFormProps> = ({
   error,
   success,
 }) => {
+  const { t } = useTranslation(['auth']);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -102,9 +105,9 @@ export const PasswordResetForm: React.FC<PasswordResetFormProps> = ({
 
   const getPasswordStrengthText = (): string => {
     const strength = getPasswordStrength();
-    if (strength <= 2) return 'Weak';
-    if (strength <= 3) return 'Fair';
-    return 'Strong';
+    if (strength <= 2) return t('passwordResetForm.weak');
+    if (strength <= 3) return t('passwordResetForm.fair');
+    return t('passwordResetForm.strong');
   };
 
   if (success) {
@@ -113,13 +116,13 @@ export const PasswordResetForm: React.FC<PasswordResetFormProps> = ({
         <Paper sx={{ p: 4, textAlign: 'center' }}>
           <CheckCircleIcon sx={{ fontSize: 64, color: 'success.main', mb: 2 }} />
           <Typography variant="h4" gutterBottom>
-            Password Reset Successfully!
+            {t('passwordResetForm.successTitle')}
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            Your password has been updated. You can now log in with your new password.
+            {t('passwordResetForm.successSubtitle')}
           </Typography>
           <Button variant="contained" href="/login">
-            Go to Login
+            {t('passwordResetForm.goToLogin')}
           </Button>
         </Paper>
       </Box>
@@ -129,13 +132,16 @@ export const PasswordResetForm: React.FC<PasswordResetFormProps> = ({
   return (
     <Box sx={{ maxWidth: 500, mx: 'auto', mt: 4, p: 2 }}>
       <Paper sx={{ p: 4 }}>
+        <Box display="flex" justifyContent="flex-end" mb={1}>
+          <LanguageSwitcher />
+        </Box>
         <Box sx={{ textAlign: 'center', mb: 4 }}>
           <SecurityIcon sx={{ fontSize: 64, color: 'primary.main', mb: 2 }} />
           <Typography variant="h4" gutterBottom>
-            Set New Password
+            {t('passwordResetForm.title')}
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Create a strong password for your account.
+            {t('passwordResetForm.subtitle')}
           </Typography>
         </Box>
 
@@ -150,7 +156,7 @@ export const PasswordResetForm: React.FC<PasswordResetFormProps> = ({
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="New Password"
+                label={t('passwordResetForm.newPassword')}
                 type={showPassword ? 'text' : 'password'}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
@@ -184,7 +190,7 @@ export const PasswordResetForm: React.FC<PasswordResetFormProps> = ({
                       {getPasswordStrengthText()}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {getPasswordStrength()}/5 criteria met
+                      {t('passwordResetForm.criteriaMet', { count: getPasswordStrength() })}
                     </Typography>
                   </Box>
                 </Box>
@@ -195,11 +201,11 @@ export const PasswordResetForm: React.FC<PasswordResetFormProps> = ({
                 <Box sx={{ mt: 2 }}>
                   <Grid container spacing={1}>
                     {[
-                      { key: 'length', label: 'At least 8 characters' },
-                      { key: 'lowercase', label: 'Lowercase letter' },
-                      { key: 'uppercase', label: 'Uppercase letter' },
-                      { key: 'number', label: 'Number' },
-                      { key: 'special', label: 'Special character' },
+                      { key: 'length', label: t('passwordResetForm.criteria.length') },
+                      { key: 'lowercase', label: t('passwordResetForm.criteria.lowercase') },
+                      { key: 'uppercase', label: t('passwordResetForm.criteria.uppercase') },
+                      { key: 'number', label: t('passwordResetForm.criteria.number') },
+                      { key: 'special', label: t('passwordResetForm.criteria.special') },
                     ].map(({ key, label }) => (
                       <Grid item xs={12} sm={6} key={key}>
                         <Chip
@@ -218,7 +224,7 @@ export const PasswordResetForm: React.FC<PasswordResetFormProps> = ({
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Confirm New Password"
+                label={t('passwordResetForm.confirmPassword')}
                 type={showConfirmPassword ? 'text' : 'password'}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -227,7 +233,7 @@ export const PasswordResetForm: React.FC<PasswordResetFormProps> = ({
                 error={confirmPassword !== '' && newPassword !== confirmPassword}
                 helperText={
                   confirmPassword !== '' && newPassword !== confirmPassword
-                    ? 'Passwords do not match'
+                    ? t('passwordResetForm.passwordsDoNotMatch')
                     : ''
                 }
                 InputProps={{
@@ -253,7 +259,7 @@ export const PasswordResetForm: React.FC<PasswordResetFormProps> = ({
               size="large"
               disabled={!validateForm() || loading}
             >
-              {loading ? 'Updating Password...' : 'Update Password'}
+              {loading ? t('passwordResetForm.updating') : t('passwordResetForm.updatePassword')}
             </Button>
           </Box>
         </form>

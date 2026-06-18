@@ -4,8 +4,8 @@
  */
 
 import { useCallback } from 'react';
-import { apiConfig } from '../../../config/api';
 import { ErrorInfo, ErrorSeverity, ErrorReport, UseErrorHandlerReturn } from './types';
+import { reportClientError } from '../../../services/clientErrorLogger';
 
 /**
  * Custom hook for error handling
@@ -89,17 +89,7 @@ export const useErrorHandler = (): UseErrorHandlerReturn => {
         },
       };
 
-      const response = await fetch(apiConfig.getEndpoint('/api/client-errors'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(errorReport),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error reporting failed: ${response.status}`);
-      }
+      await reportClientError(error.message, error, errorReport.context);
 
       // Optional: Send to external monitoring service (e.g., Sentry)
       if (window.Sentry && typeof window.Sentry.captureException === 'function') {
@@ -171,9 +161,14 @@ export const useErrorHandler = (): UseErrorHandlerReturn => {
 
 // Type augmentation for external monitoring services
 declare global {
+  interface SentryCaptureContext {
+    tags?: Record<string, string | number | boolean>;
+    extra?: Record<string, unknown>;
+  }
+
   interface Window {
     Sentry?: {
-      captureException: (error: Error, options?: any) => void;
+      captureException: (error: Error, options?: SentryCaptureContext) => void;
     };
   }
 }

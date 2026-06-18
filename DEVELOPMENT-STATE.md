@@ -1,9 +1,9 @@
 # Development Branch — Current State
 
-This document captures the state of the `development` branch as of March 2026.
+This document captures the state of the `development` branch as of April 2026.
 It is the working reference for what is complete, what is broken, and what needs to be fixed before V2 can replace V1 in production.
 
-> **Post-audit update (March 2026):** A comprehensive code audit identified 48 issues across security, architecture, performance, type safety, and code quality. **45 fixes have been applied** (patches 11–55, documented in [docs/patch-notes/](docs/patch-notes/)). A follow-up technical audit resolved all 7 critical functional fixes and cleaned up the codebase for production deployment.
+> **Post-audit update (April 2026):** The March 2026 remediation wave (45 fixes) was followed by additional hardening passes (P0/P1 stabilization and P2 cleanup/doc-truth sweeps). This file reflects the current post-remediation state of the `development` branch.
 
 ---
 
@@ -43,8 +43,7 @@ It is the working reference for what is complete, what is broken, and what needs
 - Order list with business-day statistics (CA, card/cash totals, top 3 products)
 - Search by order ID or date
 - Stats pulled from `GET /api/legal/business-day-stats`
-- Retour processing via `POST /api/orders/payment/retour` (with legal journal REFUND entry)
-- Cancellation via `POST /api/orders/payment/cancel-unified` (partial/full, with legal journal)
+- Return / annulation (full or partial) via `POST /api/orders/payment/cancel-unified` (legal journal REFUND, audit trail) — the only app path is **Historique** (`useHistoryAPI`).
 
 ### Settings
 - Business info (name, address, SIRET, TVA) — reads/writes `business_settings`
@@ -83,27 +82,26 @@ It is the working reference for what is complete, what is broken, and what needs
 - SendGrid email service with templates (invitation, verification, establishment created)
 
 ### Services
-- Thermal printing service (`utils/thermalPrint/`) — modular with queue, formatters, templates
 - Multi-method printing (`services/printing/`) — browser, network, PrintNode, StarCloudPRNT
 - Digital/email/QR receipt services (`services/receipts/`)
 
 ---
 
-## Resolved Critical Fixes
+## Resolved / Decided Critical Fixes
 
-All 7 critical fixes from the initial audit have been resolved:
+The initial audit's 7 critical items have now been resolved or explicitly decided:
 
 | # | Fix | Status | Details |
 |---|-----|--------|---------|
 | 1 | Wire legal journal on order creation | ✅ Done | `orderCRUD.ts` writes SALE + audit trail on `status === 'completed'` |
 | 2 | Fix retour/change validation failures | ✅ Done | Dedicated `/orders/payment/change` endpoint bypasses `orderCreate` validation |
-| 3 | Route retour/change to correct endpoints | ✅ Done | `usePOSAPI` → `/orders/payment/retour`; `useHistoryAPI` → `/orders/payment/cancel-unified` |
+| 3 | Route retour/change to correct endpoints | ✅ Done | `useHistoryAPI` → `/orders/payment/cancel-unified`; `usePOSAPI` → `/orders/payment/change` (monnaie) — dedicated `/retour` route removed (unused) |
 | 4 | Remove hardcoded credentials | ✅ Done | `auth.ts` is clean — no bypass, no debug routes |
 | 5 | Restore permissions query | ✅ Done | `/me` endpoint fetches `UserModel.getUserPermissions(userId)` |
-| 6 | UI dialogs for retour/change in POS | ⏳ Secondary | State and API exist; dialog components needed for v2.1 |
-| 7 | UI dialog for return in History | ⏳ Secondary | State and API exist; dialog component needed for v2.1 |
+| 6 | POS “retour” dialog | ❌ Dropped | Was unused; return flow is **Historique** only. |
+| 7 | UI dialog for return in History | ✅ Done | `ReturnDialog` + `cancel-unified` |
 
-Fixes 6 and 7 are UI convenience features. The backend endpoints work and can be called from the frontend. Dialog components are planned for v2.1.
+Return/annulation is fully implemented in Historique. POS `change` (faire de la monnaie) is wired; there is no separate POS retour.
 
 ---
 
@@ -113,13 +111,13 @@ These do not prevent the POS from working but should be addressed in a future re
 
 | # | Issue | File | Notes |
 |---|-------|------|-------|
-| 9 | `orderAudit.ts` GET stubs return empty arrays | `routes/orders/orderAudit.ts` | GET audit trail endpoints return `{ audit_entries: [] }`. Wire to actual `audit_trail` table queries when reporting is needed. |
 | 11 | CORS missing explicit `mosehxl.com` | `app.ts` | The `CORS_ORIGIN` env var covers it in production if set correctly, but it's not explicit in code. |
-| 14 | Settings printer tab not connected | `components/Settings/PrinterSettings.tsx` | UI exists but is not wired to the new `services/printing/` backend services. |
+| 14 | Settings printer tab not connected | `components/Settings/Settings/PrinterSettings.tsx` | UI exists but is not wired to the new `services/printing/` backend services. |
 | 15 | History dialogs for order details and receipts missing | `components/History/HistoryContainer.tsx` | View and print receipt flows exist in V1 but not yet ported. |
 
 > **Previously known issues, now resolved:**
 > - ~~#8: `orderService.ts` dead code~~ → Removed (patch #32)
+> - ~~#9: `orderAudit.ts` GET stubs return empty arrays~~ → Wired to real `audit_trail` reads via `AuditTrailModel.getOrderAuditEntries` (Non-Blocking #9 implementation)
 > - ~~#10: Audit trail not written on order creation~~ → Now written in `orderCRUD.ts`
 > - ~~#12: Debug logging in `useAuth.ts`~~ → Replaced with structured logger (patch #33)
 > - ~~#13: `usePOSAPI.processChange` notes mismatch~~ → Fixed with dedicated `/orders/payment/change` endpoint
@@ -130,22 +128,24 @@ These do not prevent the POS from working but should be addressed in a future re
 
 The V2 schema is fully backward-compatible with V1 production data. All schema changes are additive. A V1 data backfill migration is included.
 
-### Migration chain (12 files, lexicographic order)
+### Migration chain status (source of truth)
 
+Do not rely on a hardcoded migration count in this document. The chain is active
+and keeps growing.
+
+Use the CLI as the source of truth:
+
+```bash
+cd MuseBar/backend
+npm run migration:status
 ```
-2025_09_12_07_30_00_remove_email_unique_constraints.sql
-2025_09_15_00_00_00_add_establishment_fields.sql
-2026_02_25_00_00_00_add_pos_columns_and_establishment_isolation.sql
-2026_02_25_00_15_00_create_setup_progress_tables.sql
-2026_02_25_00_30_00_create_status_transitions_table.sql
-2026_02_25_01_00_00_convert_timestamps_to_timestamptz.sql
-2026_02_26_01_00_00_accounting_decimal_precision.sql
-2026_02_26_02_00_00_add_establishment_id_to_closure_bulletins.sql
-2026_02_26_02_30_00_add_closure_tips_change_weekly.sql
-2026_02_26_03_00_00_add_users_is_active.sql
-2026_03_05_12_00_00_rate_limit_store.sql
-2026_03_05_13_00_00_v1_data_backfill.sql       ← auto-creates establishment, links all V1 data
-```
+
+Current chain includes migrations across these categories:
+- tenant/isolation schema evolution,
+- legal journal and closure hardening,
+- auth/session and permission model hardening,
+- security/rate-limit infrastructure,
+- V1-to-V2 compatibility/backfill support.
 
 ### Steps to migrate production DB
 

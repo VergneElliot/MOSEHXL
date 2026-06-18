@@ -1,11 +1,15 @@
 import { useCallback } from 'react';
 import { ApiService } from '../services/apiService';
-import { OrderItem, LocalSubBill } from '../types';
+import { OrderItem, LocalSubBill, Order } from '../types';
+
+interface ChangeResponse {
+  message?: string;
+  [key: string]: unknown;
+}
 
 export interface POSAPIActions {
-  createOrder: (orderData: CreateOrderData) => Promise<any>;
-  processRetour: (retourData: RetourData) => Promise<any>;
-  processChange: (changeData: ChangeData) => Promise<any>;
+  createOrder: (orderData: CreateOrderData) => Promise<Order>;
+  processChange: (changeData: ChangeData) => Promise<ChangeResponse>;
 }
 
 export interface CreateOrderData {
@@ -20,19 +24,13 @@ export interface CreateOrderData {
   notes?: string;
 }
 
-export interface RetourData {
-  item: OrderItem;
-  reason: string;
-  paymentMethod: 'cash' | 'card';
-}
-
 export interface ChangeData {
   amount: number;
   direction: 'card-to-cash' | 'cash-to-card';
 }
 
 export const usePOSAPI = (
-  onSuccess: (message: string) => void,
+  onSuccess: (message: string, order?: Order) => void,
   onError: (message: string) => void,
   onDataUpdate: () => void
 ): POSAPIActions => {
@@ -42,7 +40,7 @@ export const usePOSAPI = (
   const createOrder = useCallback(
     async (orderData: CreateOrderData) => {
       try {
-        await apiService.createOrder({
+        const created = await apiService.createOrder({
           totalAmount: orderData.totalAmount,
           taxAmount: orderData.totalTax,
           paymentMethod: orderData.paymentMethod,
@@ -58,8 +56,9 @@ export const usePOSAPI = (
           change: orderData.change ?? 0,
           notes: orderData.notes,
         });
-        onSuccess('Commande créée avec succès');
+        onSuccess('Commande créée avec succès', created);
         onDataUpdate();
+        return created;
       } catch (error: unknown) {
         const err = error as { response?: { data?: { error?: string } }; message?: string };
         const errorMessage =
@@ -73,43 +72,10 @@ export const usePOSAPI = (
     [apiService, onSuccess, onError, onDataUpdate]
   );
 
-  const processRetour = useCallback(
-    async (retourData: RetourData) => {
-      try {
-        // Use the dedicated retour endpoint — it validates the payload,
-        // creates the negative order, and writes a REFUND entry to the
-        // legal journal and audit trail.
-        const response = await apiService.post('/orders/payment/retour', {
-          item: {
-            productId: retourData.item.productId,
-            productName: retourData.item.productName,
-            quantity: retourData.item.quantity,
-            unitPrice: retourData.item.unitPrice,
-            totalPrice: retourData.item.totalPrice,
-            taxRate: retourData.item.taxRate,
-          },
-          reason: retourData.reason,
-          paymentMethod: retourData.paymentMethod,
-        });
-
-        onSuccess('Retour traité avec succès');
-        onDataUpdate();
-        return response.data;
-      } catch (error: unknown) {
-        const err = error as { response?: { data?: { error?: string } }; message?: string };
-        const errorMessage =
-          err.response?.data?.error || err.message || 'Erreur lors du traitement du retour';
-        onError(errorMessage);
-        throw error;
-      }
-    },
-    [apiService, onSuccess, onError, onDataUpdate]
-  );
-
   const processChange = useCallback(
     async (changeData: ChangeData) => {
       try {
-        const response = await apiService.post('/orders/payment/change', {
+        const response = await apiService.post<ChangeResponse>('/orders/payment/change', {
           amount: changeData.amount,
           direction: changeData.direction,
         });
@@ -130,7 +96,6 @@ export const usePOSAPI = (
 
   return {
     createOrder,
-    processRetour,
     processChange,
   };
 };

@@ -2,6 +2,7 @@ import { PoolClient } from 'pg';
 import { Logger } from '../../../utils/logger';
 import { AuditTrailModel } from '../../../models/auditTrail';
 import { BusinessInfo } from '../../../routes/establishmentAccountCreation/types';
+import { logSoftwareEventBestEffort } from '../../legal/softwareEventJournal';
 
 export interface EstablishmentUpdateData {
   establishmentId: string;
@@ -117,6 +118,17 @@ export class EstablishmentOperations {
       this.logger.info('Audit trail logged for establishment business info update', { 
         establishmentId, 
         userId 
+      });
+
+      await logSoftwareEventBestEffort({
+        establishmentId,
+        eventType: 'ESTABLISHMENT_STATUS_UPDATED',
+        eventData: {
+          new_status: status,
+          update_type: 'business_info_completion',
+          source: 'establishment_account_creation',
+        },
+        userId,
       });
 
       return {
@@ -252,6 +264,17 @@ export class EstablishmentOperations {
         },
         ip_address: ipAddress,
         user_agent: userAgent
+      });
+
+      await logSoftwareEventBestEffort({
+        establishmentId,
+        eventType: 'ESTABLISHMENT_STATUS_UPDATED',
+        eventData: {
+          new_status: status,
+          update_type: 'status_change',
+          source: 'establishment_account_creation',
+        },
+        userId,
       });
 
     } catch (error) {

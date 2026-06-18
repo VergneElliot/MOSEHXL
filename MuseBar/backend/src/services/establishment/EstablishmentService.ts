@@ -4,7 +4,7 @@
  * Lives in establishment/ directory; enhanced creation uses EstablishmentCreationOrchestrator.
  */
 
-import { pool } from '../../app';
+import { pool } from '../../db/pool';
 import crypto from 'crypto';
 import { EstablishmentModel } from '../../models/establishment';
 import { AuditTrailModel } from '../../models/auditTrail';

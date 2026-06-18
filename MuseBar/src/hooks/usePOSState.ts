@@ -15,11 +15,6 @@ export interface POSState {
   mobileView: 'menu' | 'order';
 
   // Dialog states
-  retourDialogOpen: boolean;
-  retourItem: OrderItem | null;
-  retourReason: string;
-  retourPaymentMethod: 'cash' | 'card';
-  retourLoading: boolean;
   changeDialogOpen: boolean;
   changeAmount: string;
   changeDirection: 'card-to-cash' | 'cash-to-card';
@@ -49,11 +44,6 @@ export interface POSActions {
   setMobileView: (view: 'menu' | 'order') => void;
 
   // Dialog actions
-  setRetourDialogOpen: (open: boolean) => void;
-  setRetourItem: (item: OrderItem | null) => void;
-  setRetourReason: (reason: string) => void;
-  setRetourPaymentMethod: (method: 'cash' | 'card') => void;
-  setRetourLoading: (loading: boolean) => void;
   setChangeDialogOpen: (open: boolean) => void;
   setChangeAmount: (amount: string) => void;
   setChangeDirection: (direction: 'card-to-cash' | 'cash-to-card') => void;
@@ -84,11 +74,6 @@ export const usePOSState = (): [POSState, POSActions] => {
   const [mobileView, setMobileView] = useState<'menu' | 'order'>('menu');
 
   // Dialog states
-  const [retourDialogOpen, setRetourDialogOpen] = useState(false);
-  const [retourItem, setRetourItem] = useState<OrderItem | null>(null);
-  const [retourReason, setRetourReason] = useState('');
-  const [retourPaymentMethod, setRetourPaymentMethod] = useState<'cash' | 'card'>('cash');
-  const [retourLoading, setRetourLoading] = useState(false);
   const [changeDialogOpen, setChangeDialogOpen] = useState(false);
   const [changeAmount, setChangeAmount] = useState('');
   const [changeDirection, setChangeDirection] = useState<'card-to-cash' | 'cash-to-card'>(
@@ -120,11 +105,6 @@ export const usePOSState = (): [POSState, POSActions] => {
     currentOrder,
     paymentDialogOpen,
     mobileView,
-    retourDialogOpen,
-    retourItem,
-    retourReason,
-    retourPaymentMethod,
-    retourLoading,
     changeDialogOpen,
     changeAmount,
     changeDirection,
@@ -141,11 +121,6 @@ export const usePOSState = (): [POSState, POSActions] => {
     clearOrder,
     setPaymentDialogOpen,
     setMobileView,
-    setRetourDialogOpen,
-    setRetourItem,
-    setRetourReason,
-    setRetourPaymentMethod,
-    setRetourLoading,
     setChangeDialogOpen,
     setChangeAmount,
     setChangeDirection,

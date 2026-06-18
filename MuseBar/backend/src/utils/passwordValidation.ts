@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 /**
  * Shared password validation — single source of truth for all flows.
  * Use this for: setup wizard, establishment account creation, invitation acceptance,
@@ -12,6 +13,17 @@ export const PASSWORD_MAX_LENGTH = 128;
 export interface PasswordValidationResult {
   isValid: boolean;
   error?: string;
+}
+
+const PASSWORD_BREACH_API_URL = 'https://api.pwnedpasswords.com/range';
+
+function isPasswordBreachCheckEnabled(): boolean {
+  return process.env.PASSWORD_BREACH_CHECK_ENABLED?.trim().toLowerCase() === 'true';
+}
+
+function getPasswordBreachCheckTimeoutMs(): number {
+  const raw = Number(process.env.PASSWORD_BREACH_CHECK_TIMEOUT_MS ?? 2500);
+  return Number.isFinite(raw) && raw > 0 ? raw : 2500;
 }
 
 /**
@@ -39,6 +51,55 @@ export function validatePassword(password: string): PasswordValidationResult {
     return { isValid: false, error: 'Password must contain at least one number' };
   }
   return { isValid: true };
+}
+
+async function isPasswordCompromised(password: string): Promise<boolean> {
+  const hashHex = crypto.createHash('sha1').update(password).digest('hex').toUpperCase();
+
+  const prefix = hashHex.slice(0, 5);
+  const suffix = hashHex.slice(5);
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), getPasswordBreachCheckTimeoutMs());
+  try {
+    const response = await fetch(`${PASSWORD_BREACH_API_URL}/${prefix}`, {
+      headers: {
+        'Add-Padding': 'true',
+      },
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      return false;
+    }
+    const body = await response.text();
+    const normalizedLines = body.split('\n').map((line) => line.trim()).filter(Boolean);
+    return normalizedLines.some((line) => line.split(':')[0]?.toUpperCase() === suffix);
+  } catch {
+    // Optional control: fail-open when breach API is unavailable.
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function validatePasswordWithBreachCheck(password: string): Promise<PasswordValidationResult> {
+  const basic = validatePassword(password);
+  if (!basic.isValid) {
+    return basic;
+  }
+  if (!isPasswordBreachCheckEnabled()) {
+    return basic;
+  }
+
+  const compromised = await isPasswordCompromised(password);
+  if (compromised) {
+    return {
+      isValid: false,
+      error: 'Password has appeared in known data breaches. Please choose a different password.',
+    };
+  }
+
+  return basic;
 }
 
 /**

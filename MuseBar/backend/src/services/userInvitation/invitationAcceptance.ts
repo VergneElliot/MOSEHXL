@@ -4,10 +4,11 @@
  */
 
 import bcrypt from 'bcrypt';
-import { pool } from '../../app';
+import { pool } from '../../db/pool';
 import { Logger } from '../../utils/logger';
 import { InvitationQueries } from '../../utils/database';
 import { EstablishmentModel, CreateEstablishmentData } from '../../models/establishment';
+import { mapInvitationRoleLabelToCanonicalRole } from '../../auth/roleVocabulary';
 import { 
   InvitationAcceptanceData, 
   InvitationResult,
@@ -68,7 +69,7 @@ export class InvitationAcceptance {
         acceptanceData.lastName || invitationRecord.establishment_name,
         'establishment_admin',
         establishment.id,
-        true,
+        false,
         true,
         true
       ]);
@@ -166,9 +167,9 @@ export class InvitationAcceptance {
         hashedPassword,
         acceptanceData.firstName || 'User',
         acceptanceData.lastName || 'User',
-        invitationRecord.role,
+        mapInvitationRoleLabelToCanonicalRole(invitationRecord.role),
         invitationRecord.establishment_id,
-        invitationRecord.role === 'establishment_admin',
+        false,
         true,
         true
       ]);

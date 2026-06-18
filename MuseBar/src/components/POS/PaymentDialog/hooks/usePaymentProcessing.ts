@@ -4,7 +4,7 @@
  */
 
 import { useCallback } from 'react';
-import { OrderItem } from '../../../../types';
+import { OrderItem, Order } from '../../../../types';
 import { usePOSAPI } from '../../../../hooks/usePOSAPI';
 import { PaymentState } from '../types';
 
@@ -14,7 +14,7 @@ interface UsePaymentProcessingProps {
   totalWithTips: number;
   cashChange: number;
   onLoading: (loading: boolean) => void;
-  onSuccess: () => void;
+  onSuccess: (createdOrder?: Order) => void;
   onError: (error: string) => void;
   onReset: () => void;
 }
@@ -31,7 +31,7 @@ export const usePaymentProcessing = ({
 }: UsePaymentProcessingProps) => {
   
   const { createOrder } = usePOSAPI(
-    (message) => onSuccess(),
+    (message, createdOrder) => onSuccess(createdOrder),
     (message) => onError(message),
     () => {} // onDataUpdate placeholder
   );
@@ -58,8 +58,8 @@ export const usePaymentProcessing = ({
         change: state.simplePaymentMethod === 'cash' ? cashChange : 0,
       };
 
-      await createOrder(orderData);
-      onSuccess();
+      const created = await createOrder(orderData);
+      onSuccess(created);
       onReset();
     } catch (error) {
       console.error('Payment failed:', error);
@@ -103,8 +103,8 @@ export const usePaymentProcessing = ({
         tips: state.subBills.reduce((sum, bill) => sum + parseFloat(bill.tip || '0'), 0),
       };
 
-      await createOrder(orderData);
-      onSuccess();
+      const created = await createOrder(orderData);
+      onSuccess(created);
       onReset();
     } catch (error) {
       console.error('Split payment failed:', error);

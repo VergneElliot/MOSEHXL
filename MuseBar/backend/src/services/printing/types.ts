@@ -3,6 +3,8 @@
 export interface ReceiptData {
   order_id: number;
   sequence_number: number;
+  document_kind?: 'ticket' | 'invoice';
+  document_number?: string;
   total_amount: number;
   total_tax: number;
   payment_method: string;
@@ -22,6 +24,14 @@ export interface ReceiptData {
     siret?: string;
     tax_identification?: string;
   };
+  legal_info?: {
+    payment_due_date?: string;
+    payment_terms?: string;
+    late_penalty_terms?: string;
+    recovery_fee_note?: string;
+    seller_legal_form?: string;
+    seller_share_capital_eur?: number;
+  };
   vat_breakdown?: Array<{
     rate: number;
     subtotal_ht: number;
@@ -30,8 +40,18 @@ export interface ReceiptData {
   receipt_type: 'detailed' | 'summary';
   tips?: number;
   change?: number;
+  customer_info?: {
+    name?: string;
+    address?: string;
+    email?: string;
+    tax_identification?: string;
+  };
   compliance_info?: {
     receipt_hash?: string;
+    invoice_hash?: string;
+    previous_invoice_hash?: string;
+    source_receipt_hash?: string;
+    source_receipt_sequence?: number;
     cash_register_id?: string;
     operator_id?: string;
   };
@@ -39,7 +59,7 @@ export interface ReceiptData {
 
 export interface ClosureBulletinData {
   id: number;
-  closure_type: 'DAILY' | 'MONTHLY' | 'ANNUAL';
+  closure_type: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL';
   period_start: string;
   period_end: string;
   total_transactions: number;
@@ -100,14 +120,18 @@ export interface Printer {
 }
 
 export interface PrintingConfig {
-  provider: 'printnode' | 'star-cloudprnt' | 'network' | 'browser' | 'composite' | 'digital';
-  apiKey?: string;
-  defaultPrinter?: string;
-  networkPrinterIp?: string;
-  networkPrinterPort?: number;
-  fallbackProvider?: string;
-  providers?: PrintingConfig[];
-  establishmentId?: number;
+  /** Epson TM-Intelligent Server Direct Print (printer polls HTTPS, ePOS-Print XML). */
+  provider: 'epson-server-direct' | 'network-escpos' | 'digital';
+  /** Establishment UUID (matches public.establishments.id and JWT payload). */
+  establishmentId?: string;
+  /** Shown in printer lists / status (optional). */
+  printerLabel?: string;
+  /** Validated on GET /api/printing/epson/poll — stored in printing_configurations.config */
+  pollKey?: string;
+  /** LAN ESC/POS — printer IPv4/hostname (fallback: THERMAL_PRINTER_HOST). */
+  printerHost?: string;
+  /** LAN ESC/POS — raw socket port (default 9100). */
+  printerPort?: number;
   timeout?: number;
 }
 

@@ -26,11 +26,6 @@ describe('usePOSState', () => {
     expect(state.currentOrder).toEqual([]);
     expect(state.paymentDialogOpen).toBe(false);
     expect(state.mobileView).toBe('menu');
-    expect(state.retourDialogOpen).toBe(false);
-    expect(state.retourItem).toBeNull();
-    expect(state.retourReason).toBe('');
-    expect(state.retourPaymentMethod).toBe('cash');
-    expect(state.retourLoading).toBe(false);
     expect(state.changeDialogOpen).toBe(false);
     expect(state.changeAmount).toBe('');
     expect(state.changeDirection).toBe('card-to-cash');
@@ -133,61 +128,6 @@ describe('usePOSState', () => {
     });
 
     expect(result.current[0].mobileView).toBe('order');
-  });
-
-  it('should update retour dialog state', () => {
-    const { result } = renderHook(() => usePOSState());
-    const [, actions] = result.current;
-
-    act(() => {
-      actions.setRetourDialogOpen(true);
-    });
-
-    expect(result.current[0].retourDialogOpen).toBe(true);
-  });
-
-  it('should update retour item', () => {
-    const { result } = renderHook(() => usePOSState());
-    const [, actions] = result.current;
-
-    act(() => {
-      actions.setRetourItem(mockOrderItem);
-    });
-
-    expect(result.current[0].retourItem).toEqual(mockOrderItem);
-  });
-
-  it('should update retour reason', () => {
-    const { result } = renderHook(() => usePOSState());
-    const [, actions] = result.current;
-
-    act(() => {
-      actions.setRetourReason('Customer request');
-    });
-
-    expect(result.current[0].retourReason).toBe('Customer request');
-  });
-
-  it('should update retour payment method', () => {
-    const { result } = renderHook(() => usePOSState());
-    const [, actions] = result.current;
-
-    act(() => {
-      actions.setRetourPaymentMethod('card');
-    });
-
-    expect(result.current[0].retourPaymentMethod).toBe('card');
-  });
-
-  it('should update retour loading state', () => {
-    const { result } = renderHook(() => usePOSState());
-    const [, actions] = result.current;
-
-    act(() => {
-      actions.setRetourLoading(true);
-    });
-
-    expect(result.current[0].retourLoading).toBe(true);
   });
 
   it('should update change dialog state', () => {

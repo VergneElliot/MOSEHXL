@@ -4,13 +4,18 @@
  */
 
 import express from 'express';
-import type { NextFunction, Response } from 'express';
-import { requireAuth, requireAdmin } from '../auth';
+import type { Response } from 'express';
+import { requireAuth, requireAdmin, requireEstablishmentAdminOrPermission } from '../auth';
+import { P } from '../../permissions/registry';
+
+const canManageUsers = requireEstablishmentAdminOrPermission(P.access_user_management);
 import { validateBody, validateParams } from '../../middleware/validation';
-import { UserInvitationService } from '../../services/userInvitationService';
+import { UserInvitationService } from '../../services/userInvitation';
 import { EstablishmentModel } from '../../models/establishment';
 import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';
+import { INVITATION_ROLE_LABELS, InvitationRoleLabel } from '../../auth/roleVocabulary';
+import { AuthorizationError, NotFoundError, ValidationError, asyncHandler } from '../../middleware/errorHandler';
 import {
   AuthenticatedRequest,
   EstablishmentInvitationData,
@@ -40,17 +45,14 @@ export function initializeInvitationRoutes(services: ServiceInitialization): voi
 router.post('/send-establishment-invitation', requireAuth, requireAdmin, validateBody([
   { field: 'name', required: true },
   { field: 'email', required: true },
-]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+]), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { name, email, phone, address, subscription_plan }: EstablishmentInvitationData = req.body;
     const user = req.user!;
 
     // Validate required fields
     if (!name || !email) {
-      return res.status(400).json({
-        success: false,
-        message: 'Establishment name and email are required'
-      });
+      throw new ValidationError('Establishment name and email are required');
     }
 
     // Email uniqueness check removed - users can have multiple establishments with same email
@@ -100,62 +102,50 @@ router.post('/send-establishment-invitation', requireAuth, requireAdmin, validat
       },
       'INVITATION_ROUTES'
     );
-    next(error);
+    throw error;
   }
-});
+}));
 
 /**
  * POST /send-user-invitation
  * Send user invitation (Establishment Admin only)
  */
-router.post('/send-user-invitation', requireAuth, validateBody([
+router.post('/send-user-invitation', requireAuth, canManageUsers, validateBody([
   { field: 'email', required: true },
   { field: 'firstName', required: true },
   { field: 'lastName', required: true },
   { field: 'role', required: true },
   { field: 'establishmentId', required: true },
-]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+]), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { email, firstName, lastName, role, establishmentId }: UserInvitationData = req.body;
     const user = req.user!;
 
     // Validate required fields
     if (!email || !firstName || !lastName || !role || !establishmentId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email, first name, last name, role, and establishment ID are required'
-      });
+      throw new ValidationError('Email, first name, last name, role, and establishment ID are required');
     }
 
     // Validate user has access to this establishment
     if (!user.is_admin && user.establishment_id !== establishmentId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied to this establishment'
-      });
+      throw new AuthorizationError('Access denied to this establishment');
     }
 
     // Get establishment details
     const establishment = await EstablishmentModel.getById(establishmentId);
     if (!establishment) {
-      return res.status(404).json({
-        success: false,
-        message: 'Establishment not found'
-      });
+      throw new NotFoundError('Establishment');
     }
 
     // Check if user already exists in this establishment
     // Check if user already exists (simplified check)
     const existingUserCheck = { exists: false };
     if (existingUserCheck.exists) {
-      return res.status(400).json({
-        success: false,
-        message: 'User already exists in this establishment'
-      });
+      throw new ValidationError('User already exists in this establishment');
     }
 
-    if (!['establishment_admin', 'establishment_manager', 'establishment_staff'].includes(role)) {
-      return res.status(400).json({ success: false, message: 'Invalid role' });
+    if (!INVITATION_ROLE_LABELS.includes(role as InvitationRoleLabel)) {
+      throw new ValidationError('Invalid role');
     }
 
     // Send user invitation
@@ -163,7 +153,7 @@ router.post('/send-user-invitation', requireAuth, validateBody([
       email,
       firstName,
       lastName,
-      role: role as 'establishment_admin' | 'establishment_manager' | 'establishment_staff',
+      role: role as InvitationRoleLabel,
       establishmentId,
       establishmentName: establishment.name,
       inviterUserId: String(user.id),
@@ -203,9 +193,9 @@ router.post('/send-user-invitation', requireAuth, validateBody([
       },
       'INVITATION_ROUTES'
     );
-    next(error);
+    throw error;
   }
-});
+}));
 
 /**
  * POST /accept-invitation
@@ -214,24 +204,18 @@ router.post('/send-user-invitation', requireAuth, validateBody([
 router.post('/accept-invitation', validateBody([
   { field: 'token', required: true },
   { field: 'password', required: true },
-]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+]), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { token, password, firstName, lastName }: InvitationAcceptanceData = req.body;
 
     if (!token || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Token and password are required'
-      });
+      throw new ValidationError('Token and password are required');
     }
 
     // Get invitation details
     const invitation = await userInvitationService.getInvitationByToken(token);
     if (!invitation) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid or expired invitation token'
-      });
+      throw new ValidationError('Invalid or expired invitation token');
     }
 
     // Accept invitation based on type
@@ -245,7 +229,10 @@ router.post('/accept-invitation', validateBody([
     }
 
     if (!result.success) {
-      return res.status(400).json(result);
+      throw new ValidationError(
+        typeof result.message === 'string' ? result.message : 'Failed to accept invitation',
+        { result: result as unknown as Record<string, unknown> }
+      );
     }
 
     res.json({
@@ -258,28 +245,25 @@ router.post('/accept-invitation', validateBody([
       'Failed to accept invitation',
       { 
         error: error as Error,
-        token: req.body.token 
+        token_present: typeof req.body.token === 'string' && req.body.token.length > 0
       },
       'INVITATION_ROUTES'
     );
-    next(error);
+    throw error;
   }
-});
+}));
 
 /**
  * GET /pending-invitations
  * Get pending invitations for establishment
  */
-router.get('/pending-invitations', requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+router.get('/pending-invitations', requireAuth, canManageUsers, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = req.user!;
     const establishmentId = req.query.establishmentId as string || user.establishment_id;
 
     if (!establishmentId) {
-      return res.status(400).json({
-        success: false,
-        message: 'User must be associated with an establishment'
-      });
+      throw new ValidationError('User must be associated with an establishment');
     }
 
     const invitations = await userInvitationService.getPendingInvitations(establishmentId);
@@ -309,28 +293,25 @@ router.get('/pending-invitations', requireAuth, async (req: AuthenticatedRequest
       },
       'INVITATION_ROUTES'
     );
-    next(error);
+    throw error;
   }
-});
+}));
 
 /**
  * DELETE /cancel-invitation/:invitationId
  * Cancel invitation (Establishment Admin only)
  */
-router.delete('/cancel-invitation/:invitationId', requireAuth, validateParams([
-  { param: 'invitationId', validator: (v: string) => typeof v === 'string' && v.length > 0 }
-]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+router.delete('/cancel-invitation/:invitationId', requireAuth, canManageUsers, validateParams([
+  { param: 'invitationId', validator: (v: string) => v.length > 0 }
+]), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { invitationId } = req.params;
+    const invitationId = req.params.invitationId ?? '';
     const user = req.user!;
 
     const success = await userInvitationService.cancelInvitation(invitationId, String(user.id));
 
     if (!success) {
-      return res.status(404).json({
-        success: false,
-        message: 'Invitation not found or already processed'
-      });
+      throw new NotFoundError('Invitation');
     }
 
     await AuditTrailModel.logAction({
@@ -357,25 +338,25 @@ router.delete('/cancel-invitation/:invitationId', requireAuth, validateParams([
       },
       'INVITATION_ROUTES'
     );
-    next(error);
+    throw error;
   }
-});
+}));
 
 /**
  * POST /resend-invitation/:invitationId
  * Resend invitation (Establishment Admin only)
  */
-router.post('/resend-invitation/:invitationId', requireAuth, validateParams([
-  { param: 'invitationId', validator: (v: string) => typeof v === 'string' && v.length > 0 }
-]), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+router.post('/resend-invitation/:invitationId', requireAuth, canManageUsers, validateParams([
+  { param: 'invitationId', validator: (v: string) => v.length > 0 }
+]), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { invitationId } = req.params;
+    const invitationId = req.params.invitationId ?? '';
     const user = req.user!;
 
     const result = { success: true, trackingId: 'placeholder' };
 
     if (!result.success) {
-      return res.status(400).json(result);
+      throw new ValidationError('Failed to resend invitation');
     }
 
     await AuditTrailModel.logAction({
@@ -406,9 +387,9 @@ router.post('/resend-invitation/:invitationId', requireAuth, validateParams([
       },
       'INVITATION_ROUTES'
     );
-    next(error);
+    throw error;
   }
-});
+}));
 
 export { router as invitationRoutes };
 

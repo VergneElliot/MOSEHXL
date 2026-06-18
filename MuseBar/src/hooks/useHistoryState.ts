@@ -26,7 +26,6 @@ export interface HistoryState {
   // Receipt dialog state
   receiptDialogOpen: boolean;
   currentReceipt: Order | null;
-  receiptType: 'detailed' | 'summary';
 
   // Return dialog state
   returnDialogOpen: boolean;
@@ -51,8 +50,7 @@ export interface HistoryActions {
   // Receipt actions
   setReceiptDialogOpen: (open: boolean) => void;
   setCurrentReceipt: (receipt: Order | null) => void;
-  setReceiptType: (type: 'detailed' | 'summary') => void;
-  openReceiptDialog: (order: Order, type: 'detailed' | 'summary') => void;
+  openReceiptDialog: (order: Order) => void;
   closeReceiptDialog: () => void;
 
   // Return actions
@@ -90,7 +88,6 @@ export const useHistoryState = (): [HistoryState, HistoryActions] => {
   // Receipt dialog state
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   const [currentReceipt, setCurrentReceipt] = useState<Order | null>(null);
-  const [receiptType, setReceiptType] = useState<'detailed' | 'summary'>('detailed');
 
   // Return dialog state
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
@@ -104,9 +101,8 @@ export const useHistoryState = (): [HistoryState, HistoryActions] => {
   const [returnError, setReturnError] = useState('');
 
   // Receipt helper actions
-  const openReceiptDialog = (order: Order, type: 'detailed' | 'summary') => {
+  const openReceiptDialog = (order: Order) => {
     setCurrentReceipt(order);
-    setReceiptType(type);
     setReceiptDialogOpen(true);
   };
 
@@ -156,7 +152,6 @@ export const useHistoryState = (): [HistoryState, HistoryActions] => {
     stats,
     receiptDialogOpen,
     currentReceipt,
-    receiptType,
     returnDialogOpen,
     orderToReturn,
     returnReason,
@@ -176,7 +171,6 @@ export const useHistoryState = (): [HistoryState, HistoryActions] => {
     setStats,
     setReceiptDialogOpen,
     setCurrentReceipt,
-    setReceiptType,
     openReceiptDialog,
     closeReceiptDialog,
     setReturnDialogOpen,

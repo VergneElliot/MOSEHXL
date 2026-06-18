@@ -4,13 +4,11 @@
  */
 
 import express from 'express';
-import retourRouter from './orderRetour';
 import cancelRouter from './orderCancel';
 import changeRouter from './orderChange';
 
 const router = express.Router();
 
-router.use(retourRouter);
 router.use(cancelRouter);
 router.use(changeRouter);
 

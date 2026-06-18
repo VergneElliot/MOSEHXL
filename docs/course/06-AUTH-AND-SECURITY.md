@@ -74,19 +74,31 @@ eyJhbGciOiJIUzI1NiJ9.eyJpZCI6MywiZW1haWwiOiJlbGxpb3QudmVyZ25lQGdtYWlsLmNvbSIsIml
 {
   "id": 3,
   "email": "elliot.vergne@gmail.com",
-  "is_admin": true,
+  "role": "establishment_admin",
+  "establishment_id": "7e6f6d39-4db8-4f27-b31d-5f6d3c8c8b12",
+  "jti": "b9e5fdb8-5f2a-4f0f-8f28-1be25d53b9cc",
+  "is_admin": false,
   "iat": 1709000000,       // issued at (timestamp)
   "exp": 1709043200        // expires at (12 hours later)
 }
 ```
 
-**Signature**: A cryptographic signature created using the payload + a secret key (`JWT_SECRET`). If anyone modifies the payload (e.g., changes `is_admin` to `true`), the signature won't match and the token is rejected.
+`is_admin` may still appear for backward compatibility, but runtime authorization
+is role/permission-driven (`role` + permission checks).
+
+**Signature**: A cryptographic signature created using the payload + a secret key (`JWT_SECRET`). If anyone modifies the payload (e.g., changes `role` to `system_admin`), the signature won't match and the token is rejected.
 
 ### Creating a token
 
 ```typescript
 const token = jwt.sign(
-  { id: user.id, email: user.email, is_admin: user.is_admin },  // payload
+  {
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    establishment_id: user.establishment_id,
+    jti: generatedJti,
+  },                                                              // payload
   JWT_SECRET,                                                       // secret key
   { expiresIn: '12h' }                                              // expiration
 );
@@ -97,7 +109,7 @@ const token = jwt.sign(
 ```typescript
 const payload = jwt.verify(token, JWT_SECRET);
 // If the token is expired or the signature doesn't match → throws an error
-// If valid → returns the payload { id, email, is_admin }
+// If valid → returns the payload { id, email, role, establishment_id, ... }
 ```
 
 ### Why localStorage?
@@ -123,8 +135,34 @@ Our system has three roles:
 | Role | What they see | How it's checked |
 |------|--------------|-----------------|
 | `system_admin` | System Admin interface (establishments, system users) | `user.role === 'system_admin'` in `App.tsx` |
-| `establishment_admin` | All business tabs based on permissions | `user.is_admin` in `requireAdmin` middleware |
-| `cashier` | Only tabs their permissions allow | `user.permissions.includes('access_pos')` in `AppRouter.tsx` |
+| `establishment_admin` | Full establishment business UI scope | `user.role === 'establishment_admin'` and route-level guards |
+| `staff` | Only tabs and actions granted by permissions | `user.permissions.includes(...)` in `AppRouter.tsx` + backend permission middleware |
+
+### Important: two role vocabularies exist on purpose
+
+There are **two separate role vocabularies** in this codebase. They do different jobs:
+
+1. **Canonical auth/runtime roles** (JWT + middleware decisions):
+   - `system_admin`
+   - `establishment_admin`
+   - `staff`
+
+2. **User-management template role ids** (used by role-editor UI and legacy management endpoints):
+   - `admin`
+   - `manager`
+   - `staff`
+   - `cashier`
+
+And invitation flows use invitation labels:
+- `establishment_admin`, `establishment_manager`, `establishment_staff`
+
+These invitation labels are normalized to canonical runtime roles when user
+accounts are created (`establishment_admin` stays `establishment_admin`, the
+others become `staff`).
+
+Canonical role mapping logic lives in:
+- `backend/src/auth/roleVocabulary.ts`
+- consumed by `routes/authLogin.ts` and invitation acceptance/validation flows.
 
 ### How permissions work
 
@@ -136,18 +174,17 @@ users table:              permissions table:      user_permissions (join table):
 │ id │ email     │       │ id │ name         │    │ user_id │ permission_id │
 ├────┼───────────┤       ├────┼──────────────┤    ├─────────┼───────────────┤
 │  1 │ alice@... │       │  1 │ access_pos   │    │       1 │             1 │  (alice → POS)
-│  2 │ bob@...   │       │  2 │ access_menu  │    │       1 │             4 │  (alice → history)
-│  3 │ elliot@...│       │  3 │ access_happy │    │       2 │             1 │  (bob → POS only)
-└────┴───────────┘       │  4 │ access_history│    └─────────┴───────────────┘
+│  2 │ bob@...   │       │  2 │ access_menu  │    │       1 │             4 │  (alice → compliance)
+│  3 │ elliot@...│       │  3 │ access_settings │ │       2 │             1 │  (bob → POS only)
+└────┴───────────┘       │  4 │ access_compliance │└─────────┴───────────────┘
                          └────┴──────────────┘
 ```
 
-Alice can see POS and History. Bob can only see POS. The `requirePermission` middleware checks this:
+Alice can see POS and compliance surfaces. Bob can only see POS. The `requirePermission` middleware checks this:
 
 ```typescript
 export function requirePermission(permission: string) {
   return async (req, res, next) => {
-    if (req.user?.is_admin) return next();  // admins bypass permission checks
     const perms = await UserModel.getUserPermissions(req.user.id);
     if (!perms.includes(permission)) return res.status(403).json({ error: 'Permission denied' });
     next();
@@ -159,7 +196,7 @@ On the frontend, `AppRouter.tsx` filters which tabs are visible:
 
 ```typescript
 const filteredTabs = TABS.filter(tab => {
-  if (tab.adminOnly) return user?.is_admin;
+  if (tab.adminOnly) return user?.role === 'establishment_admin';
   if (tab.permission) return user?.permissions?.includes(tab.permission);
   return true;
 });
@@ -175,17 +212,16 @@ The frontend runs on `localhost:3000`. The backend runs on `localhost:3001`. The
 
 ```typescript
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    // ... network IPs ...
-    ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : [])
-  ],
-  credentials: true  // allow cookies and auth headers
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // non-browser clients
+    if (isAllowedOrigin(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true
 }));
 ```
 
-In production, `CORS_ORIGIN` would include `https://mosehxl.com`.
+In development, localhost/LAN origins are allowed. In non-development, allowed origins come from configured `CORS_ORIGIN` values (fail-closed by default).
 
 ### How it works technically
 
@@ -280,7 +316,8 @@ The `X-Powered-By` header (which Express adds by default, revealing "Express" to
      │                                      │    user.password_hash)       │
      │                                      │                              │
      │                                      │  jwt.sign({ id, email,      │
-     │                                      │    is_admin }, SECRET)       │
+     │                                      │    role, establishment_id }, │
+     │                                      │    SECRET)                    │
      │                                      │                              │
      │  { token, user, expiresIn } ◄────   │                              │
      │                                      │                              │
@@ -292,7 +329,8 @@ The `X-Powered-By` header (which Express adds by default, revealing "Express" to
      │  GET /api/products                  │                              │
      │  Authorization: Bearer <token>──►   │                              │
      │                                      │  jwt.verify(token, SECRET)   │
-     │                                      │  req.user = { id, email }    │
+     │                                      │  req.user = { id, email,     │
+     │                                      │    role, establishment_id }   │
      │                                      │                              │
      │                                      │  SELECT * FROM products ──►  │
      │  products[] ◄───────────────────    │                     ◄──────  │

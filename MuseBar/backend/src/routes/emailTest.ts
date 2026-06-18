@@ -9,6 +9,7 @@ import { EmailService } from '../services/email/EmailService';
 import { Logger } from '../utils/logger';
 import { getEnvironmentConfig } from '../config/environment';
 import { requireAuth, requireAdmin } from './auth';
+import { AppError, asyncHandler } from '../middleware/errorHandler';
 
 const router = Router();
 const config = getEnvironmentConfig();
@@ -19,7 +20,7 @@ const logger = Logger.getInstance(config);
  * POST /api/test-email
  * Requires: authenticated, admin.
  */
-router.post('/test-email', requireAuth, requireAdmin, async (req, res) => {
+router.post('/test-email', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
   try {
     const { to, subject = 'MuseBar Email Test', message = 'This is a test email from MuseBar V2 Development' } = req.body;
 
@@ -34,20 +35,22 @@ router.post('/test-email', requireAuth, requireAdmin, async (req, res) => {
     const emailService = EmailService.getInstance();
     
     if (!emailService.isConfigured()) {
-      return res.status(500).json({
-        success: false,
-        error: 'Email service not configured. Check SENDGRID_API_KEY and FROM_EMAIL.'
-      });
+      throw new AppError(
+        'Email service not configured. Check SENDGRID_API_KEY and FROM_EMAIL.',
+        500,
+        'EMAIL_SERVICE_NOT_CONFIGURED'
+      );
     }
 
     // Validate configuration
     const validation = emailService.validateConfiguration();
     if (!validation.isValid) {
-      return res.status(500).json({
-        success: false,
-        error: 'Email configuration invalid',
-        issues: validation.issues
-      });
+      throw new AppError(
+        'Email configuration invalid',
+        500,
+        'EMAIL_CONFIGURATION_INVALID',
+        { issues: validation.issues }
+      );
     }
 
     // Send test email
@@ -98,21 +101,21 @@ Sent at: ${new Date().toISOString()}
       error: error as Error,
       to: req.body.to
     }, 'EMAIL_TEST');
-
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred',
-      details: process.env.NODE_ENV === 'development' ? error : undefined
-    });
+    if (error instanceof AppError) throw error;
+    throw new AppError(
+      error instanceof Error ? error.message : 'Unknown error occurred',
+      500,
+      'EMAIL_TEST_SEND_FAILED'
+    );
   }
-});
+}));
 
 /**
  * Get email configuration status
  * GET /api/email-status
  * Requires: authenticated, admin.
  */
-router.get('/email-status', requireAuth, requireAdmin, async (req, res) => {
+router.get('/email-status', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
   try {
     const emailService = EmailService.getInstance();
     
@@ -130,20 +133,21 @@ router.get('/email-status', requireAuth, requireAdmin, async (req, res) => {
 
   } catch (error) {
     logger.error('Failed to get email status', { error: error as Error }, 'EMAIL_TEST');
-
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
-    });
+    if (error instanceof AppError) throw error;
+    throw new AppError(
+      error instanceof Error ? error.message : 'Unknown error occurred',
+      500,
+      'EMAIL_STATUS_FAILED'
+    );
   }
-});
+}));
 
 /**
  * Get email logs
  * GET /api/email-logs
  * Requires: authenticated, admin.
  */
-router.get('/email-logs', requireAuth, requireAdmin, async (req, res) => {
+router.get('/email-logs', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
   try {
     const emailService = EmailService.getInstance();
     const logs = emailService.getAllEmailLogs();
@@ -155,12 +159,13 @@ router.get('/email-logs', requireAuth, requireAdmin, async (req, res) => {
 
   } catch (error) {
     logger.error('Failed to get email logs', { error: error as Error }, 'EMAIL_TEST');
-
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
-    });
+    if (error instanceof AppError) throw error;
+    throw new AppError(
+      error instanceof Error ? error.message : 'Unknown error occurred',
+      500,
+      'EMAIL_LOGS_FAILED'
+    );
   }
-});
+}));
 
 export default router; 

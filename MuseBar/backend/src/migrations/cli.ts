@@ -47,6 +47,10 @@ async function main() {
           console.log('Usage: npm run migration:create <migration-name>');
           process.exit(1);
         }
+        if (!args[0]) {
+          console.error('❌ Migration name is required');
+          process.exit(1);
+        }
         migrationManager.createMigration(args[0]);
         break;
 

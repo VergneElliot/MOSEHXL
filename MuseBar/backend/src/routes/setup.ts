@@ -3,56 +3,64 @@
  */
 
 import express from 'express';
-import { SetupService } from '../services/SetupService';
+import { SetupService } from '../services/setup/SetupService';
 import { validateParams, validateBody } from '../middleware/validation';
 import { Logger } from '../utils/logger';
 import { getEnvironmentConfig } from '../config/environment';
+import { AppError, asyncHandler, NotFoundError, ValidationError } from '../middleware/errorHandler';
 
 const router = express.Router();
 const config = getEnvironmentConfig();
 const logger = Logger.getInstance(config);
 
 // GET /api/setup/validate/:token - Validate invitation token
-router.get('/validate/:token', validateParams([{ param: 'token', validator: (v: string)=> typeof v === 'string' && v.length > 0 }]), async (req, res) => {
+router.get('/validate/:token', validateParams([{ param: 'token', validator: (v: string) => v.length > 0 }]), asyncHandler(async (req, res) => {
   try {
-    const { token } = req.params;
+    const token = req.params.token ?? '';
     const setupService = SetupService.getInstance();
     const result = await setupService.validateInvitation(token);
 
     if (!result.isValid) {
-      return res.status(400).json(result);
+      throw new ValidationError(
+        typeof result.error === 'string' ? result.error : 'Invalid invitation token',
+        { result: result as unknown as Record<string, unknown> }
+      );
     }
 
     res.json(result);
   } catch (error) {
+    if (error instanceof AppError) throw error;
     logger.error('Error validating invitation token', { error: error as Error }, 'SETUP_API');
-    res.status(500).json({ 
-      isValid: false, 
-      error: error instanceof Error ? error.message : 'Internal server error during validation' 
-    });
+    throw new AppError(
+      error instanceof Error ? error.message : 'Internal server error during validation',
+      500,
+      'SETUP_VALIDATE_FAILED'
+    );
   }
-});
+}));
 
 // GET /api/setup/status/:token - Check setup completion status
-router.get('/status/:token', validateParams([{ param: 'token', validator: (v: string)=> typeof v === 'string' && v.length > 0 }]), async (req, res) => {
+router.get('/status/:token', validateParams([{ param: 'token', validator: (v: string) => v.length > 0 }]), asyncHandler(async (req, res) => {
   try {
-    const { token } = req.params;
+    const token = req.params.token ?? '';
     const setupService = SetupService.getInstance();
     const result = await setupService.checkSetupStatus(token);
 
     if (result.error) {
-      return res.status(404).json(result);
+      throw new NotFoundError(typeof result.error === 'string' ? result.error : 'Setup status');
     }
 
     res.json(result);
   } catch (error) {
+    if (error instanceof AppError) throw error;
     logger.error('Error checking setup status', { error: error as Error }, 'SETUP_API');
-    res.status(500).json({ 
-      completed: false, 
-      error: error instanceof Error ? error.message : 'Internal server error' 
-    });
+    throw new AppError(
+      error instanceof Error ? error.message : 'Internal server error',
+      500,
+      'SETUP_STATUS_FAILED'
+    );
   }
-});
+}));
 
 // POST /api/setup/complete - Complete business setup
 router.post('/complete', validateBody([
@@ -66,7 +74,7 @@ router.post('/complete', validateBody([
   { field: 'phone', required: true },
   { field: 'address', required: true },
   { field: 'invitation_token', required: true }
-]), async (req, res) => {
+]), asyncHandler(async (req, res) => {
   try {
     const setupService = SetupService.getInstance();
     const result = await setupService.completeBusinessSetup(
@@ -76,17 +84,22 @@ router.post('/complete', validateBody([
     );
 
     if (!result.success) {
-      return res.status(400).json(result);
+      throw new ValidationError(
+        typeof result.message === 'string' ? result.message : 'Failed to complete setup',
+        { result: result as unknown as Record<string, unknown> }
+      );
     }
 
     res.status(201).json(result);
   } catch (error) {
+    if (error instanceof AppError) throw error;
     logger.error('Error completing business setup', { error: error as Error }, 'SETUP_API');
-    res.status(500).json({
-      success: false,
-      message: error instanceof Error ? error.message : 'Failed to complete setup. Please try again.'
-    });
+    throw new AppError(
+      error instanceof Error ? error.message : 'Failed to complete setup. Please try again.',
+      500,
+      'SETUP_COMPLETE_FAILED'
+    );
   }
-});
+}));
 
 export default router;

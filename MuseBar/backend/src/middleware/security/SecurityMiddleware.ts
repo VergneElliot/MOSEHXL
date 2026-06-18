@@ -110,6 +110,9 @@ export class SecurityMiddlewareFactory {
 
       const middleware = middlewares[index];
       index++;
+      if (!middleware) {
+        return next();
+      }
       try {
         middleware(req, res, runNext);
       } catch (error) {

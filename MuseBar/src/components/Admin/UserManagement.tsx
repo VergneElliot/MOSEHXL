@@ -19,7 +19,11 @@ import {
   Button,
   TextField,
   Checkbox,
+  FormControl,
   FormControlLabel,
+  InputLabel,
+  Select,
+  MenuItem,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -27,12 +31,24 @@ import {
   Alert,
 } from '@mui/material';
 
+import { EstablishmentAssignableRole } from '../../types/auth';
 import {
   useUserState,
   useUserActions,
   usePermissions,
   useUserForm,
 } from './UserManagement/hooks';
+
+function formatEstablishmentRoleLabel(role: string): string {
+  switch (role) {
+    case 'establishment_admin':
+      return "Administrateur d'établissement";
+    case 'staff':
+      return 'Staff';
+    default:
+      return role;
+  }
+}
 
 const UserManagement: React.FC<{ token: string }> = ({ token }) => {
   // Initialize hooks
@@ -71,7 +87,7 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
     const success = await userActions.createUser(
       formData.email,
       formData.password,
-      formData.isAdmin
+      formData.role
     );
 
     if (success) {
@@ -119,7 +135,7 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
           <TableHead>
             <TableRow>
               <TableCell>Email</TableCell>
-              <TableCell>Admin</TableCell>
+              <TableCell>Rôle</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -127,7 +143,7 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
             {userState.users.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>{user.email}</TableCell>
-                <TableCell>{user.isAdmin ? 'Oui' : 'Non'}</TableCell>
+                <TableCell>{formatEstablishmentRoleLabel(user.role)}</TableCell>
                 <TableCell>
                   <Button
                     onClick={() => permissions.openPermDialog(user)}
@@ -166,15 +182,22 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
             value={userForm.newPassword}
             onChange={(e) => userForm.updatePassword(e.target.value)}
           />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={userForm.newIsAdmin}
-                onChange={(e) => userForm.updateIsAdmin(e.target.checked)}
-              />
-            }
-            label="Administrateur"
-          />
+          <FormControl fullWidth margin="dense" variant="outlined">
+            <InputLabel id="add-user-role-label">Rôle</InputLabel>
+            <Select<EstablishmentAssignableRole>
+              labelId="add-user-role-label"
+              label="Rôle"
+              value={userForm.newRole}
+              onChange={(e) =>
+                userForm.updateRole(e.target.value as EstablishmentAssignableRole)
+              }
+            >
+              <MenuItem value="staff">Staff</MenuItem>
+              <MenuItem value="establishment_admin">
+                Administrateur d'établissement
+              </MenuItem>
+            </Select>
+          </FormControl>
         </DialogContent>
         <DialogActions>
           <Button onClick={userForm.closeAddDialog}>Annuler</Button>

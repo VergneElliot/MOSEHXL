@@ -3,13 +3,14 @@
  * Main route handler for establishment account creation flow
  */
 
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Request, Response } from 'express';
 import { validateBody } from '../../middleware/validation';
 import { validateInvitation } from './middleware/validateInvitation';
 import { validateBusinessInfo } from './middleware/validateBusinessInfo';
 import { Logger } from '../../utils/logger';
-import { validatePassword } from '../../utils/passwordValidation';
-import { pool } from '../../app';
+import { validatePasswordWithBreachCheck } from '../../utils/passwordValidation';
+import { pool } from '../../db/pool';
+import { asyncHandler } from '../../middleware/errorHandler';
 import { EstablishmentAccountService } from '../../services/establishmentAccountCreation/EstablishmentAccountService';
 import { 
   EstablishmentAccountCreationRequest,
@@ -43,7 +44,7 @@ router.post('/complete',
   ]),
   validateInvitation,
   validateBusinessInfo,
-  async (req: Request, res: Response, next: NextFunction) => {
+  asyncHandler(async (req: Request, res: Response) => {
     try {
       logger.info('Route handler started for establishment account creation');
       const { token, password } = req.body as EstablishmentAccountCreationRequest;
@@ -52,7 +53,7 @@ router.post('/complete',
 
       logger.info('Extracted request data', { tokenPreview: token.substring(0, 8) + '...', businessType: businessInfo.businessType });
 
-      const passwordValidation = validatePassword(password);
+      const passwordValidation = await validatePasswordWithBreachCheck(password);
       if (!passwordValidation.isValid) {
         logger.warn('Password validation failed', { error: passwordValidation.error });
         return res.status(400).json({
@@ -80,31 +81,31 @@ router.post('/complete',
       res.json(response);
     } catch (error) {
       logger.error('Establishment account creation error', error as Error);
-      next(error);
+      throw error;
     }
-  }
+  })
 );
 
 /**
  * GET /health
  * Health check endpoint for establishment account creation service
  */
-router.get('/health', async (req: Request, res: Response) => {
+router.get('/health', asyncHandler(async (req: Request, res: Response) => {
   res.json({
     success: true,
     message: 'Establishment Account Creation Service is healthy',
     timestamp: new Date().toISOString(),
     version: '1.0.0'
   });
-});
+}));
 
 /**
  * GET /validate/:token
  * Validate invitation token (for frontend pre-validation)
  */
-router.get('/validate/:token', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/validate/:token', asyncHandler(async (req: Request, res: Response) => {
   try {
-    const { token } = req.params;
+    const token = req.params.token ?? '';
     
     // Initialize service if not already done
     if (!establishmentAccountService) {
@@ -117,8 +118,8 @@ router.get('/validate/:token', async (req: Request, res: Response, next: NextFun
     res.json(validationResult);
   } catch (error) {
     logger.error('Token validation error', error as Error);
-    next(error);
+    throw error;
   }
-});
+}));
 
 export default router;

@@ -6,6 +6,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { BusinessInfo, BusinessInfoValidationResult } from '../types';
 import { Logger } from '../../../utils/logger';
+import { AppError } from '../../../middleware/errorHandler';
 
 /**
  * Validate business information middleware
@@ -44,10 +45,11 @@ export const validateBusinessInfo = async (
   } catch (error) {
     const logger = Logger.getInstance();
     logger.error('Business info validation error', error as Error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error during business info validation'
-    });
+    next(new AppError(
+      'Internal server error during business info validation',
+      500,
+      'ESTABLISHMENT_BUSINESS_INFO_VALIDATION_FAILED'
+    ));
   }
 };
 

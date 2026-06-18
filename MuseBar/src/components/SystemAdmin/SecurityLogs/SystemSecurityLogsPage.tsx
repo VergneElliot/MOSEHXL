@@ -3,19 +3,10 @@ import { Box, Typography } from '@mui/material';
 import { SecurityLogsStats } from './SecurityLogsStats';
 import { SecurityLogsList } from './SecurityLogsList';
 import { SecurityLogsFilter } from './SecurityLogsFilter';
-
-interface SecurityLogsFilters {
-  severity: string[];
-  dateRange: {
-    start: string | null;
-    end: string | null;
-  };
-  actionType: string[];
-  userId: string;
-}
+import type { SecurityLogFilters } from '../../../types/system';
 
 const SystemSecurityLogsPage: React.FC = () => {
-  const [filters, setFilters] = useState<SecurityLogsFilters>({
+  const [filters, setFilters] = useState<SecurityLogFilters>({
     severity: [],
     dateRange: { start: null, end: null },
     actionType: [],

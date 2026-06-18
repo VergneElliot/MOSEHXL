@@ -75,8 +75,8 @@ export const useCompliance = (): UseComplianceReturn => {
       const response = await apiService.get<{ bulletins: ClosureBulletin[]; total?: number }>(
         '/legal/closure/bulletins'
       );
-      const bulletins = Array.isArray((response.data as any)?.bulletins)
-        ? (response.data as any).bulletins
+      const bulletins = Array.isArray(response.data?.bulletins)
+        ? response.data.bulletins
         : [];
       setState(prev => ({ ...prev, closureBulletins: bulletins }));
     } catch {

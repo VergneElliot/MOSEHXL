@@ -3,9 +3,10 @@
  * Handles JWT token generation and authentication for setup process
  */
 
-import jwt, { SignOptions } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import { Logger } from '../../../utils/logger';
 import { SetupJwtPayload } from './types';
+import { signJwtToken, verifyJwtToken } from '../../../security/jwtConfig';
 
 /**
  * Setup authentication management service
@@ -30,11 +31,6 @@ export class SetupAuthManager {
     establishmentId: string,
     expiresIn: '7d' | '24h' | '1h' | '30m' = '7d'
   ): string {
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      throw new Error('JWT_SECRET environment variable is not set');
-    }
-
     this.assertAuthUser(user);
     const payload: SetupJwtPayload = {
       userId: user.id,
@@ -44,8 +40,7 @@ export class SetupAuthManager {
     };
 
     try {
-      const options: SignOptions = { expiresIn };
-      const token = jwt.sign(payload, jwtSecret, options);
+      const token = signJwtToken(payload, expiresIn);
       
       this.logger.debug(
         'Authentication token generated for setup completion',
@@ -68,13 +63,8 @@ export class SetupAuthManager {
    * Verify authentication token
    */
   public static verifyAuthToken(token: string): SetupJwtPayload {
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      throw new Error('JWT_SECRET environment variable is not set');
-    }
-
     try {
-      const decoded = jwt.verify(token, jwtSecret) as SetupJwtPayload;
+      const decoded = verifyJwtToken(token) as SetupJwtPayload;
       
       this.logger.debug(
         'Authentication token verified',
@@ -101,11 +91,6 @@ export class SetupAuthManager {
     stepId: string,
     expiresIn: '7d' | '24h' | '1h' | '30m' = '1h'
   ): string {
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      throw new Error('JWT_SECRET environment variable is not set');
-    }
-
     const payload = {
       establishmentId,
       stepId,
@@ -114,8 +99,7 @@ export class SetupAuthManager {
     };
 
     try {
-      const options: SignOptions = { expiresIn };
-      const token = jwt.sign(payload, jwtSecret, options);
+      const token = signJwtToken(payload, expiresIn);
       
       this.logger.debug(
         'Temporary setup token generated',
@@ -142,13 +126,8 @@ export class SetupAuthManager {
     stepId: string;
     type: string;
   } {
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      throw new Error('JWT_SECRET environment variable is not set');
-    }
-
     try {
-      const decoded = jwt.verify(token, jwtSecret) as {
+      const decoded = verifyJwtToken(token) as {
         establishmentId?: unknown;
         stepId?: unknown;
         type?: unknown;

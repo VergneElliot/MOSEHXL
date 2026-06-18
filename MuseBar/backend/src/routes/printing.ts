@@ -1,31 +1,65 @@
-import { Router, Response, NextFunction } from 'express';
-import { PrintingServiceFactory, IPrintingService, PrintingConfig } from '../services/printing';
+import { Router, Response, NextFunction, Request } from 'express';
+import type { Response as ExpressResponse } from 'express';
+import type { PrintingConfig, IPrintingService } from '../services/printing';
 import type { PrintResult, ReceiptData as PrintingReceiptData, ClosureBulletinData as PrintingClosureBulletinData } from '../services/printing/types';
-import { pool } from '../app';
+import { pool } from '../db/pool';
 import { authenticateToken } from '../middleware/auth';
 import { getLogger } from '../utils/logger';
 import type { AuthenticatedRequest } from './userManagement/types';
+import { epsonServerDirectPollHandler } from '../printing/epsonPollHandler';
+import {
+  ALLOWED_PRINT_PROVIDERS,
+  listPrintingConfigurations,
+  savePrintingConfiguration,
+  parseConfigCell,
+} from '../printing/printingConfigRepo';
+import {
+  buildClosureBulletinData,
+  buildReceiptDataForInvoice,
+  buildReceiptDataForOrder,
+  buildTestReceiptData,
+  logPrintingHistory,
+  PrintingUser,
+} from '../printing/printDataRepo';
+import { createPrintingServiceManager } from '../printing/printingServiceManager';
+import { logSoftwareEventBestEffort } from '../services/legal/softwareEventJournal';
+import { AppError, asyncHandler, NotFoundError, ValidationError } from '../middleware/errorHandler';
+import {
+  renderClosureBulletinPdf,
+  renderReceiptOrInvoicePdf,
+} from '../services/documents/documentPdfService';
+import {
+  buildClosureExportData,
+  buildClosurePdfFilename,
+  buildClosureXlsxAttachment,
+} from '../services/documents/closureXlsxService';
+import {
+  emailClosureBulletinDocument,
+  emailReceiptDocument,
+  validateRecipientEmail,
+} from '../services/documents/documentEmailService';
 
 const router = Router();
 
-// Cache for printing services per establishment
-const printingServices: Map<number, IPrintingService> = new Map();
+/**
+ * Epson TM-Intelligent — Server Direct Print poll (no JWT; secured with x-epson-poll-key header).
+ * Configure this full URL in the printer TMNet WebConfig.
+ */
+router.get('/epson/poll', asyncHandler(async (req: Request, res: Response) => {
+  try {
+    return await epsonServerDirectPollHandler(pool, req, res);
+  } catch (error) {
+    getLogger().error('Epson Server Direct poll error', error instanceof Error ? error : undefined);
+    throw new AppError('Internal error', 500, 'EPSON_POLL_FAILED');
+  }
+}));
 
-type PrintingUser = {
-  establishment_id: number;
-  id: number;
-  username?: string;
-};
+const printingServiceManager = createPrintingServiceManager(pool, getLogger());
 
 function getPrintingUser(req: AuthenticatedRequest): PrintingUser | null {
   const establishmentIdRaw = req.user?.establishment_id;
-  const establishmentId =
-    typeof establishmentIdRaw === 'number'
-      ? establishmentIdRaw
-      : typeof establishmentIdRaw === 'string'
-        ? parseInt(establishmentIdRaw, 10)
-        : NaN;
-  if (!Number.isFinite(establishmentId) || establishmentId <= 0) return null;
+  const establishmentId = typeof establishmentIdRaw === 'string' ? establishmentIdRaw : null;
+  if (!establishmentId) return null;
   if (!req.user) return null;
   return {
     establishment_id: establishmentId,
@@ -37,66 +71,18 @@ function getPrintingUser(req: AuthenticatedRequest): PrintingUser | null {
 /**
  * Get printing service for establishment
  */
-async function getPrintingService(establishmentId: number): Promise<IPrintingService> {
-  // Check cache first
-  if (printingServices.has(establishmentId)) {
-    return printingServices.get(establishmentId)!;
-  }
-
-  try {
-    // Get configuration from database
-    const configResult = await pool.query(
-      `SELECT * FROM printing_configurations 
-       WHERE establishment_id = $1 AND is_active = true 
-       ORDER BY created_at DESC LIMIT 1`,
-      [establishmentId]
-    );
-
-    let config: PrintingConfig;
-    
-    if (configResult.rows.length > 0) {
-      const dbConfig = configResult.rows[0];
-      config = {
-        provider: dbConfig.provider,
-        establishmentId,
-        ...dbConfig.config
-      };
-    } else {
-      // Default configuration
-      config = {
-        provider: 'composite',
-        establishmentId,
-        providers: [
-          { provider: 'network' },
-          { provider: 'browser' }
-        ]
-      };
-    }
-
-    // Create and cache service
-    const service = await PrintingServiceFactory.create(config);
-    printingServices.set(establishmentId, service);
-    
-    return service;
-  } catch (error) {
-    getLogger().error('Error getting printing service', error instanceof Error ? error : undefined);
-    
-    // Fallback to browser printing
-    const fallbackService = await PrintingServiceFactory.create({
-      provider: 'browser',
-      establishmentId
-    });
-    
-    return fallbackService;
-  }
+async function getPrintingService(establishmentId: string): Promise<IPrintingService> {
+  // Backwards-compatible wrapper so other code in this file doesn't change shape.
+  return await printingServiceManager.getPrintingService(establishmentId);
 }
 
 // Middleware to ensure establishment context
 const ensureEstablishment = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   const user = getPrintingUser(req);
   if (!user) {
-    return res.status(400).json({ error: 'Establishment context required' });
+    throw new ValidationError('Establishment context required');
   }
+  void res;
   next();
 };
 
@@ -110,27 +96,31 @@ export async function getStatusResponse(user: PrintingUser) {
 
 /** In-process handler: test print. Used by routes and by printingCompat. */
 export async function testPrintResponse(user: PrintingUser, printerId?: string) {
+  void printerId;
   const service = await getPrintingService(user.establishment_id);
-  return await service.testPrint(printerId);
+
+  const testData = await buildTestReceiptData(pool, user);
+  const result = await service.printReceipt(testData);
+  return {
+    ...result,
+    message: result.success ? 'Test print queued successfully' : `Test print failed: ${result.message}`,
+  };
 }
 
 // GET /api/printing/status
-router.get('/status', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
+router.get('/status', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const data = await getStatusResponse(user);
     res.json(data);
   } catch (error) {
     getLogger().error('Error checking printer status', error instanceof Error ? error : undefined);
-    res.status(500).json({ 
-      error: 'Failed to check printer status',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+    throw new AppError('Failed to check printer status', 500, 'PRINTING_STATUS_FAILED');
   }
-});
+}));
 
 // GET /api/printing/printers
-router.get('/printers', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
+router.get('/printers', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const service = await getPrintingService(user.establishment_id);
@@ -143,27 +133,21 @@ router.get('/printers', authenticateToken, ensureEstablishment, async (req: Auth
     });
   } catch (error) {
     getLogger().error('Error listing printers', error instanceof Error ? error : undefined);
-    res.status(500).json({ 
-      error: 'Failed to list printers',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+    throw new AppError('Failed to list printers', 500, 'PRINTING_PRINTERS_FAILED');
   }
-});
+}));
 
 // POST /api/printing/test
-router.post('/test', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/test', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const result = await testPrintResponse(user, req.body?.printerId);
     res.json(result);
   } catch (error) {
     getLogger().error('Error test printing', error instanceof Error ? error : undefined);
-    res.status(500).json({ 
-      error: 'Test print failed',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+    throw new AppError('Test print failed', 500, 'PRINTING_TEST_FAILED');
   }
-});
+}));
 
 /** In-process handler: print receipt. Used by routes and by printingCompat. */
 export async function printReceiptResponse(
@@ -172,119 +156,13 @@ export async function printReceiptResponse(
   type: string = 'detailed'
 ): Promise<{ result: PrintResult; receiptData: PrintingReceiptData }> {
   const establishmentId = user.establishment_id;
-  const receiptResult = await pool.query(
-    `SELECT 
-      o.id as order_id,
-      o.receipt_number as sequence_number,
-      o.total_amount,
-      o.tax_amount as total_tax,
-      o.payment_method,
-      o.created_at,
-      o.tips,
-      o.change AS change,
-      o.receipt_hash,
-      json_agg(
-        json_build_object(
-          'product_name', oi.product_name,
-          'quantity', oi.quantity,
-          'unit_price', oi.unit_price,
-          'total_price', oi.total_price,
-          'tax_rate', p.tax_rate
-        )
-      ) as items,
-      e.name as business_name,
-      e.address as business_address,
-      e.phone as business_phone,
-      e.email as business_email,
-      e.siret,
-      e.tax_identification
-    FROM orders o
-    JOIN establishments e ON e.id = $2
-    LEFT JOIN order_items oi ON o.id = oi.order_id
-    LEFT JOIN products p ON oi.product_id = p.id
-    WHERE o.id = $1 AND o.establishment_id = $2
-    GROUP BY o.id, e.id`,
-    [orderId, establishmentId]
-  );
-
-  if (receiptResult.rows.length === 0) {
-    const err = Object.assign(new Error('Receipt not found'), { statusCode: 404 });
-    throw err;
-  }
-
-  const receiptRow = receiptResult.rows[0];
-  const receiptData: PrintingReceiptData = {
-    order_id: Number(receiptRow.order_id),
-    sequence_number: Number(receiptRow.sequence_number),
-    total_amount: parseFloat(receiptRow.total_amount),
-    total_tax: parseFloat(receiptRow.total_tax),
-    payment_method: String(receiptRow.payment_method ?? ''),
-    created_at: new Date(receiptRow.created_at).toISOString(),
-    items: Array.isArray(receiptRow.items) ? receiptRow.items : [],
-    business_info: {
-      name: String(receiptRow.business_name ?? ''),
-      address: String(receiptRow.business_address ?? ''),
-      phone: String(receiptRow.business_phone ?? ''),
-      email: String(receiptRow.business_email ?? ''),
-      siret: receiptRow.siret ? String(receiptRow.siret) : undefined,
-      tax_identification: receiptRow.tax_identification ? String(receiptRow.tax_identification) : undefined
-    },
-    receipt_type: type as 'detailed' | 'summary',
-    tips: receiptRow.tips ? parseFloat(receiptRow.tips) : undefined,
-    change: receiptRow.change ? parseFloat(receiptRow.change) : undefined,
-    compliance_info: {
-      receipt_hash: receiptRow.receipt_hash ? String(receiptRow.receipt_hash) : undefined,
-      cash_register_id: `CR-${user.establishment_id}`,
-      operator_id: user.username
-    }
-  };
-
-  const toNumber = (v: unknown): number => {
-    if (typeof v === 'number') return v;
-    if (typeof v === 'string') {
-      const n = parseFloat(v);
-      return Number.isFinite(n) ? n : 0;
-    }
-    return 0;
-  };
-
-  const items: Array<{ tax_rate?: number; total_price?: string | number }> = Array.isArray(receiptRow.items)
-    ? (receiptRow.items as Array<{ tax_rate?: number; total_price?: string | number }>)
-    : [];
-
-  const vatBreakdown: Array<{ rate: number; subtotal_ht: number; vat: number }> = [];
-  const vat10Items = items.filter((item) => item.tax_rate === 10);
-  const vat20Items = items.filter((item) => item.tax_rate === 20);
-  if (vat10Items.length > 0) {
-    const subtotal = vat10Items.reduce((sum, item) => sum + toNumber(item.total_price), 0);
-    const vat = subtotal * 0.1 / 1.1;
-    vatBreakdown.push({ rate: 10, subtotal_ht: subtotal - vat, vat });
-  }
-  if (vat20Items.length > 0) {
-    const subtotal = vat20Items.reduce((sum, item) => sum + toNumber(item.total_price), 0);
-    const vat = subtotal * 0.2 / 1.2;
-    vatBreakdown.push({ rate: 20, subtotal_ht: subtotal - vat, vat });
-  }
-  receiptData.vat_breakdown = vatBreakdown;
-
+  const receiptData = await buildReceiptDataForOrder(pool, establishmentId, user, orderId, type);
   const service = await getPrintingService(user.establishment_id);
   const result = await service.printReceipt(receiptData);
-  await pool.query(
-    `INSERT INTO printing_history 
-     (establishment_id, print_type, provider, status, metadata) 
-     VALUES ($1, $2, $3, $4, $5)`,
-    [
-      user.establishment_id,
-      'receipt',
-      result.provider || 'unknown',
-      result.success ? 'success' : 'failed',
-      JSON.stringify({
-        order_id: orderId,
-        receipt_number: receiptRow.sequence_number,
-        ...result.metadata
-      })
-    ]
-  );
+  await logPrintingHistory(pool, user.establishment_id, 'receipt', result, {
+    order_id: orderId,
+    receipt_number: receiptData.sequence_number,
+  });
   return { result, receiptData };
 }
 
@@ -293,195 +171,424 @@ export async function printClosureBulletinResponse(
   user: PrintingUser,
   bulletinId: number
 ): Promise<{ result: PrintResult; bulletinData: PrintingClosureBulletinData }> {
-  const bulletinResult = await pool.query(
-    `SELECT 
-      cb.*,
-      e.name as business_name,
-      e.address as business_address,
-      e.phone as business_phone,
-      e.email as business_email,
-      e.siret,
-      e.tax_identification
-    FROM closure_bulletins cb
-    JOIN establishments e ON cb.establishment_id = e.id
-    WHERE cb.id = $1 AND cb.establishment_id = $2`,
-    [bulletinId, user.establishment_id]
-  );
-
-  if (bulletinResult.rows.length === 0) {
-    const err = Object.assign(new Error('Closure bulletin not found'), { statusCode: 404 });
-    throw err;
-  }
-
-  const bulletin = bulletinResult.rows[0];
-  const bulletinData: PrintingClosureBulletinData = {
-    id: Number(bulletin.id),
-    closure_type: bulletin.closure_type,
-    period_start: new Date(bulletin.period_start).toISOString(),
-    period_end: new Date(bulletin.period_end).toISOString(),
-    total_transactions: Number(bulletin.total_transactions),
-    fond_de_caisse: bulletin.fond_de_caisse ? parseFloat(bulletin.fond_de_caisse) : 0,
-    total_amount: parseFloat(bulletin.total_amount),
-    total_vat: parseFloat(bulletin.total_vat),
-    vat_breakdown: bulletin.vat_breakdown,
-    payment_methods_breakdown: bulletin.payment_methods_breakdown,
-    first_sequence: Number(bulletin.first_sequence),
-    last_sequence: Number(bulletin.last_sequence),
-    closure_hash: String(bulletin.closure_hash),
-    is_closed: Boolean(bulletin.is_closed),
-    closed_at: bulletin.closed_at,
-    created_at: bulletin.created_at,
-    tips_total: bulletin.tips_total ? parseFloat(bulletin.tips_total) : undefined,
-    change_total: bulletin.change_total ? parseFloat(bulletin.change_total) : undefined,
-    business_info: {
-      name: String(bulletin.business_name ?? ''),
-      address: String(bulletin.business_address ?? ''),
-      phone: String(bulletin.business_phone ?? ''),
-      email: String(bulletin.business_email ?? ''),
-      siret: bulletin.siret ? String(bulletin.siret) : undefined,
-      tax_identification: bulletin.tax_identification ? String(bulletin.tax_identification) : undefined
-    },
-    compliance_info: {
-      cash_register_id: `CR-${user.establishment_id}`,
-      operator_id: user.username
-    }
-  };
-
+  const bulletinData = await buildClosureBulletinData(pool, user, bulletinId);
   const service = await getPrintingService(user.establishment_id);
   const result = await service.printClosureBulletin(bulletinData);
-  await pool.query(
-    `INSERT INTO printing_history 
-     (establishment_id, print_type, provider, status, metadata) 
-     VALUES ($1, $2, $3, $4, $5)`,
-    [
-      user.establishment_id,
-      'closure_bulletin',
-      result.provider || 'unknown',
-      result.success ? 'success' : 'failed',
-      JSON.stringify({
-        bulletin_id: bulletinId,
-        closure_type: bulletin.closure_type,
-        ...result.metadata
-      })
-    ]
-  );
+  await logPrintingHistory(pool, user.establishment_id, 'closure_bulletin', result, {
+    bulletin_id: bulletinId,
+    closure_type: bulletinData.closure_type,
+  });
   return { result, bulletinData };
 }
 
-// POST /api/printing/receipt/:orderId
-router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
+/** In-process handler: print invoice. */
+export async function printInvoiceResponse(
+  user: PrintingUser,
+  invoiceId: number
+): Promise<{ result: PrintResult; invoiceData: PrintingReceiptData }> {
+  const invoiceData = await buildReceiptDataForInvoice(pool, user, invoiceId);
+  const service = await getPrintingService(user.establishment_id);
+  const result = await service.printReceipt(invoiceData);
+  await logPrintingHistory(pool, user.establishment_id, 'invoice', result, {
+    invoice_id: invoiceId,
+    invoice_number: invoiceData.document_number,
+    invoice_sequence: invoiceData.sequence_number,
+  });
+  return { result, invoiceData };
+}
+
+// GET /api/printing/receipt/:orderId/preview
+// Preview-only: returns receipt_data but DOES NOT queue a print job.
+router.get('/receipt/:orderId/preview', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
-    const orderId = parseInt(req.params.orderId);
-    const type = (req.query.type as string) || 'detailed';
+    const orderId = parseInt(req.params.orderId ?? '', 10);
+    if (!Number.isFinite(orderId) || orderId <= 0) {
+      throw new ValidationError('Invalid order id');
+    }
+    const type = typeof req.query.type === 'string' ? req.query.type : 'detailed';
+    const receiptData = await buildReceiptDataForOrder(pool, user.establishment_id, user, orderId, type);
+    res.json({ receipt_data: receiptData });
+  } catch (error: unknown) {
+    if (error instanceof AppError) throw error;
+    const e = error as { statusCode?: number; message?: string };
+    if (e?.statusCode === 404) {
+      throw new NotFoundError('Receipt');
+    }
+    getLogger().error('Error generating receipt preview', error instanceof Error ? error : undefined);
+    throw new AppError(
+      e?.message ?? (error instanceof Error ? error.message : 'Unknown error'),
+      500,
+      'PRINTING_RECEIPT_PREVIEW_FAILED'
+    );
+  }
+}));
+
+// POST /api/printing/receipt/:orderId
+router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = getPrintingUser(req)!;
+    const orderId = parseInt(req.params.orderId ?? '', 10);
+    if (!Number.isFinite(orderId) || orderId <= 0) {
+      throw new ValidationError('Invalid order id');
+    }
+    const type = typeof req.query.type === 'string' ? req.query.type : 'detailed';
     const { result, receiptData } = await printReceiptResponse(user, orderId, type);
     res.json({ ...result, receipt_data: receiptData });
   } catch (error: unknown) {
+    if (error instanceof AppError) throw error;
     const e = error as { statusCode?: number; message?: string };
     if (e?.statusCode === 404) {
-      return res.status(404).json({ error: 'Receipt not found' });
+      throw new NotFoundError('Receipt');
     }
     getLogger().error('Error printing receipt', error instanceof Error ? error : undefined);
-    res.status(500).json({ 
-      error: 'Failed to print receipt',
-      message: e?.message ?? (error instanceof Error ? error.message : 'Unknown error')
-    });
+    throw new AppError(
+      e?.message ?? (error instanceof Error ? error.message : 'Unknown error'),
+      500,
+      'PRINTING_RECEIPT_FAILED'
+    );
   }
-});
+}));
 
 // POST /api/printing/closure/:bulletinId
-router.post('/closure/:bulletinId', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
+// Preview-only: returns bulletin_data but DOES NOT queue a print job.
+router.get('/closure/:bulletinId/preview', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
-    const bulletinId = parseInt(req.params.bulletinId);
+    const bulletinId = parseInt(req.params.bulletinId ?? '', 10);
+    if (!Number.isFinite(bulletinId) || bulletinId <= 0) {
+      throw new ValidationError('Invalid closure bulletin id');
+    }
+    const bulletinData = await buildClosureBulletinData(pool, user, bulletinId);
+    res.json({ bulletin_data: bulletinData });
+  } catch (error: unknown) {
+    if (error instanceof AppError) throw error;
+    const e = error as { statusCode?: number; message?: string };
+    if (e?.statusCode === 404) {
+      throw new NotFoundError('Closure bulletin');
+    }
+    getLogger().error('Error generating closure preview', error instanceof Error ? error : undefined);
+    throw new AppError(
+      e?.message ?? (error instanceof Error ? error.message : 'Unknown error'),
+      500,
+      'PRINTING_CLOSURE_PREVIEW_FAILED'
+    );
+  }
+}));
+
+// POST /api/printing/closure/:bulletinId
+router.post('/closure/:bulletinId', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = getPrintingUser(req)!;
+    const bulletinId = parseInt(req.params.bulletinId ?? '', 10);
+    if (!Number.isFinite(bulletinId) || bulletinId <= 0) {
+      throw new ValidationError('Invalid closure bulletin id');
+    }
     const { result, bulletinData } = await printClosureBulletinResponse(user, bulletinId);
     res.json({ ...result, bulletin_data: bulletinData });
   } catch (error: unknown) {
+    if (error instanceof AppError) throw error;
     const e = error as { statusCode?: number; message?: string };
     if (e?.statusCode === 404) {
-      return res.status(404).json({ error: 'Closure bulletin not found' });
+      throw new NotFoundError('Closure bulletin');
     }
     getLogger().error('Error printing closure bulletin', error instanceof Error ? error : undefined);
-    res.status(500).json({ 
-      error: 'Failed to print closure bulletin',
-      message: e?.message ?? (error instanceof Error ? error.message : 'Unknown error')
-    });
+    throw new AppError(
+      e?.message ?? (error instanceof Error ? error.message : 'Unknown error'),
+      500,
+      'PRINTING_CLOSURE_FAILED'
+    );
   }
-});
+}));
 
-// GET /api/printing/configuration
-router.get('/configuration', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
+// GET /api/printing/invoice/:invoiceId/preview
+// Preview-only: returns invoice_data but DOES NOT queue a print job.
+router.get('/invoice/:invoiceId/preview', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
-    
-    const configResult = await pool.query(
-      `SELECT * FROM printing_configurations 
-       WHERE establishment_id = $1 
-       ORDER BY created_at DESC`,
-      [user.establishment_id]
+    const invoiceId = parseInt(req.params.invoiceId ?? '', 10);
+    if (!Number.isFinite(invoiceId) || invoiceId <= 0) {
+      throw new ValidationError('Invalid invoice id');
+    }
+    const invoiceData = await buildReceiptDataForInvoice(pool, user, invoiceId);
+    res.json({ invoice_data: invoiceData });
+  } catch (error: unknown) {
+    if (error instanceof AppError) throw error;
+    const e = error as { statusCode?: number; message?: string };
+    if (e?.statusCode === 404) {
+      throw new NotFoundError('Invoice');
+    }
+    if (e?.statusCode === 422) {
+      throw new ValidationError(e.message ?? 'Invoice compliance validation failed');
+    }
+    getLogger().error('Error generating invoice preview', error instanceof Error ? error : undefined);
+    throw new AppError(
+      e?.message ?? (error instanceof Error ? error.message : 'Unknown error'),
+      500,
+      'PRINTING_INVOICE_PREVIEW_FAILED'
     );
-    
+  }
+}));
+
+// POST /api/printing/invoice/:invoiceId
+router.post('/invoice/:invoiceId', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = getPrintingUser(req)!;
+    const invoiceId = parseInt(req.params.invoiceId ?? '', 10);
+    if (!Number.isFinite(invoiceId) || invoiceId <= 0) {
+      throw new ValidationError('Invalid invoice id');
+    }
+    const { result, invoiceData } = await printInvoiceResponse(user, invoiceId);
+    res.json({ ...result, invoice_data: invoiceData });
+  } catch (error: unknown) {
+    if (error instanceof AppError) throw error;
+    const e = error as { statusCode?: number; message?: string };
+    if (e?.statusCode === 404) {
+      throw new NotFoundError('Invoice');
+    }
+    if (e?.statusCode === 422) {
+      throw new ValidationError(e.message ?? 'Invoice compliance validation failed');
+    }
+    getLogger().error('Error printing invoice', error instanceof Error ? error : undefined);
+    throw new AppError(
+      e?.message ?? (error instanceof Error ? error.message : 'Unknown error'),
+      500,
+      'PRINTING_INVOICE_FAILED'
+    );
+  }
+}));
+
+// GET /api/printing/configuration
+router.get('/configuration', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = getPrintingUser(req)!;
+
+    const configurations = await listPrintingConfigurations(pool, user.establishment_id);
     res.json({
-      configurations: configResult.rows,
-      establishment_id: user.establishment_id
+      configurations,
+      establishment_id: user.establishment_id,
     });
   } catch (error) {
     getLogger().error('Error getting printing configuration', error instanceof Error ? error : undefined);
-    res.status(500).json({ 
-      error: 'Failed to get printing configuration',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+    throw new AppError(
+      'Failed to get printing configuration',
+      500,
+      'PRINTING_CONFIG_FETCH_FAILED'
+    );
   }
-});
+}));
 
 // POST /api/printing/configuration
-router.post('/configuration', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/configuration', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
-    const { provider, config } = req.body;
-    
+    const { provider, config: bodyConfig } = req.body;
+
     if (!provider) {
-      return res.status(400).json({ error: 'Provider is required' });
+      throw new ValidationError('Provider is required');
     }
-    
-    // Deactivate existing configurations
-    await pool.query(
-      `UPDATE printing_configurations 
-       SET is_active = false 
-       WHERE establishment_id = $1`,
-      [user.establishment_id]
+
+    const { configuration } = await savePrintingConfiguration(
+      pool,
+      user.establishment_id,
+      provider,
+      bodyConfig
     );
-    
-    // Insert new configuration
-    const result = await pool.query(
-      `INSERT INTO printing_configurations 
-       (establishment_id, provider, config, is_active) 
-       VALUES ($1, $2, $3, true) 
-       RETURNING *`,
-      [user.establishment_id, provider, JSON.stringify(config || {})]
-    );
-    
-    // Clear cached service
-    printingServices.delete(user.establishment_id);
-    
+    printingServiceManager.clearPrintingService(user.establishment_id);
+    await logSoftwareEventBestEffort({
+      establishmentId: user.establishment_id,
+      eventType: 'PRINTING_CONFIGURATION_UPDATED',
+      userId: String(user.id),
+      eventData: {
+        provider,
+        has_config_payload: bodyConfig != null,
+      },
+    });
+
     res.json({
-      configuration: result.rows[0],
-      message: 'Printing configuration updated successfully'
+      configuration,
+      message: 'Printing configuration updated successfully',
     });
   } catch (error) {
+    const e = error as { statusCode?: number; message?: string };
+    if (e?.statusCode === 400) {
+      throw new ValidationError(e.message ?? 'Invalid printing configuration');
+    }
     getLogger().error('Error updating printing configuration', error instanceof Error ? error : undefined);
-    res.status(500).json({ 
-      error: 'Failed to update printing configuration',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+    throw new AppError(
+      e?.message ?? (error instanceof Error ? error.message : 'Unknown error'),
+      500,
+      'PRINTING_CONFIG_UPDATE_FAILED'
+    );
   }
-});
+}));
 
-// GET /api/printing/history
-router.get('/history', authenticateToken, ensureEstablishment, async (req: AuthenticatedRequest, res: Response) => {
+function sendPdfDownload(res: ExpressResponse, buffer: Buffer, filename: string): void {
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(buffer);
+}
+
+function sendXlsxDownload(res: ExpressResponse, buffer: Buffer, filename: string): void {
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  );
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(buffer);
+}
+
+function mapDocumentRouteError(error: unknown, fallbackCode: string): never {
+  if (error instanceof AppError) throw error;
+  const e = error as { statusCode?: number; message?: string };
+  if (e?.statusCode === 404) throw new NotFoundError('Document');
+  if (e?.statusCode === 400) throw new ValidationError(e.message ?? 'Invalid request');
+  if (e?.statusCode === 422) throw new ValidationError(e.message ?? 'Compliance validation failed');
+  if (e?.statusCode === 503) throw new AppError(e.message ?? 'Email service unavailable', 503, 'EMAIL_SERVICE_NOT_CONFIGURED');
+  const message = e?.message ?? (error instanceof Error ? error.message : 'Unknown error');
+  if (
+    message.includes('SendGrid') ||
+    message.toLowerCase().includes('unauthorized') ||
+    message.toLowerCase().includes('from_email')
+  ) {
+    throw new AppError(message, 503, 'EMAIL_PROVIDER_ERROR');
+  }
+  getLogger().error('Document route error', error instanceof Error ? error : undefined);
+  throw new AppError(message, 500, fallbackCode);
+}
+
+// GET /api/printing/receipt/:orderId/export-pdf
+router.get('/receipt/:orderId/export-pdf', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
-    const { limit = 50, offset = 0 } = req.query;
+    const orderId = parseInt(req.params.orderId ?? '', 10);
+    if (!Number.isFinite(orderId) || orderId <= 0) throw new ValidationError('Invalid order id');
+    const type = typeof req.query.type === 'string' ? req.query.type : 'detailed';
+    const receiptData = await buildReceiptDataForOrder(pool, user.establishment_id, user, orderId, type);
+    const pdf = await renderReceiptOrInvoicePdf(receiptData);
+    sendPdfDownload(res, pdf, `ticket-${receiptData.document_number ?? orderId}.pdf`);
+  } catch (error) {
+    mapDocumentRouteError(error, 'PRINTING_RECEIPT_EXPORT_FAILED');
+  }
+}));
+
+// POST /api/printing/receipt/:orderId/email
+router.post('/receipt/:orderId/email', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = getPrintingUser(req)!;
+    const orderId = parseInt(req.params.orderId ?? '', 10);
+    if (!Number.isFinite(orderId) || orderId <= 0) throw new ValidationError('Invalid order id');
+    const type = typeof req.query.type === 'string' ? req.query.type : 'detailed';
+    const receiptData = await buildReceiptDataForOrder(pool, user.establishment_id, user, orderId, type);
+    const to = validateRecipientEmail(req.body?.to);
+    const result = await emailReceiptDocument(receiptData, to);
+    await logPrintingHistory(pool, user.establishment_id, 'receipt', { success: true, message: result.message }, {
+      order_id: orderId,
+      action: 'email',
+      recipient: to,
+      tracking_id: result.trackingId,
+    });
+    res.json({ success: true, ...result });
+  } catch (error) {
+    mapDocumentRouteError(error, 'PRINTING_RECEIPT_EMAIL_FAILED');
+  }
+}));
+
+// GET /api/printing/invoice/:invoiceId/export-pdf
+router.get('/invoice/:invoiceId/export-pdf', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = getPrintingUser(req)!;
+    const invoiceId = parseInt(req.params.invoiceId ?? '', 10);
+    if (!Number.isFinite(invoiceId) || invoiceId <= 0) throw new ValidationError('Invalid invoice id');
+    const invoiceData = await buildReceiptDataForInvoice(pool, user, invoiceId);
+    const pdf = await renderReceiptOrInvoicePdf(invoiceData);
+    sendPdfDownload(res, pdf, `${invoiceData.document_number ?? `invoice-${invoiceId}`}.pdf`);
+  } catch (error) {
+    mapDocumentRouteError(error, 'PRINTING_INVOICE_EXPORT_FAILED');
+  }
+}));
+
+// POST /api/printing/invoice/:invoiceId/email
+router.post('/invoice/:invoiceId/email', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = getPrintingUser(req)!;
+    const invoiceId = parseInt(req.params.invoiceId ?? '', 10);
+    if (!Number.isFinite(invoiceId) || invoiceId <= 0) throw new ValidationError('Invalid invoice id');
+    const invoiceData = await buildReceiptDataForInvoice(pool, user, invoiceId);
+    const to = validateRecipientEmail(req.body?.to ?? invoiceData.customer_info?.email);
+    const result = await emailReceiptDocument(invoiceData, to);
+    await logPrintingHistory(pool, user.establishment_id, 'invoice', { success: true, message: result.message }, {
+      invoice_id: invoiceId,
+      action: 'email',
+      recipient: to,
+      tracking_id: result.trackingId,
+    });
+    res.json({ success: true, ...result });
+  } catch (error) {
+    mapDocumentRouteError(error, 'PRINTING_INVOICE_EMAIL_FAILED');
+  }
+}));
+
+// GET /api/printing/closure/:bulletinId/export-pdf
+router.get('/closure/:bulletinId/export-pdf', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = getPrintingUser(req)!;
+    const bulletinId = parseInt(req.params.bulletinId ?? '', 10);
+    if (!Number.isFinite(bulletinId) || bulletinId <= 0) throw new ValidationError('Invalid closure bulletin id');
+    const bulletinData = await buildClosureBulletinData(pool, user, bulletinId);
+    const exportData = await buildClosureExportData(pool, user.establishment_id, bulletinData);
+    const pdf = await renderClosureBulletinPdf(bulletinData, exportData);
+    sendPdfDownload(res, pdf, buildClosurePdfFilename(bulletinData));
+  } catch (error) {
+    mapDocumentRouteError(error, 'PRINTING_CLOSURE_EXPORT_FAILED');
+  }
+}));
+
+// GET /api/printing/closure/:bulletinId/export-xlsx
+router.get('/closure/:bulletinId/export-xlsx', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = getPrintingUser(req)!;
+    const bulletinId = parseInt(req.params.bulletinId ?? '', 10);
+    if (!Number.isFinite(bulletinId) || bulletinId <= 0) throw new ValidationError('Invalid closure bulletin id');
+    const bulletinData = await buildClosureBulletinData(pool, user, bulletinId);
+    const exportData = await buildClosureExportData(pool, user.establishment_id, bulletinData);
+    const xlsx = await buildClosureXlsxAttachment(pool, user.establishment_id, bulletinData, exportData);
+    sendXlsxDownload(res, xlsx.buffer, xlsx.filename);
+  } catch (error) {
+    mapDocumentRouteError(error, 'PRINTING_CLOSURE_XLSX_EXPORT_FAILED');
+  }
+}));
+
+// POST /api/printing/closure/:bulletinId/email
+router.post('/closure/:bulletinId/email', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = getPrintingUser(req)!;
+    const bulletinId = parseInt(req.params.bulletinId ?? '', 10);
+    if (!Number.isFinite(bulletinId) || bulletinId <= 0) throw new ValidationError('Invalid closure bulletin id');
+    const bulletinData = await buildClosureBulletinData(pool, user, bulletinId);
+    const to = validateRecipientEmail(req.body?.to);
+    const result = await emailClosureBulletinDocument(pool, user.establishment_id, bulletinData, to);
+    await logPrintingHistory(pool, user.establishment_id, 'closure_bulletin', { success: true, message: result.message }, {
+      bulletin_id: bulletinId,
+      action: 'email',
+      recipient: to,
+      tracking_id: result.trackingId,
+      attachments: result.attachments,
+    });
+    res.json({ success: true, ...result });
+  } catch (error) {
+    mapDocumentRouteError(error, 'PRINTING_CLOSURE_EMAIL_FAILED');
+  }
+}));
+
+// GET /api/printing/history
+router.get('/history', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = getPrintingUser(req)!;
+    const rawLimit = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : 50;
+    const rawOffset = typeof req.query.offset === 'string' ? parseInt(req.query.offset, 10) : 0;
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 500) : 50;
+    const offset = Number.isFinite(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
     
     const historyResult = await pool.query(
       `SELECT * FROM printing_history 
@@ -498,18 +605,15 @@ router.get('/history', authenticateToken, ensureEstablishment, async (req: Authe
     
     res.json({
       history: historyResult.rows,
-      total: parseInt(countResult.rows[0].count),
-      limit: parseInt(limit as string),
-      offset: parseInt(offset as string)
+      total: parseInt(String(countResult.rows[0]?.count ?? '0'), 10),
+      limit,
+      offset
     });
   } catch (error) {
     getLogger().error('Error getting printing history', error instanceof Error ? error : undefined);
-    res.status(500).json({ 
-      error: 'Failed to get printing history',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+    throw new AppError('Failed to get printing history', 500, 'PRINTING_HISTORY_FETCH_FAILED');
   }
-});
+}));
 
 // Export router
 export default router;

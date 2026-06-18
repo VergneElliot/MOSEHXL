@@ -5,9 +5,13 @@
 
 import express from 'express';
 import LegalJournalModel from '../../models/legalJournal';
-import { requireAuth, requireAdmin } from '../auth';
+import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
+import { AppError, asyncHandler, ValidationError } from '../../middleware/errorHandler';
+import { Logger } from '../../utils/logger';
+import { P } from '../../permissions/registry';
 
 const router = express.Router();
+const logger = Logger.getInstance();
 
 // All compliance routes require authentication.
 router.use(requireAuth);
@@ -16,12 +20,14 @@ router.use(requireAuth);
  * GET compliance status
  * GET /api/legal/compliance/status
  */
-router.get('/status', requireAdmin, async (req, res) => {
+router.get('/status', requirePermission(P.access_compliance), asyncHandler(async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
-    const integrity = await LegalJournalModel.verifyJournalIntegrity();
+    const integrity = await LegalJournalModel.verifyJournalIntegrity(establishmentId);
     
     // Get recent closures
-    const recentClosures = await LegalJournalModel.getClosureBulletins('DAILY');
+    const recentClosures = await LegalJournalModel.getClosureBulletins(establishmentId, 'DAILY');
     const today = new Date();
     const todayClosure = recentClosures.find(bulletin => {
       const bulletinDate = new Date(bulletin.period_start);
@@ -37,35 +43,41 @@ router.get('/status', requireAdmin, async (req, res) => {
       verified_at: new Date().toISOString()
     });
   } catch (error: unknown) {
-    process.stderr.write(`Error checking compliance status: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to check compliance status', details: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error(
+      'Error checking compliance status',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_COMPLIANCE'
+    );
+    throw new AppError('Failed to check compliance status', 500, 'LEGAL_COMPLIANCE_STATUS_FAILED');
   }
-});
+}));
 
 /**
  * GET compliance report
  * GET /api/legal/compliance/report
  */
-router.get('/report', requireAdmin, async (req, res) => {
+router.get('/report', requirePermission(P.access_compliance), asyncHandler(async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
   try {
     const { start_date, end_date } = req.query;
     
     if (!start_date || !end_date) {
-      return res.status(400).json({ error: 'Start date and end date are required' });
+      throw new ValidationError('Start date and end date are required');
     }
     
     const startDate = new Date(start_date as string);
     const endDate = new Date(end_date as string);
     
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-      return res.status(400).json({ error: 'Invalid date format' });
+      throw new ValidationError('Invalid date format');
     }
     
     // Get journal entries for the period
-    const entries = await LegalJournalModel.getEntriesForPeriod(startDate, endDate);
+    const entries = await LegalJournalModel.getEntriesForPeriod(establishmentId, startDate, endDate);
     
     // Get closures for the period
-    const closures = await LegalJournalModel.getClosureBulletins();
+    const closures = await LegalJournalModel.getClosureBulletins(establishmentId);
     const periodClosures = closures.filter(bulletin => {
       const bulletinDate = new Date(bulletin.period_start);
       return bulletinDate >= startDate && bulletinDate <= endDate;
@@ -101,16 +113,21 @@ router.get('/report', requireAdmin, async (req, res) => {
     
     res.json(report);
   } catch (error: unknown) {
-    process.stderr.write(`Error generating compliance report: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to generate compliance report', details: error instanceof Error ? error.message : 'Unknown error' });
+    if (error instanceof AppError) throw error;
+    logger.error(
+      'Error generating compliance report',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_COMPLIANCE'
+    );
+    throw new AppError('Failed to generate compliance report', 500, 'LEGAL_COMPLIANCE_REPORT_FAILED');
   }
-});
+}));
 
 /**
  * GET regulatory requirements
  * GET /api/legal/compliance/requirements
  */
-router.get('/requirements', async (req, res) => {
+router.get('/requirements', requirePermission(P.access_compliance), asyncHandler(async (_req, res) => {
   try {
     res.json({
       requirements: [
@@ -137,9 +154,13 @@ router.get('/requirements', async (req, res) => {
       compliance_notes: 'Requirements based on French fiscal law'
     });
   } catch (error: unknown) {
-    process.stderr.write(`Error fetching regulatory requirements: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to fetch regulatory requirements', details: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error(
+      'Error fetching regulatory requirements',
+      error instanceof Error ? error : new Error(String(error)),
+      'LEGAL_COMPLIANCE'
+    );
+    throw new AppError('Failed to fetch regulatory requirements', 500, 'LEGAL_COMPLIANCE_REQUIREMENTS_FAILED');
   }
-});
+}));
 
 export default router; 

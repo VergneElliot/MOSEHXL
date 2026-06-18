@@ -73,7 +73,7 @@ export interface ErrorReport {
   level: string;
   severity: ErrorSeverity;
   retryCount: number;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
 }
 
 /**

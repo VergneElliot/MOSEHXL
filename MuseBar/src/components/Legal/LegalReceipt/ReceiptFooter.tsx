@@ -17,7 +17,16 @@ export const ReceiptFooter: React.FC<ReceiptFooterProps> = ({
   totalVAT,
   sousTotalHT,
   receiptType = 'detailed',
+  documentKind = 'ticket',
+  invoiceLegalInfo,
 }) => {
+  const summaryLabel = documentKind === 'invoice'
+    ? 'Facture entreprise - Sans détail des articles'
+    : 'Reçu d\'entreprise - Sans détail des articles';
+  const detailedLabel = documentKind === 'invoice'
+    ? 'Facture détaillée avec breakdown complet des articles et taxes'
+    : 'Ticket détaillé avec breakdown complet des articles et taxes';
+
   return (
     <Box sx={{ mt: 2 }}>
       {/* VAT Breakdown */}
@@ -80,7 +89,7 @@ export const ReceiptFooter: React.FC<ReceiptFooterProps> = ({
             <>
               <Grid item xs={12}>
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-                  Reçu d'entreprise - Sans détail des articles
+                  {summaryLabel}
                 </Typography>
               </Grid>
             </>
@@ -92,8 +101,47 @@ export const ReceiptFooter: React.FC<ReceiptFooterProps> = ({
       {receiptType === 'detailed' && (
         <Box sx={{ textAlign: 'center', mb: 2 }}>
           <Typography variant="caption" color="text.secondary">
-            Ticket détaillé avec breakdown complet des articles et taxes
+            {detailedLabel}
           </Typography>
+        </Box>
+      )}
+
+      {documentKind === 'invoice' && invoiceLegalInfo && (
+        <Box sx={{ mt: 2, pt: 1, borderTop: '1px solid #eee' }}>
+          <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+            Mentions légales facture
+          </Typography>
+          {invoiceLegalInfo.paymentDueDate && (
+            <Typography variant="caption" display="block" color="text.secondary">
+              Échéance paiement: {invoiceLegalInfo.paymentDueDate}
+            </Typography>
+          )}
+          {invoiceLegalInfo.paymentTerms && (
+            <Typography variant="caption" display="block" color="text.secondary">
+              Conditions paiement: {invoiceLegalInfo.paymentTerms}
+            </Typography>
+          )}
+          {invoiceLegalInfo.latePenaltyTerms && (
+            <Typography variant="caption" display="block" color="text.secondary">
+              Pénalités retard: {invoiceLegalInfo.latePenaltyTerms}
+            </Typography>
+          )}
+          {invoiceLegalInfo.recoveryFeeNote && (
+            <Typography variant="caption" display="block" color="text.secondary">
+              {invoiceLegalInfo.recoveryFeeNote}
+            </Typography>
+          )}
+          {invoiceLegalInfo.sellerLegalForm && (
+            <Typography variant="caption" display="block" color="text.secondary">
+              Forme juridique: {invoiceLegalInfo.sellerLegalForm}
+            </Typography>
+          )}
+          {invoiceLegalInfo.sellerShareCapitalEur !== undefined &&
+            String(invoiceLegalInfo.sellerShareCapitalEur).trim() !== '' && (
+              <Typography variant="caption" display="block" color="text.secondary">
+                Capital social: {formatCurrency(parseFloat(String(invoiceLegalInfo.sellerShareCapitalEur)))}
+              </Typography>
+            )}
         </Box>
       )}
     </Box>

@@ -2,6 +2,15 @@
 
 This chapter explains the French legal requirements for cashier software and exactly how our system implements them technically. This is the most complex part of the project, so we'll go step by step.
 
+> **Current compliance scope (important):**
+> MOSEHXL implements an architecture aligned with French fiscal Article 286-I-3
+> bis du CGI (per-establishment hash-chained legal journal, closure bulletins,
+> audit trail, tenant isolation, signed archives), but does **not** claim NF525
+> or LNE certification at this stage.
+>
+> For the current hard-truth gap list and remediation status, always check:
+> `docs/audits/2026-04-29-full-repo-state-audit-hard-copy.md`.
+
 ---
 
 ## Why Does This Exist?
@@ -68,16 +77,22 @@ Properties:
 - You can't reverse it — given the hash, you can't find the input
 - It's extremely unlikely that two different inputs give the same hash
 
+### One journal chain per establishment (multi-tenant)
+
+In production, `legal_journal` has an **`establishment_id`** on every row. **Sequence numbers** and the **hash chain** are independent **per establishment** — tenant A’s sequence 1, 2, 3 has nothing to do with tenant B’s 1, 2, 3. Integrity checks and `MAX(sequence_number)` are always run **in SQL with `WHERE establishment_id = $1`**, so a fiscal review for one bar never includes another bar’s lines.
+
+The DB trigger on **UPDATE/DELETE** still applies in normal running code, and a dedicated statement-level trigger also blocks **TRUNCATE**. Only a controlled **migration** may temporarily remove/recreate these protections while applying a schema change.
+
 ### How it's implemented
 
 ```typescript
-// models/legalJournal/journalOperations.ts
-static async addEntry(transactionType, orderId, amount, vatAmount, paymentMethod, ...) {
-  // 1. Get the next sequence number (1, 2, 3, ...)
-  const sequenceNumber = await JournalQueries.getNextSequenceNumber();
+// models/legalJournal/journalOperations.ts (simplified)
+static async addEntry(establishmentId: string, transactionType, orderId, amount, vatAmount, paymentMethod, ...) {
+  // 1. Next sequence number for *this* establishment only
+  const sequenceNumber = await JournalQueries.getNextSequenceNumber(establishmentId);
 
-  // 2. Get the previous entry's hash (or all zeros for the first entry)
-  const lastEntry = await JournalQueries.getLastEntry();
+  // 2. Previous entry in the same establishment’s chain
+  const lastEntry = await JournalQueries.getLastEntry(establishmentId);
   const previousHash = lastEntry
     ? lastEntry.current_hash
     : '0000000000000000000000000000000000000000000000000000000000000000';
@@ -85,14 +100,13 @@ static async addEntry(transactionType, orderId, amount, vatAmount, paymentMethod
   // 3. Build the data string (pipe-separated values)
   const dataString = `${sequenceNumber}|${transactionType}|${orderId}|${amount}|${vatAmount}|${paymentMethod}|${timestamp}|${registerId}`;
 
-  // 4. Hash it: SHA256(previousHash + "|" + dataString)
+  // 4. Hash: SHA256(previousHash + "|" + dataString)
   const currentHash = JournalSigning.generateHash(dataString, previousHash);
 
-  // 5. Store in the database
+  // 5. Persist with establishment_id (and the trigger still blocks UPDATE/DELETE)
   return await JournalQueries.insertEntry(
-    sequenceNumber, transactionType, orderId, amount, vatAmount,
-    paymentMethod, transactionData, previousHash, currentHash,
-    timestamp, userId, registerId
+    establishmentId, sequenceNumber, transactionType, orderId, amount, vatAmount,
+    paymentMethod, transactionData, previousHash, currentHash, timestamp, userId, registerId
   );
 }
 ```
@@ -107,33 +121,18 @@ static generateHash(dataString: string, previousHash: string): string {
 
 ### The integrity check
 
-To verify no entries have been tampered with, we recompute every hash from scratch:
+To verify no entries have been tampered with, we load **all rows for one establishment** ordered by `sequence_number`, then recompute every hash and check chain continuity. There is no global “all tenants” report — verification is always **`verifyJournalIntegrity(establishmentId)`** (see `journalSigning.ts`).
 
 ```typescript
-static async verifyJournalIntegrity() {
-  const entries = await JournalQueries.getAllEntriesOrdered();  // ordered by sequence number
-  const errors = [];
-
-  for (let i = 0; i < entries.length; i++) {
-    const entry = entries[i];
-
-    // Rebuild the data string
-    const dataString = `${entry.sequence_number}|${entry.transaction_type}|...`;
-
-    // Recompute the hash
-    const expectedHash = generateHash(dataString, entry.previous_hash);
-
-    // Compare with stored hash
-    if (expectedHash !== entry.current_hash) {
-      errors.push(`Entry ${entry.sequence_number}: hash mismatch`);
-    }
-
-    // Check chain continuity
-    if (i > 0 && entry.previous_hash !== entries[i-1].current_hash) {
-      errors.push(`Entry ${entry.sequence_number}: chain broken`);
-    }
-  }
-
+// models/legalJournal/journalSigning.ts (logic outline)
+static async verifyJournalIntegrity(establishmentId: string) {
+  const result = await pool.query(
+    `SELECT * FROM legal_journal WHERE establishment_id = $1 ORDER BY sequence_number ASC`,
+    [establishmentId]
+  );
+  const entries = result.rows;
+  const errors: string[] = [];
+  // ... recompute each hash, compare to entry.current_hash, check previous_hash links ...
   return { isValid: errors.length === 0, errors };
 }
 ```
@@ -147,10 +146,23 @@ CREATE TRIGGER trigger_prevent_legal_journal_modification
     BEFORE UPDATE OR DELETE ON legal_journal
     FOR EACH ROW
     EXECUTE FUNCTION prevent_legal_journal_modification();
--- This BLOCKS any UPDATE or DELETE on the legal_journal table
+
+CREATE TRIGGER trigger_prevent_legal_journal_truncate
+    BEFORE TRUNCATE ON legal_journal
+    FOR EACH STATEMENT
+    EXECUTE FUNCTION prevent_legal_journal_truncate();
+-- This BLOCKS UPDATE, DELETE, and TRUNCATE on legal_journal during normal operation
 ```
 
-The trigger runs at the PostgreSQL level — even if someone bypasses our application code and connects directly to the database, they can't modify entries.
+The triggers run at the PostgreSQL level — even if someone bypasses our application code and connects directly to the database, they can't modify, purge, or inject a broken chain entry.
+
+For defense in depth, insert paths are also checked in PostgreSQL: a `BEFORE INSERT` trigger recomputes the expected hash payload from the previous row in the same establishment chain and rejects any mismatch on sequence, `previous_hash`, or `current_hash`.
+
+For backup/restore operations, the policy is:
+
+- use `pg_dump` for logical backups (read-only on source data),
+- restore into a controlled target environment where migrations are replayed,
+- never disable immutability triggers in production as part of routine export/import.
 
 ---
 
@@ -182,31 +194,21 @@ Every significant action must be logged with who did it, when, from where, and w
 ### How it's implemented
 
 ```typescript
-// models/auditTrail.ts
-export const AuditTrailModel = {
-  async logAction(data: {
-    user_id?: string;
-    action_type: string;
-    resource_type?: string;
-    resource_id?: string;
-    action_details?: Record<string, unknown>;
-    ip_address?: string;
-    user_agent?: string;
-  }) {
-    await pool.query(`
-      INSERT INTO audit_trail
-        (user_id, action_type, resource_type, resource_id, action_details, ip_address, user_agent)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-    `, [data.user_id, data.action_type, data.resource_type, data.resource_id,
-        JSON.stringify(data.action_details), data.ip_address, data.user_agent]);
-  }
-};
+// models/auditTrail.ts (simplified)
+// Rows include establishment_id: passed explicitly or resolved from the acting user's users.establishment_id
+await pool.query(`
+  INSERT INTO audit_trail (
+    user_id, action_type, resource_type, resource_id,
+    action_details, ip_address, user_agent, session_id, establishment_id
+  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+`, [ ... , establishment_id ]);
 ```
 
 Each entry records:
 - **Who**: `user_id` — which user did this
 - **What**: `action_type` — what action (LOGIN, CREATE_ORDER, etc.)
 - **Which**: `resource_type` + `resource_id` — which resource was affected (ORDER #42)
+- **Tenant**: `establishment_id` — which establishment the event belongs to (for filtering in multi-tenant audits)
 - **Details**: `action_details` — JSON with full context (items, amounts, reason)
 - **Where**: `ip_address` + `user_agent` — the user's IP and browser info
 - **When**: `timestamp` — automatically set by PostgreSQL
@@ -273,10 +275,10 @@ All data must be exportable in a format that can be given to inspectors. The exp
 
 The `ArchiveService` in `models/archiveService.ts` can export data to CSV, XML, PDF, or JSON. Each export:
 
-1. Queries the relevant data for the period
-2. Writes it to a file
-3. Computes a SHA-256 hash of the file
-4. Stores the export record in `archive_exports` with the hash
+1. Is tied to an **`establishment_id`** in `archive_exports` (and to the same tenant’s legal data when the export builds on closures or the journal).
+2. Writes a file, computes a SHA-256 hash, and stores metadata including the hash and signature.
+
+**API rule:** there is **no** “list all establishments’ exports.” List and get-by-id require an authenticated user **with** an `establishment_id` and use **only** that tenant in SQL (`WHERE establishment_id = $1`). A platform `system_admin` user without a tenant does not receive a cross-tenant dump — they are not a substitute for an on-site inspection account at the bar.
 
 If an inspector receives the file, they can recompute the hash and verify it matches the stored hash.
 
@@ -437,7 +439,7 @@ Never round tax or sale amounts before persisting; round only for display.
 | Pillar | Mechanism | Tables | Code |
 |--------|-----------|--------|------|
 | **I** Immutability | SHA-256 hash chain + DB trigger | `legal_journal` | `legalJournal/journalSigning.ts`, `journalOperations.ts` |
-| **S** Security | Action logging with user/IP/details | `audit_trail` | `models/auditTrail.ts`, logged in every route |
+| **S** Security | Action logging with user/IP/details and **establishment** where applicable | `audit_trail` | `models/auditTrail.ts`, logged in every route |
 | **C** Conservation | Periodic summary bulletins | `closure_bulletins`, `closure_settings` | `legalJournal/closureOperations.ts`, `utils/closureScheduler.ts` |
 | **A** Archiving | Signed file exports | `archive_exports` | `models/archiveService.ts` |
 

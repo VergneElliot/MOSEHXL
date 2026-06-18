@@ -19,6 +19,9 @@ export const LegalReceiptContainer: React.FC<LegalReceiptProps> = ({
   order,
   businessInfo,
   receiptType = 'detailed',
+  documentKind = 'ticket',
+  documentNumber,
+  invoiceLegalInfo,
 }) => {
   // Add print styles to document head
   useEffect(() => {
@@ -67,6 +70,8 @@ export const LegalReceiptContainer: React.FC<LegalReceiptProps> = ({
         businessInfo={businessInfo}
         order={order}
         receiptType={receiptType}
+        documentKind={documentKind}
+        documentNumber={documentNumber}
       />
 
       {/* Items section - only for detailed receipts */}
@@ -84,12 +89,16 @@ export const LegalReceiptContainer: React.FC<LegalReceiptProps> = ({
         totalVAT={totalVAT}
         sousTotalHT={sousTotalHT}
         receiptType={receiptType}
+        documentKind={documentKind}
+        invoiceLegalInfo={invoiceLegalInfo}
       />
 
       {/* Legal signature and compliance information */}
       <ReceiptSignature
         businessInfo={businessInfo}
         order={order}
+        documentKind={documentKind}
+        documentNumber={documentNumber}
       />
     </Paper>
   );

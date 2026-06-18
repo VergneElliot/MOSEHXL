@@ -3,7 +3,7 @@
  * REFACTORED: Main setup database that delegates to specialized modules
  * The original 434-line database has been modularized into:
  * - invitationOperations.ts (Invitation management)
- * - userAccountOperations.ts (User account operations)
+ * - establishmentAccountCreation/database/UserAccountOperations.ts (canonical user account operations)
  * - establishmentOperations.ts (Establishment setup)
  * - transactionOperations.ts (Transaction management)
  * - setupDatabase.ts (Main coordinator)
@@ -18,7 +18,7 @@ import {
   SetupProgress
 } from './types';
 import { InvitationOperations } from './invitationOperations';
-import { UserAccountOperations } from './userAccountOperations';
+import { UserAccountOperations } from '../establishmentAccountCreation/database/UserAccountOperations';
 import { EstablishmentOperations } from './establishmentOperations';
 import { TransactionOperations } from './transactionOperations';
 import { Logger } from '../../utils/logger';

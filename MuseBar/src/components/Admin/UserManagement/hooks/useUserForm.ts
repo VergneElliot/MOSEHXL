@@ -4,12 +4,13 @@
  */
 
 import { useState, useCallback } from 'react';
+import { EstablishmentAssignableRole } from '../../../../types/auth';
 
 export const useUserForm = () => {
   const [showAdd, setShowAdd] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [newIsAdmin, setNewIsAdmin] = useState(false);
+  const [newRole, setNewRole] = useState<EstablishmentAssignableRole>('staff');
 
   /**
    * Open add user dialog
@@ -25,7 +26,7 @@ export const useUserForm = () => {
     setShowAdd(false);
     setNewEmail('');
     setNewPassword('');
-    setNewIsAdmin(false);
+    setNewRole('staff');
   }, []);
 
   /**
@@ -42,11 +43,8 @@ export const useUserForm = () => {
     setNewPassword(password);
   }, []);
 
-  /**
-   * Update admin status
-   */
-  const updateIsAdmin = useCallback((isAdmin: boolean) => {
-    setNewIsAdmin(isAdmin);
+  const updateRole = useCallback((role: EstablishmentAssignableRole) => {
+    setNewRole(role);
   }, []);
 
   /**
@@ -86,9 +84,9 @@ export const useUserForm = () => {
     return {
       email: newEmail.trim(),
       password: newPassword,
-      isAdmin: newIsAdmin,
+      role: newRole,
     };
-  }, [newEmail, newPassword, newIsAdmin]);
+  }, [newEmail, newPassword, newRole]);
 
   /**
    * Reset form to initial state
@@ -96,7 +94,7 @@ export const useUserForm = () => {
   const resetForm = useCallback(() => {
     setNewEmail('');
     setNewPassword('');
-    setNewIsAdmin(false);
+    setNewRole('staff');
   }, []);
 
   return {
@@ -106,14 +104,14 @@ export const useUserForm = () => {
     // Form fields
     newEmail,
     newPassword,
-    newIsAdmin,
+    newRole,
     
     // Actions
     openAddDialog,
     closeAddDialog,
     updateEmail,
     updatePassword,
-    updateIsAdmin,
+    updateRole,
     resetForm,
     
     // Validation

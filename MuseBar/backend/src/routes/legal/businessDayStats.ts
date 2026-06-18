@@ -4,11 +4,14 @@
  */
 
 import express from 'express';
-import { requireAuth, getEstablishmentId } from '../auth';
+import { requireAuth, getEstablishmentId, requireAnyPermission } from '../auth';
 import { DEFAULT_APP_TIMEZONE } from '../../config/timezone';
 import { getCurrentBusinessDayPeriod } from '../../models/legalJournal/businessDayPeriod';
 import { computePaymentBreakdownFromOrders } from '../../models/legalJournal/paymentBreakdown';
 import { BusinessDayStatsRepository } from '../../models/legalJournal/businessDayStatsRepository';
+import { P } from '../../permissions/registry';
+import { logError } from '../../utils/logger';
+import { AppError, asyncHandler } from '../../middleware/errorHandler';
 
 const router = express.Router();
 const DEFAULT_CLOSURE_TIME = '02:00';
@@ -20,7 +23,10 @@ router.use(requireAuth);
  * Returns live stats for the current business day: total TTC, transaction count,
  * card/cash breakdown (including tips and "faire de la monnaie"), and top products.
  */
-router.get('/business-day-stats', async (req, res) => {
+router.get(
+  '/business-day-stats',
+  requireAnyPermission([P.access_compliance, P.access_pos]),
+  asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
 
@@ -71,9 +77,14 @@ router.get('/business-day-stats', async (req, res) => {
       },
     });
   } catch (error) {
-    process.stderr.write(`Error fetching business day stats: ${error instanceof Error ? error.message : String(error)}\n`);
-    res.status(500).json({ error: 'Failed to fetch business day statistics' });
+    logError('Error fetching business day stats', error instanceof Error ? error : new Error(String(error)));
+    throw new AppError(
+      'Failed to fetch business day statistics',
+      500,
+      'BUSINESS_DAY_STATS_FETCH_FAILED'
+    );
   }
-});
+  })
+);
 
 export default router;

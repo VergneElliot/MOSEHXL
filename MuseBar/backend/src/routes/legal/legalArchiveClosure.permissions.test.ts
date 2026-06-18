@@ -1,0 +1,584 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import request from 'supertest';
+import express from 'express';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { generateToken } from '../auth';
+import { errorHandler } from '../../middleware/errorHandler';
+
+const EST = '11111111-1111-4111-8111-111111111111';
+
+const mocks = vi.hoisted(() => ({
+  poolQuery: vi.fn(),
+  getUserPermissions: vi.fn(),
+  getArchiveExports: vi.fn(),
+  getArchiveExportById: vi.fn(),
+  verifyArchiveExport: vi.fn(),
+  downloadArchiveExport: vi.fn(),
+  exportData: vi.fn(),
+  getClosureBulletins: vi.fn(),
+  getLastFondDeCaisse: vi.fn(),
+  createDailyClosureOpen: vi.fn(),
+  createWeeklyClosureOpen: vi.fn(),
+  createMonthlyClosureOpen: vi.fn(),
+  createAnnualClosureOpen: vi.fn(),
+  closeOpenClosureBulletin: vi.fn(),
+  deleteOpenClosureBulletin: vi.fn(),
+  logClosure: vi.fn(),
+}));
+
+vi.mock('../../db/pool', () => ({
+  __esModule: true,
+  default: express(),
+  pool: {
+    query: mocks.poolQuery,
+  },
+}));
+
+vi.mock('../../utils/logger', () => ({
+  Logger: {
+    getInstance: () => ({ error: vi.fn(), info: vi.fn(), warn: vi.fn() }),
+  },
+}));
+
+vi.mock('../../models/user', () => ({
+  UserModel: {
+    getUserPermissions: mocks.getUserPermissions,
+  },
+}));
+
+vi.mock('../../models/archiveService', () => ({
+  ArchiveService: {
+    getArchiveExports: mocks.getArchiveExports,
+    getArchiveExportById: mocks.getArchiveExportById,
+    verifyArchiveExport: mocks.verifyArchiveExport,
+    downloadArchiveExport: mocks.downloadArchiveExport,
+    exportData: mocks.exportData,
+  },
+}));
+
+vi.mock('../../models/legalJournal', () => ({
+  __esModule: true,
+  default: {
+    getClosureBulletins: mocks.getClosureBulletins,
+    getClosureBulletinsPaginated: vi.fn(),
+    getLastFondDeCaisse: mocks.getLastFondDeCaisse,
+    createDailyClosureOpen: mocks.createDailyClosureOpen,
+    createWeeklyClosureOpen: mocks.createWeeklyClosureOpen,
+    createMonthlyClosureOpen: mocks.createMonthlyClosureOpen,
+    createAnnualClosureOpen: mocks.createAnnualClosureOpen,
+    closeOpenClosureBulletin: mocks.closeOpenClosureBulletin,
+    deleteOpenClosureBulletin: mocks.deleteOpenClosureBulletin,
+    logClosure: mocks.logClosure,
+  },
+}));
+
+import archiveRouter from './archive';
+import closureRouter from './closure';
+
+const app = express();
+app.use(express.json());
+app.use('/archive', archiveRouter);
+app.use('/closure', closureRouter);
+app.use(errorHandler);
+
+function tokenFor(role: 'establishment_admin' | 'staff') {
+  return generateToken(
+    {
+      id: role === 'staff' ? 22 : 11,
+      email: `${role}@example.com`,
+      is_admin: false,
+      role,
+      establishment_id: EST,
+    },
+    false
+  );
+}
+
+describe('legal archive/closure permission gating', () => {
+  beforeEach(() => {
+    mocks.poolQuery.mockReset();
+    mocks.getUserPermissions.mockReset();
+    mocks.getArchiveExports.mockReset();
+    mocks.getArchiveExportById.mockReset();
+    mocks.verifyArchiveExport.mockReset();
+    mocks.downloadArchiveExport.mockReset();
+    mocks.exportData.mockReset();
+    mocks.getClosureBulletins.mockReset();
+    mocks.getLastFondDeCaisse.mockReset();
+    mocks.createDailyClosureOpen.mockReset();
+    mocks.createWeeklyClosureOpen.mockReset();
+    mocks.createMonthlyClosureOpen.mockReset();
+    mocks.createAnnualClosureOpen.mockReset();
+    mocks.closeOpenClosureBulletin.mockReset();
+    mocks.deleteOpenClosureBulletin.mockReset();
+    mocks.logClosure.mockReset();
+
+    mocks.poolQuery.mockImplementation(async (query: unknown) => {
+      const sql = String(query ?? '');
+      if (sql.includes('FROM token_blocklist')) {
+        return { rows: [] };
+      }
+      return { rows: [] };
+    });
+
+    mocks.getArchiveExports.mockResolvedValue([]);
+    mocks.getArchiveExportById.mockResolvedValue(null);
+    mocks.verifyArchiveExport.mockResolvedValue({ isValid: true, errors: [] });
+    mocks.downloadArchiveExport.mockResolvedValue(null);
+    mocks.exportData.mockResolvedValue({ id: 1 });
+    mocks.getClosureBulletins.mockResolvedValue([]);
+    mocks.getLastFondDeCaisse.mockResolvedValue(200);
+    mocks.createDailyClosureOpen.mockResolvedValue({
+      id: 91,
+      closure_type: 'DAILY',
+      period_start: '2026-04-29T00:00:00.000Z',
+      period_end: '2026-04-29T23:59:59.999Z',
+      total_amount: 250,
+      total_vat: 50,
+      closure_hash: 'hash-daily',
+      first_sequence: 1,
+      last_sequence: 44,
+    });
+    mocks.createWeeklyClosureOpen.mockResolvedValue({
+      id: 92,
+      closure_type: 'WEEKLY',
+      period_start: '2026-04-21T00:00:00.000Z',
+      period_end: '2026-04-27T23:59:59.999Z',
+      total_amount: 350,
+      total_vat: 70,
+      closure_hash: 'hash-weekly',
+      first_sequence: 1,
+      last_sequence: 60,
+    });
+    mocks.createMonthlyClosureOpen.mockResolvedValue({
+      id: 93,
+      closure_type: 'MONTHLY',
+      period_start: '2026-04-01T00:00:00.000Z',
+      period_end: '2026-04-30T23:59:59.999Z',
+      total_amount: 1250,
+      total_vat: 250,
+      closure_hash: 'hash-monthly',
+      first_sequence: 1,
+      last_sequence: 180,
+    });
+    mocks.createAnnualClosureOpen.mockResolvedValue({
+      id: 94,
+      closure_type: 'ANNUAL',
+      period_start: '2026-01-01T00:00:00.000Z',
+      period_end: '2026-12-31T23:59:59.999Z',
+      total_amount: 10250,
+      total_vat: 2050,
+      closure_hash: 'hash-annual',
+      first_sequence: 1,
+      last_sequence: 1400,
+    });
+    mocks.logClosure.mockResolvedValue({});
+    mocks.closeOpenClosureBulletin.mockImplementation(async (closureId: number) => ({
+      id: closureId,
+      is_closed: true,
+      closed_at: new Date().toISOString(),
+    }));
+    mocks.deleteOpenClosureBulletin.mockResolvedValue(true);
+  });
+
+  it('denies /archive/list without access_closure', async () => {
+    mocks.getUserPermissions.mockResolvedValue([]);
+
+    const res = await request(app)
+      .get('/archive/list')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(403);
+    expect(mocks.getArchiveExports).not.toHaveBeenCalled();
+  });
+
+  it('allows /archive/list with access_closure', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+
+    const res = await request(app)
+      .get('/archive/list')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(200);
+    expect(mocks.getArchiveExports).toHaveBeenCalledWith(EST);
+  });
+
+  it('allows /archive/:id with access_closure and scopes archive lookup', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    mocks.getArchiveExportById.mockResolvedValue({
+      id: 12,
+      establishment_id: EST,
+      export_type: 'DAILY',
+    });
+
+    const res = await request(app)
+      .get('/archive/12')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(200);
+    expect(mocks.getArchiveExportById).toHaveBeenCalledWith(12, EST);
+    expect(res.body.archive.id).toBe(12);
+  });
+
+  it('denies /archive/:id without access_closure', async () => {
+    mocks.getUserPermissions.mockResolvedValue([]);
+
+    const res = await request(app)
+      .get('/archive/12')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(403);
+    expect(mocks.getArchiveExportById).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for /archive/:id when archive is missing despite access_closure', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    mocks.getArchiveExportById.mockResolvedValue(null);
+
+    const res = await request(app)
+      .get('/archive/999')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(404);
+    expect(mocks.getArchiveExportById).toHaveBeenCalledWith(999, EST);
+    expect(res.body.error?.message).toBe('Archive not found');
+  });
+
+  it('returns 400 for /archive/:id when archive id is invalid and skips lookup', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+
+    const res = await request(app)
+      .get('/archive/not-a-number')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error?.message).toBe('Invalid archive ID');
+    expect(mocks.getArchiveExportById).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for /archive/create when required fields are missing', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+
+    const res = await request(app)
+      .post('/archive/create')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`)
+      .send({ archiveType: 'DAILY' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error?.message).toBe('Archive type, start date, and end date are required');
+  });
+
+  it('allows /archive/create with access_closure and sends establishment-scoped export payload', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    const archiveRecord = { id: 41, establishment_id: EST, export_type: 'DAILY' };
+    mocks.exportData.mockResolvedValue(archiveRecord);
+
+    const res = await request(app)
+      .post('/archive/create')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`)
+      .send({
+        archiveType: 'DAILY',
+        startDate: '2026-01-01',
+        endDate: '2026-01-31',
+      });
+
+    expect(res.status).toBe(201);
+    expect(mocks.exportData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        export_type: 'DAILY',
+        establishment_id: EST,
+        created_by: '22',
+        format: 'JSON',
+        period_start: expect.any(Date),
+        period_end: expect.any(Date),
+      })
+    );
+    expect(res.body.archive.id).toBe(41);
+  });
+
+  it('denies /archive/create without access_closure', async () => {
+    mocks.getUserPermissions.mockResolvedValue([]);
+
+    const res = await request(app)
+      .post('/archive/create')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`)
+      .send({
+        archiveType: 'DAILY',
+        startDate: '2026-01-01',
+        endDate: '2026-01-31',
+      });
+
+    expect(res.status).toBe(403);
+    expect(mocks.exportData).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for /archive/:id/export when archive id is invalid', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+
+    const res = await request(app)
+      .post('/archive/not-a-number/export')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`)
+      .send({ format: 'json' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error?.message).toBe('Invalid archive ID');
+  });
+
+  it('verifies archive integrity via /archive/:id/verify', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    mocks.verifyArchiveExport.mockResolvedValue({
+      isValid: false,
+      errors: ['Digital signature verification failed - file authenticity compromised'],
+    });
+
+    const res = await request(app)
+      .post('/archive/77/verify')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`)
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(mocks.verifyArchiveExport).toHaveBeenCalledWith(77, EST);
+    expect(res.body.isValid).toBe(false);
+    expect(res.body.errors).toEqual([
+      'Digital signature verification failed - file authenticity compromised',
+    ]);
+  });
+
+  it('returns 404 for /archive/:id/verify when archive is missing', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    mocks.verifyArchiveExport.mockResolvedValue({
+      isValid: false,
+      errors: ['Archive export not found'],
+    });
+
+    const res = await request(app)
+      .post('/archive/77/verify')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`)
+      .send({});
+
+    expect(res.status).toBe(404);
+    expect(res.body.error?.message).toBe('Archive not found');
+  });
+
+  it('downloads archive via /archive/:id/download', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    const tempFilePath = path.join(os.tmpdir(), `archive-download-${Date.now()}.json`);
+    fs.writeFileSync(tempFilePath, '{"ok":true}', 'utf-8');
+    mocks.downloadArchiveExport.mockResolvedValue({
+      filePath: tempFilePath,
+      fileName: 'musebar_export_DAILY_77.json',
+    });
+
+    const res = await request(app)
+      .get('/archive/77/download')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(200);
+    expect(res.header['content-disposition']).toContain('musebar_export_DAILY_77.json');
+    expect(mocks.downloadArchiveExport).toHaveBeenCalledWith(77, EST);
+
+    fs.unlinkSync(tempFilePath);
+  });
+
+  it('denies /archive/:id/export without access_closure', async () => {
+    mocks.getUserPermissions.mockResolvedValue([]);
+
+    const res = await request(app)
+      .post('/archive/77/export')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`)
+      .send({ format: 'json' });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('supports legacy /archive/:id/export as a download alias', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    const tempFilePath = path.join(os.tmpdir(), `archive-export-${Date.now()}.json`);
+    fs.writeFileSync(tempFilePath, '{"ok":true}', 'utf-8');
+    mocks.downloadArchiveExport.mockResolvedValue({
+      filePath: tempFilePath,
+      fileName: 'musebar_export_DAILY_77.json',
+    });
+
+    const res = await request(app)
+      .post('/archive/77/export')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`)
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(res.header['content-disposition']).toContain('musebar_export_DAILY_77.json');
+    expect(res.header.deprecation).toBe('true');
+    expect(mocks.downloadArchiveExport).toHaveBeenCalledWith(77, EST);
+
+    fs.unlinkSync(tempFilePath);
+  });
+
+  it('denies /closure/bulletins without access_closure', async () => {
+    mocks.getUserPermissions.mockResolvedValue([]);
+
+    const res = await request(app)
+      .get('/closure/bulletins')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(403);
+    expect(mocks.getClosureBulletins).not.toHaveBeenCalled();
+  });
+
+  it('allows /closure/bulletins with access_closure and scopes to caller establishment', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    mocks.getClosureBulletins.mockResolvedValue([
+      { id: 1, closure_type: 'DAILY', establishment_id: EST },
+    ]);
+
+    const res = await request(app)
+      .get('/closure/bulletins')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(200);
+    expect(mocks.getClosureBulletins).toHaveBeenCalledWith(EST, undefined);
+    expect(res.body.total).toBe(1);
+  });
+
+  it('allows /closure/monthly-latest with access_closure and uses monthly establishment scope', async () => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
+
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    mocks.getClosureBulletins.mockResolvedValue([
+      {
+        id: 77,
+        closure_type: 'MONTHLY',
+        period_start: monthStart,
+        period_end: monthEnd,
+        establishment_id: EST,
+      },
+    ]);
+
+    const res = await request(app)
+      .get('/closure/monthly-latest')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(200);
+    expect(mocks.getClosureBulletins).toHaveBeenCalledWith(EST, 'MONTHLY');
+    expect(res.body.id).toBe(77);
+  });
+
+  it('returns 404 on /closure/monthly-latest when no current-month bulletin exists', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    mocks.getClosureBulletins.mockResolvedValue([
+      {
+        id: 66,
+        closure_type: 'MONTHLY',
+        period_start: '2025-01-01T00:00:00.000Z',
+        period_end: '2025-01-31T23:59:59.999Z',
+      },
+    ]);
+
+    const res = await request(app)
+      .get('/closure/monthly-latest')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(404);
+    expect(mocks.getClosureBulletins).toHaveBeenCalledWith(EST, 'MONTHLY');
+    expect(res.body.error?.message).toBe('Monthly closure bulletin for the current month not found');
+  });
+
+  it('allows /closure/today-status with access_closure and strips total_transactions from bulletin', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    mocks.getClosureBulletins.mockResolvedValue([
+      {
+        id: 88,
+        closure_type: 'DAILY',
+        period_start: new Date().toISOString(),
+        total_transactions: 22,
+      },
+    ]);
+    mocks.getLastFondDeCaisse.mockResolvedValue(150);
+
+    const res = await request(app)
+      .get('/closure/today-status')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+
+    expect(res.status).toBe(200);
+    expect(mocks.getClosureBulletins).toHaveBeenCalledWith(EST, 'DAILY');
+    expect(mocks.getLastFondDeCaisse).toHaveBeenCalledWith(EST);
+    expect(res.body.has_closure).toBe(true);
+    expect(res.body.last_fond_de_caisse).toBe(150);
+    expect(res.body.bulletin.total_transactions).toBeUndefined();
+  });
+
+  it('allows /closure/create with access_closure and appends CLOSURE legal journal entry', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+
+    const res = await request(app)
+      .post('/closure/create')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`)
+      .send({
+        date: '2026-04-29',
+        type: 'DAILY',
+        fond_de_caisse: 100,
+      });
+
+    expect(res.status).toBe(201);
+    expect(mocks.createDailyClosureOpen).toHaveBeenCalledWith(
+      new Date('2026-04-29'),
+      EST,
+      undefined,
+      false,
+      100
+    );
+    expect(mocks.logClosure).toHaveBeenCalledWith(
+      EST,
+      'DAILY',
+      250,
+      50,
+      expect.objectContaining({
+        closure_bulletin_id: 91,
+        closure_type: 'DAILY',
+        closure_hash: 'hash-daily',
+        first_sequence: 1,
+        last_sequence: 44,
+        force: false,
+      }),
+      '22'
+    );
+    expect(mocks.closeOpenClosureBulletin).toHaveBeenCalledWith(91, EST);
+    expect(mocks.deleteOpenClosureBulletin).not.toHaveBeenCalled();
+  });
+
+  it('fails closed on /closure/create when journal append fails and rolls back open bulletin', async () => {
+    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
+    mocks.createDailyClosureOpen.mockResolvedValue({
+      id: 222,
+      closure_type: 'DAILY',
+      period_start: '2026-04-29T00:00:00.000Z',
+      period_end: '2026-04-29T23:59:59.999Z',
+      total_amount: 250,
+      total_vat: 50,
+      closure_hash: 'hash-daily',
+      first_sequence: 1,
+      last_sequence: 44,
+      is_closed: false,
+    });
+    mocks.logClosure.mockRejectedValue(new Error('journal fail'));
+
+    const res = await request(app)
+      .post('/closure/create')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`)
+      .send({
+        date: '2026-04-29',
+        type: 'DAILY',
+        fond_de_caisse: 100,
+      });
+
+    expect(res.status).toBe(500);
+    expect(String(res.body?.error?.message ?? '')).toContain(
+      'Failed to persist legal journal entry for closure bulletin'
+    );
+    expect(mocks.deleteOpenClosureBulletin).toHaveBeenCalledWith(222, EST);
+    expect(mocks.closeOpenClosureBulletin).not.toHaveBeenCalled();
+  });
+});

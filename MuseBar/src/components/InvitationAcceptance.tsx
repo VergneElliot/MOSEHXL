@@ -9,19 +9,8 @@ import { Box, Alert } from '@mui/material';
 import { InvitationValidation } from './auth/InvitationValidation';
 import { AccountSetupForm } from './auth/AccountSetupForm';
 import { InvitationSuccess } from './auth/InvitationSuccess';
+import type { InvitationData } from './auth/types';
 import { apiService } from '../services/apiService';
-
-interface InvitationData {
-  email: string;
-  establishmentName: string;
-  role: string;
-  inviterName: string;
-  expiresAt: string;
-  prefill: {
-    firstName?: string;
-    lastName?: string;
-  };
-}
 
 interface AccountSetupData {
   firstName: string;

@@ -4,7 +4,7 @@ export interface SystemUser {
   email: string;
   first_name: string;
   last_name: string;
-  role: 'system_admin' | 'system_operator';
+  role: 'system_admin';
   is_active: boolean;
   last_login?: string;
   created_at: string;
@@ -41,6 +41,29 @@ export interface SystemSecurityLog {
   user_agent?: string;
   timestamp: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
+}
+
+export interface SecurityLogFilters {
+  severity: string[];
+  dateRange: {
+    start: string | null;
+    end: string | null;
+  };
+  actionType: string[];
+  userId: string;
+}
+
+export interface AuditTrailEntry {
+  id: number;
+  user_id: number | null;
+  action_type: string;
+  resource_type: string;
+  resource_id: string | null;
+  action_details: string | Record<string, unknown> | null;
+  timestamp: string;
+  ip_address: string | null;
+  user_agent: string | null;
+  session_id: string | null;
 }
 
 export interface CreateEstablishmentRequest {

@@ -22,6 +22,10 @@ const ProgressiveLoading: React.FC<ProgressiveLoadingProps> = ({ stages, onCompl
     }
 
     const stage = stages[currentStage];
+    if (!stage) {
+      if (onComplete) onComplete();
+      return;
+    }
     let progressInterval: ReturnType<typeof setInterval> | undefined;
 
     const stageTimeout = setTimeout(() => {
@@ -47,6 +51,9 @@ const ProgressiveLoading: React.FC<ProgressiveLoadingProps> = ({ stages, onCompl
   }
 
   const currentStageData = stages[currentStage];
+  if (!currentStageData) {
+    return <>{children}</>;
+  }
 
   return (
     <Box sx={{ textAlign: 'center', p: 4 }}>

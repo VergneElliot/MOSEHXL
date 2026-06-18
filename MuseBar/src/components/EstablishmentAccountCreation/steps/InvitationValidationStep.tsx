@@ -14,12 +14,14 @@ import {
   CardContent,
   Chip
 } from '@mui/material';
+import type { ChipProps } from '@mui/material/Chip';
 import { CheckCircle, Error, AccessTime } from '@mui/icons-material';
 import { establishmentAccountApi } from '../../../services/establishmentAccountApi';
+import { InvitationValidationResult } from '../types';
 
 interface InvitationValidationStepProps {
   token: string;
-  onComplete: (data: any) => void;
+  onComplete: (data: InvitationValidationResult) => void;
   onError: (error: string) => void;
 }
 
@@ -29,7 +31,7 @@ const InvitationValidationStep: React.FC<InvitationValidationStepProps> = ({
   onError
 }) => {
   const [isValidating, setIsValidating] = useState(true);
-  const [validationResult, setValidationResult] = useState<any>(null);
+  const [validationResult, setValidationResult] = useState<InvitationValidationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const validateInvitation = React.useCallback(async () => {
@@ -66,7 +68,7 @@ const InvitationValidationStep: React.FC<InvitationValidationStepProps> = ({
     return <AccessTime color="warning" />;
   };
 
-  const getStatusColor = () => {
+  const getStatusColor = (): Extract<ChipProps['color'], 'info' | 'error' | 'success' | 'warning'> => {
     if (isValidating) return 'info';
     if (error) return 'error';
     if (validationResult?.isValid) return 'success';
@@ -99,7 +101,7 @@ const InvitationValidationStep: React.FC<InvitationValidationStepProps> = ({
             </Typography>
             <Chip 
               label={getStatusText()} 
-              color={getStatusColor() as any}
+              color={getStatusColor()}
               size="small"
             />
           </Box>

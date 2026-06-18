@@ -7,7 +7,8 @@
 export { EmailService } from './EmailService';
 
 // Template Management
-export { EmailTemplateManager, EmailTemplate } from './EmailTemplateManager';
+export { EmailTemplateManager } from './templates/EmailTemplateManager';
+export type { EmailTemplate } from './templates/types';
 
 // Email Logging and Tracking
 export { EmailLogger, EmailLog, EmailStats } from './EmailLogger';

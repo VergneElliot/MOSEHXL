@@ -10,9 +10,8 @@ export function registerSetTokenFunction(setToken: (token: string | null) => voi
 }
 
 export function getAuthToken(): string | null {
-  // Try to get token from localStorage
-  const token = localStorage.getItem('auth_token');
-  return token;
+  // Tokens are no longer persisted in localStorage.
+  return null;
 }
 
 export function ensureAuthentication(): void {

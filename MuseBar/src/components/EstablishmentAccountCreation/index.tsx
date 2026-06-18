@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Box, Container, Paper, Typography, Alert, CircularProgress } from '@mui/material';
-import { SetupState, SetupActions } from './types';
+import { SetupState, SetupActions, SetupStepPayload } from './types';
 import { useEstablishmentSetup } from './hooks/useEstablishmentSetup';
 import SetupStepper from './components/SetupStepper';
 import AccountCreationStep from './steps/AccountCreationStep';
@@ -99,14 +99,14 @@ const EstablishmentAccountCreation: React.FC = () => {
   }, [token, setupActions]);
 
   // Handle step completion
-  const handleStepComplete = (stepId: number, data?: any) => {
+  const handleStepComplete = (stepId: number, data?: SetupStepPayload) => {
     setupActions.completeStep(stepId);
     
-    if (stepId === 1 && data?.password) {
+    if (stepId === 1 && data && 'password' in data) {
       setupActions.setPassword(data.password);
       setupActions.setError(null); // Clear any previous errors
       setupActions.setCurrentStep(2);
-    } else if (stepId === 2 && data?.businessInfo) {
+    } else if (stepId === 2 && data && 'businessInfo' in data) {
       setupActions.setBusinessInfo(data.businessInfo);
       setupActions.setError(null); // Clear any previous errors
       setupActions.setCurrentStep(3);

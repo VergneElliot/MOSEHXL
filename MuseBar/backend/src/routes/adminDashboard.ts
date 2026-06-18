@@ -8,6 +8,8 @@ import { requireAuth, requireAdmin } from './auth';
 import { DashboardDataService } from '../services/establishment';
 import { Logger } from '../utils/logger';
 import { getEnvironmentConfig } from '../config/environment';
+import { pool } from '../db/pool';
+import { AppError, asyncHandler } from '../middleware/errorHandler';
 
 const router = express.Router();
 const config = getEnvironmentConfig();
@@ -16,25 +18,16 @@ const dashboardService = new DashboardDataService(logger);
 
 // GET /api/admin-dashboard/test - Minimal test endpoint; requires auth and admin like other dashboard routes
 router.get('/test', requireAuth, requireAdmin, (req, res) => {
-  try {
-    res.json({
-      success: true,
-      message: 'Test endpoint working',
-      timestamp: new Date().toISOString()
-    });
-  } catch {
-    res.status(500).json({ 
-      success: false,
-      error: 'Test endpoint failed'
-    });
-  }
+  res.json({
+    success: true,
+    message: 'Test endpoint working',
+    timestamp: new Date().toISOString()
+  });
 });
 
 // GET /api/admin-dashboard/metrics - Get comprehensive dashboard metrics
-router.get('/metrics', requireAuth, requireAdmin, async (req, res) => {
+router.get('/metrics', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
   try {
-    // Get database client
-    const { pool } = await import('../app');
     const client = await pool.connect();
     
     try {
@@ -58,13 +51,9 @@ router.get('/metrics', requireAuth, requireAdmin, async (req, res) => {
       },
       'ADMIN_DASHBOARD_ROUTE'
     );
-
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to fetch dashboard metrics'
-    });
+    throw new AppError('Failed to fetch dashboard metrics', 500, 'ADMIN_DASHBOARD_METRICS_FAILED');
   }
-});
+}));
 
 // GET /api/admin-dashboard/health - Health check for admin dashboard service
 router.get('/health', (req, res) => {

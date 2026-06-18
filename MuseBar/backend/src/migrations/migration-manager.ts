@@ -1,6 +1,7 @@
 import { Pool } from 'pg';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 
 /* eslint-disable no-console */
 
@@ -9,6 +10,14 @@ export interface Migration {
   name: string;
   up: string;
   down: string;
+  up_checksum: string;
+  executed_at?: Date;
+}
+
+interface ExecutedMigrationRow {
+  id: string;
+  name: string;
+  up_checksum: string | null;
   executed_at?: Date;
 }
 
@@ -29,12 +38,18 @@ export class MigrationManager {
       CREATE TABLE IF NOT EXISTS migrations (
         id VARCHAR(255) PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
+        up_checksum VARCHAR(64),
         executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `;
+    const addChecksumColumnQuery = `
+      ALTER TABLE migrations
+      ADD COLUMN IF NOT EXISTS up_checksum VARCHAR(64);
     `;
 
     try {
       await this.pool.query(createTableQuery);
+      await this.pool.query(addChecksumColumnQuery);
       console.log('✅ Migrations table initialized');
     } catch (error) {
       console.error('❌ Failed to initialize migrations table:', error);
@@ -70,7 +85,11 @@ export class MigrationManager {
       throw new Error(`Invalid migration filename format: ${filename}`);
     }
 
-    const [, id, name] = match;
+    const id = match[1];
+    const name = match[2];
+    if (!id || !name) {
+      throw new Error(`Invalid migration filename format: ${filename}`);
+    }
     
     // Split content into up and down migrations
     const sections = content.split('-- DOWN');
@@ -78,24 +97,33 @@ export class MigrationManager {
       throw new Error(`Migration ${filename} must contain -- UP and -- DOWN sections`);
     }
 
-    const up = sections[0].replace('-- UP', '').trim();
-    const down = sections[1].trim();
+    const upSection = sections[0];
+    const downSection = sections[1];
+    if (!upSection || !downSection) {
+      throw new Error(`Migration ${filename} must contain both -- UP and -- DOWN sections`);
+    }
+    const up = upSection.replace('-- UP', '').trim();
+    const down = downSection.trim();
+    const up_checksum = crypto.createHash('sha256').update(up, 'utf8').digest('hex');
 
     return {
       id,
       name: name.replace(/_/g, ' '),
       up,
-      down
+      down,
+      up_checksum
     };
   }
 
   /**
    * Get executed migrations from database
    */
-  private async getExecutedMigrations(): Promise<string[]> {
+  private async getExecutedMigrations(): Promise<ExecutedMigrationRow[]> {
     try {
-      const result = await this.pool.query('SELECT id FROM migrations ORDER BY executed_at');
-      return result.rows.map(row => row.id);
+      const result = await this.pool.query(
+        'SELECT id, name, up_checksum, executed_at FROM migrations ORDER BY executed_at'
+      );
+      return result.rows as ExecutedMigrationRow[];
     } catch (error) {
       console.error('❌ Failed to get executed migrations:', error);
       return [];
@@ -108,12 +136,57 @@ export class MigrationManager {
   private async markMigrationExecuted(migration: Migration): Promise<void> {
     try {
       await this.pool.query(
-        'INSERT INTO migrations (id, name) VALUES ($1, $2)',
-        [migration.id, migration.name]
+        'INSERT INTO migrations (id, name, up_checksum) VALUES ($1, $2, $3)',
+        [migration.id, migration.name, migration.up_checksum]
       );
     } catch (error) {
       console.error('❌ Failed to mark migration as executed:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Persist checksum for executed migrations missing checksum metadata (one-time baseline).
+   */
+  private async updateMigrationChecksum(migrationId: string, checksum: string): Promise<void> {
+    try {
+      await this.pool.query(
+        'UPDATE migrations SET up_checksum = $2 WHERE id = $1',
+        [migrationId, checksum]
+      );
+    } catch (error) {
+      console.error('❌ Failed to update migration checksum:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Verify applied migrations still match current migration files.
+   */
+  private async verifyExecutedMigrationChecksums(
+    allMigrations: Migration[],
+    executedMigrations: ExecutedMigrationRow[]
+  ): Promise<void> {
+    const fileById = new Map(allMigrations.map(migration => [migration.id, migration]));
+    for (const executed of executedMigrations) {
+      const fileMigration = fileById.get(executed.id);
+      if (!fileMigration) continue;
+
+      if (!executed.up_checksum) {
+        await this.updateMigrationChecksum(executed.id, fileMigration.up_checksum);
+        console.log(
+          `ℹ️  Baseline checksum stored for migration ${executed.id}`
+        );
+        continue;
+      }
+
+      if (executed.up_checksum !== fileMigration.up_checksum) {
+        throw new Error(
+          `Migration checksum mismatch for ${executed.id}. ` +
+            `Applied checksum=${executed.up_checksum}, file checksum=${fileMigration.up_checksum}. ` +
+            'Do not edit already-applied migration files.'
+        );
+      }
     }
   }
 
@@ -139,11 +212,14 @@ export class MigrationManager {
       await this.initialize();
 
       const files = this.getMigrationFiles();
+      const allMigrations = files.map(file => this.parseMigrationFile(file));
       const executedMigrations = await this.getExecutedMigrations();
+      const executedIds = new Set(executedMigrations.map(migration => migration.id));
+
+      await this.verifyExecutedMigrationChecksums(allMigrations, executedMigrations);
       
-      const pendingMigrations = files
-        .map(file => this.parseMigrationFile(file))
-        .filter(migration => !executedMigrations.includes(migration.id));
+      const pendingMigrations = allMigrations
+        .filter(migration => !executedIds.has(migration.id));
 
       if (pendingMigrations.length === 0) {
         console.log('✅ Database is up to date');
@@ -157,6 +233,7 @@ export class MigrationManager {
         
         try {
           await this.pool.query('BEGIN');
+          await this.pool.query("SELECT set_config('app.bypass_rls', 'on', true)");
           await this.pool.query(migration.up);
           await this.markMigrationExecuted(migration);
           await this.pool.query('COMMIT');
@@ -184,13 +261,14 @@ export class MigrationManager {
 
     try {
       const executedMigrations = await this.getExecutedMigrations();
+      const executedIds = executedMigrations.map(migration => migration.id);
       
-      if (executedMigrations.length === 0) {
+      if (executedIds.length === 0) {
         console.log('✅ No migrations to rollback');
         return;
       }
 
-      const lastMigrationId = executedMigrations[executedMigrations.length - 1];
+      const lastMigrationId = executedIds[executedIds.length - 1];
       const files = this.getMigrationFiles();
       const migration = files
         .map(file => this.parseMigrationFile(file))
@@ -205,6 +283,7 @@ export class MigrationManager {
 
       try {
         await this.pool.query('BEGIN');
+        await this.pool.query("SELECT set_config('app.bypass_rls', 'on', true)");
         await this.pool.query(migration.down);
         await this.markMigrationNotExecuted(migration.id);
         await this.pool.query('COMMIT');
@@ -231,16 +310,21 @@ export class MigrationManager {
     try {
       const files = this.getMigrationFiles();
       const executedMigrations = await this.getExecutedMigrations();
+      const executedIds = new Set(executedMigrations.map(migration => migration.id));
       
       const allMigrations = files.map(file => this.parseMigrationFile(file));
+      const byId = new Map(allMigrations.map(migration => [migration.id, migration]));
       
       for (const migration of allMigrations) {
-        const isExecuted = executedMigrations.includes(migration.id);
-        const status = isExecuted ? '✅ EXECUTED' : '⏳ PENDING';
-        console.log(`${status} ${migration.id} - ${migration.name}`);
+        const isExecuted = executedIds.has(migration.id);
+        const executed = executedMigrations.find(row => row.id === migration.id);
+        const hasDrift = isExecuted && Boolean(executed?.up_checksum) && executed?.up_checksum !== migration.up_checksum;
+        const status = hasDrift ? '⚠️  DRIFT' : isExecuted ? '✅ EXECUTED' : '⏳ PENDING';
+        const checksumSummary = isExecuted ? ` (sha256:${migration.up_checksum.slice(0, 12)})` : '';
+        console.log(`${status} ${migration.id} - ${migration.name}${checksumSummary}`);
       }
 
-      const pendingCount = allMigrations.filter(m => !executedMigrations.includes(m.id)).length;
+      const pendingCount = allMigrations.filter(m => !executedIds.has(m.id)).length;
       const executedCount = executedMigrations.length;
 
       console.log('\n📈 Summary:');

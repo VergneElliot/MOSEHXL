@@ -12,9 +12,10 @@ import {
 import {
   CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
+import type { InvitationData } from './types';
 
 interface InvitationSuccessProps {
-  invitation: any;
+  invitation: InvitationData;
   onContinue: () => void;
 }
 

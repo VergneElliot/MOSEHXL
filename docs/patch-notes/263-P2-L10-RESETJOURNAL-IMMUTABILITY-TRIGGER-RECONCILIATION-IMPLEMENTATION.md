@@ -6,44 +6,59 @@ Related plan: `docs/patch-notes/262-P2-L10-RESETJOURNAL-IMMUTABILITY-TRIGGER-REC
 ## What changed
 
 Updated:
+
 - `MuseBar/backend/src/models/legalJournal/journalQueries.ts`
 
-`resetJournalDevOnly()` now uses:
+`resetJournalDevOnly(establishmentId)` now performs the delete inside a
+dedicated transaction that bypasses the legal immutability trigger via
+`SET LOCAL session_replication_role = 'replica'`, while preserving the
+per-tenant predicate. Effective sequence per call:
 
-1. `TRUNCATE TABLE legal_journal RESTART IDENTITY`
+1. `BEGIN`
+2. `SET LOCAL session_replication_role = 'replica'`
+3. `DELETE FROM legal_journal WHERE establishment_id = $1`
+4. `COMMIT`
 
-instead of:
-
-1. `DELETE FROM legal_journal`
-2. `ALTER SEQUENCE legal_journal_id_seq RESTART WITH 1`
+On failure the transaction is rolled back and the client connection is
+always released. The production guard (`NODE_ENV === 'production' → 403`)
+fires before any client is acquired.
 
 ## Why this reconciles L10
 
-The legal immutability trigger blocks row-level `DELETE` on `legal_journal`.
-Using `TRUNCATE ... RESTART IDENTITY` avoids this row-delete path while keeping
-the route dev-only and destructive reset semantics intact.
+The legal immutability trigger
+(`trigger_prevent_legal_journal_modification`) blocks `DELETE` and `UPDATE`
+on `legal_journal` per row. `SET LOCAL session_replication_role = 'replica'`
+disables user triggers for the lifetime of the current transaction only,
+which lets the dev reset path delete by tenant scope without removing or
+weakening the trigger globally. A naive `TRUNCATE TABLE legal_journal
+RESTART IDENTITY` would also bypass the trigger but would discard tenant
+scoping, which is not acceptable on this branch (multi-establishment
+journal).
 
 ## Regression coverage added
 
 Added:
+
 - `MuseBar/backend/src/models/legalJournal/journalQueries.resetJournalDevOnly.test.ts`
 
 Covers:
-1. production guard still blocks reset,
-2. non-production reset executes the truncate statement.
+
+1. Production guard still blocks reset (and no client is acquired).
+2. Non-production reset issues `BEGIN`, `SET LOCAL session_replication_role
+   = 'replica'`, the tenant-scoped `DELETE`, and `COMMIT` in that order.
+3. On `DELETE` failure, the transaction is rolled back and the client is
+   released.
 
 ## Verification
 
 Executed:
+
 1. `npm run type-check` -> pass
 2. lint diagnostics on touched files -> no issues
-
-Note:
-- This backend currently has `"test": "echo \"Error: no test specified\" && exit 1"`
-  in `package.json`, so targeted test execution via `npm run test -- ...` is not
-  available in the current project state.
+3. `npm test -- journalQueries.resetJournalDevOnly` -> pass
 
 ## Result
 
 P2-L10 objective is satisfied: dev reset no longer conflicts with legal
-immutability trigger behavior, while production remains protected.
+immutability trigger behavior, tenant scoping is preserved, and production
+remains protected.

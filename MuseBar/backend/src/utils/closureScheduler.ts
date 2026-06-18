@@ -1,8 +1,16 @@
-import { pool } from '../app';
+import { pool } from '../db/pool';
 import { DEFAULT_APP_TIMEZONE } from '../config/timezone';
 import { LegalJournalModel } from '../models/legalJournal';
 import { AuditTrailModel } from '../models/auditTrail';
 import moment from 'moment-timezone';
+import { runWithTenantContext } from '../rls/tenantContext';
+import { Logger } from './logger';
+
+function toFiniteNumber(value: unknown): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const parsed = parseFloat(String(value ?? 0));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
 export class ClosureScheduler {
   private static interval: NodeJS.Timeout | null = null;
@@ -49,27 +57,40 @@ export class ClosureScheduler {
   // Check if closure should be executed (runs per-establishment for multi-tenancy).
   static async checkAndExecuteClosure() {
     try {
-      const settings = await this.getClosureSettings();
+      const now = new Date();
+      const establishmentsResult = await pool.query('SELECT id FROM establishments');
+      const establishmentIds: string[] = establishmentsResult.rows.map((r: { id: string }) => r.id);
 
-      if (!settings.auto_closure_enabled) {
-        return;
-      }
+      for (const establishmentId of establishmentIds) {
+        await runWithTenantContext({ establishmentId }, async () => {
+          const settings = await this.getClosureSettings(establishmentId);
+          if (!settings.auto_closure_enabled) return;
 
-      const nowParis = moment.tz(new Date(), settings.timezone);
-      const shouldClose = await this.shouldExecuteClosure(settings, nowParis);
+          const nowTz = moment.tz(now, settings.timezone);
+          const shouldClose = await this.shouldExecuteClosure(settings, nowTz);
+          if (!shouldClose) return;
 
-      if (shouldClose) {
-        await this.executeAutomaticClosure(nowParis.toDate());
+          await this.executeAutomaticClosureForEstablishment(establishmentId, now);
+        });
       }
     } catch (error) {
       throw error;
     }
   }
 
-  // Get closure settings from database
-  static async getClosureSettings() {
-    const query = 'SELECT setting_key, setting_value FROM closure_settings';
-    const result = await pool.query(query);
+  // Get closure settings from database.
+  // Supports both legacy global settings and per-establishment settings.
+  static async getClosureSettings(establishmentId: string) {
+    let result;
+    try {
+      result = await pool.query(
+        'SELECT setting_key, setting_value FROM closure_settings WHERE establishment_id = $1',
+        [establishmentId]
+      );
+    } catch {
+      // Legacy closure_settings without establishment_id column.
+      result = await pool.query('SELECT setting_key, setting_value FROM closure_settings');
+    }
     
     const settings: { [key: string]: string } = {};
     result.rows.forEach(row => {
@@ -104,15 +125,15 @@ export class ClosureScheduler {
     return false;
   }
 
-  // Execute automatic closure for each establishment (multi-tenant: one bulletin per establishment).
-  static async executeAutomaticClosure(now: Date) {
+  // Execute automatic closure for one establishment.
+  static async executeAutomaticClosureForEstablishment(establishmentId: string, now: Date) {
     try {
-      const settings = await this.getClosureSettings();
+      const settings = await this.getClosureSettings(establishmentId);
       const closureTime = settings.daily_closure_time || '02:00';
       const timezone = settings.timezone || DEFAULT_APP_TIMEZONE;
 
       const nowTz = moment.tz(now, timezone);
-      const closureHour = parseInt(closureTime.split(':')[0], 10);
+      const closureHour = parseInt(closureTime.split(':')[0] ?? '0', 10);
       let businessDay = nowTz.clone();
       if (closureHour < 12 && nowTz.hour() < closureHour) {
         businessDay = businessDay.subtract(1, 'day');
@@ -120,40 +141,107 @@ export class ClosureScheduler {
       businessDay.set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
       const businessDayDate = businessDay.toDate();
 
-      // Get all establishments so each gets its own daily closure
-      const establishmentsResult = await pool.query('SELECT id FROM establishments');
-      const establishmentIds: string[] = establishmentsResult.rows.map((r: { id: string }) => r.id);
-
-      const closed: Array<{ establishmentId: string; bulletinId: number }> = [];
-      for (const establishmentId of establishmentIds) {
-        try {
-          const closureBulletin = await LegalJournalModel.createDailyClosure(businessDayDate, establishmentId, timezone);
-          closed.push({ establishmentId, bulletinId: closureBulletin.id });
-          await AuditTrailModel.logAction({
-            action_type: 'AUTO_CLOSURE_EXECUTED',
-            resource_type: 'CLOSURE_BULLETIN',
-            resource_id: closureBulletin.id.toString(),
-            action_details: {
-              closure_type: 'DAILY',
-              establishment_id: establishmentId,
-              period_start: businessDay.toISOString(),
-              transaction_count: closureBulletin.total_transactions,
-              total_amount: closureBulletin.total_amount,
-              closure_time: now.toISOString(),
-              trigger: 'AUTOMATIC'
-            },
-            ip_address: 'system',
-            user_agent: 'ClosureScheduler'
-          });
-        } catch (err) {
-          if (err instanceof Error && err.message.includes('already exists')) {
-            continue; // This establishment already closed for this period
-          }
-          throw err;
+      let closureBulletin;
+      try {
+        // Create an OPEN bulletin first so we can keep bulletin+journal atomic.
+        closureBulletin = await LegalJournalModel.createDailyClosureOpen(
+          businessDayDate,
+          establishmentId,
+          timezone
+        );
+      } catch (err) {
+        if (err instanceof Error && err.message.includes('already exists')) {
+          return null;
         }
+        throw err;
       }
 
-      return closed;
+      const closureId = Number(closureBulletin.id);
+      if (!Number.isFinite(closureId)) {
+        throw new Error('Automatic closure created without valid bulletin id');
+      }
+
+      // Append the matching CLOSURE entry to the legal journal and only then
+      // finalize the bulletin. If append fails, rollback the OPEN bulletin.
+      const totalAmount = toFiniteNumber(closureBulletin.total_amount);
+      const totalVat = toFiniteNumber(closureBulletin.total_vat);
+      let journalSequenceNumber: number | null = null;
+      try {
+        const journalEntry = await LegalJournalModel.logClosure(
+          establishmentId,
+          'DAILY',
+          totalAmount,
+          totalVat,
+          {
+            closure_bulletin_id: closureBulletin.id ?? null,
+            closure_type: 'DAILY',
+            period_start: closureBulletin.period_start ?? null,
+            period_end: closureBulletin.period_end ?? null,
+            closure_hash: closureBulletin.closure_hash ?? null,
+            first_sequence: closureBulletin.first_sequence ?? null,
+            last_sequence: closureBulletin.last_sequence ?? null,
+            force: false,
+            trigger: 'AUTOMATIC',
+          }
+        );
+        journalSequenceNumber = journalEntry?.sequence_number ?? null;
+      } catch (journalError) {
+        Logger.getInstance().error(
+          `Auto closure journal append failed for bulletin ${String(closureBulletin.id ?? 'unknown')}`,
+          journalError instanceof Error ? journalError : new Error(String(journalError)),
+          'LEGAL_JOURNAL'
+        );
+        await AuditTrailModel.logAction({
+          action_type: 'AUTO_CLOSURE_JOURNAL_APPEND_FAILED',
+          resource_type: 'CLOSURE_BULLETIN',
+          resource_id: closureBulletin.id?.toString(),
+          action_details: {
+            closure_type: 'DAILY',
+            establishment_id: establishmentId,
+            bulletin_id: closureBulletin.id ?? null,
+            closure_time: now.toISOString(),
+            error: journalError instanceof Error ? journalError.message : 'Unknown error',
+          },
+          ip_address: 'system',
+          user_agent: 'ClosureScheduler'
+        });
+
+        const rolledBack = await LegalJournalModel.deleteOpenClosureBulletin(closureId, establishmentId);
+        if (!rolledBack) {
+          Logger.getInstance().error(
+            `Failed to rollback open auto-closure bulletin ${closureId} after journal append failure`,
+            new Error('Open closure bulletin rollback affected 0 rows'),
+            'LEGAL_CLOSURE'
+          );
+        }
+
+        throw new Error('AUTO_CLOSURE_JOURNAL_APPEND_FAILED');
+      }
+
+      const finalizedBulletin = await LegalJournalModel.closeOpenClosureBulletin(closureId, establishmentId);
+      if (!finalizedBulletin) {
+        throw new Error(`Failed to finalize auto-closure bulletin ${closureId}`);
+      }
+
+      await AuditTrailModel.logAction({
+        action_type: 'AUTO_CLOSURE_EXECUTED',
+        resource_type: 'CLOSURE_BULLETIN',
+        resource_id: closureId.toString(),
+        action_details: {
+          closure_type: 'DAILY',
+          establishment_id: establishmentId,
+          period_start: businessDay.toISOString(),
+          transaction_count: finalizedBulletin.total_transactions,
+          total_amount: finalizedBulletin.total_amount,
+          closure_time: now.toISOString(),
+          trigger: 'AUTOMATIC',
+          journal_sequence_number: journalSequenceNumber,
+        },
+        ip_address: 'system',
+        user_agent: 'ClosureScheduler'
+      });
+
+      return { establishmentId, bulletinId: closureId };
       
     } catch (error) {
       // Failed to execute automatic closure
@@ -162,6 +250,7 @@ export class ClosureScheduler {
         action_type: 'AUTO_CLOSURE_FAILED',
         action_details: { 
           error: error instanceof Error ? error.message : 'Unknown error',
+          establishment_id: establishmentId,
           closure_time: now.toISOString()
         },
         ip_address: 'system',
