@@ -9,7 +9,6 @@ import AppRouter from './components/common/AppRouter';
 import SystemAdminRouter from './components/common/SystemAdminRouter';
 import { Login } from './components/auth';
 import type { User } from './types';
-import InvitationAcceptance from './components/InvitationAcceptance';
 import { AppHeader } from './components/common/AppHeader';
 import { BusinessSetupWizard } from './components/Setup';
 import EstablishmentAccountCreation from './components/EstablishmentAccountCreation';
@@ -108,7 +107,6 @@ function App() {
           {!isAuthenticated ? (
             <Container maxWidth="xl" sx={{ mt: 2 }}>
               <Login onLogin={handleLogin} />
-              <InvitationAcceptance />
             </Container>
           ) : isSystemAdmin ? (
             // System Admin Interface - Full screen, no container

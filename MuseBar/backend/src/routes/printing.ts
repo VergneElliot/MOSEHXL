@@ -29,8 +29,9 @@ import {
   renderReceiptOrInvoicePdf,
 } from '../services/documents/documentPdfService';
 import {
+  buildClosureExportData,
+  buildClosurePdfFilename,
   buildClosureXlsxAttachment,
-  isPeriodClosureBulletin,
 } from '../services/documents/closureXlsxService';
 import {
   emailClosureBulletinDocument,
@@ -535,8 +536,9 @@ router.get('/closure/:bulletinId/export-pdf', authenticateToken, ensureEstablish
     const bulletinId = parseInt(req.params.bulletinId ?? '', 10);
     if (!Number.isFinite(bulletinId) || bulletinId <= 0) throw new ValidationError('Invalid closure bulletin id');
     const bulletinData = await buildClosureBulletinData(pool, user, bulletinId);
-    const pdf = await renderClosureBulletinPdf(bulletinData);
-    sendPdfDownload(res, pdf, `closure-bulletin-${bulletinId}.pdf`);
+    const exportData = await buildClosureExportData(pool, user.establishment_id, bulletinData);
+    const pdf = await renderClosureBulletinPdf(bulletinData, exportData);
+    sendPdfDownload(res, pdf, buildClosurePdfFilename(bulletinData));
   } catch (error) {
     mapDocumentRouteError(error, 'PRINTING_CLOSURE_EXPORT_FAILED');
   }
@@ -549,11 +551,8 @@ router.get('/closure/:bulletinId/export-xlsx', authenticateToken, ensureEstablis
     const bulletinId = parseInt(req.params.bulletinId ?? '', 10);
     if (!Number.isFinite(bulletinId) || bulletinId <= 0) throw new ValidationError('Invalid closure bulletin id');
     const bulletinData = await buildClosureBulletinData(pool, user, bulletinId);
-    if (!isPeriodClosureBulletin(bulletinData.closure_type)) {
-      throw new ValidationError('Export Excel disponible uniquement pour les bulletins hebdomadaires, mensuels ou annuels');
-    }
-    const xlsx = await buildClosureXlsxAttachment(pool, user.establishment_id, bulletinData);
-    if (!xlsx) throw new ValidationError('Impossible de générer le récapitulatif Excel');
+    const exportData = await buildClosureExportData(pool, user.establishment_id, bulletinData);
+    const xlsx = await buildClosureXlsxAttachment(pool, user.establishment_id, bulletinData, exportData);
     sendXlsxDownload(res, xlsx.buffer, xlsx.filename);
   } catch (error) {
     mapDocumentRouteError(error, 'PRINTING_CLOSURE_XLSX_EXPORT_FAILED');

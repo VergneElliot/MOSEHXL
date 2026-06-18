@@ -324,6 +324,10 @@ export async function buildReceiptDataForInvoice(
     },
     compliance_info: {
       invoice_hash: row.invoice_hash ? String(row.invoice_hash) : undefined,
+      previous_invoice_hash: row.previous_invoice_hash ? String(row.previous_invoice_hash) : undefined,
+      source_receipt_hash: row.source_receipt_hash ? String(row.source_receipt_hash) : undefined,
+      source_receipt_sequence:
+        row.source_receipt_sequence == null ? undefined : parseNumber(row.source_receipt_sequence),
       cash_register_id: getRegisterIdForEstablishment(user.establishment_id),
       operator_id: user.username,
     },

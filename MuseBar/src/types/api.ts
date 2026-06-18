@@ -115,7 +115,7 @@ export interface ErrorResponse extends ApiResponse {
 // Closure bulletin types
 export interface ClosureBulletin {
   id: number;
-  closure_type: 'DAILY' | 'MONTHLY' | 'ANNUAL';
+  closure_type: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL';
   period_start: string;
   period_end: string;
   total_transactions: number;

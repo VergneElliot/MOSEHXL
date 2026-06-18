@@ -2,6 +2,8 @@ import { apiConfig } from '../../config/api';
 import { registerSetTokenFunction } from '../authHelper';
 
 let authToken: string | null = null;
+const REFRESH_BOOTSTRAP_HINT_KEY = 'auth_refresh_bootstrap_hint';
+let refreshAccessTokenPromise: Promise<string | null> | null = null;
 
 export function setToken(token: string | null) {
   authToken = token;
@@ -27,6 +29,52 @@ function readCookieValue(cookieName: string): string | null {
   }
   const value = cookiePart.slice(cookieName.length + 1).trim();
   return value.length > 0 ? decodeURIComponent(value) : null;
+}
+
+async function requestAccessTokenRefresh(): Promise<string | null> {
+  const csrfToken = readCookieValue('musebar_csrf_token');
+  if (!csrfToken) {
+    return null;
+  }
+
+  const response = await fetch(apiConfig.getEndpoint('/api/auth/refresh'), {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-csrf-token': csrfToken,
+    },
+    body: JSON.stringify({
+      rememberMe: localStorage.getItem('remember_me') === 'true',
+    }),
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const data = await response.json() as {
+    token?: string;
+    expiresIn?: string;
+  };
+  if (!data.token) {
+    return null;
+  }
+
+  setToken(data.token);
+  localStorage.setItem('token_expires_in', data.expiresIn || '12h');
+  localStorage.setItem(REFRESH_BOOTSTRAP_HINT_KEY, 'true');
+  return data.token;
+}
+
+async function refreshAccessToken(): Promise<string | null> {
+  if (!refreshAccessTokenPromise) {
+    refreshAccessTokenPromise = requestAccessTokenRefresh().finally(() => {
+      refreshAccessTokenPromise = null;
+    });
+  }
+
+  return refreshAccessTokenPromise;
 }
 
 export async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -71,8 +119,29 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
     
     if (!res.ok) {
       if (res.status === 401) {
+        const shouldTryRefresh =
+          endpoint !== '/auth/login' &&
+          endpoint !== '/auth/refresh' &&
+          endpoint !== '/auth/logout';
+        if (shouldTryRefresh) {
+          const refreshedToken = await refreshAccessToken();
+          if (refreshedToken) {
+            const retryHeaders = {
+              ...headers,
+              Authorization: `Bearer ${refreshedToken}`,
+            };
+            const retryRes = await fetch(url, {
+              ...config,
+              headers: retryHeaders,
+            });
+            if (retryRes.ok) {
+              return retryRes.json();
+            }
+          }
+        }
         localStorage.removeItem('remember_me');
         localStorage.removeItem('token_expires_in');
+        localStorage.removeItem(REFRESH_BOOTSTRAP_HINT_KEY);
         window.location.href = '/login';
         throw new Error('Session expired - please login again');
       }
