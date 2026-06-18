@@ -1,14 +1,14 @@
 -- UP
 -- P1-1: Complete A3 DB constraints for legal/tenant tables.
 -- - Backfill + enforce NOT NULL on audit_trail.establishment_id, archive_exports.establishment_id, closure_bulletins.establishment_id
--- - Enforce closure uniqueness on (establishment_id, closure_type, period_start, period_end)
--- - Fail closed (no silent deletions) if unresolved NULLs or duplicate closure keys remain.
+-- - Preserve corrective closure history: forced replacement bulletins intentionally
+--   keep prior rows for audit trail, so no uniqueness constraint is enforced here.
+-- - Fail closed (no silent deletions) if unresolved NULLs remain.
 
 DO $$
 DECLARE
   fallback_establishment_id UUID;
   unresolved_count INTEGER;
-  duplicate_closure_count INTEGER;
 BEGIN
   SELECT id
   INTO fallback_establishment_id
@@ -74,19 +74,6 @@ BEGIN
     RAISE EXCEPTION 'A3 constraints hardening: unresolved closure_bulletins.establishment_id NULL rows (%)', unresolved_count;
   END IF;
 
-  SELECT COUNT(*)
-  INTO duplicate_closure_count
-  FROM (
-    SELECT establishment_id, closure_type, period_start, period_end
-    FROM closure_bulletins
-    GROUP BY establishment_id, closure_type, period_start, period_end
-    HAVING COUNT(*) > 1
-  ) dup;
-
-  IF duplicate_closure_count > 0 THEN
-    RAISE EXCEPTION 'A3 constraints hardening: duplicate closure key groups found (%). Resolve duplicates before enforcing uniqueness.',
-      duplicate_closure_count;
-  END IF;
 END $$;
 
 -- Align FK behavior with NOT NULL invariants.
@@ -115,12 +102,7 @@ ALTER TABLE archive_exports
 ALTER TABLE closure_bulletins
   ALTER COLUMN establishment_id SET NOT NULL;
 
-CREATE UNIQUE INDEX IF NOT EXISTS ux_closure_bulletins_establishment_type_period
-  ON closure_bulletins(establishment_id, closure_type, period_start, period_end);
-
 -- DOWN
-DROP INDEX IF EXISTS ux_closure_bulletins_establishment_type_period;
-
 ALTER TABLE audit_trail
   ALTER COLUMN establishment_id DROP NOT NULL;
 

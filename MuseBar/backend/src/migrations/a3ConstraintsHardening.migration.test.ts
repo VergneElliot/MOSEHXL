@@ -18,12 +18,12 @@ describe('A3 constraints hardening migration', () => {
     expect(sql).toContain('RAISE EXCEPTION');
   });
 
-  it('guards against duplicate closure keys before uniqueness enforcement', () => {
+  it('does not enforce closure key uniqueness because corrective bulletins are retained', () => {
     const sql = fs.readFileSync(migrationPath, 'utf8');
 
-    expect(sql).toContain('duplicate closure key groups found');
-    expect(sql).toContain('HAVING COUNT(*) > 1');
-    expect(sql).toContain('CREATE UNIQUE INDEX IF NOT EXISTS ux_closure_bulletins_establishment_type_period');
+    expect(sql).toContain('forced replacement bulletins intentionally');
+    expect(sql).not.toContain('duplicate closure key groups found');
+    expect(sql).not.toContain('CREATE UNIQUE INDEX IF NOT EXISTS ux_closure_bulletins_establishment_type_period');
   });
 
   it('enforces NOT NULL on legal/audit closure target tables', () => {
