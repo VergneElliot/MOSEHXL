@@ -10,6 +10,40 @@ import {
 } from './types';
 import { formatEuroAmount } from '../../utils/formatCurrency';
 
+function normalizeThermalText(content: string): string {
+  const replaced = content
+    .replace(/€/g, 'EUR')
+    .replace(/[’‘]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/œ/g, 'oe')
+    .replace(/Œ/g, 'OE')
+    .replace(/æ/g, 'ae')
+    .replace(/Æ/g, 'AE')
+    .replace(/ß/g, 'ss')
+    .replace(/°/g, ' deg ')
+    .replace(/\u00a0/g, ' ');
+
+  const withoutDiacritics = replaced.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  return Array.from(withoutDiacritics)
+    .map((char) => {
+      const code = char.charCodeAt(0);
+      if (
+        char === '\n' ||
+        char === '\r' ||
+        char === '\t' ||
+        code === 0x07 ||
+        code === 0x1b ||
+        code === 0x1d ||
+        (code >= 0x20 && code <= 0x7e)
+      ) {
+        return char;
+      }
+      return '?';
+    })
+    .join('');
+}
+
 export abstract class BasePrintingService implements IPrintingService {
   protected config: PrintingConfig;
   protected isInitialized: boolean = false;
@@ -108,8 +142,8 @@ export abstract class BasePrintingService implements IPrintingService {
       content += ESC_POS.BOLD_ON + 'ARTICLES\n' + ESC_POS.BOLD_OFF;
       
       for (const item of data.items) {
-        const itemLine = `${item.product_name} (${item.quantity} x ${formatEuroAmount(item.unit_price)})`;
-        const totalLine = formatEuroAmount(item.total_price);
+        const itemLine = `${item.product_name} (${item.quantity} x ${formatEuroAmount(item.unit_price, 'EUR')})`;
+        const totalLine = formatEuroAmount(item.total_price, 'EUR');
         content += this.padLine(itemLine, totalLine, 32) + '\n';
       }
       
@@ -121,28 +155,28 @@ export abstract class BasePrintingService implements IPrintingService {
       content += ESC_POS.BOLD_ON + 'TVA\n' + ESC_POS.BOLD_OFF;
       
       for (const vat of data.vat_breakdown) {
-        const baseLine = `Base HT (${vat.rate}%): ${formatEuroAmount(vat.subtotal_ht)}`;
-        const vatLine = `TVA ${vat.rate}%: ${formatEuroAmount(vat.vat)}`;
+        const baseLine = `Base HT (${vat.rate}%): ${formatEuroAmount(vat.subtotal_ht, 'EUR')}`;
+        const vatLine = `TVA ${vat.rate}%: ${formatEuroAmount(vat.vat, 'EUR')}`;
         content += baseLine + '\n';
         content += vatLine + '\n';
       }
       
-      content += `TVA Totale: ${formatEuroAmount(data.total_tax)}\n`;
-      content += `Sous-total HT: ${formatEuroAmount(data.total_amount - data.total_tax)}\n`;
+      content += `TVA Totale: ${formatEuroAmount(data.total_tax, 'EUR')}\n`;
+      content += `Sous-total HT: ${formatEuroAmount(data.total_amount - data.total_tax, 'EUR')}\n`;
       content += '================================\n';
     }
     
     // Tips and Change
     if (data.tips && data.tips > 0) {
-      content += `Pourboire: ${formatEuroAmount(data.tips)}\n`;
+      content += `Pourboire: ${formatEuroAmount(data.tips, 'EUR')}\n`;
     }
     if (data.change && data.change > 0) {
-      content += `Monnaie: ${formatEuroAmount(data.change)}\n`;
+      content += `Monnaie: ${formatEuroAmount(data.change, 'EUR')}\n`;
     }
     
     // Total
     content += ESC_POS.BOLD_ON + ESC_POS.DOUBLE_HEIGHT;
-    content += `TOTAL TTC: ${formatEuroAmount(data.total_amount)}\n`;
+    content += `TOTAL TTC: ${formatEuroAmount(data.total_amount, 'EUR')}\n`;
     content += ESC_POS.NORMAL_SIZE + ESC_POS.BOLD_OFF;
     
     // Compliance Info
@@ -168,7 +202,7 @@ export abstract class BasePrintingService implements IPrintingService {
     // Cut paper
     content += ESC_POS.CUT;
     
-    return content;
+    return normalizeThermalText(content);
   }
 
   protected generateClosureBulletinContent(data: ClosureBulletinData): string {
@@ -282,7 +316,7 @@ export abstract class BasePrintingService implements IPrintingService {
     content += '\n\n\n';
     content += ESC_POS.CUT;
     
-    return content;
+    return normalizeThermalText(content);
   }
 
   protected formatPaymentMethod(method: string): string {
