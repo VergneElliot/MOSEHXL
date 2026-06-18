@@ -108,6 +108,18 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
     }
   };
 
+  const handleDeleteUser = async (user: typeof userState.users[number]) => {
+    const confirmed = window.confirm(
+      `Supprimer définitivement le compte ${user.email} ?`
+    );
+    if (!confirmed) return;
+
+    const success = await userActions.deleteUser(user.id);
+    if (success) {
+      userActions.fetchUsers();
+    }
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
@@ -149,8 +161,17 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
                     onClick={() => permissions.openPermDialog(user)}
                     variant="outlined"
                     size="small"
+                    sx={{ mr: 1 }}
                   >
                     Permissions
+                  </Button>
+                  <Button
+                    onClick={() => handleDeleteUser(user)}
+                    variant="outlined"
+                    color="error"
+                    size="small"
+                  >
+                    Supprimer
                   </Button>
                 </TableCell>
               </TableRow>
