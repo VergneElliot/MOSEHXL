@@ -13,15 +13,18 @@ export class InMemoryRateLimitStore implements IRateLimitStoreAdapter {
     windowMs: number
   ): Promise<{ count: number; resetTime: number }> {
     const now = Date.now();
-    if (!this.store[key] || now > this.store[key].resetTime) {
-      this.store[key] = {
+    const currentEntry = this.store[key];
+    const entry = !currentEntry || now > currentEntry.resetTime
+      ? {
         count: 1,
         resetTime: now + windowMs,
+      }
+      : {
+        ...currentEntry,
+        count: currentEntry.count + 1,
       };
-    } else {
-      this.store[key].count++;
-    }
-    const entry = this.store[key];
+
+    this.store[key] = entry;
     return { count: entry.count, resetTime: entry.resetTime };
   }
 
