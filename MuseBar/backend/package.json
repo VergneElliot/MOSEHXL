@@ -12,7 +12,7 @@
     "lint": "eslint src --ext .ts,.tsx",
     "type-check": "tsc --noEmit",
     "dev": "ts-node src/app.ts",
-    "build": "tsc && mkdir -p dist/docs && cp src/docs/openapi.yaml dist/docs/",
+    "build": "tsc && mkdir -p dist/docs dist/migrations/files && cp src/docs/openapi.yaml dist/docs/ && cp src/migrations/files/*.sql dist/migrations/files/",
     "start": "node dist/app.js",
     "check:schema-drift": "node scripts/check-legal-schema-drift.js",
     "migration:migrate": "ts-node src/migrations/cli.ts migrate",
