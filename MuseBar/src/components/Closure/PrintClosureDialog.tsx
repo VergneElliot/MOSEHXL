@@ -81,11 +81,6 @@ const PrintClosureDialog: React.FC<PrintClosureDialogProps> = ({
   const [preview, setPreview] = useState<ClosurePreviewData | null>(null);
 
   const hasValidId = useMemo(() => Number.isFinite(bulletinId) && (bulletinId ?? 0) > 0, [bulletinId]);
-  const isPeriodBulletin = useMemo(() => {
-    const type = String(preview?.closure_type ?? '').toUpperCase();
-    return type === 'WEEKLY' || type === 'MONTHLY' || type === 'ANNUAL';
-  }, [preview?.closure_type]);
-
   useEffect(() => {
     if (!open) return;
     if (!hasValidId || bulletinId == null) {
@@ -356,13 +351,11 @@ const PrintClosureDialog: React.FC<PrintClosureDialogProps> = ({
           {exporting ? 'Export...' : 'JSON'}
         </Button>
         <Button onClick={handleExportPdf} variant="outlined" disabled={loadingPreview || exportingPdf || !preview}>
-          {exportingPdf ? 'PDF...' : 'PDF'}
+          {exportingPdf ? 'PDF...' : 'PDF comptable'}
         </Button>
-        {isPeriodBulletin && (
-          <Button onClick={handleExportXlsx} variant="outlined" disabled={loadingPreview || exportingXlsx || !preview}>
-            {exportingXlsx ? 'Excel...' : 'Excel'}
-          </Button>
-        )}
+        <Button onClick={handleExportXlsx} variant="outlined" disabled={loadingPreview || exportingXlsx || !preview}>
+          {exportingXlsx ? 'Excel...' : 'Excel comptable'}
+        </Button>
         <Button
           onClick={handleSendEmail}
           variant="outlined"

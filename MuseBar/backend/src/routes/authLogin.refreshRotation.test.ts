@@ -126,9 +126,15 @@ describe('POST /auth/refresh token rotation', () => {
 
     expect(res.status).toBe(200);
     expect(typeof res.body.token).toBe('string');
+    expect(res.body.expiresIn).toBe('12h');
     expect(res.body.refreshToken).toBeUndefined();
     const setCookieHeader = res.headers['set-cookie'] ?? [];
     expect(setCookieHeader.some((value: string) => value.includes('musebar_refresh_token='))).toBe(true);
+    expect(
+      setCookieHeader.some((value: string) =>
+        value.startsWith('musebar_csrf_token=') && value.includes('Path=/;')
+      )
+    ).toBe(true);
     const decoded = verifyToken(res.body.token);
     expect(decoded.role).toBe('establishment_admin');
     expect(decoded.establishment_id).toBe('11111111-1111-4111-8111-111111111111');
@@ -157,6 +163,21 @@ describe('POST /auth/refresh token rotation', () => {
     );
     expect(mocks.lockClientQuery).toHaveBeenLastCalledWith('COMMIT');
     expect(mocks.lockClientRelease).toHaveBeenCalled();
+  });
+
+  it('accepts duplicate legacy CSRF cookies when the header matches one of them', async () => {
+    const res = await request(app)
+      .post('/auth/refresh')
+      .set('Cookie', [
+        REFRESH_COOKIE,
+        'musebar_csrf_token=legacy-csrf',
+        CSRF_COOKIE,
+      ])
+      .set(CSRF_HEADER)
+      .send({ rememberMe: true });
+
+    expect(res.status).toBe(200);
+    expect(mocks.rotateRefreshToken).toHaveBeenCalledTimes(1);
   });
 
   it('returns 400 when refresh token is missing', async () => {
@@ -230,7 +251,7 @@ describe('POST /auth/refresh token rotation', () => {
   });
 
   it('expires refresh session when absolute cap is reached', async () => {
-    const longAgo = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
+    const longAgo = new Date(Date.now() - 181 * 24 * 60 * 60 * 1000);
     mocks.getRefreshFamilyIssuedAt.mockResolvedValueOnce(longAgo);
 
     const res = await request(app)

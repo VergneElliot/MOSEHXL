@@ -1,5 +1,10 @@
 import PDFDocument from 'pdfkit';
 import type { ClosureBulletinData, ReceiptData } from '../printing/types';
+import {
+  buildClosureAccountingRows,
+  type ClosureExportData,
+  type AccountingRow,
+} from './closureXlsxService';
 
 type PdfDoc = InstanceType<typeof PDFDocument>;
 
@@ -117,7 +122,12 @@ function writeComplianceFooter(doc: PdfDoc, data: ReceiptData): void {
   if (compliance.cash_register_id) doc.text(`Caisse: ${compliance.cash_register_id}`);
   if (compliance.operator_id) doc.text(`Opérateur: ${compliance.operator_id}`);
   const hash = compliance.invoice_hash ?? compliance.receipt_hash;
-  if (hash) doc.text(`Empreinte: ${hash.slice(0, 16)}…`);
+  if (hash) doc.text(`Empreinte: ${hash}`);
+  if (compliance.source_receipt_sequence != null) {
+    doc.text(`Ticket source: ${String(compliance.source_receipt_sequence).padStart(6, '0')}`);
+  }
+  if (compliance.source_receipt_hash) doc.text(`Empreinte ticket source: ${compliance.source_receipt_hash}`);
+  if (compliance.previous_invoice_hash) doc.text(`Empreinte facture précédente: ${compliance.previous_invoice_hash}`);
 }
 
 export async function renderReceiptPdf(data: ReceiptData): Promise<Buffer> {
@@ -154,7 +164,68 @@ function closureTypeLabel(type: string): string {
   return map[type] ?? type;
 }
 
-export async function renderClosureBulletinPdf(data: ClosureBulletinData): Promise<Buffer> {
+function writeClosureAccountingBreakdown(
+  doc: PdfDoc,
+  data: ClosureBulletinData,
+  exportData?: ClosureExportData
+): void {
+  if (!exportData) return;
+  const rows = buildClosureAccountingRows(data, exportData);
+  if (rows.length === 0) return;
+
+  doc.addPage();
+  doc.fontSize(12).font('Helvetica-Bold').text('Détail export comptable');
+  doc.moveDown(0.5);
+  doc.fontSize(7).font('Helvetica');
+  doc.text(
+    'Les lignes ci-dessous sont destinées à l’export comptable. L’affichage et l’impression restent volontairement synthétiques.'
+  );
+  doc.moveDown(0.5);
+
+  const columns: Array<{ title: string; x: number; width: number; value: (row: AccountingRow) => string }> = [
+    { title: 'Type', x: 50, width: 58, value: (row) => row.label },
+    { title: 'Date', x: 108, width: 58, value: (row) => row.date.slice(0, 10) },
+    { title: 'ID', x: 166, width: 42, value: (row) => String(row.sourceId) },
+    { title: 'CA TTC', x: 208, width: 52, value: (row) => formatEuro(row.totalTtc) },
+    { title: 'CB', x: 260, width: 48, value: (row) => formatEuro(row.card) },
+    { title: 'Cash', x: 308, width: 48, value: (row) => formatEuro(row.cash) },
+    { title: 'Soumis TVA10', x: 356, width: 55, value: (row) => formatEuro(row.vat10Ttc) },
+    { title: 'TVA10', x: 411, width: 45, value: (row) => formatEuro(row.vat10Vat) },
+    { title: 'Soumis TVA20', x: 456, width: 55, value: (row) => formatEuro(row.vat20Ttc) },
+    { title: 'TVA20', x: 511, width: 45, value: (row) => formatEuro(row.vat20Vat) },
+  ];
+
+  const drawHeader = () => {
+    const y = doc.y;
+    doc.font('Helvetica-Bold');
+    for (const column of columns) {
+      doc.text(column.title, column.x, y, { width: column.width, continued: false });
+    }
+    doc.y = y + 18;
+    doc.moveDown(0.4);
+    doc.font('Helvetica');
+  };
+
+  drawHeader();
+  for (const row of rows) {
+    if (doc.y > 760) {
+      doc.addPage();
+      drawHeader();
+    }
+    const y = doc.y;
+    if (row.label.startsWith('TOTAL')) doc.font('Helvetica-Bold');
+    for (const column of columns) {
+      doc.text(column.value(row), column.x, y, { width: column.width, continued: false });
+    }
+    doc.font('Helvetica');
+    doc.y = y + 18;
+  }
+}
+
+export async function renderClosureBulletinPdf(
+  data: ClosureBulletinData,
+  exportData?: ClosureExportData
+): Promise<Buffer> {
   return renderToBuffer((doc) => {
     writeBusinessHeader(doc, data, 'BULLETIN DE CLÔTURE');
     doc.fontSize(10).font('Helvetica');
@@ -205,6 +276,7 @@ export async function renderClosureBulletinPdf(data: ClosureBulletinData): Promi
     if (data.compliance_info?.cash_register_id) {
       doc.text(`Caisse: ${data.compliance_info.cash_register_id}`);
     }
+    writeClosureAccountingBreakdown(doc, data, exportData);
     doc.moveDown();
     doc.text('Document généré par MOSEHXL — bulletin de clôture.', { align: 'center' });
   });

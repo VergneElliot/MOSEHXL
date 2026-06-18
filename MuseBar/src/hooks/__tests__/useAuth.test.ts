@@ -95,4 +95,20 @@ describe('useAuth refresh rememberMe behavior', () => {
       rememberMe: true,
     });
   });
+
+  it('coalesces concurrent refresh calls into one request', async () => {
+    localStorage.setItem('remember_me', 'true');
+    const { result } = renderHook(() => useAuth());
+
+    await act(async () => {
+      await Promise.all([
+        result.current.refreshToken(),
+        result.current.refreshToken(),
+        result.current.refreshToken(),
+      ]);
+    });
+
+    expect(mockPost).toHaveBeenCalledTimes(1);
+    expect(result.current.token).toBe('refreshed-token');
+  });
 });

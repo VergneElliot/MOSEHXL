@@ -49,6 +49,9 @@ export interface ReceiptData {
   compliance_info?: {
     receipt_hash?: string;
     invoice_hash?: string;
+    previous_invoice_hash?: string;
+    source_receipt_hash?: string;
+    source_receipt_sequence?: number;
     cash_register_id?: string;
     operator_id?: string;
   };

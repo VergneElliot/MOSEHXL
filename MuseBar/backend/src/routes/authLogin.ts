@@ -35,7 +35,10 @@ const MAX_SUPPORT_IMPERSONATION_MINUTES = 120;
 const MAX_FAILED_LOGIN_ATTEMPTS = Number(process.env.AUTH_LOCKOUT_MAX_FAILED_ATTEMPTS ?? 5);
 const BASE_LOCKOUT_MINUTES = Number(process.env.AUTH_LOCKOUT_BASE_MINUTES ?? 15);
 const MAX_LOCKOUT_MINUTES = Number(process.env.AUTH_LOCKOUT_MAX_MINUTES ?? 240);
-const MAX_REFRESH_SESSION_ABSOLUTE_DAYS = Number(process.env.AUTH_REFRESH_ABSOLUTE_MAX_DAYS ?? 30);
+const ACCESS_TOKEN_EXPIRES_IN = process.env.AUTH_ACCESS_TOKEN_EXPIRES_IN || '12h';
+const REFRESH_SESSION_DAYS = Number(process.env.AUTH_REFRESH_SESSION_DAYS ?? 1);
+const REMEMBER_REFRESH_SESSION_DAYS = Number(process.env.AUTH_REFRESH_REMEMBER_DAYS ?? 30);
+const MAX_REFRESH_SESSION_ABSOLUTE_DAYS = Number(process.env.AUTH_REFRESH_ABSOLUTE_MAX_DAYS ?? 180);
 const CLIENT_SESSION_COOKIE_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;
 const authRateLimitBase = process.env.NODE_ENV === 'development' ? 5 : 1;
 const authLimiterPool = process.env.NODE_ENV === 'test' ? undefined : pool;
@@ -81,9 +84,11 @@ function computeRefreshExpiry(
   sessionStartedAt?: Date
 ): { expiresAt: Date; refreshExpiresIn: string } {
   const nowMs = Date.now();
-  const days = rememberMe ? 7 : 1;
+  const days = rememberMe
+    ? toPositiveFiniteNumber(REMEMBER_REFRESH_SESSION_DAYS, 30)
+    : toPositiveFiniteNumber(REFRESH_SESSION_DAYS, 1);
   const rollingExpiryMs = nowMs + days * 24 * 60 * 60 * 1000;
-  const absoluteCapDays = toPositiveFiniteNumber(MAX_REFRESH_SESSION_ABSOLUTE_DAYS, 30);
+  const absoluteCapDays = toPositiveFiniteNumber(MAX_REFRESH_SESSION_ABSOLUTE_DAYS, 180);
   const sessionStartMs = sessionStartedAt?.getTime() ?? nowMs;
   const absoluteExpiryMs = sessionStartMs + absoluteCapDays * 24 * 60 * 60 * 1000;
   const effectiveExpiryMs = Math.min(rollingExpiryMs, absoluteExpiryMs);
@@ -118,22 +123,22 @@ function getClientSessionCookieName(): string {
 }
 
 function getCookieValue(req: express.Request, cookieName: string): string | null {
+  return getCookieValues(req, cookieName)[0] ?? null;
+}
+
+function getCookieValues(req: express.Request, cookieName: string): string[] {
   const rawCookieHeader = req.headers.cookie;
   if (typeof rawCookieHeader !== 'string' || rawCookieHeader.length === 0) {
-    return null;
+    return [];
   }
 
-  const cookiePair = rawCookieHeader
+  return rawCookieHeader
     .split(';')
     .map((part) => part.trim())
-    .find((part) => part.startsWith(`${cookieName}=`));
-
-  if (!cookiePair) {
-    return null;
-  }
-
-  const value = cookiePair.slice(cookieName.length + 1).trim();
-  return value.length > 0 ? decodeURIComponent(value) : null;
+    .filter((part) => part.startsWith(`${cookieName}=`))
+    .map((cookiePair) => cookiePair.slice(cookieName.length + 1).trim())
+    .filter((value) => value.length > 0)
+    .map((value) => decodeURIComponent(value));
 }
 
 function normalizeClientSessionId(raw: unknown): string | null {
@@ -365,7 +370,10 @@ function getRefreshTokenFromRequest(
 }
 
 function computeRefreshCookieMaxAgeMs(rememberMe: boolean, expiresAt?: Date): number {
-  const defaultMaxAgeMs = rememberMe ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+  const days = rememberMe
+    ? toPositiveFiniteNumber(REMEMBER_REFRESH_SESSION_DAYS, 30)
+    : toPositiveFiniteNumber(REFRESH_SESSION_DAYS, 1);
+  const defaultMaxAgeMs = days * 24 * 60 * 60 * 1000;
   if (!expiresAt) {
     return defaultMaxAgeMs;
   }
@@ -397,11 +405,17 @@ function setCsrfTokenCookie(
   expiresAt?: Date
 ): void {
   const maxAgeMs = computeRefreshCookieMaxAgeMs(rememberMe, expiresAt);
-  res.cookie(getCsrfCookieName(), csrfToken, {
+  res.clearCookie(getCsrfCookieName(), {
     httpOnly: false,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
     path: '/api/auth',
+  });
+  res.cookie(getCsrfCookieName(), csrfToken, {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/',
     maxAge: maxAgeMs,
   });
 }
@@ -420,20 +434,30 @@ function clearCsrfTokenCookie(res: express.Response): void {
     httpOnly: false,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
+    path: '/',
+  });
+  // Clear legacy cookies created before the frontend needed to read the CSRF token from app routes.
+  res.clearCookie(getCsrfCookieName(), {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
     path: '/api/auth',
   });
 }
 
 function validateRefreshCsrf(req: express.Request): void {
-  const csrfFromCookie = getCookieValue(req, getCsrfCookieName());
+  const csrfCookieValues = getCookieValues(req, getCsrfCookieName());
   const csrfFromHeader = req.header('x-csrf-token');
-  if (!csrfFromCookie || !csrfFromHeader) {
+  if (csrfCookieValues.length === 0 || !csrfFromHeader) {
     throw new ValidationError('CSRF token is required');
   }
 
-  const cookieBuffer = Buffer.from(csrfFromCookie);
   const headerBuffer = Buffer.from(csrfFromHeader);
-  if (cookieBuffer.length !== headerBuffer.length || !crypto.timingSafeEqual(cookieBuffer, headerBuffer)) {
+  const hasMatchingCookie = csrfCookieValues.some((csrfFromCookie) => {
+    const cookieBuffer = Buffer.from(csrfFromCookie);
+    return cookieBuffer.length === headerBuffer.length && crypto.timingSafeEqual(cookieBuffer, headerBuffer);
+  });
+  if (!hasMatchingCookie) {
     throw new AuthenticationError('Invalid CSRF token');
   }
 }
@@ -646,7 +670,8 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
 
     const token = generateToken(
       { id: user.id, email: user.email, role, establishment_id },
-      !!rememberMe
+      !!rememberMe,
+      ACCESS_TOKEN_EXPIRES_IN as Parameters<typeof generateToken>[2]
     );
     const refreshToken = crypto.randomBytes(32).toString('hex');
     const csrfToken = crypto.randomBytes(32).toString('hex');
@@ -683,7 +708,7 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
         establishment_id,
         permissions: [],
       },
-      expiresIn: '15m',
+      expiresIn: ACCESS_TOKEN_EXPIRES_IN,
       refreshExpiresIn,
     });
   } catch (error) {
@@ -1026,7 +1051,8 @@ router.post('/refresh', refreshRateLimit, asyncHandler(async (req, res) => {
 
     const token = generateToken(
       { id: userId, email: userRow.email, role, establishment_id },
-      !!rememberMe
+      !!rememberMe,
+      ACCESS_TOKEN_EXPIRES_IN as Parameters<typeof generateToken>[2]
     );
     const nextRefreshToken = crypto.randomBytes(32).toString('hex');
     const nextCsrfToken = crypto.randomBytes(32).toString('hex');
@@ -1060,7 +1086,7 @@ router.post('/refresh', refreshRateLimit, asyncHandler(async (req, res) => {
     setCsrfTokenCookie(res, nextCsrfToken, !!rememberMe, expiresAt);
     return res.json({
       token,
-      expiresIn: '15m',
+      expiresIn: ACCESS_TOKEN_EXPIRES_IN,
       refreshExpiresIn,
     });
   } catch (error) {
@@ -1318,7 +1344,8 @@ router.post('/support/impersonation/stop', requireAuth, requireAdmin, asyncHandl
         role: 'system_admin',
         establishment_id: null,
       },
-      false
+      false,
+      ACCESS_TOKEN_EXPIRES_IN as Parameters<typeof generateToken>[2]
     );
 
     await logAuditOrThrow({
@@ -1345,7 +1372,7 @@ router.post('/support/impersonation/stop', requireAuth, requireAdmin, asyncHandl
     return res.json({
       message: 'Support impersonation ended',
       token: resetToken,
-      expiresIn: '15m',
+      expiresIn: ACCESS_TOKEN_EXPIRES_IN,
     });
   } catch (error) {
     if (error instanceof AppError) {

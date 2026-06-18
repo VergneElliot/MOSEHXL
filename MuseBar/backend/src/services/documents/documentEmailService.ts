@@ -6,7 +6,11 @@ import {
   renderClosureBulletinPdf,
   renderReceiptOrInvoicePdf,
 } from './documentPdfService';
-import { buildClosureXlsxAttachment } from './closureXlsxService';
+import {
+  buildClosureExportData,
+  buildClosurePdfFilename,
+  buildClosureXlsxAttachment,
+} from './closureXlsxService';
 import type { Pool } from 'pg';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -104,24 +108,23 @@ export async function emailClosureBulletinDocument(
   to: string
 ): Promise<{ trackingId: string; message: string; attachments: string[] }> {
   const recipient = validateRecipientEmail(to);
-  const pdf = await renderClosureBulletinPdf(data);
+  const exportData = await buildClosureExportData(pool, establishmentId, data);
+  const pdf = await renderClosureBulletinPdf(data, exportData);
   const attachments = [
-    toBase64Attachment(pdf, `closure-bulletin-${data.id}.pdf`, 'application/pdf'),
+    toBase64Attachment(pdf, buildClosurePdfFilename(data), 'application/pdf'),
   ];
 
-  const xlsxAttachment = await buildClosureXlsxAttachment(pool, establishmentId, data);
-  if (xlsxAttachment) {
-    attachments.push(
-      toBase64Attachment(xlsxAttachment.buffer, xlsxAttachment.filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    );
-  }
+  const xlsxAttachment = await buildClosureXlsxAttachment(pool, establishmentId, data, exportData);
+  attachments.push(
+    toBase64Attachment(xlsxAttachment.buffer, xlsxAttachment.filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  );
 
   const emailService = getEmailService();
   const trackingId = await emailService.sendEmail({
     to: recipient,
     subject: bulletinEmailSubject(data),
     html: bulletinEmailHtml(data),
-    text: `Bulletin de clôture ${data.closure_type} joint en PDF${xlsxAttachment ? ' et Excel' : ''}.`,
+    text: `Bulletin de clôture ${data.closure_type} joint en PDF et Excel.`,
     attachments,
     trackingId: `doc-closure-${data.id}-${Date.now()}`,
   });

@@ -24,6 +24,14 @@ interface AuthActions {
   refreshToken: () => Promise<void>;
 }
 
+type RefreshResponse = {
+  token: string;
+  expiresIn?: string;
+  refreshExpiresIn?: string;
+};
+
+let inFlightRefresh: Promise<RefreshResponse> | null = null;
+
 export const useAuth = (): AuthState & AuthActions => {
   const REFRESH_BOOTSTRAP_HINT_KEY = 'auth_refresh_bootstrap_hint';
   const [token, setToken] = useState<string | null>(null);
@@ -85,16 +93,17 @@ export const useAuth = (): AuthState & AuthActions => {
 
       const rememberMeForRefresh =
         rememberMe || localStorage.getItem('remember_me') === 'true';
-      const response = await apiService.post<{
-        token: string;
-        expiresIn?: string;
-        refreshExpiresIn?: string;
-      }>(
-        '/auth/refresh',
-        { rememberMe: rememberMeForRefresh }
-      );
-      const newToken = response.data.token;
-      const refreshedExpiresIn = response.data.expiresIn || '15m';
+      if (!inFlightRefresh) {
+        inFlightRefresh = apiService
+          .post<RefreshResponse>('/auth/refresh', { rememberMe: rememberMeForRefresh })
+          .then((response) => response.data)
+          .finally(() => {
+            inFlightRefresh = null;
+          });
+      }
+      const response = await inFlightRefresh;
+      const newToken = response.token;
+      const refreshedExpiresIn = response.expiresIn || '15m';
       
       setToken(newToken);
       setRememberMe(rememberMeForRefresh);

@@ -19,8 +19,9 @@ const mocks = vi.hoisted(() => ({
   logSoftwareEventBestEffort: vi.fn(),
   renderReceiptOrInvoicePdf: vi.fn(),
   renderClosureBulletinPdf: vi.fn(),
+  buildClosureExportData: vi.fn(),
+  buildClosurePdfFilename: vi.fn(),
   buildClosureXlsxAttachment: vi.fn(),
-  isPeriodClosureBulletin: vi.fn(),
   emailReceiptDocument: vi.fn(),
   emailClosureBulletinDocument: vi.fn(),
   validateRecipientEmail: vi.fn((email: unknown) => {
@@ -103,8 +104,9 @@ vi.mock('../services/documents/documentPdfService', () => ({
 }));
 
 vi.mock('../services/documents/closureXlsxService', () => ({
+  buildClosureExportData: mocks.buildClosureExportData,
+  buildClosurePdfFilename: mocks.buildClosurePdfFilename,
   buildClosureXlsxAttachment: mocks.buildClosureXlsxAttachment,
-  isPeriodClosureBulletin: mocks.isPeriodClosureBulletin,
 }));
 
 vi.mock('../services/documents/documentEmailService', () => ({
@@ -135,6 +137,11 @@ describe('printing routes', () => {
     mocks.buildClosureBulletinData.mockReset();
     mocks.logPrintingHistory.mockReset();
     mocks.logSoftwareEventBestEffort.mockReset();
+    mocks.renderReceiptOrInvoicePdf.mockReset();
+    mocks.renderClosureBulletinPdf.mockReset();
+    mocks.buildClosureExportData.mockReset();
+    mocks.buildClosurePdfFilename.mockReset();
+    mocks.buildClosureXlsxAttachment.mockReset();
 
     mocks.managerGetService.mockResolvedValue({
       checkPrinterStatus: vi.fn().mockResolvedValue({ connected: true }),
@@ -692,20 +699,20 @@ describe('printing routes', () => {
     expect(String(res.body.error?.message ?? '')).toContain('Invoice compliance blocked');
   });
 
-  it('exports closure XLSX for period bulletins', async () => {
+  it('exports closure XLSX with accountant breakdown data', async () => {
     mocks.buildClosureBulletinData.mockResolvedValue({
       id: 5,
-      closure_type: 'MONTHLY',
+      closure_type: 'DAILY',
       period_start: '2026-05-01T00:00:00.000Z',
       period_end: '2026-05-31T23:59:59.000Z',
       total_amount: 100,
       total_vat: 20,
       business_info: { name: 'Muse', address: '', phone: '', email: '' },
     });
-    mocks.isPeriodClosureBulletin.mockReturnValue(true);
+    mocks.buildClosureExportData.mockResolvedValue({ kind: 'daily', orderRows: [] });
     mocks.buildClosureXlsxAttachment.mockResolvedValue({
       buffer: Buffer.from('xlsx'),
-      filename: 'closure-recap-5.xlsx',
+      filename: 'bilan-cloture-daily-2026-05-01-2026-05-31.xlsx',
     });
 
     const res = await request(app)
@@ -714,5 +721,12 @@ describe('printing routes', () => {
 
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toContain('spreadsheetml');
+    expect(mocks.buildClosureExportData).toHaveBeenCalled();
+    expect(mocks.buildClosureXlsxAttachment).toHaveBeenCalledWith(
+      expect.anything(),
+      'est-1',
+      expect.objectContaining({ id: 5 }),
+      { kind: 'daily', orderRows: [] }
+    );
   });
 });
