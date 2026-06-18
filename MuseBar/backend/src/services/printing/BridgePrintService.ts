@@ -41,7 +41,11 @@ export class BridgePrintService extends BasePrintingService {
 
   async printReceipt(data: ReceiptData): Promise<PrintResult> {
     const documentType =
-      data.order_id === 99999 && data.sequence_number === 99999 ? 'test' : 'receipt';
+      data.order_id === 99999 && data.sequence_number === 99999
+        ? 'test'
+        : data.document_kind === 'invoice'
+          ? 'invoice'
+          : 'receipt';
     return this.enqueueReceipt(data, documentType);
   }
 
@@ -83,12 +87,39 @@ export class BridgePrintService extends BasePrintingService {
     };
   }
 
-  async printClosureBulletin(_data: ClosureBulletinData): Promise<PrintResult> {
-    return {
-      success: false,
-      message: 'Closure bulletin printing is not enabled for MuseBar Bridge V1',
-      provider: 'bridge',
-    };
+  async printClosureBulletin(data: ClosureBulletinData): Promise<PrintResult> {
+    try {
+      const payload = this.generateClosureBulletinContent(data);
+      const job = await createBridgePrintJob(this.pool, {
+        establishmentId: this.establishmentId,
+        documentType: 'closure_bulletin',
+        payloadFormat: 'escpos',
+        payloadBase64: Buffer.from(payload, 'latin1').toString('base64'),
+        metadata: {
+          bulletin_id: data.id,
+          closure_type: data.closure_type,
+          period_start: data.period_start,
+          period_end: data.period_end,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Closure bulletin queued for MuseBar Bridge',
+        printJobId: job.id,
+        provider: 'bridge',
+        metadata: {
+          document_type: 'closure_bulletin',
+          queue_status: job.status,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Bridge closure queue failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        provider: 'bridge',
+      };
+    }
   }
 
   async checkPrinterStatus(_printerId?: string): Promise<PrinterStatus> {
@@ -109,7 +140,7 @@ export class BridgePrintService extends BasePrintingService {
       id: 'bridge-default',
       name: this.printerLabel,
       description: `Local bridge queue (${status.pending} pending)`,
-      capabilities: ['thermal', 'receipt', 'bridge', 'network-escpos'],
+      capabilities: ['thermal', 'receipt', 'invoice', 'closure', 'bridge', 'network-escpos'],
       isDefault: true,
       status: status.lastError ? `Last error: ${status.lastError}` : 'Configured',
       provider: 'bridge',
@@ -118,7 +149,7 @@ export class BridgePrintService extends BasePrintingService {
 
   private async enqueueReceipt(
     data: ReceiptData,
-    documentType: Extract<BridgePrintDocumentType, 'test' | 'receipt'>
+    documentType: Extract<BridgePrintDocumentType, 'test' | 'receipt' | 'invoice'>
   ): Promise<PrintResult> {
     try {
       const payload = this.generateReceiptContent(data);
@@ -131,6 +162,8 @@ export class BridgePrintService extends BasePrintingService {
           order_id: data.order_id,
           sequence_number: data.sequence_number,
           document_kind: data.document_kind ?? 'ticket',
+          document_number: data.document_number,
+          receipt_type: data.receipt_type,
         },
       });
 
