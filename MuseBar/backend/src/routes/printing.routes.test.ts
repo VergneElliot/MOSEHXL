@@ -9,6 +9,11 @@ const mocks = vi.hoisted(() => ({
   epsonHandler: vi.fn(),
   listPrintingConfigurations: vi.fn(),
   savePrintingConfiguration: vi.fn(),
+  getActiveBridgeConfiguration: vi.fn(),
+  claimNextBridgePrintJob: vi.fn(),
+  ackBridgePrintJob: vi.fn(),
+  failBridgePrintJob: vi.fn(),
+  getBridgeQueueStatus: vi.fn(),
   managerGetService: vi.fn(),
   managerClearService: vi.fn(),
   buildTestReceiptData: vi.fn(),
@@ -65,6 +70,8 @@ vi.mock('../middleware/auth', () => ({
 vi.mock('../utils/logger', () => ({
   getLogger: () => ({
     error: mocks.loggerError,
+    info: vi.fn(),
+    warn: vi.fn(),
   }),
 }));
 
@@ -73,10 +80,18 @@ vi.mock('../printing/epsonPollHandler', () => ({
 }));
 
 vi.mock('../printing/printingConfigRepo', () => ({
-  ALLOWED_PRINT_PROVIDERS: ['epson-server-direct', 'digital'],
+  ALLOWED_PRINT_PROVIDERS: ['epson-server-direct', 'bridge', 'digital'],
   listPrintingConfigurations: mocks.listPrintingConfigurations,
   savePrintingConfiguration: mocks.savePrintingConfiguration,
+  getActiveBridgeConfiguration: mocks.getActiveBridgeConfiguration,
   parseConfigCell: vi.fn(),
+}));
+
+vi.mock('../printing/bridgePrintJobRepo', () => ({
+  claimNextBridgePrintJob: mocks.claimNextBridgePrintJob,
+  ackBridgePrintJob: mocks.ackBridgePrintJob,
+  failBridgePrintJob: mocks.failBridgePrintJob,
+  getBridgeQueueStatus: mocks.getBridgeQueueStatus,
 }));
 
 vi.mock('../printing/printDataRepo', () => ({
@@ -129,6 +144,11 @@ describe('printing routes', () => {
     mocks.epsonHandler.mockReset();
     mocks.listPrintingConfigurations.mockReset();
     mocks.savePrintingConfiguration.mockReset();
+    mocks.getActiveBridgeConfiguration.mockReset();
+    mocks.claimNextBridgePrintJob.mockReset();
+    mocks.ackBridgePrintJob.mockReset();
+    mocks.failBridgePrintJob.mockReset();
+    mocks.getBridgeQueueStatus.mockReset();
     mocks.managerGetService.mockReset();
     mocks.managerClearService.mockReset();
     mocks.buildTestReceiptData.mockReset();
@@ -183,6 +203,98 @@ describe('printing routes', () => {
     expect(res.status).toBe(500);
     expect(res.body?.error?.message).toBe('Internal error');
     expect(mocks.loggerError).toHaveBeenCalled();
+  });
+
+  it('returns null bridge job when the local bridge queue is empty', async () => {
+    mocks.getActiveBridgeConfiguration.mockResolvedValue({ bridgeKey: 'bridge-key' });
+    mocks.claimNextBridgePrintJob.mockResolvedValue(null);
+
+    const res = await request(app)
+      .get('/printing/bridge/poll?establishment_id=est-1')
+      .set('x-bridge-key', 'bridge-key');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ job: null });
+    expect(mocks.claimNextBridgePrintJob).toHaveBeenCalledWith(expect.anything(), 'est-1');
+  });
+
+  it('returns claimed bridge job payload for valid bridge key', async () => {
+    mocks.getActiveBridgeConfiguration.mockResolvedValue({ bridgeKey: 'bridge-key' });
+    mocks.claimNextBridgePrintJob.mockResolvedValue({
+      id: 'job-1',
+      document_type: 'receipt',
+      payload_format: 'escpos',
+      payload_base64: 'abc=',
+      attempt_count: 1,
+      metadata: { order_id: 7 },
+    });
+
+    const res = await request(app)
+      .get('/printing/bridge/poll?establishment_id=est-1')
+      .set('x-bridge-key', 'bridge-key');
+
+    expect(res.status).toBe(200);
+    expect(res.body.job).toEqual({
+      id: 'job-1',
+      document_type: 'receipt',
+      payload_format: 'escpos',
+      payload_base64: 'abc=',
+      attempt_count: 1,
+      metadata: { order_id: 7 },
+    });
+  });
+
+  it('rejects bridge poll with invalid bridge key', async () => {
+    mocks.getActiveBridgeConfiguration.mockResolvedValue({ bridgeKey: 'bridge-key' });
+
+    const res = await request(app)
+      .get('/printing/bridge/poll?establishment_id=est-1')
+      .set('x-bridge-key', 'wrong-key');
+
+    expect(res.status).toBe(401);
+    expect(mocks.claimNextBridgePrintJob).not.toHaveBeenCalled();
+  });
+
+  it('acks and fails bridge jobs with establishment-scoped bridge auth', async () => {
+    mocks.getActiveBridgeConfiguration.mockResolvedValue({ bridgeKey: 'bridge-key' });
+    mocks.ackBridgePrintJob.mockResolvedValue({ id: 'job-2', status: 'printed', document_type: 'receipt' });
+    mocks.failBridgePrintJob.mockResolvedValue({ id: 'job-3', status: 'pending', document_type: 'receipt' });
+
+    const ack = await request(app)
+      .post('/printing/bridge/jobs/job-2/ack?establishment_id=est-1')
+      .set('x-bridge-key', 'bridge-key');
+    const fail = await request(app)
+      .post('/printing/bridge/jobs/job-3/fail?establishment_id=est-1')
+      .set('x-bridge-key', 'bridge-key')
+      .send({ error: 'printer offline' });
+
+    expect(ack.status).toBe(200);
+    expect(ack.body).toEqual({ success: true, job_id: 'job-2', status: 'printed' });
+    expect(fail.status).toBe(200);
+    expect(fail.body).toEqual({ success: true, job_id: 'job-3', status: 'pending' });
+    expect(mocks.ackBridgePrintJob).toHaveBeenCalledWith(expect.anything(), 'est-1', 'job-2');
+    expect(mocks.failBridgePrintJob).toHaveBeenCalledWith(expect.anything(), 'est-1', 'job-3', 'printer offline');
+  });
+
+  it('returns bridge queue status for a valid local bridge', async () => {
+    mocks.getActiveBridgeConfiguration.mockResolvedValue({ bridgeKey: 'bridge-key' });
+    mocks.getBridgeQueueStatus.mockResolvedValue({
+      pending: 1,
+      claimed: 0,
+      printed: 2,
+      failed: 0,
+      expired: 0,
+      lastPrintedAt: null,
+      lastFailedAt: null,
+      lastError: null,
+    });
+
+    const res = await request(app)
+      .get('/printing/bridge/status?establishment_id=est-1')
+      .set('x-bridge-key', 'bridge-key');
+
+    expect(res.status).toBe(200);
+    expect(res.body.status.pending).toBe(1);
   });
 
   it('returns status payload for authenticated establishment user', async () => {

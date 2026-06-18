@@ -23,6 +23,7 @@ vi.mock('crypto', async () => {
 });
 
 import {
+  getActiveBridgeConfiguration,
   listPrintingConfigurations,
   parseConfigCell,
   savePrintingConfiguration,
@@ -65,6 +66,31 @@ describe('printingConfigRepo', () => {
     expect(rows[0].epson_server_direct_poll_url).toContain('/api/printing/epson/poll?establishment_id=est-1');
   });
 
+  it('enriches bridge configurations with local bridge env snippet', async () => {
+    process.env.APP_URL = 'https://mosehxl.com';
+    const pool = {
+      query: vi.fn().mockResolvedValue({
+        rows: [
+          {
+            id: 2,
+            provider: 'bridge',
+            config: JSON.stringify({ bridgeKey: 'bridge-secret', printerLabel: 'Caisse' }),
+          },
+        ],
+      }),
+    } as unknown as Pool;
+
+    const rows = await listPrintingConfigurations(pool, 'est-bridge');
+
+    expect(rows[0].bridge_key_header).toBe('x-bridge-key');
+    expect(rows[0].bridge_poll_url).toBe(
+      'https://mosehxl.com/api/printing/bridge/poll?establishment_id=est-bridge'
+    );
+    expect(rows[0].bridge_env).toContain('MUSEBAR_API_URL=https://mosehxl.com');
+    expect(rows[0].bridge_env).toContain('ESTABLISHMENT_ID=est-bridge');
+    expect(rows[0].bridge_env).toContain('BRIDGE_KEY=bridge-secret');
+  });
+
   it('saves configuration with tenant-scoped update/insert and auto-generates Epson poll key', async () => {
     mocks.randomUUID.mockReturnValue('generated-poll-key');
     const query = vi
@@ -101,6 +127,53 @@ describe('printingConfigRepo', () => {
     );
     expect(mergedConfig).toEqual({ pollKey: 'generated-poll-key' });
     expect(configuration.config).toEqual({ pollKey: 'generated-poll-key' });
+  });
+
+  it('auto-generates bridge key when saving bridge configuration', async () => {
+    mocks.randomUUID.mockReturnValue('generated-bridge-key');
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 34,
+            provider: 'bridge',
+            config: JSON.stringify({ bridgeKey: 'generated-bridge-key' }),
+            is_active: true,
+          },
+        ],
+      });
+    const pool = { query } as unknown as Pool;
+
+    const { configuration, mergedConfig } = await savePrintingConfiguration(pool, 'est-4', 'bridge', {});
+
+    expect(query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('INSERT INTO printing_configurations'),
+      ['est-4', 'bridge', JSON.stringify({ bridgeKey: 'generated-bridge-key' })]
+    );
+    expect(mergedConfig).toEqual({ bridgeKey: 'generated-bridge-key' });
+    expect(configuration.config).toEqual({ bridgeKey: 'generated-bridge-key' });
+  });
+
+  it('returns active bridge config only for bridge provider', async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // set tenant
+      .mockResolvedValueOnce({
+        rows: [{ provider: 'bridge', config: JSON.stringify({ bridgeKey: 'secret' }) }],
+      })
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+    const release = vi.fn();
+    const pool = {
+      connect: vi.fn().mockResolvedValue({ query, release }),
+    } as unknown as Pool;
+
+    await expect(getActiveBridgeConfiguration(pool, 'est-5')).resolves.toEqual({ bridgeKey: 'secret' });
+    expect(query).toHaveBeenCalledWith("SELECT set_config('app.establishment_id', $1, true)", ['est-5']);
+    expect(release).toHaveBeenCalled();
   });
 
   it('rejects unknown printing providers with statusCode 400', async () => {

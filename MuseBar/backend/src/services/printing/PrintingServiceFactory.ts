@@ -1,12 +1,19 @@
+import type { Pool } from 'pg';
+
 import { IPrintingService, PrintingConfig } from './types';
 import { EpsonServerDirectPrintService } from './EpsonServerDirectPrintService';
 import { NetworkEscPosPrintService } from './NetworkEscPosPrintService';
+import { BridgePrintService } from './BridgePrintService';
 import { DigitalReceiptService } from '../receipts/DigitalReceiptService';
+
+export interface PrintingServiceFactoryDeps {
+  pool?: Pool;
+}
 
 export class PrintingServiceFactory {
   private static instances: Map<string, IPrintingService> = new Map();
 
-  static async create(config: PrintingConfig): Promise<IPrintingService> {
+  static async create(config: PrintingConfig, deps: PrintingServiceFactoryDeps = {}): Promise<IPrintingService> {
     const configKey = JSON.stringify(config);
 
     if (this.instances.has(configKey)) {
@@ -21,6 +28,12 @@ export class PrintingServiceFactory {
         break;
       case 'network-escpos':
         service = new NetworkEscPosPrintService(config);
+        break;
+      case 'bridge':
+        if (!deps.pool) {
+          throw new Error('Pool dependency is required for bridge printing');
+        }
+        service = new BridgePrintService(config, deps.pool);
         break;
       case 'digital':
         service = new DigitalReceiptService(config);

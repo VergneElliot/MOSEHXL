@@ -23,7 +23,6 @@ import {
   Print as PrintIcon,
   Check as CheckIcon,
   Cloud as CloudIcon,
-  Router as RouterIcon,
 } from '@mui/icons-material';
 import { apiConfig } from '../../config/api';
 import { apiCore } from '../../services/api';
@@ -42,6 +41,9 @@ interface PrintingConfig {
   provider: string;
   config: Record<string, unknown>;
   is_active: boolean;
+  bridge_env?: string | null;
+  bridge_poll_url?: string | null;
+  bridge_key_header?: string | null;
 }
 
 interface ProviderField {
@@ -71,6 +73,12 @@ interface PrintingConfigurationsResponse {
 interface PrintingTestResponse {
   success?: boolean;
   message?: string;
+  printJobId?: string;
+}
+
+interface PrintingConfigurationSaveResponse {
+  configuration?: PrintingConfig;
+  message?: string;
 }
 
 interface PrintersResponse {
@@ -78,14 +86,12 @@ interface PrintersResponse {
 }
 
 const providerInfo: Record<string, ProviderInfo> = {
-  'network-escpos': {
-    name: 'Network receipt printer (LAN)',
-    icon: <RouterIcon />,
+  bridge: {
+    name: 'MuseBar Bridge',
+    icon: <CloudIcon />,
     description:
-      'Epson TM-m30II and similar: send ESC/POS directly to the printer IP on port 9100. The MuseBar backend must run on the same local network as the printer.',
+      'Recommended for cloud production: a small local bridge polls MuseBar Cloud and prints to your local Epson TM-m30II over the bar network.',
     fields: [
-      { name: 'printerHost', label: 'Printer IP address', type: 'text', required: true },
-      { name: 'printerPort', label: 'Port (default 9100)', type: 'number', required: false, default: 9100 },
       { name: 'printerLabel', label: 'Printer display name (optional)', type: 'text', required: false },
     ],
   },
@@ -100,7 +106,7 @@ const providerInfo: Record<string, ProviderInfo> = {
 
 export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = false }) => {
   const [activeStep, setActiveStep] = useState(0);
-  const [selectedProvider, setSelectedProvider] = useState<string>('network-escpos');
+  const [selectedProvider, setSelectedProvider] = useState<string>('bridge');
   const [config, setConfig] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -188,6 +194,12 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
         throw new Error('Failed to save configuration');
       }
 
+      const saved = (await saveResponse.json()) as PrintingConfigurationSaveResponse;
+      if (saved.configuration) {
+        setCurrentConfig(saved.configuration);
+        setConfig(saved.configuration.config);
+      }
+
       // Then test print
       const testResponse = await fetch(apiConfig.getEndpoint('/api/printing/test'), {
         method: 'POST',
@@ -201,7 +213,11 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
       const result = (await testResponse.json()) as PrintingTestResponse;
       
       if (result.success) {
-        setSuccess('Test print successful!');
+        setSuccess(
+          selectedProvider === 'bridge'
+            ? `Test print queued for MuseBar Bridge${result.printJobId ? ` (${result.printJobId})` : ''}. Start the local bridge to print it.`
+            : 'Test print successful!'
+        );
         // Load printers if available
         loadPrinters();
       } else {
@@ -256,6 +272,12 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
         throw new Error('Failed to save configuration');
       }
 
+      const saved = (await response.json()) as PrintingConfigurationSaveResponse;
+      if (saved.configuration) {
+        setCurrentConfig(saved.configuration);
+        setConfig(saved.configuration.config);
+      }
+
       setSuccess('Configuration saved successfully!');
       setActiveStep(3);
       
@@ -267,6 +289,29 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
     } finally {
       setLoading(false);
     }
+  };
+
+  const renderBridgeEnvSnippet = () => {
+    if (selectedProvider !== 'bridge' || !currentConfig?.bridge_env) return null;
+
+    return (
+      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+          Local bridge .env
+        </Typography>
+        <Typography variant="body2" sx={{ mb: 1 }}>
+          Copy this into <code>MuseBar/bridge/.env</code> on the cashier PC, then update
+          <code> PRINTER_HOST</code> if the printer IP changed.
+        </Typography>
+        <TextField
+          fullWidth
+          multiline
+          minRows={7}
+          value={currentConfig.bridge_env}
+          InputProps={{ readOnly: true }}
+        />
+      </Paper>
+    );
   };
 
   const renderProviderSelection = () => (
@@ -350,6 +395,8 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
           </Alert>
         )}
 
+        {renderBridgeEnvSnippet()}
+
         <Box mt={3} display="flex" gap={2}>
           <Button onClick={() => setActiveStep(0)}>
             Back
@@ -416,6 +463,8 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
           </Paper>
         )}
 
+        {renderBridgeEnvSnippet()}
+
         {printers.length > 0 && (
           <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
@@ -463,6 +512,9 @@ export const PrinterSetup: React.FC<PrinterSetupProps> = ({ onClose, embedded = 
       <Typography variant="body1" color="text.secondary" mb={3}>
         Your printing configuration has been saved successfully.
       </Typography>
+      <Box textAlign="left">
+        {renderBridgeEnvSnippet()}
+      </Box>
       {onClose && (
         <Button variant="contained" onClick={onClose}>
           Close
