@@ -84,4 +84,60 @@ describe('NetworkEscPosPrintService', () => {
     expect(payload).not.toContain('é');
     expect(payload).not.toContain('É');
   });
+
+  it('preserves ESC/POS cut command after thermal text normalization', async () => {
+    await service.printReceipt({
+      order_id: 3,
+      sequence_number: 44,
+      total_amount: 12,
+      total_tax: 2,
+      payment_method: 'card',
+      created_at: new Date().toISOString(),
+      business_info: {
+        name: 'Muse',
+        address: 'Addr',
+        phone: '01',
+        email: 'muse@test.fr',
+      },
+      receipt_type: 'summary',
+    });
+
+    const payload = mocks.sendEscPosToPrinter.mock.calls[0][0] as string;
+    expect(payload).toContain('\x1D\x56\x00');
+    expect(payload).not.toContain('\x1D\x56?');
+    expect(payload.indexOf('\x1D\x56\x00')).toBeGreaterThan(payload.indexOf('Merci de votre visite!'));
+  });
+
+  it('prints invoice detail mode according to receipt_type', async () => {
+    await service.printReceipt({
+      order_id: 4,
+      sequence_number: 45,
+      document_kind: 'invoice',
+      document_number: 'FAC-2026-000045',
+      total_amount: 18,
+      total_tax: 3,
+      payment_method: 'card',
+      created_at: new Date().toISOString(),
+      business_info: {
+        name: 'Muse',
+        address: 'Addr',
+        phone: '01',
+        email: 'muse@test.fr',
+      },
+      receipt_type: 'detailed',
+      items: [{
+        product_name: 'Cafe',
+        quantity: 2,
+        unit_price: 9,
+        total_price: 18,
+        tax_rate: 20,
+      }],
+    });
+
+    const payload = mocks.sendEscPosToPrinter.mock.calls[0][0] as string;
+    expect(payload).toContain('FACTURE #FAC-2026-000045');
+    expect(payload).toContain('Facture detaillee');
+    expect(payload).toContain('ARTICLES');
+    expect(payload).toContain('Cafe');
+  });
 });

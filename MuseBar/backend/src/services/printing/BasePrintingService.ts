@@ -28,15 +28,7 @@ function normalizeThermalText(content: string): string {
   return Array.from(withoutDiacritics)
     .map((char) => {
       const code = char.charCodeAt(0);
-      if (
-        char === '\n' ||
-        char === '\r' ||
-        char === '\t' ||
-        code === 0x07 ||
-        code === 0x1b ||
-        code === 0x1d ||
-        (code >= 0x20 && code <= 0x7e)
-      ) {
+      if (code <= 0x1f || (code >= 0x20 && code <= 0x7e)) {
         return char;
       }
       return '?';
@@ -104,6 +96,16 @@ export abstract class BasePrintingService implements IPrintingService {
 
   protected generateReceiptContent(data: ReceiptData): string {
     let content = '';
+    const isInvoice = data.document_kind === 'invoice';
+    const documentLabel = isInvoice ? 'FACTURE' : 'RECU';
+    const documentNumber = data.document_number ?? String(data.sequence_number);
+    const typeLabel = isInvoice
+      ? data.receipt_type === 'summary'
+        ? 'Facture sans detail'
+        : 'Facture detaillee'
+      : data.receipt_type === 'summary'
+        ? 'Ticket simplifie'
+        : 'Ticket detaille';
     
     // Initialize printer
     content += ESC_POS.INIT;
@@ -129,11 +131,23 @@ export abstract class BasePrintingService implements IPrintingService {
     
     // Receipt Info
     content += ESC_POS.BOLD_ON;
-    content += `RECU #${data.sequence_number}\n`;
+    content += `${documentLabel} #${documentNumber}\n`;
     content += ESC_POS.BOLD_OFF;
+    content += `Type: ${typeLabel}\n`;
     content += `Commande: ${data.order_id}\n`;
     content += `Date: ${new Date(data.created_at).toLocaleString('fr-FR')}\n`;
     content += `Paiement: ${this.formatPaymentMethod(data.payment_method)}\n`;
+
+    if (isInvoice && data.customer_info) {
+      content += '--------------------------------\n';
+      content += ESC_POS.BOLD_ON + 'CLIENT\n' + ESC_POS.BOLD_OFF;
+      if (data.customer_info.name) content += `${data.customer_info.name}\n`;
+      if (data.customer_info.address) content += `${data.customer_info.address}\n`;
+      if (data.customer_info.email) content += `${data.customer_info.email}\n`;
+      if (data.customer_info.tax_identification) {
+        content += `TVA client: ${data.customer_info.tax_identification}\n`;
+      }
+    }
     
     content += '================================\n';
     
@@ -185,6 +199,12 @@ export abstract class BasePrintingService implements IPrintingService {
       if (data.compliance_info.receipt_hash) {
         content += `Hash: ${data.compliance_info.receipt_hash.substring(0, 16)}...\n`;
       }
+      if (data.compliance_info.invoice_hash) {
+        content += `Hash facture: ${data.compliance_info.invoice_hash.substring(0, 16)}...\n`;
+      }
+      if (data.compliance_info.source_receipt_sequence) {
+        content += `Ticket source: ${data.compliance_info.source_receipt_sequence}\n`;
+      }
       if (data.compliance_info.cash_register_id) {
         content += `Caisse: ${data.compliance_info.cash_register_id}\n`;
       }
@@ -197,7 +217,7 @@ export abstract class BasePrintingService implements IPrintingService {
     content += ESC_POS.LEFT;
     content += `Ref. legale: Article 286-I-3 bis du CGI\n`;
     content += ESC_POS.CENTER;
-    content += '\nMerci de votre visite!\n\n';
+    content += '\nMerci de votre visite!\n\n\n\n';
     
     // Cut paper
     content += ESC_POS.CUT;
