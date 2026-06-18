@@ -40,7 +40,11 @@ class ApiConfig {
    */
   private async runInitialize(): Promise<void> {
     const currentHost = window.location.hostname;
+    const currentOrigin = window.location.origin;
+    const isBrowserHttps = window.location.protocol === 'https:';
+    const isLocalHost = currentHost === 'localhost' || currentHost === '127.0.0.1';
     const possibleUrls = [
+      ...(isBrowserHttps && !isLocalHost ? [currentOrigin] : []),
       `http://${currentHost}:3001`,
       'http://localhost:3001',
       'http://127.0.0.1:3001',

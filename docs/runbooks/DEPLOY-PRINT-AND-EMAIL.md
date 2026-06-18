@@ -56,7 +56,8 @@ Minimum migrations for print + invoice + email features (if production predates 
 
 ### Step D — Environment variables
 
-Set in production `.env`:
+Set backend values in production `.env` (current server path:
+`/var/www/MOSEHXL/MuseBar/backend/.env`):
 
 | Variable | Required | Example / note |
 |----------|----------|----------------|
@@ -69,10 +70,31 @@ Set in production `.env`:
 | `SENDGRID_API_KEY` | yes for email | `SG....` |
 | `FROM_EMAIL` | yes for email | verified sender, e.g. `noreply@mosehxl.com` |
 | `APP_URL` | yes for printing | `https://mosehxl.com` (poll URL generation) |
+| `AUTH_ENFORCE_ADMIN_2FA` | yes for current production | `false` until the frontend has a full 2FA enrollment/login flow |
+| `ESTABLISHMENT_ADMIN_PERMISSION_MODE` | yes for current production | `implicit_all` so establishment admins are not locked out by missing explicit permission rows |
 
 Optional: `PUBLIC_API_URL` if API base differs from `APP_URL`.
 
-Restart backend after env changes.
+Set frontend build values in production `.env.production` (current server path:
+`/var/www/MOSEHXL/MuseBar/.env.production`):
+
+| Variable | Required | Example / note |
+|----------|----------|----------------|
+| `REACT_APP_API_URL` | yes | `https://mosehxl.com`; required at build time so the browser calls the proxied production API instead of `localhost:3001` |
+
+Rebuild frontend after changing frontend env values:
+
+```bash
+cd /var/www/MOSEHXL
+npm run build --workspace MuseBar
+```
+
+Restart backend after backend env changes:
+
+```bash
+pm2 restart musebar-backend --update-env
+pm2 save
+```
 
 ---
 
