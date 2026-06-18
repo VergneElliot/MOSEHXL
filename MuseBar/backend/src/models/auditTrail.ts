@@ -16,6 +16,19 @@ export interface AuditEntry {
 }
 
 export class AuditTrailModel {
+  private static async resolveFallbackEstablishmentId(): Promise<string | null> {
+    const result = await pool.query(
+      `
+        SELECT id
+        FROM establishments
+        ORDER BY created_at ASC NULLS LAST, id ASC
+        LIMIT 1
+      `
+    );
+    const row = result.rows[0] as { id?: string } | undefined;
+    return row?.id ?? null;
+  }
+
   static async logAction({
     establishment_id,
     user_id,
@@ -35,6 +48,9 @@ export class AuditTrailModel {
         const row = r.rows[0] as { establishment_id?: string } | undefined;
         est = row?.establishment_id ?? null;
       }
+    }
+    if (est == null) {
+      est = await this.resolveFallbackEstablishmentId();
     }
 
     const query = `
