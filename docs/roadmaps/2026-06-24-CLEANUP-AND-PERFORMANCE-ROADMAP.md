@@ -107,6 +107,7 @@ The codebase is architecturally strong and fiscally aligned (CGI Art. 286-I-3 bi
 Phase 4B completed on 2026-06-25; see `docs/patch-notes/417-CLEANUP-PHASE4B-AUTHLOGIN-TOTP-ROUTES-IMPLEMENTATION.md`.
 Phase 4C completed on 2026-06-25; see `docs/patch-notes/418-CLEANUP-PHASE4C-AUTHLOGIN-SESSION-REFRESH-ROUTES-IMPLEMENTATION.md`.
 Phase 4D completed on 2026-06-25; see `docs/patch-notes/419-CLEANUP-PHASE4D-AUTHLOGIN-SUPPORT-LOGOUT-ROUTES-IMPLEMENTATION.md`.
+Phase 4E completed on 2026-06-25; see `docs/patch-notes/420-CLEANUP-PHASE4E-AUTHLOGIN-LOGIN-ROUTES-IMPLEMENTATION.md`.
 
 **Goal:** eliminate the last monolith; no file mixing too many concerns.
 
