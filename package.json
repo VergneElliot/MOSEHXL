@@ -7,14 +7,16 @@
     "start:frontend": "npm run start --workspace MuseBar",
     "start:backend": "npm run start --workspace MuseBar/backend",
     "dev:backend": "npm run dev --workspace MuseBar/backend",
-    "build": "npm run build --workspace MuseBar && npm run build --workspace MuseBar/backend",
+    "build": "npm run build --workspace MuseBar && npm run build --workspace MuseBar/backend && npm run build --workspace MuseBar/bridge",
     "build:frontend": "npm run build --workspace MuseBar",
     "build:backend": "npm run build --workspace MuseBar/backend",
+    "build:bridge": "npm run build --workspace MuseBar/bridge",
     "docs:patch-notes-index": "node scripts/generate-patch-notes-index.js"
   },
   "workspaces": [
     "MuseBar",
     "MuseBar/backend",
+    "MuseBar/bridge",
     "MuseBar/packages/*"
   ]
 }

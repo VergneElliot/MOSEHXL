@@ -6,7 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 
-const { loadDotEnv } = require('../src/config');
+const { loadDotEnv } = require('../dist/config');
 
 test('loadDotEnv reads key value pairs without overriding process env', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'musebar-bridge-'));

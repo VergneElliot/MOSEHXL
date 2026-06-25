@@ -81,6 +81,8 @@ The codebase is architecturally strong and fiscally aligned (CGI Art. 286-I-3 bi
 
 ### Phase 3 — Bring the bridge into standards (P1) — effort: M
 
+**Status:** Done on 2026-06-25. See `docs/patch-notes/415-CLEANUP-PHASE3-BRIDGE-TYPESCRIPT-CI-IMPLEMENTATION.md`.
+
 **Goal:** the bridge stops being an untested, untyped orphan. Two viable strategies — pick one:
 
 - **Strategy 3A (recommended now): TypeScript in the monorepo.**

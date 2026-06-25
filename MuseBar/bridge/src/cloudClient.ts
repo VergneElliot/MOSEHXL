@@ -1,6 +1,14 @@
-'use strict';
+import type { BridgeConfig } from './config';
 
-function bridgeHeaders(config) {
+export interface BridgePrintJob {
+  id: string;
+  document_type: string;
+  payload_format: string;
+  payload_base64: string;
+  attempt_count?: number;
+}
+
+function bridgeHeaders(config: BridgeConfig): Record<string, string> {
   return {
     'x-bridge-key': config.bridgeKey,
     // Allows local testing through ngrok without receiving the browser warning page.
@@ -8,24 +16,24 @@ function bridgeHeaders(config) {
   };
 }
 
-function withEstablishment(config, path) {
-  const url = new URL(`${config.apiUrl}${path}`);
+function withEstablishment(config: BridgeConfig, routePath: string): URL {
+  const url = new URL(`${config.apiUrl}${routePath}`);
   url.searchParams.set('establishment_id', config.establishmentId);
   return url;
 }
 
-async function readError(response) {
+async function readError(response: Response): Promise<string> {
   const text = await response.text();
   if (!text) return response.statusText || 'No response body';
   try {
-    const body = JSON.parse(text);
-    return body?.error?.message || body?.message || JSON.stringify(body);
+    const body = JSON.parse(text) as { error?: { message?: string }; message?: string };
+    return body.error?.message || body.message || JSON.stringify(body);
   } catch {
     return text.slice(0, 500);
   }
 }
 
-async function pollJob(config) {
+export async function pollJob(config: BridgeConfig): Promise<BridgePrintJob | null> {
   const response = await fetch(withEstablishment(config, '/api/printing/bridge/poll'), {
     method: 'GET',
     headers: bridgeHeaders(config),
@@ -33,11 +41,11 @@ async function pollJob(config) {
   if (!response.ok) {
     throw new Error(`Poll failed (${response.status}): ${await readError(response)}`);
   }
-  const body = await response.json();
-  return body.job || null;
+  const body = await response.json() as { job?: BridgePrintJob | null };
+  return body.job ?? null;
 }
 
-async function ackJob(config, jobId) {
+export async function ackJob(config: BridgeConfig, jobId: string): Promise<void> {
   const response = await fetch(withEstablishment(config, `/api/printing/bridge/jobs/${jobId}/ack`), {
     method: 'POST',
     headers: bridgeHeaders(config),
@@ -47,7 +55,7 @@ async function ackJob(config, jobId) {
   }
 }
 
-async function failJob(config, jobId, error) {
+export async function failJob(config: BridgeConfig, jobId: string, error: unknown): Promise<void> {
   const response = await fetch(withEstablishment(config, `/api/printing/bridge/jobs/${jobId}/fail`), {
     method: 'POST',
     headers: {
@@ -60,5 +68,3 @@ async function failJob(config, jobId, error) {
     throw new Error(`FAIL report failed (${response.status}): ${await readError(response)}`);
   }
 }
-
-module.exports = { pollJob, ackJob, failJob };

@@ -130,6 +130,34 @@ jobs:
         flags: backend
         name: backend-coverage
 
+  # Bridge Testing
+  bridge-test:
+    name: Print Bridge Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: package-lock.json
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run bridge linting
+      run: npm run lint --workspace MuseBar/bridge
+
+    - name: Run bridge type checking
+      run: npm run type-check --workspace MuseBar/bridge
+
+    - name: Run bridge tests
+      run: npm test --workspace MuseBar/bridge
+
   # Security Scanning
   security-scan:
     name: Security Scan
@@ -165,7 +193,7 @@ jobs:
   build-and-deploy:
     name: Build and Deploy
     runs-on: ubuntu-latest
-    needs: [frontend-test, backend-test, security-scan]
+    needs: [frontend-test, backend-test, bridge-test, security-scan]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     
     steps:
@@ -335,7 +363,7 @@ jobs:
   notify:
     name: Notify Team
     runs-on: ubuntu-latest
-    needs: [frontend-test, backend-test, security-scan, build-and-deploy]
+    needs: [frontend-test, backend-test, bridge-test, security-scan, build-and-deploy]
     if: always()
     
     steps:
