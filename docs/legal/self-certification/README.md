@@ -37,6 +37,7 @@ below is an engineering evidence package, not legal advice.
 | `04-OPERATIONAL-CONTROLS.md` | Required production policies: retention, backups, restore drills, archive handling |
 | `05-EVIDENCE-INDEX.md` | Evidence catalogue: audits, patch notes, code modules, migrations, tests, commands |
 | `06-RELEASE-FREEZE-CHECKLIST.md` | Checklist for freezing a specific release/commit as the attested version |
+| `evidence-templates/` | Fillable records for retention, backup, restore drills, archive exports, config snapshots, and release evidence |
 
 ---
 
@@ -69,8 +70,9 @@ Remaining self-certification work is therefore mostly:
 2. Complete the mapping in `02-REFERENTIEL-MAPPING.md`.
 3. Attach or reference all evidence in `05-EVIDENCE-INDEX.md`.
 4. Implement the operational controls in `04-OPERATIONAL-CONTROLS.md`.
-5. Freeze the release using `06-RELEASE-FREEZE-CHECKLIST.md`.
-6. Fill, date, and sign `03-ATTESTATION-DRAFT.md`.
+5. Copy and fill the required records from `evidence-templates/`.
+6. Freeze the release using `06-RELEASE-FREEZE-CHECKLIST.md`.
+7. Fill, date, and sign `03-ATTESTATION-DRAFT.md`.
 
 The attestation should refer to a specific immutable release identifier
 (git tag/commit + build version), not to a moving branch.
