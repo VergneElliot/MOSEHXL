@@ -1,21 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { BasePrintingService } from './BasePrintingService';
-import type { PrintingConfig, Printer, PrinterStatus, PrintResult, ReceiptData, ClosureBulletinData } from './types';
+import type { PrintingConfig, Printer, PrinterStatus, PrintResult, ReceiptData } from './types';
 
 class TestPrintingService extends BasePrintingService {
   async initialize(): Promise<void> {
     return;
   }
 
-  async printReceipt(_data: ReceiptData): Promise<PrintResult> {
+  async printReceipt(): Promise<PrintResult> {
     return { success: true, message: 'ok' };
   }
 
-  async printClosureBulletin(_data: ClosureBulletinData): Promise<PrintResult> {
+  async printClosureBulletin(): Promise<PrintResult> {
     return { success: true, message: 'ok' };
   }
 
-  async checkPrinterStatus(_printerId?: string): Promise<PrinterStatus> {
+  async checkPrinterStatus(): Promise<PrinterStatus> {
     return { available: true, status: 'ok' };
   }
 

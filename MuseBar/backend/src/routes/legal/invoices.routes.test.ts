@@ -93,7 +93,12 @@ describe('legal invoices routes', () => {
     mocks.buildReceiptDataForOrder.mockResolvedValue({
       total_amount: 120,
       total_tax: 20,
-      business_info: { name: 'MOSEHXL BAR' },
+      business_info: {
+        name: 'MOSEHXL BAR',
+        address: '10 Rue de la Paix, 75002 Paris',
+        siret: '12345678900012',
+        tax_identification: 'FR12345678901',
+      },
       items: [{ product_name: 'Menu midi', quantity: 1, unit_price: 100, total_price: 120, tax_rate: 20 }],
       vat_breakdown: [{ rate: 20, subtotal_ht: 100, vat: 20, total_ttc: 120 }],
       sequence_number: 99,
@@ -155,7 +160,12 @@ describe('legal invoices routes', () => {
     mocks.buildReceiptDataForOrder.mockResolvedValue({
       total_amount: 60,
       total_tax: 10,
-      business_info: { name: 'MOSEHXL BAR' },
+      business_info: {
+        name: 'MOSEHXL BAR',
+        address: '10 Rue de la Paix, 75002 Paris',
+        siret: '12345678900012',
+        tax_identification: 'FR12345678901',
+      },
       items: [],
       vat_breakdown: [],
       sequence_number: 15,
@@ -163,7 +173,24 @@ describe('legal invoices routes', () => {
     });
 
     mocks.poolQuery.mockResolvedValueOnce({
-      rows: [{ id: 88, invoice_number: 'FAC-2026-000088', order_id: 42, invoice_mode: 'detailed' }],
+      rows: [
+        {
+          id: 88,
+          invoice_number: 'FAC-2026-000088',
+          order_id: 42,
+          invoice_mode: 'detailed',
+          payment_due_date: '2026-06-30',
+          payment_terms: 'Paiement comptant',
+          late_penalty_terms: 'Pénalités légales',
+          recovery_fee_note: 'Indemnité forfaitaire de recouvrement: 40 EUR (C. com. art. L441-10)',
+          business_info: {
+            name: 'MOSEHXL BAR',
+            address: '10 Rue de la Paix, 75002 Paris',
+            siret: '12345678900012',
+            tax_identification: 'FR12345678901',
+          },
+        },
+      ],
       rowCount: 1,
     });
 
