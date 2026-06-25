@@ -1,6 +1,5 @@
 import express from 'express';
 import crypto from 'crypto';
-import QRCode from 'qrcode';
 import speakeasy from 'speakeasy';
 import { UserModel } from '../models/user';
 import { TokenBlocklistModel } from '../models/tokenBlocklist';
@@ -26,7 +25,6 @@ import {
   ACCESS_TOKEN_EXPIRES_IN,
   MAX_FAILED_LOGIN_ATTEMPTS,
   MAX_SUPPORT_IMPERSONATION_MINUTES,
-  TOTP_ISSUER,
   computeLockoutDurationMinutes,
   computeRefreshExpiry,
   isAdminTwoFactorEnforced,
@@ -50,6 +48,7 @@ import {
   normalizeUserAgent,
 } from './authLogin/sessionSignals';
 import { logAuditOrThrow, revokeTokenOrThrow } from './authLogin/sideEffects';
+import totpRoutes from './authLogin/totpRoutes';
 
 const router = express.Router();
 
@@ -271,137 +270,7 @@ router.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
   }
 }));
 
-// ---------------------------------------------------------------------------
-// 2FA / TOTP enrollment and management
-// ---------------------------------------------------------------------------
-router.get('/2fa/totp/status', requireAuth, asyncHandler(async (req, res) => {
-  const userId = req.user!.id;
-  const dbUser = await UserModel.findById(userId);
-  if (!dbUser) {
-    throw new NotFoundError('User');
-  }
-
-  const role = deriveCanonicalRole({
-    roleFromDb: dbUser.role,
-    isAdminFlag: dbUser.is_admin,
-    establishmentId: dbUser.establishment_id,
-  });
-
-  return res.json({
-    enabled: dbUser.mfa_totp_enabled === true,
-    required_for_role: isAdminTwoFactorEnforced() && requiresAdminTwoFactor(role),
-    role,
-  });
-}));
-
-router.post('/2fa/totp/setup', requireAuth, asyncHandler(async (req, res) => {
-  const userId = req.user!.id;
-  const dbUser = await UserModel.findById(userId);
-  if (!dbUser) {
-    throw new NotFoundError('User');
-  }
-
-  const generatedSecret = speakeasy.generateSecret({
-    length: 20,
-    name: `${TOTP_ISSUER}:${dbUser.email}`,
-    issuer: TOTP_ISSUER,
-  });
-  const secret = generatedSecret.base32;
-  const otpauthUrl = generatedSecret.otpauth_url;
-  if (!secret || !otpauthUrl) {
-    throw new AppError('Failed to generate TOTP setup material', 500, 'MFA_TOTP_SETUP_GENERATION_FAILED');
-  }
-  const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
-  await UserModel.setMfaTotpSecret(userId, secret);
-
-  await logAuditOrThrow({
-    user_id: String(userId),
-    action_type: 'MFA_TOTP_SETUP_STARTED',
-    action_details: { issuer: TOTP_ISSUER },
-    ip_address: req.ip,
-    user_agent: req.headers['user-agent'],
-  }, 'MFA_TOTP_SETUP_STARTED');
-
-  return res.json({
-    secret,
-    otpauthUrl,
-    qrCodeDataUrl,
-  });
-}));
-
-router.post('/2fa/totp/enable', requireAuth, asyncHandler(async (req, res) => {
-  const userId = req.user!.id;
-  const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
-  if (!code) {
-    throw new ValidationError('code is required');
-  }
-
-  const mfaState = await UserModel.getMfaTotpState(userId);
-  if (!mfaState?.mfa_totp_secret) {
-    throw new ValidationError('TOTP setup is required before enabling two-factor authentication');
-  }
-
-  if (!speakeasy.totp.verify({
-    secret: mfaState.mfa_totp_secret,
-    encoding: 'base32',
-    token: code,
-    window: 1,
-  })) {
-    throw new ValidationError('Invalid two-factor authentication code');
-  }
-
-  await UserModel.enableMfaTotp(userId);
-  await logAuditOrThrow({
-    user_id: String(userId),
-    action_type: 'MFA_TOTP_ENABLED',
-    ip_address: req.ip,
-    user_agent: req.headers['user-agent'],
-  }, 'MFA_TOTP_ENABLED');
-
-  return res.json({ message: 'Two-factor authentication enabled' });
-}));
-
-router.post('/2fa/totp/disable', requireAuth, asyncHandler(async (req, res) => {
-  const userId = req.user!.id;
-  const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
-  const password = typeof req.body?.password === 'string' ? req.body.password : '';
-  if (!code || !password) {
-    throw new ValidationError('code and password are required');
-  }
-
-  const dbUser = await UserModel.findById(userId);
-  if (!dbUser) {
-    throw new NotFoundError('User');
-  }
-
-  const validPassword = await UserModel.verifyPassword(dbUser, password);
-  if (!validPassword) {
-    throw new AuthenticationError('Invalid credentials');
-  }
-
-  const mfaState = await UserModel.getMfaTotpState(userId);
-  if (!mfaState?.mfa_totp_enabled || !mfaState.mfa_totp_secret) {
-    throw new ValidationError('Two-factor authentication is not enabled');
-  }
-  if (!speakeasy.totp.verify({
-    secret: mfaState.mfa_totp_secret,
-    encoding: 'base32',
-    token: code,
-    window: 1,
-  })) {
-    throw new ValidationError('Invalid two-factor authentication code');
-  }
-
-  await UserModel.disableMfaTotp(userId);
-  await logAuditOrThrow({
-    user_id: String(userId),
-    action_type: 'MFA_TOTP_DISABLED',
-    ip_address: req.ip,
-    user_agent: req.headers['user-agent'],
-  }, 'MFA_TOTP_DISABLED');
-
-  return res.json({ message: 'Two-factor authentication disabled' });
-}));
+router.use('/2fa/totp', totpRoutes);
 
 // ---------------------------------------------------------------------------
 // GET /api/auth/me — returns current user info and permissions

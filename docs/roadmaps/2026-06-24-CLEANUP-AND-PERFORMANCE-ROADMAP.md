@@ -104,6 +104,7 @@ The codebase is architecturally strong and fiscally aligned (CGI Art. 286-I-3 bi
 ### Phase 4 — Modularize remaining large files (P2) — effort: M
 
 **Status:** In progress. Phase 4A completed on 2026-06-25; see `docs/patch-notes/416-CLEANUP-PHASE4A-AUTHLOGIN-SUPPORT-MODULES-IMPLEMENTATION.md`.
+Phase 4B completed on 2026-06-25; see `docs/patch-notes/417-CLEANUP-PHASE4B-AUTHLOGIN-TOTP-ROUTES-IMPLEMENTATION.md`.
 
 **Goal:** eliminate the last monolith; no file mixing too many concerns.
 
