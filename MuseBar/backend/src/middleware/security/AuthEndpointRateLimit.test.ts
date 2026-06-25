@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { NextFunction, Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
 import { RateLimitError } from '../errorHandler';
+import { signJwtToken } from '../../security/jwtConfig';
 import {
   createAuthRateLimitMiddleware,
   createRefreshRateLimitKeyResolver,
@@ -46,7 +46,7 @@ describe('auth endpoint rate limiter utilities', () => {
 
   it('derives refresh key from bearer token user id', () => {
     const secret = 'x'.repeat(40);
-    const token = jwt.sign({ id: 42 }, secret, { expiresIn: '1h' });
+    const token = signJwtToken({ id: 42 }, '1h');
     const resolver = createRefreshRateLimitKeyResolver(secret);
     const req = {
       ip: '127.0.0.1',

@@ -10,8 +10,6 @@ export interface EpsonQueuedJob {
   xml: string;
 }
 
-const queues = new Map<number, EpsonQueuedJob[]>();
-
 const queuesByEstablishment = new Map<string, EpsonQueuedJob[]>();
 
 export function enqueueEposJob(establishmentId: string, xml: string): string {

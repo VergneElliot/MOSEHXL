@@ -313,7 +313,6 @@ export class MigrationManager {
       const executedIds = new Set(executedMigrations.map(migration => migration.id));
       
       const allMigrations = files.map(file => this.parseMigrationFile(file));
-      const byId = new Map(allMigrations.map(migration => [migration.id, migration]));
       
       for (const migration of allMigrations) {
         const isExecuted = executedIds.has(migration.id);

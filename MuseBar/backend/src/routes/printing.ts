@@ -1,7 +1,7 @@
 import { timingSafeEqual } from 'crypto';
 import { Router, Response, NextFunction, Request } from 'express';
 import type { Response as ExpressResponse } from 'express';
-import type { PrintingConfig, IPrintingService } from '../services/printing';
+import type { IPrintingService } from '../services/printing';
 import type { PrintResult, ReceiptData as PrintingReceiptData, ClosureBulletinData as PrintingClosureBulletinData } from '../services/printing/types';
 import { pool } from '../db/pool';
 import { authenticateToken } from '../middleware/auth';
@@ -9,10 +9,8 @@ import { getLogger } from '../utils/logger';
 import type { AuthenticatedRequest } from './userManagement/types';
 import { epsonServerDirectPollHandler } from '../printing/epsonPollHandler';
 import {
-  ALLOWED_PRINT_PROVIDERS,
   listPrintingConfigurations,
   savePrintingConfiguration,
-  parseConfigCell,
   getActiveBridgeConfiguration,
 } from '../printing/printingConfigRepo';
 import {
