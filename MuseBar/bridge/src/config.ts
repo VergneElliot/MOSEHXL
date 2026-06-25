@@ -1,9 +1,18 @@
-'use strict';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const fs = require('node:fs');
-const path = require('node:path');
+export interface BridgeConfig {
+  apiUrl: string;
+  establishmentId: string;
+  bridgeKey: string;
+  printerDriver: string;
+  printerHost: string;
+  printerPort: number;
+  pollIntervalMs: number;
+  printerTimeoutMs: number;
+}
 
-function loadDotEnv(filePath = path.join(process.cwd(), '.env')) {
+export function loadDotEnv(filePath = path.join(process.cwd(), '.env')): void {
   if (!fs.existsSync(filePath)) return;
   const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/);
   for (const line of lines) {
@@ -18,7 +27,7 @@ function loadDotEnv(filePath = path.join(process.cwd(), '.env')) {
   }
 }
 
-function required(name) {
+function required(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) {
     throw new Error(`${name} is required`);
@@ -26,7 +35,7 @@ function required(name) {
   return value;
 }
 
-function optionalInt(name, defaultValue) {
+function optionalInt(name: string, defaultValue: number): number {
   const raw = process.env[name]?.trim();
   if (!raw) return defaultValue;
   const value = Number.parseInt(raw, 10);
@@ -36,7 +45,7 @@ function optionalInt(name, defaultValue) {
   return value;
 }
 
-function loadConfig() {
+export function loadConfig(): BridgeConfig {
   loadDotEnv();
   const apiUrl = required('MUSEBAR_API_URL').replace(/\/$/, '');
   const printerPort = optionalInt('PRINTER_PORT', 9100);
@@ -55,5 +64,3 @@ function loadConfig() {
     printerTimeoutMs: optionalInt('PRINTER_TIMEOUT_MS', 8000),
   };
 }
-
-module.exports = { loadConfig, loadDotEnv };

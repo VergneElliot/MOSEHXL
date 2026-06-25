@@ -1,39 +1,52 @@
-'use strict';
+import net from 'node:net';
 
-const net = require('node:net');
+import type { BridgeConfig } from '../config';
+import type { BridgePrintJob } from '../cloudClient';
 
-function sendEscPosBuffer(buffer, options) {
+export interface NetworkPrinterOptions {
+  host: string;
+  port: number;
+  timeoutMs?: number;
+}
+
+export function sendEscPosBuffer(buffer: Buffer, options: NetworkPrinterOptions): Promise<void> {
   const { host, port, timeoutMs = 8000 } = options;
 
-  return new Promise((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     let settled = false;
     const client = net.createConnection({ host, port }, () => {
       client.write(buffer);
       client.end();
     });
 
-    const settle = (fn, value) => {
+    const settleResolve = (): void => {
       if (settled) return;
       settled = true;
-      fn(value);
+      resolve();
+    };
+
+    const settleReject = (error: Error): void => {
+      if (settled) return;
+      settled = true;
+      reject(error);
     };
 
     client.setTimeout(timeoutMs);
     client.on('timeout', () => {
       client.destroy();
-      settle(reject, new Error(`Printer connection timeout (${host}:${port})`));
+      settleReject(new Error(`Printer connection timeout (${host}:${port})`));
     });
     client.on('error', (error) => {
-      settle(reject, error);
+      settleReject(error);
     });
     client.on('close', (hadError) => {
       if (hadError) return;
-      settle(resolve);
+      settleResolve();
     });
   });
 }
 
-async function printEscPosJob(job, config) {
+export async function printEscPosJob(job: BridgePrintJob, config: BridgeConfig): Promise<void> {
   if (job.payload_format !== 'escpos') {
     throw new Error(`Unsupported payload format: ${job.payload_format}`);
   }
@@ -48,5 +61,3 @@ async function printEscPosJob(job, config) {
     timeoutMs: config.printerTimeoutMs,
   });
 }
-
-module.exports = { printEscPosJob, sendEscPosBuffer };

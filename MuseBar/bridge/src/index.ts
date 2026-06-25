@@ -1,20 +1,18 @@
 #!/usr/bin/env node
-'use strict';
+import { loadConfig, type BridgeConfig } from './config';
+import { pollJob, ackJob, failJob, type BridgePrintJob } from './cloudClient';
+import { printEscPosJob } from './printers/networkEscpos';
 
-const { loadConfig } = require('./config');
-const { pollJob, ackJob, failJob } = require('./cloudClient');
-const { printEscPosJob } = require('./printers/networkEscpos');
-
-function sleep(ms) {
+function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function log(message, extra) {
+function log(message: string, extra?: Record<string, unknown>): void {
   const suffix = extra ? ` ${JSON.stringify(extra)}` : '';
   process.stdout.write(`[${new Date().toISOString()}] ${message}${suffix}\n`);
 }
 
-async function processJob(config, job) {
+async function processJob(config: BridgeConfig, job: BridgePrintJob): Promise<void> {
   log('Print job received', {
     jobId: job.id,
     documentType: job.document_type,
@@ -40,7 +38,7 @@ async function processJob(config, job) {
   }
 }
 
-async function run() {
+async function run(): Promise<void> {
   const config = loadConfig();
   log('MuseBar Print Bridge started', {
     apiUrl: config.apiUrl,

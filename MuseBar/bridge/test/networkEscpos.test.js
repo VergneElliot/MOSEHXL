@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { printEscPosJob } = require('../src/printers/networkEscpos');
+const { printEscPosJob } = require('../dist/printers/networkEscpos');
 
 test('printEscPosJob rejects unsupported payload formats', async () => {
   await assert.rejects(
