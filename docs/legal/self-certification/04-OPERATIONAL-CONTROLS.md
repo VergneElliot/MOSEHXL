@@ -14,6 +14,10 @@ fiscal data over time.
 This document defines the controls that must exist before signing the
 attestation.
 
+Fillable evidence records live in `evidence-templates/`. For each real release
+or operational control, copy the relevant template into a dated evidence folder
+and fill it there.
+
 ---
 
 ## Control 1 - Data Retention
@@ -42,6 +46,8 @@ Required evidence before signature:
 2. archive storage retention setting,
 3. written confirmation of 6-year minimum retention,
 4. person/team responsible for retention monitoring.
+
+Record template: `evidence-templates/RETENTION-POLICY-RECORD.md`.
 
 Template:
 
@@ -74,6 +80,8 @@ Required evidence before signature:
 2. latest successful backup log,
 3. backup destination and access controls,
 4. retention settings.
+
+Record template: `evidence-templates/BACKUP-EVIDENCE-RECORD.md`.
 
 Backup command example:
 
@@ -109,6 +117,8 @@ Required evidence before signature:
 3. encryption setting,
 4. access-control list or IAM policy,
 5. sample backup object metadata.
+
+Record template: `evidence-templates/BACKUP-EVIDENCE-RECORD.md`.
 
 Template:
 
@@ -165,6 +175,8 @@ npm test -- src/integration/real-db/compliance.real-db.test.ts
 The exact real-DB test command depends on environment variables and should be
 captured in the release freeze evidence.
 
+Record template: `evidence-templates/RESTORE-DRILL-RECORD.md`.
+
 ---
 
 ## Control 5 - Archive Export Procedure
@@ -195,6 +207,8 @@ Evidence template:
 | Exported by | To fill |
 | Destination | To fill |
 | Notes | To fill |
+
+Record template: `evidence-templates/ARCHIVE-EXPORT-RECORD.md`.
 
 ---
 
@@ -240,6 +254,8 @@ At release freeze, capture production-relevant configuration without secrets:
 
 Do not put secrets in the dossier.
 
+Record template: `evidence-templates/PRODUCTION-CONFIG-SNAPSHOT.md`.
+
 ---
 
 ## Operational Readiness Verdict
@@ -259,3 +275,6 @@ Before signing the attestation, mark each item:
 
 Until these are marked ready, the dossier is technically strong but not yet
 complete for a signed self-certification claim.
+
+Use `evidence-templates/RELEASE-EVIDENCE-CAPTURE.md` to gather all release-time
+evidence and link the completed operational records.

@@ -12,6 +12,10 @@ moving branch.
 
 Do not sign until this checklist is complete.
 
+Use `evidence-templates/RELEASE-EVIDENCE-CAPTURE.md` as the primary record for
+capturing command outputs and linking the completed operational evidence
+records.
+
 ---
 
 ## 1. Release Identity
@@ -158,17 +162,18 @@ Evidence to archive:
 ## 6. Operational Controls
 
 Complete `04-OPERATIONAL-CONTROLS.md` first.
+Copy and fill the operational evidence records from `evidence-templates/`.
 
 | Control | Ready? | Evidence location |
 |---------|--------|-------------------|
-| 6-year retention policy | No | To fill |
-| Daily backup schedule | No | To fill |
-| Monthly long-retention backup | No | To fill |
-| Off-site/immutable backup copy | No | To fill |
-| Restore drill completed | No | To fill |
-| Archive export procedure tested | No | To fill |
+| 6-year retention policy | No | `RETENTION-POLICY-RECORD.md` copy |
+| Daily backup schedule | No | `BACKUP-EVIDENCE-RECORD.md` copy |
+| Monthly long-retention backup | No | `BACKUP-EVIDENCE-RECORD.md` copy |
+| Off-site/immutable backup copy | No | `BACKUP-EVIDENCE-RECORD.md` copy |
+| Restore drill completed | No | `RESTORE-DRILL-RECORD.md` copy |
+| Archive export procedure tested | No | `ARCHIVE-EXPORT-RECORD.md` copy |
 | Production access/change control documented | No | To fill |
-| Production config snapshot captured without secrets | No | To fill |
+| Production config snapshot captured without secrets | No | `PRODUCTION-CONFIG-SNAPSHOT.md` copy |
 
 ---
 

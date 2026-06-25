@@ -143,3 +143,14 @@ exact patch-note paths.
 | Restore drill record | Yes | Operations folder |
 | Archive export sample | Strongly recommended | Dossier archive |
 | Journal integrity verification output | Strongly recommended | Dossier archive |
+
+Use the fillable templates in `evidence-templates/` to create these records:
+
+| Template | Evidence produced |
+|----------|-------------------|
+| `evidence-templates/RETENTION-POLICY-RECORD.md` | Approved 6-year retention policy and storage ownership |
+| `evidence-templates/BACKUP-EVIDENCE-RECORD.md` | Backup schedule, latest successful backup, long-retention/off-site/immutable proof |
+| `evidence-templates/RESTORE-DRILL-RECORD.md` | Restore drill result and corrective actions |
+| `evidence-templates/ARCHIVE-EXPORT-RECORD.md` | Archive export/verify/download evidence |
+| `evidence-templates/PRODUCTION-CONFIG-SNAPSHOT.md` | Non-secret production configuration evidence |
+| `evidence-templates/RELEASE-EVIDENCE-CAPTURE.md` | Release tag/commit, command outputs, and linked operational evidence |
