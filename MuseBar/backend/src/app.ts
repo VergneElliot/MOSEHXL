@@ -97,9 +97,11 @@ import establishmentAccountCreationRouter from './routes/establishmentAccountCre
 import printingRouter from './routes/printing';
 import printingCompatRouter from './routes/printingCompat';
 import settingsRouter from './routes/settings';
+import productOptionGroupsRouter from './routes/productOptionGroups';
 
 app.use('/api/categories', categoriesRouter);
 app.use('/api/products', productsRouter);
+app.use('/api/product-option-groups', productOptionGroupsRouter);
 app.use('/api/orders', ordersRouter);
 app.use('/api/legal', legalRouter);
 app.use('/api/auth', authSessionRouter);

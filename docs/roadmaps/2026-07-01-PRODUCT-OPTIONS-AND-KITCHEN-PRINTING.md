@@ -2,7 +2,8 @@
 
 **Date:** 2026-07-01  
 **Branch baseline:** `development` (HEAD `722b4df`)  
-**Status:** Planned — not started  
+**Status:** In progress — Phase 1 done (2026-07-01)  
+**Branch baseline:** `development`  
 **Scope:** Reusable product parameters (presets + free text), POS capture, kitchen/bar order tickets routed to named printers, cancellation tickets. Fiscal receipts and invoices unchanged.
 
 > Companion patch note: `docs/patch-notes/424-PRODUCT-OPTIONS-KITCHEN-PRINTING-PLAN.md`
@@ -475,6 +476,8 @@ Each phase = one PR series + patch note + green CI before next phase.
 
 ### Phase 1 — Schema & option group admin (effort: M)
 
+**Status:** Done on 2026-07-01. See `docs/patch-notes/425-PRODUCT-OPTIONS-PHASE1-SCHEMA-API-MENU-ADMIN-IMPLEMENTATION.md`.
+
 **Goal:** Configure parameters in menu; no POS or printing yet.
 
 **Steps:**
@@ -487,11 +490,11 @@ Each phase = one PR series + patch note + green CI before next phase.
 
 **Acceptance:**
 
-- [ ] Create “Cuisson” with 3 choices; attach to “Entrecôte”.
-- [ ] API returns embedded groups on `GET /products`.
-- [ ] CI green; no POS behaviour change.
+- [x] Create “Cuisson” with 3 choices; attach to “Entrecôte”.
+- [x] API returns embedded groups on `GET /products`.
+- [x] CI green; no POS behaviour change.
 
-**Patch note:** `424-P1-...` or fold into plan implementation notes.
+**Patch note:** `425-PRODUCT-OPTIONS-PHASE1-SCHEMA-API-MENU-ADMIN-IMPLEMENTATION.md`
 
 ---
 

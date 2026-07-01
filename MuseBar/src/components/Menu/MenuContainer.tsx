@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   Typography,
@@ -9,13 +9,21 @@ import {
   useTheme,
   useMediaQuery,
 } from '@mui/material';
-import { Category, Product } from '../../types';
+import { Category, Product, ProductOptionGroup } from '../../types';
 import { useMenuState } from '../../hooks/useMenuState';
 import { useMenuAPI } from '../../hooks/useMenuAPI';
+import {
+  initialOptionGroupForm,
+  optionGroupToForm,
+  useProductOptionGroups,
+  type OptionGroupFormData,
+} from '../../hooks/useProductOptionGroups';
 import CategorySection from './CategorySection';
 import ProductSection from './ProductSection';
 import CategoryDialog from './CategoryDialog';
 import ProductDialog from './ProductDialog';
+import OptionGroupsSection from './OptionGroupsSection';
+import OptionGroupDialog from './OptionGroupDialog';
 import { formatCurrency } from '../../utils/formatCurrency';
 
 interface MenuContainerProps {
@@ -41,6 +49,13 @@ const MenuContainer: React.FC<MenuContainerProps> = ({ categories, products, onD
     actions.closeProductDialog,
     onDataUpdate
   );
+
+  const optionGroupsApi = useProductOptionGroups(actions.showSuccess, actions.showError);
+  const [optionGroupDialogOpen, setOptionGroupDialogOpen] = useState(false);
+  const [editingOptionGroup, setEditingOptionGroup] = useState<ProductOptionGroup | null>(null);
+  const [optionGroupForm, setOptionGroupForm] = useState<OptionGroupFormData>(initialOptionGroupForm);
+  const [optionGroupError, setOptionGroupError] = useState<string | null>(null);
+  const [optionGroupSaving, setOptionGroupSaving] = useState(false);
 
   // Load archived data only when showArchived turns true (avoid re-running when api reference changes → 429 cascade)
   const showArchivedRef = React.useRef(state.showArchived);
@@ -89,6 +104,54 @@ const MenuContainer: React.FC<MenuContainerProps> = ({ categories, products, onD
     }
   };
 
+  const openOptionGroupDialog = (group?: ProductOptionGroup) => {
+    setOptionGroupError(null);
+    if (group) {
+      setEditingOptionGroup(group);
+      setOptionGroupForm(optionGroupToForm(group));
+    } else {
+      setEditingOptionGroup(null);
+      setOptionGroupForm(initialOptionGroupForm);
+    }
+    setOptionGroupDialogOpen(true);
+  };
+
+  const closeOptionGroupDialog = () => {
+    setOptionGroupDialogOpen(false);
+    setEditingOptionGroup(null);
+    setOptionGroupForm(initialOptionGroupForm);
+    setOptionGroupError(null);
+  };
+
+  const handleSubmitOptionGroup = async () => {
+    setOptionGroupSaving(true);
+    setOptionGroupError(null);
+    try {
+      if (editingOptionGroup) {
+        await optionGroupsApi.updateGroup(editingOptionGroup.id, optionGroupForm);
+      } else {
+        await optionGroupsApi.createGroup(optionGroupForm);
+      }
+      closeOptionGroupDialog();
+      await onDataUpdate();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur inconnue';
+      setOptionGroupError(message);
+    } finally {
+      setOptionGroupSaving(false);
+    }
+  };
+
+  const handleDeleteOptionGroup = async (id: string) => {
+    try {
+      await optionGroupsApi.deleteGroup(id);
+      await onDataUpdate();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur inconnue';
+      actions.showError(message);
+    }
+  };
+
   const handleCloseSnackbar = () => {
     actions.closeSnackbar();
   };
@@ -118,6 +181,13 @@ const MenuContainer: React.FC<MenuContainerProps> = ({ categories, products, onD
 
       {/* Content */}
       <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+        <OptionGroupsSection
+          groups={optionGroupsApi.groups}
+          onCreateGroup={() => openOptionGroupDialog()}
+          onEditGroup={openOptionGroupDialog}
+          onDeleteGroup={handleDeleteOptionGroup}
+        />
+
         {/* Category Section */}
         <CategorySection
           categories={categories}
@@ -184,8 +254,20 @@ const MenuContainer: React.FC<MenuContainerProps> = ({ categories, products, onD
         onFormChange={actions.updateProductForm}
         editingProduct={state.editingProduct}
         categories={categories}
+        optionGroups={optionGroupsApi.groups}
         loading={false}
         error={null}
+      />
+
+      <OptionGroupDialog
+        open={optionGroupDialogOpen}
+        onClose={closeOptionGroupDialog}
+        onSubmit={handleSubmitOptionGroup}
+        form={optionGroupForm}
+        onFormChange={setOptionGroupForm}
+        editingGroup={editingOptionGroup}
+        loading={optionGroupSaving}
+        error={optionGroupError}
       />
     </Box>
   );

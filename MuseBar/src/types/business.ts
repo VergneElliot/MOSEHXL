@@ -21,8 +21,30 @@ export interface Product {
   happyHourDiscountType: 'percentage' | 'fixed'; // Type de réduction Happy Hour
   happyHourDiscountValue: number; // Valeur de la réduction (pourcentage ex: 0.20 ou montant fixe ex: 1.00)
   isActive: boolean;
+  optionGroupIds?: string[];
+  optionGroups?: ProductOptionGroup[];
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface ProductOptionChoice {
+  id: string;
+  groupId: string;
+  label: string;
+  displayOrder: number;
+  isActive: boolean;
+}
+
+export interface ProductOptionGroup {
+  id: string;
+  name: string;
+  isRequired: boolean;
+  allowFreeText: boolean;
+  freeTextLabel?: string | null;
+  freeTextMaxLength: number;
+  displayOrder: number;
+  isActive: boolean;
+  choices: ProductOptionChoice[];
 }
 
 export interface HappyHourSettings {

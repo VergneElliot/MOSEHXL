@@ -17,6 +17,7 @@ export interface ProductFormData {
   isHappyHourEligible: boolean;
   happyHourDiscountType: 'percentage' | 'fixed';
   happyHourDiscountValue: string;
+  optionGroupIds: string[];
 }
 
 export interface MenuState {
@@ -63,7 +64,7 @@ export interface MenuActions {
   setCategoryForm: (form: CategoryFormData) => void;
   setProductForm: (form: ProductFormData) => void;
   updateCategoryForm: (field: keyof CategoryFormData, value: string) => void;
-  updateProductForm: (field: keyof ProductFormData, value: string | number | boolean) => void;
+  updateProductForm: (field: keyof ProductFormData, value: string | number | boolean | string[]) => void;
   resetForms: () => void;
 
   // UI actions
@@ -92,6 +93,7 @@ const initialProductForm: ProductFormData = {
   isHappyHourEligible: false,
   happyHourDiscountType: 'percentage',
   happyHourDiscountValue: '0',
+  optionGroupIds: [],
 };
 
 export const useMenuState = (): [MenuState, MenuActions] => {
@@ -146,6 +148,7 @@ export const useMenuState = (): [MenuState, MenuActions] => {
         isHappyHourEligible: product.isHappyHourEligible,
         happyHourDiscountType: product.happyHourDiscountType,
         happyHourDiscountValue: product.happyHourDiscountValue.toString(),
+        optionGroupIds: product.optionGroupIds ?? [],
       });
     } else {
       setEditingProduct(null);
@@ -165,7 +168,7 @@ export const useMenuState = (): [MenuState, MenuActions] => {
     setCategoryForm(prev => ({ ...prev, [field]: value }));
   };
 
-  const updateProductForm = (field: keyof ProductFormData, value: string | number | boolean) => {
+  const updateProductForm = (field: keyof ProductFormData, value: string | number | boolean | string[]) => {
     setProductForm(prev => ({ ...prev, [field]: value }));
   };
 

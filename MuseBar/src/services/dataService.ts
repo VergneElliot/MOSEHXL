@@ -1,4 +1,5 @@
-import { Category, Product } from '../types';
+import { Category, Product, ProductOptionGroup } from '../types';
+import type { ProductOptionGroupFormInput } from './api/productOptionGroups';
 import { ApiService } from './apiService';
 
 export class DataService {
@@ -134,5 +135,24 @@ export class DataService {
     // Fire and forget update; return optimistic value
     void this.updateProduct(id, { isActive: !product.isActive });
     return { ...product, isActive: !product.isActive };
+  }
+
+  public async getProductOptionGroups(): Promise<ProductOptionGroup[]> {
+    return this.apiService.getProductOptionGroups();
+  }
+
+  public async createProductOptionGroup(input: ProductOptionGroupFormInput): Promise<ProductOptionGroup> {
+    return this.apiService.createProductOptionGroup(input);
+  }
+
+  public async updateProductOptionGroup(
+    id: string,
+    input: ProductOptionGroupFormInput
+  ): Promise<ProductOptionGroup> {
+    return this.apiService.updateProductOptionGroup(id, input);
+  }
+
+  public async deleteProductOptionGroup(id: string): Promise<{ message?: string; action?: string }> {
+    return this.apiService.deleteProductOptionGroup(id);
   }
 }
