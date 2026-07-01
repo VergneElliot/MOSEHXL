@@ -129,7 +129,7 @@ router.post('/', menuWrite, asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const { name, price, tax_rate, category_id, happy_hour_discount_percent, happy_hour_discount_fixed, is_happy_hour_eligible, option_group_ids, kitchen_printer_ids } = req.body;
+    const { name, price, tax_rate, category_id, happy_hour_discount_percent, happy_hour_discount_fixed, is_happy_hour_eligible, option_group_ids, kitchen_printer_ids, print_pickup_slip } = req.body;
     const parsedOptionGroupIds = parseOptionGroupIds(option_group_ids);
     const parsedKitchenPrinterIds = parseKitchenPrinterIds(kitchen_printer_ids);
 
@@ -139,7 +139,7 @@ router.post('/', menuWrite, asyncHandler(async (req, res) => {
     if (!category_id || typeof category_id !== 'number') throw new ValidationError('Category ID is required');
 
     const product = await ProductModel.create(
-      { name, price, tax_rate, category_id, happy_hour_discount_percent, happy_hour_discount_fixed, is_happy_hour_eligible: is_happy_hour_eligible !== undefined ? is_happy_hour_eligible : true, is_active: true, establishment_id: establishmentId },
+      { name, price, tax_rate, category_id, happy_hour_discount_percent, happy_hour_discount_fixed, is_happy_hour_eligible: is_happy_hour_eligible !== undefined ? is_happy_hour_eligible : true, print_pickup_slip: print_pickup_slip === true, is_active: true, establishment_id: establishmentId },
       establishmentId
     );
     if (parsedOptionGroupIds) {
@@ -181,6 +181,7 @@ router.put('/:id', menuWrite, validateParams([paramValidations.id]), asyncHandle
     if (req.body.happy_hour_discount_fixed !== undefined) updateData.happy_hour_discount_fixed = req.body.happy_hour_discount_fixed;
     if (req.body.is_happy_hour_eligible !== undefined) updateData.is_happy_hour_eligible = req.body.is_happy_hour_eligible;
     if (req.body.is_active !== undefined) updateData.is_active = req.body.is_active === true;
+    if (req.body.print_pickup_slip !== undefined) updateData.print_pickup_slip = req.body.print_pickup_slip === true;
     const parsedOptionGroupIds = parseOptionGroupIds(req.body.option_group_ids);
     const parsedKitchenPrinterIds = parseKitchenPrinterIds(req.body.kitchen_printer_ids);
 

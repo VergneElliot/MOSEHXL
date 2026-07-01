@@ -19,6 +19,7 @@ export interface ProductFormData {
   happyHourDiscountValue: string;
   optionGroupIds: string[];
   kitchenPrinterIds: string[];
+  printPickupSlip: boolean;
 }
 
 export interface MenuState {
@@ -96,6 +97,7 @@ const initialProductForm: ProductFormData = {
   happyHourDiscountValue: '0',
   optionGroupIds: [],
   kitchenPrinterIds: [],
+  printPickupSlip: false,
 };
 
 export const useMenuState = (): [MenuState, MenuActions] => {
@@ -152,6 +154,7 @@ export const useMenuState = (): [MenuState, MenuActions] => {
         happyHourDiscountValue: product.happyHourDiscountValue.toString(),
         optionGroupIds: product.optionGroupIds ?? [],
         kitchenPrinterIds: product.kitchenPrinterIds ?? [],
+        printPickupSlip: product.printPickupSlip === true,
       });
     } else {
       setEditingProduct(null);

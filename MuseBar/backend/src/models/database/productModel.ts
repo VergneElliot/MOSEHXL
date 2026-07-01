@@ -9,7 +9,8 @@ import { Product, Category } from '../interfaces';
 /** Only these columns may be set by ProductModel.update(); prevents SQL injection via object keys. */
 const ALLOWED_PRODUCT_UPDATE_FIELDS = [
   'name', 'price', 'tax_rate', 'category_id',
-  'happy_hour_discount_percent', 'happy_hour_discount_fixed', 'is_happy_hour_eligible', 'is_active'
+  'happy_hour_discount_percent', 'happy_hour_discount_fixed', 'is_happy_hour_eligible', 'is_active',
+  'print_pickup_slip',
 ] as const;
 
 export const CategoryModel = {
@@ -172,12 +173,29 @@ export const ProductModel = {
     return result.rows;
   },
 
+  async getPrintPickupSlipFlags(
+    establishmentId: string,
+    productIds: number[]
+  ): Promise<Map<number, boolean>> {
+    if (productIds.length === 0) return new Map();
+    const result = await pool.query(
+      `SELECT id, COALESCE(print_pickup_slip, false) AS print_pickup_slip
+       FROM products
+       WHERE establishment_id = $1 AND id = ANY($2::int[])`,
+      [establishmentId, productIds]
+    );
+    return new Map(result.rows.map((row: { id: number; print_pickup_slip: boolean }) => [
+      row.id,
+      row.print_pickup_slip === true,
+    ]));
+  },
+
   async create(product: Omit<Product, 'id' | 'created_at' | 'updated_at'>, establishmentId: string): Promise<Product> {
     const result = await pool.query(
       `INSERT INTO products (
          name, price, tax_rate, category_id, happy_hour_discount_percent,
-         happy_hour_discount_fixed, is_happy_hour_eligible, is_active, establishment_id
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8)
+         happy_hour_discount_fixed, is_happy_hour_eligible, print_pickup_slip, is_active, establishment_id
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, $9)
        RETURNING *`,
       [
         product.name,
@@ -187,6 +205,7 @@ export const ProductModel = {
         product.happy_hour_discount_percent || 0,
         product.happy_hour_discount_fixed || 0,
         product.is_happy_hour_eligible,
+        product.print_pickup_slip === true,
         establishmentId,
       ]
     );

@@ -7,6 +7,7 @@ export interface KitchenDispatchOrderItem {
   product_name: string;
   quantity: number;
   kitchen_printer_ids_snapshot?: unknown;
+  print_pickup_slip_snapshot?: boolean;
   options?: OrderItemOptionRecord[];
 }
 

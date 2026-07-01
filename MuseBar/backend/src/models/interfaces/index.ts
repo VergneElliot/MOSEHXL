@@ -36,6 +36,7 @@ export interface Product {
   happy_hour_discount_percent?: number;
   happy_hour_discount_fixed?: number;
   is_happy_hour_eligible: boolean;
+  print_pickup_slip?: boolean;
   created_at: Date;
   updated_at: Date;
   is_active: boolean;

@@ -60,7 +60,7 @@ function appendKitchenLineItems(parts: string[], lines: KitchenTicketLine[]): vo
 }
 
 export function renderKitchenOrderTicket(input: {
-  orderId: number;
+  ticketDayNumber: number;
   createdAt: Date | string;
   printerName: string;
   lines: KitchenTicketLine[];
@@ -71,7 +71,7 @@ export function renderKitchenOrderTicket(input: {
     ESC_POS.CENTER,
     ESC_POS.BOLD_ON,
     ESC_POS.DOUBLE_SIZE,
-    `COMMANDE #${input.orderId}`,
+    `COMMANDE #${input.ticketDayNumber}`,
     ESC_POS.NORMAL_SIZE,
     ESC_POS.BOLD_OFF,
     ESC_POS.LEFT,
@@ -89,7 +89,7 @@ export function renderKitchenOrderTicket(input: {
 }
 
 /** Minimal slip for the customer — order number only, printed at the counter printer. */
-export function renderCustomerOrderNumberTicket(orderId: number): string {
+export function renderCustomerOrderNumberTicket(ticketDayNumber: number): string {
   const parts = [
     ESC_POS.INIT,
     ESC_POS.CENTER,
@@ -97,7 +97,7 @@ export function renderCustomerOrderNumberTicket(orderId: number): string {
     ESC_POS.DOUBLE_SIZE,
     'COMMANDE',
     '',
-    `#${orderId}`,
+    `#${ticketDayNumber}`,
     ESC_POS.NORMAL_SIZE,
     ESC_POS.BOLD_OFF,
   ];
@@ -107,7 +107,7 @@ export function renderCustomerOrderNumberTicket(orderId: number): string {
 }
 
 export function renderKitchenCancellationTicket(input: {
-  originalOrderId: number;
+  ticketDayNumber: number;
   createdAt: Date | string;
   printerName: string;
   cancellationType: 'full' | 'partial' | 'items-only';
@@ -122,7 +122,7 @@ export function renderKitchenCancellationTicket(input: {
     'ANNULATION',
     ESC_POS.NORMAL_SIZE,
     ESC_POS.BOLD_OFF,
-    `Commande #${input.originalOrderId}`,
+    `Commande #${input.ticketDayNumber}`,
     ESC_POS.LEFT,
     '',
     normalizeThermalText(input.printerName),

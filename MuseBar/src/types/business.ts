@@ -25,6 +25,7 @@ export interface Product {
   optionGroups?: ProductOptionGroup[];
   kitchenPrinterIds?: string[];
   kitchenPrinters?: KitchenPrinter[];
+  printPickupSlip?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

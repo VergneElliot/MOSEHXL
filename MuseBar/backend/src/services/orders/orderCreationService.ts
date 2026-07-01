@@ -1,5 +1,6 @@
 import { pool } from '../../db/pool';
 import { OrderItemModel, OrderModel, SubBillModel } from '../../models';
+import { ProductModel } from '../../models/database/productModel';
 import { OrderItemOptionModel, type OrderItemOptionSnapshotInput } from '../../models/database/orderItemOptionModel';
 import { AuditTrailModel } from '../../models/auditTrail';
 import type { Order } from '../../models/interfaces';
@@ -86,6 +87,7 @@ export async function createOrderWithCompliance(
     .filter((id): id is number => id != null && Number.isInteger(id) && id > 0);
   const assignedGroupsByProduct = await loadAssignedGroupsByProduct(establishmentId, productIds);
   const kitchenPrintersByProduct = await loadKitchenPrinterSnapshotsByProduct(establishmentId, productIds);
+  const printPickupSlipByProduct = await ProductModel.getPrintPickupSlipFlags(establishmentId, productIds);
 
   const validatedSnapshots: OrderItemOptionSnapshotInput[][] = [];
   for (const item of items) {
@@ -125,6 +127,8 @@ export async function createOrderWithCompliance(
   for (const [index, item] of items.entries()) {
     const kitchenPrinterSnapshot: KitchenPrinterLineSnapshot[] =
       item.product_id != null ? kitchenPrintersByProduct.get(item.product_id) ?? [] : [];
+    const printPickupSlipSnapshot =
+      item.product_id != null ? printPickupSlipByProduct.get(item.product_id) === true : false;
     const createdItem = await OrderItemModel.create(
       {
         order_id: order.id,
@@ -140,6 +144,7 @@ export async function createOrderWithCompliance(
         is_manual_happy_hour: item.is_manual_happy_hour === true,
         description: item.description || '',
         kitchen_printer_ids_snapshot: kitchenPrinterSnapshot,
+        print_pickup_slip_snapshot: printPickupSlipSnapshot,
       },
       establishmentId
     );
