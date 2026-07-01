@@ -1,7 +1,8 @@
 # 04 - Operational Controls
 
-Status: Draft operational policy  
+Status: Draft operational policy — **paused 2026-07-01** (controls not executed)  
 Owner to complete: production operator / MOSEHXL publisher  
+Resume record: `00-PAUSE-CHECKPOINT.md`
 
 ---
 

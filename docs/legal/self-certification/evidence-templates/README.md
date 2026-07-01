@@ -1,6 +1,6 @@
 # Operational Evidence Templates
 
-Status: Templates - fill during release freeze and production operations.
+Status: Templates — fill when resuming self-cert (paused 2026-07-01; see `../00-PAUSE-CHECKPOINT.md`).
 
 These files are meant to be copied into a dated evidence folder when the
 operator performs a real control:
