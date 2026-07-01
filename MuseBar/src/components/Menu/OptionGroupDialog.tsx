@@ -13,7 +13,7 @@ import {
   IconButton,
   Divider,
 } from '@mui/material';
-import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { Add as AddIcon, ArrowDownward, ArrowUpward, Delete as DeleteIcon } from '@mui/icons-material';
 import { ProductOptionGroup } from '../../types';
 import { OptionGroupFormData } from '../../hooks/useProductOptionGroups';
 
@@ -58,6 +58,18 @@ const OptionGroupDialog: React.FC<OptionGroupDialogProps> = ({
       'choices',
       form.choices.filter((_, choiceIndex) => choiceIndex !== index)
     );
+  };
+
+  const moveChoice = (index: number, direction: -1 | 1) => {
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= form.choices.length) return;
+    const choices = [...form.choices];
+    const current = choices[index];
+    const target = choices[targetIndex];
+    if (!current || !target) return;
+    choices[index] = target;
+    choices[targetIndex] = current;
+    updateField('choices', choices);
   };
 
   return (
@@ -129,6 +141,20 @@ const OptionGroupDialog: React.FC<OptionGroupDialogProps> = ({
                   fullWidth
                   placeholder="Ex: Saignant, À point, Bien cuit"
                 />
+                <IconButton
+                  aria-label="Monter la valeur"
+                  onClick={() => moveChoice(index, -1)}
+                  disabled={index === 0}
+                >
+                  <ArrowUpward fontSize="small" />
+                </IconButton>
+                <IconButton
+                  aria-label="Descendre la valeur"
+                  onClick={() => moveChoice(index, 1)}
+                  disabled={index === form.choices.length - 1}
+                >
+                  <ArrowDownward fontSize="small" />
+                </IconButton>
                 <IconButton
                   aria-label="Supprimer la valeur"
                   onClick={() => removeChoice(index)}

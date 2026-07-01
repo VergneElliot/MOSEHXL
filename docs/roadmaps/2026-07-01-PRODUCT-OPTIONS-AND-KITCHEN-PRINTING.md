@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-01  
 **Branch baseline:** `development` (HEAD `722b4df`)  
-**Status:** In progress — Phase 5 done (2026-07-01)  
+**Status:** Complete — Phase 6 done (2026-07-01)  
 **Branch baseline:** `development`  
 **Scope:** Reusable product parameters (presets + free text), POS capture, kitchen/bar order tickets routed to named printers, cancellation tickets. Fiscal receipts and invoices unchanged.
 
@@ -600,6 +600,10 @@ Each phase = one PR series + patch note + green CI before next phase.
 
 ### Phase 6 — Hardening & polish (effort: S)
 
+**Status:** Done on 2026-07-01. See `docs/patch-notes/430-PRODUCT-OPTIONS-PHASE6-HARDENING-POLISH-IMPLEMENTATION.md`.
+
+**Goal:** Production-ready polish and documentation.
+
 **Steps:**
 
 1. Software event logging when kitchen enqueue fails.
@@ -610,8 +614,10 @@ Each phase = one PR series + patch note + green CI before next phase.
 
 **Acceptance:**
 
-- [ ] Failed ticket logged; order still completed.
-- [ ] Docs/runbook complete.
+- [x] Failed ticket logged; order still completed.
+- [x] Docs/runbook complete.
+
+**Patch note:** `430-PRODUCT-OPTIONS-PHASE6-HARDENING-POLISH-IMPLEMENTATION.md`
 
 ---
 

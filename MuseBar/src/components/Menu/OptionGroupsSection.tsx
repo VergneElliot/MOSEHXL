@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import {
   Add as AddIcon,
+  ContentCopy as ContentCopyIcon,
   Delete as DeleteIcon,
   Edit as EditIcon,
   ExpandMore as ExpandMoreIcon,
@@ -25,6 +26,7 @@ interface OptionGroupsSectionProps {
   groups: ProductOptionGroup[];
   onCreateGroup: () => void;
   onEditGroup: (group: ProductOptionGroup) => void;
+  onDuplicateGroup: (group: ProductOptionGroup) => void;
   onDeleteGroup: (id: string) => void;
 }
 
@@ -32,6 +34,7 @@ const OptionGroupsSection: React.FC<OptionGroupsSectionProps> = ({
   groups,
   onCreateGroup,
   onEditGroup,
+  onDuplicateGroup,
   onDeleteGroup,
 }) => {
   return (
@@ -81,6 +84,9 @@ const OptionGroupsSection: React.FC<OptionGroupsSectionProps> = ({
                       <Box>
                         <IconButton aria-label="Modifier le paramètre" onClick={() => onEditGroup(group)}>
                           <EditIcon />
+                        </IconButton>
+                        <IconButton aria-label="Dupliquer le paramètre" onClick={() => onDuplicateGroup(group)}>
+                          <ContentCopyIcon />
                         </IconButton>
                         <IconButton aria-label="Supprimer le paramètre" onClick={() => onDeleteGroup(group.id)}>
                           <DeleteIcon />
