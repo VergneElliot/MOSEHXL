@@ -1,5 +1,9 @@
 import { ESC_POS } from '../printing/types';
 import type { KitchenTicketLine } from './kitchenTicketTypes';
+import {
+  appendKitchenTicketFooter,
+  kitchenTicketAlertSequence,
+} from './kitchenTicketFooter';
 
 function normalizeThermalText(content: string): string {
   const replaced = content
@@ -35,10 +39,23 @@ function formatTimestamp(value: Date | string): string {
 
 function formatOptionLine(option: KitchenTicketLine['options'][number]): string | null {
   const freeText = option.free_text?.trim();
-  if (freeText) return `   ${freeText}`;
+  if (freeText) return `  ${freeText}`;
   const choice = option.choice_label?.trim();
-  if (choice) return `   ${option.group_name}: ${choice}`;
+  if (choice) return `  ${option.group_name}: ${choice}`;
   return null;
+}
+
+function appendKitchenLineItems(parts: string[], lines: KitchenTicketLine[]): void {
+  parts.push(ESC_POS.BOLD_ON, ESC_POS.DOUBLE_SIZE);
+  for (const line of lines) {
+    parts.push(`${line.quantity}x ${normalizeThermalText(line.product_name)}`);
+    for (const option of line.options) {
+      const rendered = formatOptionLine(option);
+      if (rendered) parts.push(normalizeThermalText(rendered));
+    }
+    parts.push('');
+  }
+  parts.push(ESC_POS.NORMAL_SIZE, ESC_POS.BOLD_OFF);
 }
 
 export function renderKitchenOrderTicket(input: {
@@ -49,6 +66,7 @@ export function renderKitchenOrderTicket(input: {
 }): string {
   const parts = [
     ESC_POS.INIT,
+    kitchenTicketAlertSequence(),
     ESC_POS.CENTER,
     ESC_POS.BOLD_ON,
     ESC_POS.DOUBLE_SIZE,
@@ -63,16 +81,9 @@ export function renderKitchenOrderTicket(input: {
     '',
   ];
 
-  for (const line of input.lines) {
-    parts.push(`${line.quantity}x ${normalizeThermalText(line.product_name)}`);
-    for (const option of line.options) {
-      const rendered = formatOptionLine(option);
-      if (rendered) parts.push(normalizeThermalText(rendered));
-    }
-    parts.push('');
-  }
+  appendKitchenLineItems(parts, input.lines);
 
-  parts.push('--------------------------------', '', ESC_POS.PARTIAL_CUT);
+  appendKitchenTicketFooter(parts);
   return parts.join('\n');
 }
 
@@ -85,6 +96,7 @@ export function renderKitchenCancellationTicket(input: {
 }): string {
   const parts = [
     ESC_POS.INIT,
+    kitchenTicketAlertSequence(),
     ESC_POS.CENTER,
     ESC_POS.BOLD_ON,
     ESC_POS.DOUBLE_SIZE,
@@ -101,15 +113,8 @@ export function renderKitchenCancellationTicket(input: {
     '',
   ];
 
-  for (const line of input.lines) {
-    parts.push(`${line.quantity}x ${normalizeThermalText(line.product_name)}`);
-    for (const option of line.options) {
-      const rendered = formatOptionLine(option);
-      if (rendered) parts.push(normalizeThermalText(rendered));
-    }
-    parts.push('');
-  }
+  appendKitchenLineItems(parts, input.lines);
 
-  parts.push('--------------------------------', '', ESC_POS.PARTIAL_CUT);
+  appendKitchenTicketFooter(parts);
   return parts.join('\n');
 }

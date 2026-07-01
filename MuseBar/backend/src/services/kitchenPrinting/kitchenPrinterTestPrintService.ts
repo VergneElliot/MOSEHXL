@@ -3,11 +3,13 @@ import type { Pool } from 'pg';
 import { createBridgePrintJob } from '../../printing/bridgePrintJobRepo';
 import type { KitchenPrinter } from '../../models/database/kitchenPrinterModel';
 import { ESC_POS } from '../printing/types';
+import { kitchenTicketAlertSequence } from './kitchenTicketFooter';
 
 function buildKitchenTestTicket(printer: KitchenPrinter): string {
   const now = new Date().toLocaleString('fr-FR');
   const lines = [
     ESC_POS.INIT,
+    kitchenTicketAlertSequence(),
     ESC_POS.CENTER,
     ESC_POS.BOLD_ON,
     'TEST IMPRIMANTE',
