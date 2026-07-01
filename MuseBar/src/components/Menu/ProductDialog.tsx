@@ -17,8 +17,10 @@ import {
   FormControlLabel,
   Switch,
   Divider,
+  Checkbox,
+  FormGroup,
 } from '@mui/material';
-import { Product, Category } from '../../types';
+import { Product, Category, ProductOptionGroup } from '../../types';
 import { ProductFormData } from '../../hooks/useMenuState';
 
 type ProductFormValue = ProductFormData[keyof ProductFormData];
@@ -31,6 +33,7 @@ interface ProductDialogProps {
   onFormChange: (field: keyof ProductFormData, value: ProductFormValue) => void;
   editingProduct: Product | null;
   categories: Category[];
+  optionGroups: ProductOptionGroup[];
   loading: boolean;
   error: string | null;
 }
@@ -43,10 +46,19 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   onFormChange,
   editingProduct,
   categories,
+  optionGroups,
   loading,
   error,
 }) => {
   const isEditing = !!editingProduct;
+
+  const toggleOptionGroup = (groupId: string) => {
+    const current = form.optionGroupIds ?? [];
+    const next = current.includes(groupId)
+      ? current.filter((id) => id !== groupId)
+      : [...current, groupId];
+    onFormChange('optionGroupIds', next);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -218,6 +230,46 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                 )}
               </Box>
             </Box>
+
+            {optionGroups.length > 0 && (
+              <>
+                <Divider />
+                <Box>
+                  <Typography variant="subtitle1" gutterBottom>
+                    Paramètres à la commande
+                  </Typography>
+                  <FormGroup>
+                    {optionGroups.map((group) => (
+                      <FormControlLabel
+                        key={group.id}
+                        control={
+                          <Checkbox
+                            checked={form.optionGroupIds.includes(group.id)}
+                            onChange={() => toggleOptionGroup(group.id)}
+                          />
+                        }
+                        label={
+                          <Box>
+                            <Typography variant="body2">{group.name}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {[
+                                group.isRequired ? 'obligatoire' : 'optionnel',
+                                group.allowFreeText ? 'note libre' : null,
+                                group.choices.length > 0
+                                  ? group.choices.map((choice) => choice.label).join(', ')
+                                  : null,
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </Typography>
+                          </Box>
+                        }
+                      />
+                    ))}
+                  </FormGroup>
+                </Box>
+              </>
+            )}
 
             {/* Price Preview */}
             {form.price && (

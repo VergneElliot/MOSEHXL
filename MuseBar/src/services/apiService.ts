@@ -1,6 +1,7 @@
-import { Category, Product, Order, OrderItem } from '../types';
+import { Category, Product, ProductOptionGroup, Order, OrderItem } from '../types';
 import type { LiveMonthlyStats } from '../types/api';
-import { apiCore, categoriesApi, productsApi, ordersApi, legalApi } from './api';
+import { apiCore, categoriesApi, productsApi, productOptionGroupsApi, ordersApi, legalApi } from './api';
+import type { ProductOptionGroupFormInput } from './api/productOptionGroups';
 
 export class ApiService {
   private static instance: ApiService;
@@ -54,6 +55,23 @@ export class ApiService {
   async deleteProduct(id: string): Promise<{ message?: string; action?: string }> { return productsApi.deleteProduct(id); }
 
   async restoreProduct(id: string): Promise<void> { return productsApi.restoreProduct(id); }
+
+  // Product option groups (menu parameters)
+  async getProductOptionGroups(): Promise<ProductOptionGroup[]> {
+    return productOptionGroupsApi.getProductOptionGroups();
+  }
+
+  async createProductOptionGroup(input: ProductOptionGroupFormInput): Promise<ProductOptionGroup> {
+    return productOptionGroupsApi.createProductOptionGroup(input);
+  }
+
+  async updateProductOptionGroup(id: string, input: ProductOptionGroupFormInput): Promise<ProductOptionGroup> {
+    return productOptionGroupsApi.updateProductOptionGroup(id, input);
+  }
+
+  async deleteProductOptionGroup(id: string): Promise<{ message?: string; action?: string }> {
+    return productOptionGroupsApi.deleteProductOptionGroup(id);
+  }
 
   // Orders
   async getOrders(params?: { limit?: number; offset?: number }): Promise<{ orders: Order[]; total: number }> {

@@ -1,6 +1,8 @@
 import express from 'express';
 import { ProductModel } from '../models';
+import { ProductOptionGroupModel } from '../models/database/productOptionGroupModel';
 import { AuditTrailModel } from '../models/auditTrail';
+import { enrichProductsWithOptionCatalog } from '../services/productOptions/productOptionCatalogService';
 import { getEstablishmentId, requireAuth, requireAnyPermission, requirePermission } from './auth';
 import { P } from '../permissions/registry';
 import { validateParams, paramValidations } from '../middleware/validation';
@@ -11,6 +13,17 @@ const router = express.Router();
 
 const readCatalog = requireAnyPermission([P.access_pos, P.access_menu]);
 const menuWrite = requirePermission(P.access_menu);
+
+function parseOptionGroupIds(value: unknown): number[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) throw new ValidationError('option_group_ids must be an array');
+  const ids = value.map((entry) => {
+    const id = Number(entry);
+    if (!Number.isInteger(id) || id < 1) throw new ValidationError('option_group_ids contains an invalid id');
+    return id;
+  });
+  return [...new Set(ids)];
+}
 
 async function logAuditOrThrow(
   entry: Parameters<typeof AuditTrailModel.logAction>[0],
@@ -36,7 +49,7 @@ router.get('/', readCatalog, asyncHandler(async (req, res) => {
   if (!establishmentId) return;
   try {
     const products = await ProductModel.getAll(establishmentId);
-    res.json(products);
+    res.json(await enrichProductsWithOptionCatalog(products, establishmentId));
   } catch {
     throw new AppError('Failed to fetch products', 500, 'PRODUCTS_FETCH_FAILED');
   }
@@ -48,7 +61,7 @@ router.get('/archived', readCatalog, asyncHandler(async (req, res) => {
   if (!establishmentId) return;
   try {
     const products = await ProductModel.getAllArchived(establishmentId);
-    res.json(products);
+    res.json(await enrichProductsWithOptionCatalog(products, establishmentId));
   } catch {
     throw new AppError('Failed to fetch archived products', 500, 'PRODUCTS_ARCHIVED_FETCH_FAILED');
   }
@@ -60,7 +73,7 @@ router.get('/all', readCatalog, asyncHandler(async (req, res) => {
   if (!establishmentId) return;
   try {
     const products = await ProductModel.getAllIncludingArchived(establishmentId);
-    res.json(products);
+    res.json(await enrichProductsWithOptionCatalog(products, establishmentId));
   } catch {
     throw new AppError('Failed to fetch all products', 500, 'PRODUCTS_ALL_FETCH_FAILED');
   }
@@ -77,7 +90,7 @@ router.get(
   try {
     const categoryId = parseInt(req.params.categoryId ?? '', 10);
     const products = await ProductModel.getByCategory(categoryId, establishmentId);
-    res.json(products);
+    res.json(await enrichProductsWithOptionCatalog(products, establishmentId));
   } catch {
     throw new AppError('Failed to fetch products by category', 500, 'PRODUCTS_BY_CATEGORY_FETCH_FAILED');
   }
@@ -92,7 +105,8 @@ router.get('/:id', readCatalog, validateParams([paramValidations.id]), asyncHand
     const id = parseInt(req.params.id ?? '', 10);
     const product = await ProductModel.getById(id, establishmentId);
     if (!product) throw new NotFoundError('Product');
-    res.json(product);
+    const [enriched] = await enrichProductsWithOptionCatalog([product], establishmentId);
+    res.json(enriched);
   } catch {
     throw new AppError('Failed to fetch product', 500, 'PRODUCT_FETCH_FAILED');
   }
@@ -103,7 +117,8 @@ router.post('/', menuWrite, asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const { name, price, tax_rate, category_id, happy_hour_discount_percent, happy_hour_discount_fixed, is_happy_hour_eligible } = req.body;
+    const { name, price, tax_rate, category_id, happy_hour_discount_percent, happy_hour_discount_fixed, is_happy_hour_eligible, option_group_ids } = req.body;
+    const parsedOptionGroupIds = parseOptionGroupIds(option_group_ids);
 
     if (!name || typeof name !== 'string') throw new ValidationError('Product name is required');
     if (price === undefined || typeof price !== 'number' || price <= 0) throw new ValidationError('Valid price is required');
@@ -114,16 +129,20 @@ router.post('/', menuWrite, asyncHandler(async (req, res) => {
       { name, price, tax_rate, category_id, happy_hour_discount_percent, happy_hour_discount_fixed, is_happy_hour_eligible: is_happy_hour_eligible !== undefined ? is_happy_hour_eligible : true, is_active: true, establishment_id: establishmentId },
       establishmentId
     );
+    if (parsedOptionGroupIds) {
+      await ProductOptionGroupModel.setProductAssignments(product.id, parsedOptionGroupIds, establishmentId);
+    }
+    const [enriched] = await enrichProductsWithOptionCatalog([product], establishmentId);
     await logAuditOrThrow({
       user_id: String(req.user!.id),
       action_type: 'CREATE_PRODUCT',
       resource_type: 'PRODUCT',
       resource_id: String(product.id),
-      action_details: { name, price, tax_rate, category_id, establishmentId },
+      action_details: { name, price, tax_rate, category_id, option_group_ids: parsedOptionGroupIds, establishmentId },
       ip_address: req.ip,
       user_agent: req.headers['user-agent'],
     }, 'CREATE_PRODUCT');
-    res.status(201).json(product);
+    res.status(201).json(enriched);
   } catch (error) {
     if (error instanceof AppError) throw error;
     Logger.getInstance().error('Create product failed', error as Error, 'PRODUCTS_ROUTE');
@@ -146,21 +165,30 @@ router.put('/:id', menuWrite, validateParams([paramValidations.id]), asyncHandle
     if (req.body.happy_hour_discount_fixed !== undefined) updateData.happy_hour_discount_fixed = req.body.happy_hour_discount_fixed;
     if (req.body.is_happy_hour_eligible !== undefined) updateData.is_happy_hour_eligible = req.body.is_happy_hour_eligible;
     if (req.body.is_active !== undefined) updateData.is_active = req.body.is_active === true;
+    const parsedOptionGroupIds = parseOptionGroupIds(req.body.option_group_ids);
 
-    if (Object.keys(updateData).length === 0) throw new ValidationError('No valid fields to update');
+    if (Object.keys(updateData).length === 0 && parsedOptionGroupIds === undefined) {
+      throw new ValidationError('No valid fields to update');
+    }
 
-    const product = await ProductModel.update(id, updateData, establishmentId);
+    const product = Object.keys(updateData).length > 0
+      ? await ProductModel.update(id, updateData, establishmentId)
+      : await ProductModel.getById(id, establishmentId);
     if (!product) throw new NotFoundError('Product');
+    if (parsedOptionGroupIds !== undefined) {
+      await ProductOptionGroupModel.setProductAssignments(id, parsedOptionGroupIds, establishmentId);
+    }
+    const [enriched] = await enrichProductsWithOptionCatalog([product], establishmentId);
     await logAuditOrThrow({
       user_id: String(req.user!.id),
       action_type: 'UPDATE_PRODUCT',
       resource_type: 'PRODUCT',
       resource_id: String(id),
-      action_details: updateData,
+      action_details: { ...updateData, option_group_ids: parsedOptionGroupIds },
       ip_address: req.ip,
       user_agent: req.headers['user-agent'],
     }, 'UPDATE_PRODUCT');
-    res.json(product);
+    res.json(enriched);
   } catch (error) {
     if (error instanceof AppError) throw error;
     Logger.getInstance().error('Update product failed', error as Error, 'PRODUCTS_ROUTE');

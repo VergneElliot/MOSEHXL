@@ -74,6 +74,34 @@ export interface ProductRecord {
   is_active?: boolean;
   created_at: string | Date;
   updated_at: string | Date;
+  option_group_ids?: number[];
+  option_groups?: ProductOptionGroupRecord[];
+}
+
+export interface ProductOptionChoiceRecord {
+  id: number;
+  group_id: number;
+  establishment_id?: string;
+  label: string;
+  display_order: number;
+  is_active: boolean;
+  created_at?: string | Date;
+  updated_at?: string | Date;
+}
+
+export interface ProductOptionGroupRecord {
+  id: number;
+  establishment_id?: string;
+  name: string;
+  is_required: boolean;
+  allow_free_text: boolean;
+  free_text_label?: string | null;
+  free_text_max_length: number;
+  display_order: number;
+  is_active: boolean;
+  choices: ProductOptionChoiceRecord[];
+  created_at?: string | Date;
+  updated_at?: string | Date;
 }
 
 export interface CategoryRecord {

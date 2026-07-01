@@ -139,6 +139,7 @@ export const useMenuAPI = (
           price: parseFloat(productData.price),
           happyHourDiscountValue: parseFloat(productData.happyHourDiscountValue),
           isActive: true,
+          optionGroupIds: productData.optionGroupIds,
         };
         await dataService.createProduct(processedData);
         showSuccess('Produit créé avec succès');
@@ -160,6 +161,7 @@ export const useMenuAPI = (
           price: parseFloat(productData.price),
           happyHourDiscountValue: parseFloat(productData.happyHourDiscountValue),
           isActive: true,
+          optionGroupIds: productData.optionGroupIds,
         };
         await dataService.updateProduct(id, processedData);
         showSuccess('Produit mis à jour avec succès');
