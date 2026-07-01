@@ -10,7 +10,7 @@ import {
 describe('kitchenTicketRenderer', () => {
   it('renders order header, lines, and options without prices', () => {
     const ticket = renderKitchenOrderTicket({
-      orderId: 42,
+      ticketDayNumber: 3,
       createdAt: '2026-07-01T14:30:00.000Z',
       printerName: 'Bar',
       lines: [
@@ -22,7 +22,7 @@ describe('kitchenTicketRenderer', () => {
       ],
     });
 
-    expect(ticket).toContain('COMMANDE #42');
+    expect(ticket).toContain('COMMANDE #3');
     expect(ticket).toContain('2x Mojito');
     expect(ticket).toContain('sans citron');
     expect(ticket).toContain(ESC_POS.DOUBLE_SIZE);
@@ -32,18 +32,18 @@ describe('kitchenTicketRenderer', () => {
     expect(ticket).not.toMatch(/\d+[.,]\d{2}/);
   });
 
-  it('renders customer pickup slip with order number only', () => {
-    const ticket = renderCustomerOrderNumberTicket(42);
+  it('renders customer pickup slip with ticket day number only', () => {
+    const ticket = renderCustomerOrderNumberTicket(3);
     expect(ticket).toContain('COMMANDE');
-    expect(ticket).toContain('#42');
+    expect(ticket).toContain('#3');
     expect(ticket).not.toContain('Mojito');
     expect(ticket).toContain(ESC_POS.DOUBLE_SIZE);
     expect(ticket).not.toContain(ESC_POS.BEEP);
   });
 
-  it('renders cancellation header with original order id', () => {
+  it('renders cancellation header with ticket day number', () => {
     const ticket = renderKitchenCancellationTicket({
-      originalOrderId: 20,
+      ticketDayNumber: 3,
       createdAt: '2026-07-01T14:32:00.000Z',
       printerName: 'Cuisine',
       cancellationType: 'full',
@@ -51,7 +51,7 @@ describe('kitchenTicketRenderer', () => {
     });
 
     expect(ticket).toContain('ANNULATION');
-    expect(ticket).toContain('Commande #20');
+    expect(ticket).toContain('Commande #3');
     expect(ticket).toContain('1x Entrecote');
     expect(ticket).toContain('Cuisson: Bien cuit');
   });

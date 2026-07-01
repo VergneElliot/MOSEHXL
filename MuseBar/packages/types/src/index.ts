@@ -51,6 +51,7 @@ export interface OrderItem {
   created_at: Date;
   options?: OrderItemOptionRecord[];
   kitchen_printer_ids_snapshot?: KitchenPrinterLineSnapshotRecord[];
+  print_pickup_slip_snapshot?: boolean;
 }
 
 export interface KitchenPrinterLineSnapshotRecord {
@@ -112,6 +113,7 @@ export interface ProductRecord {
   option_groups?: ProductOptionGroupRecord[];
   kitchen_printer_ids?: number[];
   kitchen_printers?: KitchenPrinterRecord[];
+  print_pickup_slip?: boolean;
 }
 
 export interface ProductOptionChoiceRecord {

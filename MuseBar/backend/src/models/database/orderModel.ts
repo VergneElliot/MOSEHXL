@@ -106,17 +106,18 @@ export const OrderItemModel = {
 
   async create(item: Omit<OrderItem, 'id' | 'created_at'> & {
     kitchen_printer_ids_snapshot?: KitchenPrinterLineSnapshot[];
+    print_pickup_slip_snapshot?: boolean;
   }, establishmentId: string): Promise<OrderItem> {
     const snapshot = JSON.stringify(item.kitchen_printer_ids_snapshot ?? []);
     const result = await pool.query(
       `INSERT INTO order_items (
          order_id, product_id, product_name, quantity, unit_price, total_price,
-         tax_rate, tax_amount, happy_hour_applied, happy_hour_discount_amount, is_manual_happy_hour, description, kitchen_printer_ids_snapshot, establishment_id
+         tax_rate, tax_amount, happy_hour_applied, happy_hour_discount_amount, is_manual_happy_hour, description, kitchen_printer_ids_snapshot, print_pickup_slip_snapshot, establishment_id
        )
        SELECT
-         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, o.establishment_id
+         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, o.establishment_id
        FROM orders o
-       WHERE o.id = $1 AND o.establishment_id = $14
+       WHERE o.id = $1 AND o.establishment_id = $15
        RETURNING *`,
       [
         item.order_id,
@@ -132,6 +133,7 @@ export const OrderItemModel = {
         item.is_manual_happy_hour === true,
         item.description || '',
         snapshot,
+        item.print_pickup_slip_snapshot === true,
         establishmentId
       ]
     );

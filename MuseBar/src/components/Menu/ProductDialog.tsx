@@ -313,6 +313,25 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
               </>
             )}
 
+            <Divider />
+            <Box>
+              <Typography variant="subtitle1" gutterBottom>
+                Ticket client
+              </Typography>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={form.printPickupSlip}
+                    onChange={(e) => onFormChange('printPickupSlip', e.target.checked)}
+                  />
+                }
+                label="Ticket numéro de commande"
+              />
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ ml: 7 }}>
+                Imprime un petit ticket avec le numéro de commande sur l&apos;imprimante comptoir au paiement
+              </Typography>
+            </Box>
+
             {/* Price Preview */}
             {form.price && (
               <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>

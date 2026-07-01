@@ -2,6 +2,10 @@ import type { Pool } from 'pg';
 
 import { createBridgePrintJob } from '../../printing/bridgePrintJobRepo';
 import { logSoftwareEventBestEffort } from '../legal/softwareEventJournal';
+import {
+  allocateKitchenTicketDayNumber,
+  getKitchenTicketDayNumberForOrder,
+} from './kitchenTicketDayNumberService';
 import { groupKitchenTicketLinesByPrinter, type KitchenDispatchOrderItem } from './kitchenTicketGrouping';
 import {
   renderCustomerOrderNumberTicket,
@@ -27,56 +31,93 @@ export interface DispatchKitchenTicketsResult {
   jobIds: string[];
 }
 
+function shouldPrintPickupSlip(items: KitchenDispatchOrderItem[]): boolean {
+  return items.some((item) => item.print_pickup_slip_snapshot === true);
+}
+
 export async function dispatchKitchenTicketsForCompletedOrder(
   pool: Pool,
   input: DispatchKitchenTicketsInput
 ): Promise<DispatchKitchenTicketsResult> {
   const groups = groupKitchenTicketLinesByPrinter(input.items);
+  const wantsPickup = shouldPrintPickupSlip(input.items);
   const jobIds: string[] = [];
   let failures = 0;
 
-  if (groups.length === 0) {
+  if (groups.length === 0 && !wantsPickup) {
     return { enqueued: 0, failures: 0, jobIds };
   }
 
-  try {
-    const pickupPayload = renderCustomerOrderNumberTicket(input.order.id);
-    const pickupJob = await createBridgePrintJob(pool, {
-      establishmentId: input.establishmentId,
-      documentType: 'order_pickup_number',
-      payloadFormat: 'escpos',
-      payloadBase64: Buffer.from(pickupPayload, 'latin1').toString('base64'),
-      createdByUserId: input.createdByUserId ?? null,
-      metadata: {
-        order_id: input.order.id,
-        ticket_kind: 'pickup_number',
-      },
-    });
-    jobIds.push(pickupJob.id);
-  } catch (error) {
-    failures += 1;
-    const err = error instanceof Error ? error : new Error(String(error));
-    input.logger?.error(
-      `Failed to enqueue customer pickup number ticket for order ${input.order.id}`,
-      err,
-      'KITCHEN_PRINT'
-    );
-    await logSoftwareEventBestEffort({
-      establishmentId: input.establishmentId,
-      eventType: 'KITCHEN_TICKET_ENQUEUE_FAILED',
-      eventData: {
-        order_id: input.order.id,
-        ticket_kind: 'pickup_number',
-        error: err.message,
-      },
-      userId: input.createdByUserId != null ? String(input.createdByUserId) : undefined,
-    });
+  let ticketDayNumber: number | null = null;
+  if (groups.length > 0) {
+    try {
+      ticketDayNumber = await allocateKitchenTicketDayNumber(pool, {
+        establishmentId: input.establishmentId,
+        orderId: input.order.id,
+        referenceDate: input.order.created_at,
+      });
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      input.logger?.error(
+        `Failed to allocate kitchen ticket day number for order ${input.order.id}`,
+        err,
+        'KITCHEN_PRINT'
+      );
+      await logSoftwareEventBestEffort({
+        establishmentId: input.establishmentId,
+        eventType: 'KITCHEN_TICKET_ENQUEUE_FAILED',
+        eventData: {
+          order_id: input.order.id,
+          ticket_kind: 'day_number_allocation',
+          error: err.message,
+        },
+        userId: input.createdByUserId != null ? String(input.createdByUserId) : undefined,
+      });
+    }
+  }
+
+  if (wantsPickup) {
+    try {
+      const pickupDisplayNumber = ticketDayNumber ?? input.order.id;
+      const pickupPayload = renderCustomerOrderNumberTicket(pickupDisplayNumber);
+      const pickupJob = await createBridgePrintJob(pool, {
+        establishmentId: input.establishmentId,
+        documentType: 'order_pickup_number',
+        payloadFormat: 'escpos',
+        payloadBase64: Buffer.from(pickupPayload, 'latin1').toString('base64'),
+        createdByUserId: input.createdByUserId ?? null,
+        metadata: {
+          order_id: input.order.id,
+          ticket_kind: 'pickup_number',
+          ...(ticketDayNumber != null ? { kitchen_ticket_day_number: ticketDayNumber } : {}),
+        },
+      });
+      jobIds.push(pickupJob.id);
+    } catch (error) {
+      failures += 1;
+      const err = error instanceof Error ? error : new Error(String(error));
+      input.logger?.error(
+        `Failed to enqueue customer pickup number ticket for order ${input.order.id}`,
+        err,
+        'KITCHEN_PRINT'
+      );
+      await logSoftwareEventBestEffort({
+        establishmentId: input.establishmentId,
+        eventType: 'KITCHEN_TICKET_ENQUEUE_FAILED',
+        eventData: {
+          order_id: input.order.id,
+          ticket_kind: 'pickup_number',
+          error: err.message,
+        },
+        userId: input.createdByUserId != null ? String(input.createdByUserId) : undefined,
+      });
+    }
   }
 
   for (const group of groups) {
     try {
       const payload = renderKitchenOrderTicket({
-        orderId: input.order.id,
+        ticketDayNumber: ticketDayNumber ?? input.order.id,
         createdAt: input.order.created_at,
         printerName: group.printer.name,
         lines: group.lines,
@@ -92,6 +133,7 @@ export async function dispatchKitchenTicketsForCompletedOrder(
           kitchen_printer_slug: group.printer.slug,
           kitchen_printer_name: group.printer.name,
           order_id: input.order.id,
+          kitchen_ticket_day_number: ticketDayNumber ?? undefined,
           ticket_kind: 'order',
           lines: group.lines.map((line) => ({
             quantity: line.quantity,
@@ -141,11 +183,17 @@ export async function dispatchKitchenTicketsForCancellation(
   const jobIds: string[] = [];
   let failures = 0;
   const createdAt = new Date();
+  const ticketDayNumber = await getKitchenTicketDayNumberForOrder(
+    pool,
+    input.establishmentId,
+    input.originalOrderId
+  );
+  const displayNumber = ticketDayNumber ?? input.originalOrderId;
 
   for (const group of groups) {
     try {
       const payload = renderKitchenCancellationTicket({
-        originalOrderId: input.originalOrderId,
+        ticketDayNumber: displayNumber,
         createdAt,
         printerName: group.printer.name,
         cancellationType: input.cancellationType,
@@ -163,6 +211,7 @@ export async function dispatchKitchenTicketsForCancellation(
           kitchen_printer_name: group.printer.name,
           order_id: input.originalOrderId,
           original_order_id: input.originalOrderId,
+          ...(ticketDayNumber != null ? { kitchen_ticket_day_number: ticketDayNumber } : {}),
           ticket_kind: 'cancellation',
           cancellation_type: input.cancellationType,
           lines: group.lines.map((line) => ({

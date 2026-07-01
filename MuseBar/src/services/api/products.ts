@@ -87,6 +87,7 @@ function mapProduct(prod: ProductRecord): Product {
     optionGroups: (prod.option_groups ?? []).map(mapOptionGroup),
     kitchenPrinterIds: (prod.kitchen_printer_ids ?? []).map(String),
     kitchenPrinters: (prod.kitchen_printers ?? []).map(mapKitchenPrinter),
+    printPickupSlip: prod.print_pickup_slip === true,
     createdAt: new Date(prod.created_at),
     updatedAt: new Date(prod.updated_at),
   };
@@ -122,6 +123,7 @@ export async function createProduct(
       is_happy_hour_eligible: product.isHappyHourEligible,
       option_group_ids: (product.optionGroupIds ?? []).map((id) => parseInt(id, 10)),
       kitchen_printer_ids: (product.kitchenPrinterIds ?? []).map((id) => parseInt(id, 10)),
+      print_pickup_slip: product.printPickupSlip === true,
     }),
   });
   return mapProduct(result);
@@ -150,6 +152,9 @@ export async function updateProduct(
   }
   if (product.kitchenPrinterIds !== undefined) {
     updateData.kitchen_printer_ids = product.kitchenPrinterIds.map((printerId) => parseInt(printerId, 10));
+  }
+  if (product.printPickupSlip !== undefined) {
+    updateData.print_pickup_slip = product.printPickupSlip === true;
   }
 
   const result = await request<ProductWriteResponse>(`/products/${id}`, { method: 'PUT', body: JSON.stringify(updateData) });
