@@ -8,7 +8,8 @@ export type BridgePrintDocumentType =
   | 'closure_bulletin'
   | 'kitchen_test'
   | 'kitchen_order'
-  | 'kitchen_cancellation';
+  | 'kitchen_cancellation'
+  | 'order_pickup_number';
 export type BridgePrintPayloadFormat = 'escpos';
 
 export interface BridgePrintJob {

@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { ESC_POS } from '../printing/types';
-import { renderKitchenOrderTicket, renderKitchenCancellationTicket } from './kitchenTicketRenderer';
+import {
+  renderCustomerOrderNumberTicket,
+  renderKitchenOrderTicket,
+  renderKitchenCancellationTicket,
+} from './kitchenTicketRenderer';
 
 describe('kitchenTicketRenderer', () => {
   it('renders order header, lines, and options without prices', () => {
@@ -26,6 +30,15 @@ describe('kitchenTicketRenderer', () => {
     expect(ticket).toContain(ESC_POS.feedLines(8));
     expect(ticket).not.toContain('EUR');
     expect(ticket).not.toMatch(/\d+[.,]\d{2}/);
+  });
+
+  it('renders customer pickup slip with order number only', () => {
+    const ticket = renderCustomerOrderNumberTicket(42);
+    expect(ticket).toContain('COMMANDE');
+    expect(ticket).toContain('#42');
+    expect(ticket).not.toContain('Mojito');
+    expect(ticket).toContain(ESC_POS.DOUBLE_SIZE);
+    expect(ticket).not.toContain(ESC_POS.BEEP);
   });
 
   it('renders cancellation header with original order id', () => {

@@ -19,7 +19,7 @@ describe('kitchenTicketDispatchService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.createBridgePrintJob.mockImplementation(async (_pool, input) => ({
-      id: `job-${input.metadata.kitchen_printer_slug}`,
+      id: `job-${input.documentType}-${input.metadata?.kitchen_printer_slug ?? 'pickup'}`,
       document_type: input.documentType,
       metadata: input.metadata,
     }));
@@ -44,11 +44,16 @@ describe('kitchenTicketDispatchService', () => {
       ],
     });
 
-    expect(result.enqueued).toBe(2);
+    expect(result.enqueued).toBe(3);
     expect(result.failures).toBe(0);
-    expect(mocks.createBridgePrintJob).toHaveBeenCalledTimes(2);
-    expect(mocks.createBridgePrintJob.mock.calls[0]?.[1]?.documentType).toBe('kitchen_order');
+    expect(mocks.createBridgePrintJob).toHaveBeenCalledTimes(3);
+    expect(mocks.createBridgePrintJob.mock.calls[0]?.[1]?.documentType).toBe('order_pickup_number');
     expect(mocks.createBridgePrintJob.mock.calls[0]?.[1]?.metadata).toMatchObject({
+      order_id: 7,
+      ticket_kind: 'pickup_number',
+    });
+    expect(mocks.createBridgePrintJob.mock.calls[1]?.[1]?.documentType).toBe('kitchen_order');
+    expect(mocks.createBridgePrintJob.mock.calls[1]?.[1]?.metadata).toMatchObject({
       kitchen_printer_slug: 'bar',
       order_id: 7,
       ticket_kind: 'order',
@@ -83,7 +88,7 @@ describe('kitchenTicketDispatchService', () => {
       logger,
     });
 
-    expect(result.enqueued).toBe(0);
+    expect(result.enqueued).toBe(1);
     expect(result.failures).toBe(1);
     expect(logger.error).toHaveBeenCalled();
     expect(mocks.logSoftwareEventBestEffort).toHaveBeenCalled();

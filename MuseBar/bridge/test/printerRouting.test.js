@@ -35,6 +35,18 @@ test('resolvePrinterEndpoint routes kitchen jobs by slug', () => {
   assert.deepEqual(endpoint, { host: '192.168.0.96', port: 9100 });
 });
 
+test('resolvePrinterEndpoint routes pickup number slips to default printer', () => {
+  const endpoint = resolvePrinterEndpoint(
+    { document_type: 'order_pickup_number', metadata: { order_id: 42 } },
+    {
+      printerHost: '192.168.0.95',
+      printerPort: 9100,
+      printers: [{ slug: 'bar', host: '192.168.0.99', port: 9100 }],
+    }
+  );
+  assert.deepEqual(endpoint, { host: '192.168.0.95', port: 9100 });
+});
+
 test('resolvePrinterEndpoint falls back to default printer for receipts', () => {
   const endpoint = resolvePrinterEndpoint(
     { document_type: 'receipt', metadata: {} },

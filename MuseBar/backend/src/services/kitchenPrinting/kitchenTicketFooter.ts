@@ -2,6 +2,8 @@ import { ESC_POS } from '../printing/types';
 
 /** Trailing blank paper (~1.5–2 cm on 80 mm thermal, default line spacing). */
 export const KITCHEN_TICKET_BOTTOM_FEED_LINES = 8;
+/** Shorter tail for customer pickup number slips. */
+export const PICKUP_TICKET_BOTTOM_FEED_LINES = 4;
 
 /** Alert sequence for kitchen tickets — safe to send even if buzzer is absent. */
 export function kitchenTicketAlertSequence(): string {
@@ -15,5 +17,11 @@ export function kitchenTicketAlertSequence(): string {
 export function appendKitchenTicketFooter(parts: string[]): void {
   parts.push('--------------------------------', '');
   parts.push(ESC_POS.feedLines(KITCHEN_TICKET_BOTTOM_FEED_LINES));
+  parts.push(ESC_POS.PARTIAL_CUT);
+}
+
+export function appendPickupTicketFooter(parts: string[]): void {
+  parts.push('');
+  parts.push(ESC_POS.feedLines(PICKUP_TICKET_BOTTOM_FEED_LINES));
   parts.push(ESC_POS.PARTIAL_CUT);
 }

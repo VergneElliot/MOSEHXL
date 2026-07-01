@@ -3,7 +3,11 @@ import type { Pool } from 'pg';
 import { createBridgePrintJob } from '../../printing/bridgePrintJobRepo';
 import { logSoftwareEventBestEffort } from '../legal/softwareEventJournal';
 import { groupKitchenTicketLinesByPrinter, type KitchenDispatchOrderItem } from './kitchenTicketGrouping';
-import { renderKitchenOrderTicket, renderKitchenCancellationTicket } from './kitchenTicketRenderer';
+import {
+  renderCustomerOrderNumberTicket,
+  renderKitchenOrderTicket,
+  renderKitchenCancellationTicket,
+} from './kitchenTicketRenderer';
 
 interface KitchenDispatchLogger {
   error: (message: string, error: Error, category?: string) => void;
@@ -30,6 +34,44 @@ export async function dispatchKitchenTicketsForCompletedOrder(
   const groups = groupKitchenTicketLinesByPrinter(input.items);
   const jobIds: string[] = [];
   let failures = 0;
+
+  if (groups.length === 0) {
+    return { enqueued: 0, failures: 0, jobIds };
+  }
+
+  try {
+    const pickupPayload = renderCustomerOrderNumberTicket(input.order.id);
+    const pickupJob = await createBridgePrintJob(pool, {
+      establishmentId: input.establishmentId,
+      documentType: 'order_pickup_number',
+      payloadFormat: 'escpos',
+      payloadBase64: Buffer.from(pickupPayload, 'latin1').toString('base64'),
+      createdByUserId: input.createdByUserId ?? null,
+      metadata: {
+        order_id: input.order.id,
+        ticket_kind: 'pickup_number',
+      },
+    });
+    jobIds.push(pickupJob.id);
+  } catch (error) {
+    failures += 1;
+    const err = error instanceof Error ? error : new Error(String(error));
+    input.logger?.error(
+      `Failed to enqueue customer pickup number ticket for order ${input.order.id}`,
+      err,
+      'KITCHEN_PRINT'
+    );
+    await logSoftwareEventBestEffort({
+      establishmentId: input.establishmentId,
+      eventType: 'KITCHEN_TICKET_ENQUEUE_FAILED',
+      eventData: {
+        order_id: input.order.id,
+        ticket_kind: 'pickup_number',
+        error: err.message,
+      },
+      userId: input.createdByUserId != null ? String(input.createdByUserId) : undefined,
+    });
+  }
 
   for (const group of groups) {
     try {
