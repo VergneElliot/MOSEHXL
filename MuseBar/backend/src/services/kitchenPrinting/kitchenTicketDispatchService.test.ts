@@ -13,7 +13,7 @@ vi.mock('../legal/softwareEventJournal', () => ({
   logSoftwareEventBestEffort: mocks.logSoftwareEventBestEffort,
 }));
 
-import { dispatchKitchenTicketsForCompletedOrder } from './kitchenTicketDispatchService';
+import { dispatchKitchenTicketsForCompletedOrder, dispatchKitchenTicketsForCancellation } from './kitchenTicketDispatchService';
 
 describe('kitchenTicketDispatchService', () => {
   beforeEach(() => {
@@ -87,5 +87,27 @@ describe('kitchenTicketDispatchService', () => {
     expect(result.failures).toBe(1);
     expect(logger.error).toHaveBeenCalled();
     expect(mocks.logSoftwareEventBestEffort).toHaveBeenCalled();
+  });
+
+  it('enqueues cancellation jobs referencing the original order id', async () => {
+    const result = await dispatchKitchenTicketsForCancellation({} as never, {
+      establishmentId: 'est-1',
+      originalOrderId: 20,
+      cancellationType: 'full',
+      cancelledItems: [
+        {
+          product_name: 'Mojito',
+          quantity: 1,
+          kitchen_printer_ids_snapshot: [{ id: 1, name: 'Bar', slug: 'bar' }],
+        },
+      ],
+    });
+
+    expect(result.enqueued).toBe(1);
+    expect(mocks.createBridgePrintJob.mock.calls[0]?.[1]?.documentType).toBe('kitchen_cancellation');
+    expect(mocks.createBridgePrintJob.mock.calls[0]?.[1]?.metadata).toMatchObject({
+      original_order_id: 20,
+      ticket_kind: 'cancellation',
+    });
   });
 });

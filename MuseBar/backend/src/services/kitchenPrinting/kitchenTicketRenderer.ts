@@ -75,3 +75,41 @@ export function renderKitchenOrderTicket(input: {
   parts.push('--------------------------------', '', ESC_POS.PARTIAL_CUT);
   return parts.join('\n');
 }
+
+export function renderKitchenCancellationTicket(input: {
+  originalOrderId: number;
+  createdAt: Date | string;
+  printerName: string;
+  cancellationType: 'full' | 'partial' | 'items-only';
+  lines: KitchenTicketLine[];
+}): string {
+  const parts = [
+    ESC_POS.INIT,
+    ESC_POS.CENTER,
+    ESC_POS.BOLD_ON,
+    ESC_POS.DOUBLE_SIZE,
+    'ANNULATION',
+    ESC_POS.NORMAL_SIZE,
+    ESC_POS.BOLD_OFF,
+    `Commande #${input.originalOrderId}`,
+    ESC_POS.LEFT,
+    '',
+    normalizeThermalText(input.printerName),
+    normalizeThermalText(formatTimestamp(input.createdAt)),
+    normalizeThermalText(input.cancellationType === 'full' ? 'Annulation complete' : 'Annulation partielle'),
+    '================================',
+    '',
+  ];
+
+  for (const line of input.lines) {
+    parts.push(`${line.quantity}x ${normalizeThermalText(line.product_name)}`);
+    for (const option of line.options) {
+      const rendered = formatOptionLine(option);
+      if (rendered) parts.push(normalizeThermalText(rendered));
+    }
+    parts.push('');
+  }
+
+  parts.push('--------------------------------', '', ESC_POS.PARTIAL_CUT);
+  return parts.join('\n');
+}

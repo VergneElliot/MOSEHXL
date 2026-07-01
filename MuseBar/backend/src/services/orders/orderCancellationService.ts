@@ -3,6 +3,9 @@ import LegalJournalModel from '../../models/legalJournal';
 import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';
 import { AppError } from '../../middleware/errorHandler';
+import { pool } from '../../db/pool';
+import { attachOptionsToOrderItems } from './orderItemOptionsService';
+import { dispatchKitchenTicketsForCancellation } from '../kitchenPrinting/kitchenTicketDispatchService';
 
 type CancellationType = 'full' | 'partial' | 'items-only';
 
@@ -391,6 +394,16 @@ export class OrderCancellationService {
         'AUDIT_TRAIL'
       );
     }
+
+    const cancelledItemsWithOptions = await attachOptionsToOrderItems(cancelledItems, establishmentId);
+    void dispatchKitchenTicketsForCancellation(pool, {
+      establishmentId,
+      originalOrderId: orderId,
+      cancellationType,
+      cancelledItems: cancelledItemsWithOptions,
+      createdByUserId: userId != null ? Number(userId) : undefined,
+      logger,
+    });
 
     return {
       status: 201,

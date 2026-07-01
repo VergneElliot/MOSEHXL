@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-01  
 **Branch baseline:** `development` (HEAD `722b4df`)  
-**Status:** In progress — Phase 4 done (2026-07-01)  
+**Status:** In progress — Phase 5 done (2026-07-01)  
 **Branch baseline:** `development`  
 **Scope:** Reusable product parameters (presets + free text), POS capture, kitchen/bar order tickets routed to named printers, cancellation tickets. Fiscal receipts and invoices unchanged.
 
@@ -577,6 +577,8 @@ Each phase = one PR series + patch note + green CI before next phase.
 
 ### Phase 5 — Kitchen cancellation tickets (effort: S)
 
+**Status:** Done on 2026-07-01. See `docs/patch-notes/429-PRODUCT-OPTIONS-PHASE5-KITCHEN-CANCELLATION-TICKETS-IMPLEMENTATION.md`.
+
 **Goal:** Kitchen notified on annulation.
 
 **Steps:**
@@ -588,9 +590,11 @@ Each phase = one PR series + patch note + green CI before next phase.
 
 **Acceptance:**
 
-- [ ] Full annulation prints “ANNULATION commande #N” on affected printers.
-- [ ] Partial annulation prints only removed items.
-- [ ] Change operations (`Faire de la Monnaie`) do not print kitchen tickets.
+- [x] Full annulation prints “ANNULATION commande #N” on affected printers.
+- [x] Partial annulation prints only removed items.
+- [x] Change operations (`Faire de la Monnaie`) do not print kitchen tickets.
+
+**Patch note:** `429-PRODUCT-OPTIONS-PHASE5-KITCHEN-CANCELLATION-TICKETS-IMPLEMENTATION.md`
 
 ---
 
