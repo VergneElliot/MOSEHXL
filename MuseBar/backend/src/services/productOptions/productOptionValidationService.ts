@@ -3,9 +3,14 @@ import {
   type ProductOptionGroup,
 } from '../../models/database/productOptionGroupModel';
 import type { OrderItemOptionSnapshotInput } from '../../models/database/orderItemOptionModel';
+import {
+  AD_HOC_LINE_NOTE_DISPLAY_ORDER,
+  AD_HOC_LINE_NOTE_GROUP_NAME,
+  AD_HOC_LINE_NOTE_MAX_LENGTH,
+} from './lineItemNote';
 
 export interface CreateOrderItemOptionInput {
-  group_id: number;
+  group_id?: number | null;
   choice_id?: number | null;
   free_text?: string | null;
 }
@@ -45,9 +50,35 @@ export function validateOrderItemOptionsForProduct(
 
   const assignedById = new Map(assignedGroups.map((group) => [group.id, group]));
   const providedByGroup = new Map<number, CreateOrderItemOptionInput>();
+  let adHocLineNote: string | null = null;
 
   for (const option of options) {
-    const groupId = Number(option.group_id);
+    const rawGroupId = option.group_id;
+    if (rawGroupId == null) {
+      const freeText = normalizeFreeText(option.free_text, AD_HOC_LINE_NOTE_MAX_LENGTH);
+      if (!freeText) {
+        return {
+          ok: false,
+          error: `Line note is empty on "${productName}"`,
+        };
+      }
+      if (option.choice_id != null) {
+        return {
+          ok: false,
+          error: `Preset choices are not allowed on ad-hoc line notes for "${productName}"`,
+        };
+      }
+      if (adHocLineNote != null) {
+        return {
+          ok: false,
+          error: `Only one line note is allowed on "${productName}"`,
+        };
+      }
+      adHocLineNote = freeText;
+      continue;
+    }
+
+    const groupId = Number(rawGroupId);
     if (!Number.isInteger(groupId) || groupId < 1) {
       return { ok: false, error: `Invalid option group on line "${productName}"` };
     }
@@ -120,6 +151,17 @@ export function validateOrderItemOptionsForProduct(
         error: `Missing required option "${group.name}" for "${productName}"`,
       };
     }
+  }
+
+  if (adHocLineNote) {
+    snapshots.push({
+      group_id: null,
+      group_name_snapshot: AD_HOC_LINE_NOTE_GROUP_NAME,
+      choice_id: null,
+      choice_label_snapshot: null,
+      free_text: adHocLineNote,
+      display_order: AD_HOC_LINE_NOTE_DISPLAY_ORDER,
+    });
   }
 
   return { ok: true, value: { snapshots } };

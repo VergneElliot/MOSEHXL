@@ -1,8 +1,9 @@
 import React from 'react';
 import { ListItem, Box, Typography, IconButton, Button, Divider } from '@mui/material';
-import { Delete as DeleteIcon, LocalOffer as OffertIcon, Person as PersoIcon } from '@mui/icons-material';
+import { Delete as DeleteIcon, LocalOffer as OffertIcon, Person as PersoIcon, StickyNote2 as NoteIcon } from '@mui/icons-material';
 import type { OrderItem } from '../../types';
 import { formatOrderItemOptionLabel } from '../../utils/orderItemOptions';
+import { getLineNoteFromOptions } from '../../utils/lineItemNote';
 
 interface OrderSummaryItemProps {
   item: OrderItem;
@@ -13,6 +14,7 @@ interface OrderSummaryItemProps {
   onApplyHappyHour?: (index: number) => void;
   onApplyOffert?: (index: number) => void;
   onApplyPerso?: (index: number) => void;
+  onEditLineNote?: (index: number) => void;
 }
 
 const OrderSummaryItem: React.FC<OrderSummaryItemProps> = ({
@@ -24,7 +26,9 @@ const OrderSummaryItem: React.FC<OrderSummaryItemProps> = ({
   onApplyHappyHour,
   onApplyOffert,
   onApplyPerso,
+  onEditLineNote,
 }) => {
+  const lineNote = getLineNoteFromOptions(item.options);
   const lineActionButtonSx = {
     minWidth: 'auto',
     px: { xs: 1, md: 1.1 },
@@ -50,7 +54,7 @@ const OrderSummaryItem: React.FC<OrderSummaryItemProps> = ({
               <Box sx={{ mt: 0.5, display: 'flex', flexDirection: 'column', gap: 0.25 }}>
                 {item.options.map((option, optionIndex) => (
                   <Typography
-                    key={`${option.groupId}-${optionIndex}`}
+                    key={`${option.groupId ?? 'note'}-${optionIndex}`}
                     variant="body2"
                     color="text.secondary"
                     sx={{ fontSize: { xs: '0.9rem', md: '0.98rem' } }}
@@ -117,6 +121,18 @@ const OrderSummaryItem: React.FC<OrderSummaryItemProps> = ({
                   sx={{ ...lineActionButtonSx, '& .MuiButton-startIcon': { mr: 0.45 } }}
                 >
                   Perso
+                </Button>
+              )}
+              {onEditLineNote && item.productId && (
+                <Button
+                  size="small"
+                  variant={lineNote ? 'contained' : 'outlined'}
+                  color="warning"
+                  onClick={() => onEditLineNote(index)}
+                  startIcon={<NoteIcon sx={{ fontSize: { xs: 16, md: 18 } }} />}
+                  sx={{ ...lineActionButtonSx, '& .MuiButton-startIcon': { mr: 0.45 } }}
+                >
+                  Note
                 </Button>
               )}
             </Box>

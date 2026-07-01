@@ -26,6 +26,8 @@ import {
 } from '@mui/icons-material';
 import { OrderItem } from '../../types';
 import OrderSummaryItem from './OrderSummaryItem';
+import LineNoteDialog from './LineNoteDialog';
+import { getLineNoteFromOptions } from '../../utils/lineItemNote';
 
 interface OrderSummaryProps {
   currentOrder: OrderItem[];
@@ -49,6 +51,8 @@ interface OrderSummaryProps {
   onApplyOffert?: (index: number) => void;
   /** Set line to 0€ — consumed by staff (traceability: [Perso]) */
   onApplyPerso?: (index: number) => void;
+  /** Add or edit an ad-hoc kitchen note on a line */
+  onUpdateLineNote?: (index: number, note: string) => void;
   formatCurrency: (amount: number) => string;
 }
 
@@ -67,6 +71,7 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
   onApplyHappyHour,
   onApplyOffert,
   onApplyPerso,
+  onUpdateLineNote,
   formatCurrency,
 }) => {
   const theme = useTheme();
@@ -74,6 +79,9 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
   const [changeDialogOpen, setChangeDialogOpen] = useState(false);
   const [changeAmount, setChangeAmount] = useState('');
   const [changeSubmitting, setChangeSubmitting] = useState(false);
+  const [lineNoteDialog, setLineNoteDialog] = useState<{ index: number; productName: string } | null>(
+    null
+  );
 
   const totalLabelSx = {
     fontWeight: 800,
@@ -178,6 +186,15 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
                   onApplyHappyHour={onApplyHappyHour}
                   onApplyOffert={onApplyOffert}
                   onApplyPerso={onApplyPerso}
+                  onEditLineNote={
+                    onUpdateLineNote
+                      ? (index) => {
+                          const line = currentOrder[index];
+                          if (!line) return;
+                          setLineNoteDialog({ index, productName: line.productName });
+                        }
+                      : undefined
+                  }
                 />
               ))}
             </List>
@@ -319,6 +336,21 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
           </Button>
         </DialogActions>
       </Dialog>
+
+      <LineNoteDialog
+        open={lineNoteDialog != null}
+        productName={lineNoteDialog?.productName ?? ''}
+        initialNote={
+          lineNoteDialog != null
+            ? getLineNoteFromOptions(currentOrder[lineNoteDialog.index]?.options)
+            : ''
+        }
+        onClose={() => setLineNoteDialog(null)}
+        onSave={(note) => {
+          if (lineNoteDialog == null || !onUpdateLineNote) return;
+          onUpdateLineNote(lineNoteDialog.index, note);
+        }}
+      />
     </Card>
   );
 };

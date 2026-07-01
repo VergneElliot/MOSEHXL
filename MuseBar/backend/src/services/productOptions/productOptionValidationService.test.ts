@@ -104,4 +104,40 @@ describe('validateOrderItemOptionsForProduct', () => {
     );
     expect(result.ok).toBe(false);
   });
+
+  it('accepts ad-hoc line note without menu assignment', () => {
+    const result = validateOrderItemOptionsForProduct(
+      8,
+      'Mojito',
+      [{ group_id: null, free_text: 'sans glacons' }],
+      []
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.snapshots).toEqual([
+        expect.objectContaining({
+          group_id: null,
+          group_name_snapshot: 'Note',
+          free_text: 'sans glacons',
+        }),
+      ]);
+    }
+  });
+
+  it('accepts preset plus ad-hoc line note on the same line', () => {
+    const result = validateOrderItemOptionsForProduct(
+      5,
+      'Entrecôte',
+      [
+        { group_id: 1, choice_id: 11 },
+        { group_id: null, free_text: 'sans sauce' },
+      ],
+      [cuissonGroup]
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.snapshots).toHaveLength(2);
+      expect(result.value.snapshots[1]?.free_text).toBe('sans sauce');
+    }
+  });
 });
