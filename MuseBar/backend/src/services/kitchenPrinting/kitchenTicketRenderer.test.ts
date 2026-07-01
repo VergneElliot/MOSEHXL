@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { ESC_POS } from '../printing/types';
 import { renderKitchenOrderTicket, renderKitchenCancellationTicket } from './kitchenTicketRenderer';
 
 describe('kitchenTicketRenderer', () => {
@@ -20,6 +21,9 @@ describe('kitchenTicketRenderer', () => {
     expect(ticket).toContain('COMMANDE #42');
     expect(ticket).toContain('2x Mojito');
     expect(ticket).toContain('sans citron');
+    expect(ticket).toContain(ESC_POS.DOUBLE_SIZE);
+    expect(ticket).toContain(ESC_POS.BEEP);
+    expect(ticket).toContain(ESC_POS.feedLines(8));
     expect(ticket).not.toContain('EUR');
     expect(ticket).not.toMatch(/\d+[.,]\d{2}/);
   });

@@ -164,5 +164,21 @@ export const ESC_POS = {
   UNDERLINE_ON: '\x1B\x2D\x01',
   UNDERLINE_OFF: '\x1B\x2D\x00',
   LINE_FEED: '\n',
-  BEEP: '\x07'
+  /** ASCII BEL — internal buzzer on many ESC/POS kitchen printers (Epson, Star, etc.). */
+  BEEP: '\x07',
+  /**
+   * ESC/POS buzzer command (ESC B). More reliable on some Epson models than BEL alone.
+   * count: 1-9 beeps, duration: 1-9 (× ~100 ms).
+   */
+  buzzer: (count = 3, duration = 2): string =>
+    `${'\x1B\x42'}${String.fromCharCode(Math.min(9, Math.max(1, count)))}${String.fromCharCode(Math.min(9, Math.max(1, duration)))}`,
+  /**
+   * Epson TM-m30 / TM-T88 etc.: optional external buzzer (OT-BZ20) on drawer-kick port.
+   * pattern: 1–7 (1 = pattern A), repeat: 1–255. No-op without external buzzer enabled in printer settings.
+   */
+  epsonExternalBuzzer: (pattern = 1, repeat = 2): string =>
+    `${'\x1B\x28\x41\x03\x00\x61'}${String.fromCharCode(Math.min(7, Math.max(1, pattern)))}${String.fromCharCode(Math.min(255, Math.max(1, repeat)))}`,
+  /** ESC d n — print and feed n lines (blank tail before cut). */
+  feedLines: (count: number): string =>
+    `${'\x1B\x64'}${String.fromCharCode(Math.min(255, Math.max(0, count)))}`,
 } as const;
