@@ -1,7 +1,14 @@
 import { OrderItemModel, OrderModel, SubBillModel } from '../../models';
+import { OrderItemOptionModel } from '../../models/database/orderItemOptionModel';
 import { AuditTrailModel } from '../../models/auditTrail';
 import type { Order } from '../../models/interfaces';
 import LegalJournalModel from '../../models/legalJournal';
+import {
+  loadAssignedGroupsByProduct,
+  validateOrderItemOptionsForProduct,
+  type CreateOrderItemOptionInput,
+} from '../productOptions/productOptionValidationService';
+import type { OrderItemOptionSnapshotInput } from '../../models/database/orderItemOptionModel';
 
 export interface CreateOrderItemInput {
   product_id?: number;
@@ -15,6 +22,7 @@ export interface CreateOrderItemInput {
   happy_hour_discount_amount?: number;
   is_manual_happy_hour?: boolean;
   description?: string;
+  options?: CreateOrderItemOptionInput[];
 }
 
 export interface CreateOrderSubBillInput {
@@ -47,12 +55,17 @@ export type OrderCreationResult =
   | {
       ok: true;
       order: Awaited<ReturnType<typeof OrderModel.create>>;
-      items: Array<Awaited<ReturnType<typeof OrderItemModel.create>>>;
+      items: Array<
+        Awaited<ReturnType<typeof OrderItemModel.create>> & {
+          options: Awaited<ReturnType<typeof OrderItemOptionModel.createMany>>;
+        }
+      >;
       subBills: Array<Awaited<ReturnType<typeof SubBillModel.create>>>;
     }
   | {
       ok: false;
       error: string;
+      status?: number;
     };
 
 export async function createOrderWithCompliance(
@@ -62,6 +75,27 @@ export async function createOrderWithCompliance(
 ): Promise<OrderCreationResult> {
   const { payment_method, status, notes, items, sub_bills, tips, change } = body;
   const { establishmentId, userId, ipAddress, userAgent } = context;
+
+  const productIds = items
+    .map((item) => item.product_id)
+    .filter((id): id is number => id != null && Number.isInteger(id) && id > 0);
+  const assignedGroupsByProduct = await loadAssignedGroupsByProduct(establishmentId, productIds);
+
+  const validatedSnapshots: OrderItemOptionSnapshotInput[][] = [];
+  for (const item of items) {
+    const assignedGroups =
+      item.product_id != null ? assignedGroupsByProduct.get(item.product_id) ?? [] : [];
+    const validation = validateOrderItemOptionsForProduct(
+      item.product_id,
+      item.product_name,
+      item.options,
+      assignedGroups
+    );
+    if (!validation.ok) {
+      return { ok: false, error: validation.error, status: 400 };
+    }
+    validatedSnapshots.push(validation.value.snapshots);
+  }
 
   // Base TTC from items only — never include tips in total_amount (zero-sum for CA).
   const total_amount = items.reduce((sum, i) => sum + Number(i.total_price), 0);
@@ -81,27 +115,32 @@ export async function createOrderWithCompliance(
     establishmentId
   );
 
-  const createdItems = await Promise.all(
-    items.map((item) =>
-      OrderItemModel.create(
-        {
-          order_id: order.id,
-          product_id: item.product_id,
-          product_name: item.product_name,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          total_price: item.total_price,
-          tax_rate: item.tax_rate,
-          tax_amount: item.tax_amount,
-          happy_hour_applied: item.happy_hour_applied || false,
-          happy_hour_discount_amount: item.happy_hour_discount_amount || 0,
-          is_manual_happy_hour: item.is_manual_happy_hour === true,
-          description: item.description || '',
-        },
-        establishmentId
-      )
-    )
-  );
+  const createdItems = [];
+  for (const [index, item] of items.entries()) {
+    const createdItem = await OrderItemModel.create(
+      {
+        order_id: order.id,
+        product_id: item.product_id,
+        product_name: item.product_name,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        total_price: item.total_price,
+        tax_rate: item.tax_rate,
+        tax_amount: item.tax_amount,
+        happy_hour_applied: item.happy_hour_applied || false,
+        happy_hour_discount_amount: item.happy_hour_discount_amount || 0,
+        is_manual_happy_hour: item.is_manual_happy_hour === true,
+        description: item.description || '',
+      },
+      establishmentId
+    );
+    const options = await OrderItemOptionModel.createMany(
+      createdItem.id,
+      establishmentId,
+      validatedSnapshots[index] ?? []
+    );
+    createdItems.push({ ...createdItem, options });
+  }
 
   let createdSubBills: Array<Awaited<ReturnType<typeof SubBillModel.create>>> = [];
   if (payment_method === 'split' && Array.isArray(sub_bills)) {
@@ -125,7 +164,11 @@ export async function createOrderWithCompliance(
           total_amount: order.total_amount,
           total_tax: order.total_tax,
           payment_method: order.payment_method,
-          items: createdItems,
+          items: createdItems.map((ci) => {
+            const item = { ...ci };
+            delete item.options;
+            return item;
+          }),
           created_at: order.created_at,
         },
         userId

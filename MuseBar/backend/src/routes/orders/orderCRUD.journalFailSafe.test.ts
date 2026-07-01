@@ -65,6 +65,24 @@ vi.mock('../../models/auditTrail', () => ({
   },
 }));
 
+vi.mock('../../models/database/orderItemOptionModel', () => ({
+  OrderItemOptionModel: {
+    createMany: vi.fn().mockResolvedValue([]),
+    getByOrderItemIds: vi.fn().mockResolvedValue(new Map()),
+  },
+}));
+
+vi.mock('../../models/database/productOptionGroupModel', () => ({
+  ProductOptionGroupModel: {
+    getAllActive: vi.fn().mockResolvedValue([]),
+    getAssignmentsForProducts: vi.fn().mockResolvedValue(new Map()),
+  },
+}));
+
+vi.mock('../../services/orders/orderItemOptionsService', () => ({
+  attachOptionsToOrderItems: vi.fn(async (items: unknown[]) => items),
+}));
+
 import orderCRUDRouter from './orderCRUD';
 
 const app = express();

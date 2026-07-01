@@ -49,6 +49,20 @@ export interface OrderItem {
   sub_bill_id?: number;
   description?: string;
   created_at: Date;
+  options?: OrderItemOptionRecord[];
+}
+
+export interface OrderItemOptionRecord {
+  id: number;
+  order_item_id: number;
+  establishment_id?: string;
+  group_id: number | null;
+  group_name_snapshot: string;
+  choice_id: number | null;
+  choice_label_snapshot: string | null;
+  free_text: string | null;
+  display_order: number;
+  created_at?: string | Date;
 }
 
 export interface SubBill {

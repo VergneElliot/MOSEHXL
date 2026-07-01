@@ -12,6 +12,7 @@ import POSLayout from './POSLayout';
 import PaymentDialog from './PaymentDialog';
 import { DiversDialog, DiversFormData } from './DiversDialog';
 import PrintAfterSaleDialog from './PrintAfterSaleDialog';
+import ProductOptionDialog, { ProductOptionSelection } from './ProductOptionDialog';
 
 interface POSContainerProps {
   categories: Category[];
@@ -40,6 +41,8 @@ const POSContainer: React.FC<POSContainerProps> = ({
   // Custom hooks for state management
   const [state, actions] = usePOSState();
   const [diversDialogOpen, setDiversDialogOpen] = useState(false);
+  const [optionDialogOpen, setOptionDialogOpen] = useState(false);
+  const [pendingProduct, setPendingProduct] = useState<{ product: Product; quantity: number } | null>(null);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [lastOrderId, setLastOrderId] = useState<number | null>(null);
 
@@ -93,6 +96,57 @@ const POSContainer: React.FC<POSContainerProps> = ({
       }
     },
     [actions]
+  );
+
+  const buildOrderItem = useCallback(
+    (product: Product, selections: ProductOptionSelection[]): OrderItem => {
+      const currentPrice = logic.calculateProductPrice(product, isHappyHourActive);
+      const taxAmount = currentPrice * (product.taxRate / (1 + product.taxRate));
+      return {
+        id: `${Date.now()}-${Math.random()}`,
+        productId: product.id,
+        productName: product.name,
+        quantity: 1,
+        unitPrice: currentPrice,
+        totalPrice: currentPrice,
+        taxRate: product.taxRate,
+        taxAmount,
+        isHappyHourApplied: isHappyHourActive && product.isHappyHourEligible,
+        isOffert: false,
+        isPerso: false,
+        originalPrice: product.price,
+        options: selections.map((selection) => ({
+          groupId: selection.groupId,
+          groupName: selection.groupName,
+          choiceId: selection.choiceId ?? null,
+          choiceLabel: selection.choiceLabel ?? null,
+          freeText: selection.freeText ?? null,
+          displayOrder: selection.displayOrder,
+        })),
+      };
+    },
+    [isHappyHourActive, logic]
+  );
+
+  const handleRequestAddProduct = useCallback(
+    (product: Product, quantity: number) => {
+      if ((product.optionGroups?.length ?? 0) > 0) {
+        setPendingProduct({ product, quantity });
+        setOptionDialogOpen(true);
+        return;
+      }
+      handleAddToOrder(buildOrderItem(product, []), quantity);
+    },
+    [buildOrderItem, handleAddToOrder]
+  );
+
+  const handleConfirmProductOptions = useCallback(
+    (selections: ProductOptionSelection[]) => {
+      if (!pendingProduct) return;
+      handleAddToOrder(buildOrderItem(pendingProduct.product, selections), pendingProduct.quantity);
+      setPendingProduct(null);
+    },
+    [pendingProduct, buildOrderItem, handleAddToOrder]
   );
 
   const { handleApplyHappyHour, handleApplyOffert, handleApplyPerso } =
@@ -173,7 +227,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
           products={logic.filteredProducts}
           categories={categories}
           isHappyHourActive={isHappyHourActive}
-          onAddToOrder={(item, qty) => handleAddToOrder(item, qty ?? 1)}
+          onRequestAddProduct={handleRequestAddProduct}
           calculateProductPrice={logic.calculateProductPrice}
           formatCurrency={logic.formatCurrency}
           onDiversClick={() => setDiversDialogOpen(true)}
@@ -254,6 +308,17 @@ const POSContainer: React.FC<POSContainerProps> = ({
         onClose={() => setDiversDialogOpen(false)}
         onSubmit={handleDiversSubmit}
         formatCurrency={logic.formatCurrency}
+      />
+
+      <ProductOptionDialog
+        open={optionDialogOpen}
+        product={pendingProduct?.product ?? null}
+        quantity={pendingProduct?.quantity ?? 1}
+        onClose={() => {
+          setOptionDialogOpen(false);
+          setPendingProduct(null);
+        }}
+        onConfirm={handleConfirmProductOptions}
       />
 
       {/* Future: Add other dialog components (retour, change, etc.) */}

@@ -2,6 +2,7 @@ import React from 'react';
 import { ListItem, Box, Typography, IconButton, Button, Divider } from '@mui/material';
 import { Delete as DeleteIcon, LocalOffer as OffertIcon, Person as PersoIcon } from '@mui/icons-material';
 import type { OrderItem } from '../../types';
+import { formatOrderItemOptionLabel } from '../../utils/orderItemOptions';
 
 interface OrderSummaryItemProps {
   item: OrderItem;
@@ -45,6 +46,20 @@ const OrderSummaryItem: React.FC<OrderSummaryItemProps> = ({
             >
               {item.productName}
             </Typography>
+            {item.options && item.options.length > 0 && (
+              <Box sx={{ mt: 0.5, display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                {item.options.map((option, optionIndex) => (
+                  <Typography
+                    key={`${option.groupId}-${optionIndex}`}
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ fontSize: { xs: '0.9rem', md: '0.98rem' } }}
+                  >
+                    {formatOrderItemOptionLabel(option)}
+                  </Typography>
+                ))}
+              </Box>
+            )}
             <IconButton
               onClick={() => onRemoveItem(index)}
               size="medium"
