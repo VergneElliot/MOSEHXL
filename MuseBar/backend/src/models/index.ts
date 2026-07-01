@@ -10,3 +10,4 @@ export * from './interfaces';
 export { OrderModel, OrderItemModel, SubBillModel } from './database/orderModel';
 export { CategoryModel, ProductModel } from './database/productModel';
 export { ProductOptionGroupModel } from './database/productOptionGroupModel';
+export { KitchenPrinterModel } from './database/kitchenPrinterModel';

@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-01  
 **Branch baseline:** `development` (HEAD `722b4df`)  
-**Status:** In progress — Phase 2 done (2026-07-01)  
+**Status:** In progress — Phase 3 done (2026-07-01)  
 **Branch baseline:** `development`  
 **Scope:** Reusable product parameters (presets + free text), POS capture, kitchen/bar order tickets routed to named printers, cancellation tickets. Fiscal receipts and invoices unchanged.
 
@@ -527,6 +527,8 @@ Each phase = one PR series + patch note + green CI before next phase.
 
 ### Phase 3 — Kitchen printers admin (effort: S–M)
 
+**Status:** Done on 2026-07-01. See `docs/patch-notes/427-PRODUCT-OPTIONS-PHASE3-KITCHEN-PRINTERS-ADMIN-IMPLEMENTATION.md`.
+
 **Goal:** Define bar/cuisine printers per establishment.
 
 **Steps:**
@@ -540,8 +542,10 @@ Each phase = one PR series + patch note + green CI before next phase.
 
 **Acceptance:**
 
-- [ ] Two printers configured; product assigned to bar only.
-- [ ] Snapshot stored on completed order lines.
+- [x] Two printers configured; product assigned to bar only.
+- [x] Snapshot stored on completed order lines.
+
+**Patch note:** `427-PRODUCT-OPTIONS-PHASE3-KITCHEN-PRINTERS-ADMIN-IMPLEMENTATION.md`
 
 ---
 

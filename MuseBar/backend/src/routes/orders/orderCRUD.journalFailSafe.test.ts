@@ -79,6 +79,12 @@ vi.mock('../../models/database/productOptionGroupModel', () => ({
   },
 }));
 
+vi.mock('../../models/database/kitchenPrinterModel', () => ({
+  KitchenPrinterModel: {
+    getAssignmentsForProducts: vi.fn().mockResolvedValue(new Map()),
+  },
+}));
+
 vi.mock('../../services/orders/orderItemOptionsService', () => ({
   attachOptionsToOrderItems: vi.fn(async (items: unknown[]) => items),
 }));

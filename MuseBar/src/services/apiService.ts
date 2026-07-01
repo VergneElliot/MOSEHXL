@@ -1,7 +1,8 @@
-import { Category, Product, ProductOptionGroup, Order, OrderItem } from '../types';
+import { Category, Product, ProductOptionGroup, KitchenPrinter, Order, OrderItem } from '../types';
 import type { LiveMonthlyStats } from '../types/api';
-import { apiCore, categoriesApi, productsApi, productOptionGroupsApi, ordersApi, legalApi } from './api';
+import { apiCore, categoriesApi, productsApi, productOptionGroupsApi, kitchenPrintersApi, ordersApi, legalApi } from './api';
 import type { ProductOptionGroupFormInput } from './api/productOptionGroups';
+import type { KitchenPrinterFormInput } from './api/kitchenPrinters';
 
 export class ApiService {
   private static instance: ApiService;
@@ -71,6 +72,26 @@ export class ApiService {
 
   async deleteProductOptionGroup(id: string): Promise<{ message?: string; action?: string }> {
     return productOptionGroupsApi.deleteProductOptionGroup(id);
+  }
+
+  async getKitchenPrinters(): Promise<KitchenPrinter[]> {
+    return kitchenPrintersApi.getKitchenPrinters();
+  }
+
+  async createKitchenPrinter(input: KitchenPrinterFormInput): Promise<KitchenPrinter> {
+    return kitchenPrintersApi.createKitchenPrinter(input);
+  }
+
+  async updateKitchenPrinter(id: string, input: KitchenPrinterFormInput): Promise<KitchenPrinter> {
+    return kitchenPrintersApi.updateKitchenPrinter(id, input);
+  }
+
+  async deleteKitchenPrinter(id: string): Promise<{ message?: string; action?: string }> {
+    return kitchenPrintersApi.deleteKitchenPrinter(id);
+  }
+
+  async testKitchenPrinter(id: string): Promise<{ message?: string; job_id?: string }> {
+    return kitchenPrintersApi.testKitchenPrinter(id);
   }
 
   // Orders

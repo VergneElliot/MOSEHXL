@@ -22,7 +22,7 @@ export * from './system';
 export * from './setup';
 
 // Re-export commonly used types for convenience
-export type { Category, Product, ProductOptionGroup, ProductOptionChoice, HappyHourSettings } from './business';
+export type { Category, Product, ProductOptionGroup, ProductOptionChoice, KitchenPrinter, HappyHourSettings } from './business';
 export type { Order, OrderItem, PaymentMethod } from './orders';
 export type { User, AuthResponse } from './auth';
 export type { ApiResponse, ClosureBulletin } from './api';

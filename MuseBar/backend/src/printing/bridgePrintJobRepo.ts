@@ -1,7 +1,14 @@
 import type { Pool, PoolClient } from 'pg';
 
 export type BridgePrintJobStatus = 'pending' | 'claimed' | 'printed' | 'failed' | 'expired';
-export type BridgePrintDocumentType = 'test' | 'receipt' | 'invoice' | 'closure_bulletin';
+export type BridgePrintDocumentType =
+  | 'test'
+  | 'receipt'
+  | 'invoice'
+  | 'closure_bulletin'
+  | 'kitchen_test'
+  | 'kitchen_order'
+  | 'kitchen_cancellation';
 export type BridgePrintPayloadFormat = 'escpos';
 
 export interface BridgePrintJob {

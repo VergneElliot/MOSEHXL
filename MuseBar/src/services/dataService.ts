@@ -1,5 +1,6 @@
-import { Category, Product, ProductOptionGroup } from '../types';
+import { Category, Product, ProductOptionGroup, KitchenPrinter } from '../types';
 import type { ProductOptionGroupFormInput } from './api/productOptionGroups';
+import type { KitchenPrinterFormInput } from './api/kitchenPrinters';
 import { ApiService } from './apiService';
 
 export class DataService {
@@ -154,5 +155,25 @@ export class DataService {
 
   public async deleteProductOptionGroup(id: string): Promise<{ message?: string; action?: string }> {
     return this.apiService.deleteProductOptionGroup(id);
+  }
+
+  public async getKitchenPrinters(): Promise<KitchenPrinter[]> {
+    return this.apiService.getKitchenPrinters();
+  }
+
+  public async createKitchenPrinter(input: KitchenPrinterFormInput): Promise<KitchenPrinter> {
+    return this.apiService.createKitchenPrinter(input);
+  }
+
+  public async updateKitchenPrinter(id: string, input: KitchenPrinterFormInput): Promise<KitchenPrinter> {
+    return this.apiService.updateKitchenPrinter(id, input);
+  }
+
+  public async deleteKitchenPrinter(id: string): Promise<{ message?: string; action?: string }> {
+    return this.apiService.deleteKitchenPrinter(id);
+  }
+
+  public async testKitchenPrinter(id: string): Promise<{ message?: string; job_id?: string }> {
+    return this.apiService.testKitchenPrinter(id);
   }
 }

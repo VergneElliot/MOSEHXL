@@ -50,6 +50,26 @@ export interface OrderItem {
   description?: string;
   created_at: Date;
   options?: OrderItemOptionRecord[];
+  kitchen_printer_ids_snapshot?: KitchenPrinterLineSnapshotRecord[];
+}
+
+export interface KitchenPrinterLineSnapshotRecord {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+export interface KitchenPrinterRecord {
+  id: number;
+  establishment_id?: string;
+  name: string;
+  slug: string;
+  connection_type: 'bridge' | 'network_escpos';
+  connection_config: Record<string, unknown>;
+  display_order: number;
+  is_active: boolean;
+  created_at?: string | Date;
+  updated_at?: string | Date;
 }
 
 export interface OrderItemOptionRecord {
@@ -90,6 +110,8 @@ export interface ProductRecord {
   updated_at: string | Date;
   option_group_ids?: number[];
   option_groups?: ProductOptionGroupRecord[];
+  kitchen_printer_ids?: number[];
+  kitchen_printers?: KitchenPrinterRecord[];
 }
 
 export interface ProductOptionChoiceRecord {

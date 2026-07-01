@@ -6,6 +6,7 @@
 
 import { pool } from '../../db/pool';
 import { Order, OrderItem, SubBill } from '../interfaces';
+import type { KitchenPrinterLineSnapshot } from '../../services/kitchenPrinting/kitchenPrinterSnapshot';
 
 /** Only these columns may be set by update(); prevents SQL injection via object keys. */
 const ALLOWED_ORDER_UPDATE_FIELDS = [
@@ -103,16 +104,19 @@ export const OrderItemModel = {
     return result.rows;
   },
 
-  async create(item: Omit<OrderItem, 'id' | 'created_at'>, establishmentId: string): Promise<OrderItem> {
+  async create(item: Omit<OrderItem, 'id' | 'created_at'> & {
+    kitchen_printer_ids_snapshot?: KitchenPrinterLineSnapshot[];
+  }, establishmentId: string): Promise<OrderItem> {
+    const snapshot = JSON.stringify(item.kitchen_printer_ids_snapshot ?? []);
     const result = await pool.query(
       `INSERT INTO order_items (
          order_id, product_id, product_name, quantity, unit_price, total_price,
-         tax_rate, tax_amount, happy_hour_applied, happy_hour_discount_amount, is_manual_happy_hour, description, establishment_id
+         tax_rate, tax_amount, happy_hour_applied, happy_hour_discount_amount, is_manual_happy_hour, description, kitchen_printer_ids_snapshot, establishment_id
        )
        SELECT
-         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, o.establishment_id
+         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, o.establishment_id
        FROM orders o
-       WHERE o.id = $1 AND o.establishment_id = $13
+       WHERE o.id = $1 AND o.establishment_id = $14
        RETURNING *`,
       [
         item.order_id,
@@ -127,6 +131,7 @@ export const OrderItemModel = {
         item.happy_hour_discount_amount,
         item.is_manual_happy_hour === true,
         item.description || '',
+        snapshot,
         establishmentId
       ]
     );
