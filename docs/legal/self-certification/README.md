@@ -1,8 +1,13 @@
 # MOSEHXL Self-Certification Dossier
 
-Status: Draft dossier  
+Status: **Paused** — dossier foundation complete; operational execution pending  
 Date started: 2026-06-25  
+Paused on: 2026-07-01  
+Git anchor: `development` @ `4815a0a`  
 Target: French fiscal self-certification dossier for MOSEHXL POS scope  
+
+> **Resume here:** `00-PAUSE-CHECKPOINT.md` — authoritative record of what is done
+> and what remains before signature.
 
 ---
 
@@ -31,6 +36,7 @@ below is an engineering evidence package, not legal advice.
 
 | File | Purpose |
 |------|---------|
+| `00-PAUSE-CHECKPOINT.md` | **Pause/resume record** — what is done, what remains, resume order |
 | `01-SCOPE.md` | Defines what product/version/modules are covered by the self-certification claim |
 | `02-REFERENTIEL-MAPPING.md` | Maps the ISCA requirements to code, tests, docs, and operational evidence |
 | `03-ATTESTATION-DRAFT.md` | Draft publisher attestation text to complete and sign |
@@ -43,8 +49,8 @@ below is an engineering evidence package, not legal advice.
 
 ## Current Engineering Verdict
 
-As of this dossier start, the codebase has already closed the historical
-compliance blockers tracked in the 2026-05-20 audit and later closure pass:
+As of the **2026-07-01 pause**, the codebase has closed the historical compliance
+blockers tracked in the 2026-05-20 audit and later closure pass:
 
 - legal journal append paths are fail-closed for fiscal operations,
 - legal journal has hash-chain integrity and DB-level mutation guards,
@@ -52,15 +58,17 @@ compliance blockers tracked in the 2026-05-20 audit and later closure pass:
 - archive verify/download surfaces exist,
 - software events and audit trail have fail-safe/structured coverage for critical flows,
 - receipt/invoice/legal document generation has dedicated compliance hardening,
-- the backend quality gate is green on the latest cleanup passes.
+- the backend quality gate was green at pause (68 test files / 292 tests).
 
-Remaining self-certification work is therefore mostly:
+**Dossier documentation** (scope, mapping, attestation draft, operational policy,
+evidence index, release checklist, fillable templates) is in place.
 
-1. scope decision,
-2. signed attestation,
-3. referentiel mapping,
-4. operational controls and evidence retention,
-5. release freeze/tag discipline.
+**Remaining before a signed claim** — procedural only; see `00-PAUSE-CHECKPOINT.md`:
+
+1. approve scope (`01-SCOPE.md`),
+2. execute operational controls and fill evidence templates,
+3. freeze a release (`06-RELEASE-FREEZE-CHECKLIST.md`),
+4. sign attestation (`03-ATTESTATION-DRAFT.md`).
 
 ---
 

@@ -1,13 +1,64 @@
 # MOSEHXL — Cleanup & Performance Roadmap
 
-**Date:** 2026-06-24
-**Branch baseline:** `development` (HEAD `274b265`)
-**Author:** Engineering (full-repo clean-up pass)
+**Date:** 2026-06-24  
+**Last updated:** 2026-07-01 (pause checkpoint)  
+**Branch baseline:** `development` (paused at `4815a0a`)  
+**Author:** Engineering (full-repo clean-up pass)  
 **Scope:** (1) close the defects found in the 2026-06-24 code review, (2) define the performance/"lag" strategy, (3) sequence everything into an executable, low-risk plan.
 
 > This document is the execution plan that follows the 2026-06-24 review. For the
 > historical hard-truth audits see `docs/audits/`. For live status see
 > `docs/CURRENT-TRUTH.md` and `DEVELOPMENT-STATE.md`.
+
+---
+
+## Pause checkpoint (2026-07-01)
+
+**Status:** Paused — feature work takes priority. Resume cleanup/perf from this section.
+
+**Git anchor:** `development` @ `4815a0a`  
+**Last completed patch note:** `422-SELF-CERTIFICATION-OPERATIONAL-EVIDENCE-TEMPLATES-IMPLEMENTATION.md`  
+**Self-cert pause record:** `docs/legal/self-certification/00-PAUSE-CHECKPOINT.md`
+
+### Completed at pause
+
+| Phase | Title | Status | Patch note |
+|-------|-------|--------|------------|
+| 1 | Green baseline | **Done** | 413 |
+| 2 | Dead-code removal | **Done** | 414 |
+| 3 | Bridge → TypeScript + CI | **Done** | 415 |
+| 4A | Auth support modules | **Done** | 416 |
+| 4B | TOTP routes | **Done** | 417 |
+| 4C | Session + refresh routes | **Done** | 418 |
+| 4D | Support + logout routes | **Done** | 419 |
+| 4E | Login routes (`authLogin.ts` → 15 LOC assembler) | **Done** | 420 |
+
+**Quality gate at pause:** backend type-check ✅, lint ✅, 68 test files / 292 tests ✅.
+
+### Resume here (Track A)
+
+| Phase | Title | Status | Next action |
+|-------|-------|--------|-------------|
+| **4F** | `printing.ts` modularization (~735 LOC) | **Not started** | Split transport (route handlers) from provider/config resolution; no behavior change. File: `MuseBar/backend/src/routes/printing.ts`. |
+
+After 4F, Track A cleanup is effectively complete (largest route files under control).
+
+### Resume here (Track B)
+
+| Phase | Title | Status | Next action |
+|-------|-------|--------|-------------|
+| **5** | Performance baseline | **Not started** | Profile on real POS device; deliverable `docs/reports/2026-06-24-pos-perf-baseline.md` |
+| **6** | React quick wins | **Not started** | Blocked on Phase 5 numbers |
+| **7** | CRA → Vite | **Not started** | After Phase 6 decision gate |
+| **8** | SvelteKit migration | **Not started** | Conditional on 5–6 |
+| **9** | Backend perf / deploy ergonomics | **Not started** | Conditional on 5 |
+
+**Recommended resume order:** 4F → 5 → 6 → [lag gate] → 7 → 8 → 9.
+
+### Self-certification (parallel, also paused)
+
+Dossier + templates are ready. Operational execution, release freeze, and
+signature remain. See `docs/legal/self-certification/00-PAUSE-CHECKPOINT.md`.
 
 ---
 
@@ -103,19 +154,21 @@ The codebase is architecturally strong and fiscally aligned (CGI Art. 286-I-3 bi
 
 ### Phase 4 — Modularize remaining large files (P2) — effort: M
 
-**Status:** In progress. Phase 4A completed on 2026-06-25; see `docs/patch-notes/416-CLEANUP-PHASE4A-AUTHLOGIN-SUPPORT-MODULES-IMPLEMENTATION.md`.
-Phase 4B completed on 2026-06-25; see `docs/patch-notes/417-CLEANUP-PHASE4B-AUTHLOGIN-TOTP-ROUTES-IMPLEMENTATION.md`.
-Phase 4C completed on 2026-06-25; see `docs/patch-notes/418-CLEANUP-PHASE4C-AUTHLOGIN-SESSION-REFRESH-ROUTES-IMPLEMENTATION.md`.
-Phase 4D completed on 2026-06-25; see `docs/patch-notes/419-CLEANUP-PHASE4D-AUTHLOGIN-SUPPORT-LOGOUT-ROUTES-IMPLEMENTATION.md`.
-Phase 4E completed on 2026-06-25; see `docs/patch-notes/420-CLEANUP-PHASE4E-AUTHLOGIN-LOGIN-ROUTES-IMPLEMENTATION.md`.
+**Status:** Paused — auth split complete; printing split pending (see **Pause checkpoint** above).
+
+| Sub-phase | Status | Patch note |
+|-----------|--------|------------|
+| 4A Auth support modules | **Done** (2026-06-25) | 416 |
+| 4B TOTP routes | **Done** (2026-06-25) | 417 |
+| 4C Session + refresh routes | **Done** (2026-06-25) | 418 |
+| 4D Support + logout routes | **Done** (2026-06-25) | 419 |
+| 4E Login routes | **Done** (2026-06-25) | 420 |
+| 4F `printing.ts` split | **Not started** | — |
 
 **Goal:** eliminate the last monolith; no file mixing too many concerns.
 
-1. **Split `routes/authLogin.ts` (1412 LOC)** into a cohesive `routes/auth/` module, e.g.:
-   - `login.ts` (login + lockout), `refresh.ts` (rotation/sessions/CSRF), `logout.ts`, `totp.ts` (2FA lifecycle + step-up), `impersonation.ts` (support impersonation), shared `helpers.ts` (cookie/expiry/lockout math).
-   - Keep an `index.ts` that assembles the router so mount points and tests are stable.
-   - **No behavior change.** This is a pure structural extraction; the existing auth test suite is the safety net (run it before/after).
-2. **`printing.ts` (737 LOC):** after C2 dead-code removal, separate transport (route handlers) from provider/config resolution where it reduces size without churn.
+1. **`routes/authLogin.ts` (was 1412 LOC)** — **done.** Extracted to `routes/authLogin/` modules; assembler is ~15 LOC. Mount points and tests unchanged.
+2. **`printing.ts` (~735 LOC)** — **resume here.** After C2 dead-code removal, separate transport (route handlers) from provider/config resolution where it reduces size without churn.
 
 **Acceptance:** auth + printing test suites pass unchanged; largest backend route file well under ~500 LOC; mount points identical.
 
@@ -126,6 +179,8 @@ Phase 4E completed on 2026-06-25; see `docs/patch-notes/420-CLEANUP-PHASE4E-AUTH
 > **Core thesis:** for a POS doing a few thousand orders/day, the backend language is **not** the bottleneck. The lag lives in the browser on weak hardware and in network round-trips. Fix those first; only migrate the framework if measurements still demand it.
 
 ### Phase 5 — Establish a performance baseline (P1) — effort: S
+
+**Status:** Not started (paused 2026-07-01).
 
 **Goal:** stop guessing. Capture real numbers on the actual POS device before changing anything.
 
@@ -140,6 +195,8 @@ Phase 4E completed on 2026-06-25; see `docs/patch-notes/420-CLEANUP-PHASE4E-AUTH
 ---
 
 ### Phase 6 — Quick wins on the current React app (P1) — effort: M, low risk
+
+**Status:** Not started (paused 2026-07-01). Depends on Phase 5.
 
 Often enough to resolve the lag without a rewrite.
 
@@ -156,6 +213,8 @@ Often enough to resolve the lag without a rewrite.
 
 ### Phase 7 — Toolchain modernization: CRA → Vite (P1/P2) — effort: M
 
+**Status:** Not started (paused 2026-07-01).
+
 Independent of any framework decision; pure upside.
 
 1. Migrate the build from `react-scripts` (unmaintained) to **Vite** (keep React for now): faster dev, better code-splitting, leaner production bundle, modern TS.
@@ -169,6 +228,8 @@ Independent of any framework decision; pure upside.
 ---
 
 ### Phase 8 — Frontend framework migration (conditional, biggest lever) — effort: L
+
+**Status:** Not started (paused 2026-07-01). Conditional on Phases 5–6.
 
 **Only if Phases 6–7 don't hit the perf target.**
 
@@ -194,6 +255,8 @@ Independent of any framework decision; pure upside.
 
 ### Phase 9 — Backend performance + deployment ergonomics (conditional) — effort: M–L
 
+**Status:** Not started (paused 2026-07-01). Conditional on Phase 5.
+
 **Backend (only if Phase 5 implicates it):**
 
 1. **Profile DB**: find N+1s, add missing indexes, tune pool — usually the real backend win.
@@ -210,15 +273,22 @@ Independent of any framework decision; pure upside.
 
 ## 4. NF‑525 self-certification — remaining (procedural, G1)
 
+**Status:** Paused 2026-07-01. Authoritative resume record:
+`docs/legal/self-certification/00-PAUSE-CHECKPOINT.md`.
+
 Code-wise the ISCA pillars are implemented (hash chain + DB triggers, audit trail, fail-closed closures with VAT reconciliation, signed archives, invoice compliance enforcement). To *claim* self-certification:
 
-1. **Green evidence corpus** — delivered by **Phase 1** (a passing, reproducible test suite is part of the dossier).
-2. **Scope decision** — B2C tickets only vs full NF‑525 functional scope.
-3. **Référentiel mapping document** — map each LNE/NF‑525 requirement to the implementing code/test.
-4. **Signed attestation individuelle de l'éditeur** — the legal alternative to the ~14k€ certificate (valid because you are both publisher and user).
-5. **Operational controls** — retention (6-year), off-site/WORM backups, restore drills.
+| Item | Status at pause |
+|------|-----------------|
+| 1. Green evidence corpus | **Done** (Phase 1; re-verify on frozen release before sign) |
+| 2. Scope decision | **Draft** — `01-SCOPE.md` not formally approved |
+| 3. Référentiel mapping | **Draft** — `02-REFERENTIEL-MAPPING.md` |
+| 4. Signed attestation | **Draft** — `03-ATTESTATION-DRAFT.md` unsigned |
+| 5. Operational controls | **Policy + templates done; execution not done** — see `04-OPERATIONAL-CONTROLS.md` |
+| 6. Release freeze | **Not done** — `06-RELEASE-FREEZE-CHECKLIST.md` |
+| 7. Filled evidence records | **Not done** — templates in `evidence-templates/` |
 
-These are tracked here for completeness; only item 1 is a code task.
+Only item 1 was a code task; items 2–7 are procedural. Safe to pause while feature work proceeds.
 
 ---
 
@@ -252,7 +322,7 @@ Phase 5 (perf baseline) ── start in parallel with Track A
 | 1 | Green baseline (fix invoice tests) | S | Very low | **Yes (P0)** |
 | 2 | Dead-code removal | S | Very low | No |
 | 3 | Bridge → TS + CI | M | Low | No |
-| 4 | Split `authLogin.ts` / `printing.ts` | M | Low–Med (auth) | No |
+| 4 | Split `authLogin.ts` / `printing.ts` | M | Low–Med (auth done; printing pending) | No |
 | 5 | Perf baseline | S | None | Gates Track B |
 | 6 | React quick wins | M | Low | No |
 | 7 | CRA → Vite | M | Low–Med | No |
@@ -271,4 +341,4 @@ Phase 5 (perf baseline) ── start in parallel with Track A
 
 ---
 
-*This roadmap is a living plan. Update phase statuses here as work lands, and keep `docs/CURRENT-TRUTH.md` pointing at the latest authoritative status.*
+*This roadmap is a living plan. Update phase statuses here as work lands, and keep `docs/CURRENT-TRUTH.md` pointing at the latest authoritative status. When pausing or resuming, update the **Pause checkpoint** section at the top.*

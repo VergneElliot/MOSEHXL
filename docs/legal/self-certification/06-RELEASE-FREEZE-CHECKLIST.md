@@ -1,7 +1,8 @@
 # 06 - Release Freeze Checklist
 
-Status: Draft checklist  
-Purpose: freeze a specific MOSEHXL release before signing the attestation.
+Status: Draft checklist — **paused 2026-07-01** (no release frozen yet)  
+Purpose: freeze a specific MOSEHXL release before signing the attestation.  
+Resume record: `00-PAUSE-CHECKPOINT.md`
 
 ---
 
