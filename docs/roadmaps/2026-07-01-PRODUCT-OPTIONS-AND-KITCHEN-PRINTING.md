@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-01  
 **Branch baseline:** `development` (HEAD `722b4df`)  
-**Status:** In progress — Phase 3 done (2026-07-01)  
+**Status:** In progress — Phase 4 done (2026-07-01)  
 **Branch baseline:** `development`  
 **Scope:** Reusable product parameters (presets + free text), POS capture, kitchen/bar order tickets routed to named printers, cancellation tickets. Fiscal receipts and invoices unchanged.
 
@@ -551,6 +551,8 @@ Each phase = one PR series + patch note + green CI before next phase.
 
 ### Phase 4 — Kitchen order tickets on payment (effort: M)
 
+**Status:** Done on 2026-07-01. See `docs/patch-notes/428-PRODUCT-OPTIONS-PHASE4-KITCHEN-ORDER-TICKETS-IMPLEMENTATION.md`.
+
 **Goal:** Physical ticket on completed sale.
 
 **Steps:**
@@ -564,10 +566,12 @@ Each phase = one PR series + patch note + green CI before next phase.
 
 **Acceptance:**
 
-- [ ] Pay order → correct printer receives ticket with options.
-- [ ] Product with no printer assignment → no kitchen job.
-- [ ] Product on two printers → duplicate line on both.
-- [ ] Receipt print path unaffected.
+- [x] Pay order → correct printer receives ticket with options.
+- [x] Product with no printer assignment → no kitchen job.
+- [x] Product on two printers → duplicate line on both.
+- [x] Receipt print path unaffected.
+
+**Patch note:** `428-PRODUCT-OPTIONS-PHASE4-KITCHEN-ORDER-TICKETS-IMPLEMENTATION.md`
 
 ---
 

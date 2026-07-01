@@ -4,6 +4,7 @@ import { pool } from '../../db/pool';
 
 export type SoftwareEventType =
   | 'PRINTING_CONFIGURATION_UPDATED'
+  | 'KITCHEN_TICKET_ENQUEUE_FAILED'
   | 'HAPPY_HOUR_SETTINGS_UPDATED'
   | 'SERVER_STARTED'
   | 'SERVER_SHUTDOWN'

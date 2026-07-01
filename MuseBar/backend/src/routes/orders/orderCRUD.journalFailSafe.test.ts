@@ -85,6 +85,10 @@ vi.mock('../../models/database/kitchenPrinterModel', () => ({
   },
 }));
 
+vi.mock('../../services/kitchenPrinting/kitchenTicketDispatchService', () => ({
+  dispatchKitchenTicketsForCompletedOrder: vi.fn().mockResolvedValue({ enqueued: 0, failures: 0, jobIds: [] }),
+}));
+
 vi.mock('../../services/orders/orderItemOptionsService', () => ({
   attachOptionsToOrderItems: vi.fn(async (items: unknown[]) => items),
 }));

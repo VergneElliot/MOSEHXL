@@ -16,6 +16,7 @@ async function processJob(config: BridgeConfig, job: BridgePrintJob): Promise<vo
   log('Print job received', {
     jobId: job.id,
     documentType: job.document_type,
+    kitchenPrinterSlug: job.metadata?.kitchen_printer_slug,
     attempt: job.attempt_count,
   });
   try {
@@ -44,6 +45,7 @@ async function run(): Promise<void> {
     apiUrl: config.apiUrl,
     establishmentId: config.establishmentId,
     printer: `${config.printerHost}:${config.printerPort}`,
+    routedPrinters: config.printers.length,
     pollIntervalMs: config.pollIntervalMs,
   });
 

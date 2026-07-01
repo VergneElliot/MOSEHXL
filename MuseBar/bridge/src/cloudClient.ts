@@ -6,6 +6,7 @@ export interface BridgePrintJob {
   payload_format: string;
   payload_base64: string;
   attempt_count?: number;
+  metadata?: Record<string, unknown>;
 }
 
 function bridgeHeaders(config: BridgeConfig): Record<string, string> {

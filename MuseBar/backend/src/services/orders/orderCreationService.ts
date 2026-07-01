@@ -1,3 +1,4 @@
+import { pool } from '../../db/pool';
 import { OrderItemModel, OrderModel, SubBillModel } from '../../models';
 import { OrderItemOptionModel, type OrderItemOptionSnapshotInput } from '../../models/database/orderItemOptionModel';
 import { AuditTrailModel } from '../../models/auditTrail';
@@ -12,6 +13,7 @@ import {
   loadKitchenPrinterSnapshotsByProduct,
   type KitchenPrinterLineSnapshot,
 } from '../kitchenPrinting/kitchenPrinterSnapshot';
+import { dispatchKitchenTicketsForCompletedOrder } from '../kitchenPrinting/kitchenTicketDispatchService';
 
 export interface CreateOrderItemInput {
   product_id?: number;
@@ -227,6 +229,14 @@ export async function createOrderWithCompliance(
         auditError instanceof Error ? auditError : new Error(String(auditError)),
         'AUDIT_TRAIL'
       );
+    });
+
+    void dispatchKitchenTicketsForCompletedOrder(pool, {
+      establishmentId,
+      order,
+      items: createdItems,
+      createdByUserId: userId != null ? Number(userId) : undefined,
+      logger,
     });
   }
 
