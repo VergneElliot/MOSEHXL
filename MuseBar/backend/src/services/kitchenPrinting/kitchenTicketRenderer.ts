@@ -2,6 +2,7 @@ import { ESC_POS } from '../printing/types';
 import type { KitchenTicketLine } from './kitchenTicketTypes';
 import {
   appendKitchenTicketFooter,
+  appendPickupTicketFooter,
   kitchenTicketAlertSequence,
 } from './kitchenTicketFooter';
 
@@ -84,6 +85,24 @@ export function renderKitchenOrderTicket(input: {
   appendKitchenLineItems(parts, input.lines);
 
   appendKitchenTicketFooter(parts);
+  return parts.join('\n');
+}
+
+/** Minimal slip for the customer — order number only, printed at the counter printer. */
+export function renderCustomerOrderNumberTicket(orderId: number): string {
+  const parts = [
+    ESC_POS.INIT,
+    ESC_POS.CENTER,
+    ESC_POS.BOLD_ON,
+    ESC_POS.DOUBLE_SIZE,
+    'COMMANDE',
+    '',
+    `#${orderId}`,
+    ESC_POS.NORMAL_SIZE,
+    ESC_POS.BOLD_OFF,
+  ];
+
+  appendPickupTicketFooter(parts);
   return parts.join('\n');
 }
 
