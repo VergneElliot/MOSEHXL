@@ -9,6 +9,31 @@ export interface NetworkPrinterOptions {
   timeoutMs?: number;
 }
 
+export function isKitchenBridgeDocumentType(documentType: string): boolean {
+  return documentType === 'kitchen_order'
+    || documentType === 'kitchen_cancellation'
+    || documentType === 'kitchen_test';
+}
+
+export function resolvePrinterEndpoint(
+  job: Pick<BridgePrintJob, 'document_type' | 'metadata'>,
+  config: Pick<BridgeConfig, 'printerHost' | 'printerPort' | 'printers'>
+): NetworkPrinterOptions {
+  const slug =
+    job.metadata && typeof job.metadata.kitchen_printer_slug === 'string'
+      ? job.metadata.kitchen_printer_slug.trim()
+      : '';
+
+  if (isKitchenBridgeDocumentType(job.document_type) && slug) {
+    const routed = config.printers.find((printer) => printer.slug === slug);
+    if (routed) {
+      return { host: routed.host, port: routed.port };
+    }
+  }
+
+  return { host: config.printerHost, port: config.printerPort };
+}
+
 export function sendEscPosBuffer(buffer: Buffer, options: NetworkPrinterOptions): Promise<void> {
   const { host, port, timeoutMs = 8000 } = options;
 
@@ -55,9 +80,10 @@ export async function printEscPosJob(job: BridgePrintJob, config: BridgeConfig):
   }
 
   const payload = Buffer.from(job.payload_base64, 'base64');
+  const endpoint = resolvePrinterEndpoint(job, config);
   await sendEscPosBuffer(payload, {
-    host: config.printerHost,
-    port: config.printerPort,
+    host: endpoint.host,
+    port: endpoint.port,
     timeoutMs: config.printerTimeoutMs,
   });
 }

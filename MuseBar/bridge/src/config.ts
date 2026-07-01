@@ -1,6 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+export interface BridgePrinterRoute {
+  slug: string;
+  host: string;
+  port: number;
+}
+
 export interface BridgeConfig {
   apiUrl: string;
   establishmentId: string;
@@ -8,6 +14,7 @@ export interface BridgeConfig {
   printerDriver: string;
   printerHost: string;
   printerPort: number;
+  printers: BridgePrinterRoute[];
   pollIntervalMs: number;
   printerTimeoutMs: number;
 }
@@ -45,6 +52,35 @@ function optionalInt(name: string, defaultValue: number): number {
   return value;
 }
 
+export function parsePrintersJson(raw: string | undefined): BridgePrinterRoute[] {
+  if (!raw?.trim()) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error('PRINTERS_JSON must be valid JSON');
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error('PRINTERS_JSON must be a JSON array');
+  }
+
+  return parsed.map((entry, index) => {
+    if (!entry || typeof entry !== 'object') {
+      throw new Error(`PRINTERS_JSON[${index}] must be an object`);
+    }
+    const record = entry as Record<string, unknown>;
+    const slug = typeof record.slug === 'string' ? record.slug.trim() : '';
+    const host = typeof record.host === 'string' ? record.host.trim() : '';
+    const port = record.port != null ? Number(record.port) : 9100;
+    if (!slug) throw new Error(`PRINTERS_JSON[${index}].slug is required`);
+    if (!host) throw new Error(`PRINTERS_JSON[${index}].host is required`);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      throw new Error(`PRINTERS_JSON[${index}].port must be between 1 and 65535`);
+    }
+    return { slug, host, port };
+  });
+}
+
 export function loadConfig(): BridgeConfig {
   loadDotEnv();
   const apiUrl = required('MUSEBAR_API_URL').replace(/\/$/, '');
@@ -60,6 +96,7 @@ export function loadConfig(): BridgeConfig {
     printerDriver: process.env.PRINTER_DRIVER?.trim() || 'network-escpos',
     printerHost: required('PRINTER_HOST'),
     printerPort,
+    printers: parsePrintersJson(process.env.PRINTERS_JSON),
     pollIntervalMs: optionalInt('POLL_INTERVAL_MS', 2000),
     printerTimeoutMs: optionalInt('PRINTER_TIMEOUT_MS', 8000),
   };

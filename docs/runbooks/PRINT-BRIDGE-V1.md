@@ -57,6 +57,19 @@ POLL_INTERVAL_MS=2000
 
 If the printer receives a different DHCP address, update `PRINTER_HOST`.
 
+### Kitchen printers (bar / cuisine)
+
+For kitchen command tickets routed to multiple LAN printers, add `PRINTERS_JSON` to the same `.env`:
+
+```env
+PRINTERS_JSON=[{"slug":"bar","host":"192.168.0.95","port":9100},{"slug":"cuisine","host":"192.168.0.96","port":9100}]
+```
+
+- `slug` must match the **slug** configured on each kitchen printer in Menu admin.
+- Receipt, invoice, and test receipt jobs still use `PRINTER_HOST` / `PRINTER_PORT`.
+- `kitchen_order`, `kitchen_test`, and `kitchen_cancellation` jobs route by `metadata.kitchen_printer_slug`.
+- If a kitchen slug is missing from `PRINTERS_JSON`, the bridge falls back to `PRINTER_HOST` (useful for single-printer setups).
+
 ---
 
 ## Run Bridge
