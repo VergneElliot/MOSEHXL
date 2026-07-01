@@ -13,6 +13,7 @@ import PaymentDialog from './PaymentDialog';
 import { DiversDialog, DiversFormData } from './DiversDialog';
 import PrintAfterSaleDialog from './PrintAfterSaleDialog';
 import ProductOptionDialog, { ProductOptionSelection } from './ProductOptionDialog';
+import { upsertLineNoteInOptions } from '../../utils/lineItemNote';
 
 interface POSContainerProps {
   categories: Category[];
@@ -149,6 +150,17 @@ const POSContainer: React.FC<POSContainerProps> = ({
     [pendingProduct, buildOrderItem, handleAddToOrder]
   );
 
+  const handleUpdateLineNote = useCallback(
+    (index: number, note: string) => {
+      const line = state.currentOrder[index];
+      if (!line) return;
+      actions.updateLineAt(index, {
+        options: upsertLineNoteInOptions(line.options, note),
+      });
+    },
+    [actions, state.currentOrder]
+  );
+
   const { handleApplyHappyHour, handleApplyOffert, handleApplyPerso } =
     usePOSOrderAdjustments({
       currentOrder: state.currentOrder,
@@ -252,6 +264,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
       onApplyHappyHour={posLinePermissions.happyHourManual ? handleApplyHappyHour : undefined}
       onApplyOffert={posLinePermissions.offert ? handleApplyOffert : undefined}
       onApplyPerso={posLinePermissions.perso ? handleApplyPerso : undefined}
+      onUpdateLineNote={handleUpdateLineNote}
       formatCurrency={logic.formatCurrency}
     />
   );

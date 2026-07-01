@@ -13,9 +13,14 @@ import {
   ToggleButtonGroup,
 } from '@mui/material';
 import { Product, ProductOptionGroup } from '../../types';
+import {
+  LINE_NOTE_DISPLAY_ORDER,
+  LINE_NOTE_GROUP_NAME,
+  LINE_NOTE_MAX_LENGTH,
+} from '../../utils/lineItemNote';
 
 export interface ProductOptionSelection {
-  groupId: string;
+  groupId?: string;
   groupName: string;
   choiceId?: string | null;
   choiceLabel?: string | null;
@@ -59,11 +64,13 @@ const ProductOptionDialog: React.FC<ProductOptionDialogProps> = ({
 }) => {
   const groups = product?.optionGroups ?? [];
   const [selections, setSelections] = useState<SelectionState>({});
+  const [lineNote, setLineNote] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open && product) {
       setSelections(buildInitialState(product.optionGroups ?? []));
+      setLineNote('');
       setError(null);
     }
   }, [open, product]);
@@ -103,6 +110,15 @@ const ProductOptionDialog: React.FC<ProductOptionDialogProps> = ({
         choiceLabel: choice?.label ?? null,
         freeText: freeText || null,
         displayOrder: group.displayOrder,
+      });
+    }
+
+    const trimmedLineNote = lineNote.trim().slice(0, LINE_NOTE_MAX_LENGTH);
+    if (trimmedLineNote) {
+      output.push({
+        groupName: LINE_NOTE_GROUP_NAME,
+        freeText: trimmedLineNote,
+        displayOrder: LINE_NOTE_DISPLAY_ORDER,
       });
     }
 
@@ -183,6 +199,22 @@ const ProductOptionDialog: React.FC<ProductOptionDialogProps> = ({
               </Box>
             );
           })}
+
+          <Box>
+            <Typography variant="h6" gutterBottom>
+              Note libre (optionnel)
+            </Typography>
+            <TextField
+              label="Ex. sans glaçons, sans citron"
+              value={lineNote}
+              onChange={(event) => setLineNote(event.target.value)}
+              fullWidth
+              multiline
+              minRows={2}
+              inputProps={{ maxLength: LINE_NOTE_MAX_LENGTH }}
+              sx={{ '& .MuiInputBase-root': { fontSize: '1rem', minHeight: 52 } }}
+            />
+          </Box>
         </Box>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>

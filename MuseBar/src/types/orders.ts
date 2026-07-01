@@ -4,7 +4,7 @@ export type PaymentMethod = 'cash' | 'card' | 'split';
 
 export interface OrderItemOption {
   id?: string;
-  groupId: string;
+  groupId?: string;
   groupName: string;
   choiceId?: string | null;
   choiceLabel?: string | null;

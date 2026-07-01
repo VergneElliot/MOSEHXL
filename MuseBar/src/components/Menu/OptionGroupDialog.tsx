@@ -114,7 +114,7 @@ const OptionGroupDialog: React.FC<OptionGroupDialogProps> = ({
                   onChange={(event) => updateField('allowFreeText', event.target.checked)}
                 />
               }
-              label="Autoriser une note libre (ex: sans citron)"
+              label="Autoriser une note libre dans ce paramètre (rare — les notes à la volée sont disponibles sur toutes les lignes au POS)"
             />
             {form.allowFreeText && (
               <TextField
