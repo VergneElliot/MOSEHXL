@@ -76,7 +76,7 @@ Backend: 70 test files / 298 tests green.
 Apply migration on environments:
 
 ```bash
-cd MuseBar/backend && npm run migration:up
+cd MuseBar/backend && npm run migration:migrate
 ```
 
 Patch-note index regenerated with:
