@@ -1,10 +1,12 @@
 import { request } from './core';
-import { Order, OrderItem } from '../../types';
+import { Order, OrderItem, OrderItemOption } from '../../types';
 import type {
   Order as ApiOrder,
   OrderItem as ApiOrderItem,
+  OrderItemOptionRecord,
   SubBill as ApiSubBill,
 } from '@mosehxl/types';
+import { mapOrderItemOptionsToApiPayload } from '../../utils/orderItemOptions';
 
 type RawOrderItem = Partial<ApiOrderItem>;
 type RawOrder = Partial<ApiOrder> &
@@ -21,6 +23,7 @@ type RawOrder = Partial<ApiOrder> &
       total_price?: number | string;
       tax_rate?: number | string;
       tax_amount?: number | string;
+      options?: OrderItemOptionRecord[];
     }>;
     sub_bills?: Array<Partial<ApiSubBill> & {
       id?: string | number;
@@ -38,6 +41,18 @@ function toNumber(value: unknown, fallback: number = 0): number {
         ? parseFloat(value)
         : NaN;
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function mapRawOption(option: OrderItemOptionRecord): OrderItemOption {
+  return {
+    id: String(option.id),
+    groupId: option.group_id != null ? String(option.group_id) : '',
+    groupName: option.group_name_snapshot,
+    choiceId: option.choice_id != null ? String(option.choice_id) : null,
+    choiceLabel: option.choice_label_snapshot,
+    freeText: option.free_text,
+    displayOrder: option.display_order,
+  };
 }
 
 function mapRawItem(orderId: string | number, item: RawOrderItem): OrderItem {
@@ -58,6 +73,8 @@ function mapRawItem(orderId: string | number, item: RawOrderItem): OrderItem {
     isManualHappyHour: Boolean(item.happy_hour_applied && item.is_manual_happy_hour),
     isOffert: totalPrice === 0,
     originalPrice: unitPrice,
+    description: item.description || undefined,
+    options: (item.options ?? []).map(mapRawOption),
   };
 }
 
@@ -150,6 +167,7 @@ export async function createOrder(order: {
         is_manual_happy_hour:
           item.isHappyHourApplied === true && item.isManualHappyHour === true,
         description: item.description || null,
+        options: mapOrderItemOptionsToApiPayload(item.options),
       })),
       ...(order.sub_bills ? { sub_bills: order.sub_bills } : {}),
     }),

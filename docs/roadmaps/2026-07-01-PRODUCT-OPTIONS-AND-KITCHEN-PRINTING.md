@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-01  
 **Branch baseline:** `development` (HEAD `722b4df`)  
-**Status:** In progress — Phase 1 done (2026-07-01)  
+**Status:** In progress — Phase 2 done (2026-07-01)  
 **Branch baseline:** `development`  
 **Scope:** Reusable product parameters (presets + free text), POS capture, kitchen/bar order tickets routed to named printers, cancellation tickets. Fiscal receipts and invoices unchanged.
 
@@ -500,6 +500,8 @@ Each phase = one PR series + patch note + green CI before next phase.
 
 ### Phase 2 — POS capture & order persistence (effort: M)
 
+**Status:** Done on 2026-07-01. See `docs/patch-notes/426-PRODUCT-OPTIONS-PHASE2-POS-ORDER-PERSISTENCE-IMPLEMENTATION.md`.
+
 **Goal:** Mandatory cuisson works; options stored on order; fiscal docs unchanged.
 
 **Steps:**
@@ -514,10 +516,12 @@ Each phase = one PR series + patch note + green CI before next phase.
 
 **Acceptance:**
 
-- [ ] Cannot complete order with meat missing cuisson.
-- [ ] Drink with “sans citron” persists and shows in history.
-- [ ] Receipt preview still shows product name only (no options).
-- [ ] Legal journal entry unchanged (spot-check metadata).
+- [x] Cannot complete order with meat missing cuisson.
+- [x] Drink with “sans citron” persists and shows in history.
+- [x] Receipt preview still shows product name only (no options).
+- [x] Legal journal entry unchanged (spot-check metadata).
+
+**Patch note:** `426-PRODUCT-OPTIONS-PHASE2-POS-ORDER-PERSISTENCE-IMPLEMENTATION.md`
 
 ---
 

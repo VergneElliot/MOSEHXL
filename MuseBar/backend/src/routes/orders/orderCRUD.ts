@@ -12,6 +12,7 @@ import { validateBody, validateParams, commonValidations, paramValidations } fro
 import { assertPosOrderLinePermissions } from '../../middleware/orderPosLinePermissions';
 import { AppError, asyncHandler } from '../../middleware/errorHandler';
 import { createOrderWithCompliance } from '../../services/orders/orderCreationService';
+import { attachOptionsToOrderItems } from '../../services/orders/orderItemOptionsService';
 
 const router = express.Router();
 const logger = Logger.getInstance();
@@ -37,7 +38,10 @@ router.get('/', asyncHandler(async (req, res) => {
     const orders = await OrderModel.getAll(establishmentId, shouldPaginate ? { limit, offset } : undefined);
     const ordersWithDetails = await Promise.all(
       orders.map(async (order) => {
-        const items = await OrderItemModel.getByOrderId(order.id, establishmentId);
+        const items = await attachOptionsToOrderItems(
+          await OrderItemModel.getByOrderId(order.id, establishmentId),
+          establishmentId
+        );
         const subBills = order.payment_method === 'split' ? await SubBillModel.getByOrderId(order.id, establishmentId) : [];
         return { ...order, items, sub_bills: subBills, tips: order.tips || 0, change: order.change || 0 };
       })
@@ -74,7 +78,10 @@ router.get('/:id', validateParams([paramValidations.id]), asyncHandler(async (re
     const id = parseInt(req.params.id ?? '', 10);
     const order = await OrderModel.getById(id, establishmentId);
     if (!order) return res.status(404).json({ error: 'Order not found' });
-    const items = await OrderItemModel.getByOrderId(id, establishmentId);
+    const items = await attachOptionsToOrderItems(
+      await OrderItemModel.getByOrderId(id, establishmentId),
+      establishmentId
+    );
     const subBills = order.payment_method === 'split' ? await SubBillModel.getByOrderId(id, establishmentId) : [];
     res.json({ ...order, items, sub_bills: subBills, tips: order.tips || 0, change: order.change || 0 });
   } catch (error) {
@@ -112,7 +119,7 @@ router.post(
       );
 
       if (!creationResult.ok) {
-        throw new AppError(creationResult.error, 500, 'ORDER_CREATE_COMPLIANCE_FAILED');
+        throw new AppError(creationResult.error, creationResult.status ?? 500, 'ORDER_CREATE_COMPLIANCE_FAILED');
       }
 
       res.status(201).json({

@@ -1,4 +1,4 @@
-import React from 'react';
+import { formatOrderItemOptionLabel } from '../../utils/orderItemOptions';
 import {
   Dialog,
   DialogTitle,
@@ -117,7 +117,21 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
                 <TableBody>
                   {order.items.map(item => (
                     <TableRow key={item.id}>
-                      <TableCell>{item.productName}</TableCell>
+                      <TableCell>
+                        <Box>
+                          <Typography variant="body2">{item.productName}</Typography>
+                          {item.options?.map((option, optionIndex) => (
+                            <Typography
+                              key={`${item.id}-option-${optionIndex}`}
+                              variant="caption"
+                              color="text.secondary"
+                              display="block"
+                            >
+                              {formatOrderItemOptionLabel(option)}
+                            </Typography>
+                          ))}
+                        </Box>
+                      </TableCell>
                       <TableCell align="right">{item.quantity}</TableCell>
                       <TableCell align="right">{formatCurrency(item.unitPrice)}</TableCell>
                       <TableCell align="right">{formatCurrency(item.totalPrice)}</TableCell>

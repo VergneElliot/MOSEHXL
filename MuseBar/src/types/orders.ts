@@ -2,6 +2,16 @@
 
 export type PaymentMethod = 'cash' | 'card' | 'split';
 
+export interface OrderItemOption {
+  id?: string;
+  groupId: string;
+  groupName: string;
+  choiceId?: string | null;
+  choiceLabel?: string | null;
+  freeText?: string | null;
+  displayOrder?: number;
+}
+
 export interface OrderItem {
   id: string;
   productId: string | null; // Allow null for Divers items
@@ -17,6 +27,7 @@ export interface OrderItem {
   isPerso?: boolean; // For employee complimentary items (price = 0)
   originalPrice?: number; // Store original price for reverting discounts
   description?: string; // Description for special items like Divers
+  options?: OrderItemOption[];
 }
 
 export interface Order {

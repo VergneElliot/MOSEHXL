@@ -14,16 +14,15 @@ import {
 import { Add as AddIcon, Remove as RemoveIcon, Category as DiversIcon } from '@mui/icons-material';
 import { alpha } from '@mui/material/styles';
 import type { Theme } from '@mui/material/styles';
-import { Product, OrderItem, Category } from '../../types';
+import { Product, Category } from '../../types';
 
 interface ProductGridProps {
   products: Product[];
   categories: Category[];
   isHappyHourActive: boolean;
-  onAddToOrder: (item: OrderItem, quantity: number) => void;
+  onRequestAddProduct: (product: Product, quantity: number) => void;
   calculateProductPrice: (product: Product, isHappyHour: boolean) => number;
   formatCurrency: (amount: number) => string;
-  /** When set, a "Divers" card is shown first; clicking Ajouter calls this instead of adding a product. */
   onDiversClick?: () => void;
 }
 
@@ -31,7 +30,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({
   products,
   categories,
   isHappyHourActive,
-  onAddToOrder,
+  onRequestAddProduct,
   calculateProductPrice,
   formatCurrency,
   onDiversClick,
@@ -79,7 +78,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({
           product={product}
           categoryColor={categoryColorMap[product.categoryId]}
           isHappyHourActive={isHappyHourActive}
-          onAddToOrder={onAddToOrder}
+          onRequestAddProduct={onRequestAddProduct}
           calculateProductPrice={calculateProductPrice}
           formatCurrency={formatCurrency}
           isMobile={isMobile}
@@ -165,7 +164,7 @@ interface ProductCardProps {
   product: Product;
   categoryColor?: string;
   isHappyHourActive: boolean;
-  onAddToOrder: (item: OrderItem, quantity: number) => void;
+  onRequestAddProduct: (product: Product, quantity: number) => void;
   calculateProductPrice: (product: Product, isHappyHour: boolean) => number;
   formatCurrency: (amount: number) => string;
   isMobile: boolean;
@@ -175,7 +174,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   product,
   categoryColor,
   isHappyHourActive,
-  onAddToOrder,
+  onRequestAddProduct,
   calculateProductPrice,
   formatCurrency,
   isMobile,
@@ -203,22 +202,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const taxAmount = currentPrice * (product.taxRate / (1 + product.taxRate));
-    const orderItem: OrderItem = {
-      id: `${Date.now()}-${Math.random()}`,
-      productId: product.id,
-      productName: product.name,
-      quantity: 1,
-      unitPrice: currentPrice,
-      totalPrice: currentPrice,
-      taxRate: product.taxRate,
-      taxAmount,
-      isHappyHourApplied: isHappyHourActive && product.isHappyHourEligible,
-      isOffert: false,
-      isPerso: false,
-      originalPrice: product.price,
-    };
-    onAddToOrder(orderItem, quantity);
+    onRequestAddProduct(product, quantity);
     setQuantity(1);
   };
 
