@@ -20,7 +20,7 @@ import {
   Checkbox,
   FormGroup,
 } from '@mui/material';
-import { Product, Category, ProductOptionGroup } from '../../types';
+import { Product, Category, ProductOptionGroup, KitchenPrinter } from '../../types';
 import { ProductFormData } from '../../hooks/useMenuState';
 
 type ProductFormValue = ProductFormData[keyof ProductFormData];
@@ -34,6 +34,7 @@ interface ProductDialogProps {
   editingProduct: Product | null;
   categories: Category[];
   optionGroups: ProductOptionGroup[];
+  kitchenPrinters: KitchenPrinter[];
   loading: boolean;
   error: string | null;
 }
@@ -47,6 +48,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   editingProduct,
   categories,
   optionGroups,
+  kitchenPrinters,
   loading,
   error,
 }) => {
@@ -58,6 +60,14 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
       ? current.filter((id) => id !== groupId)
       : [...current, groupId];
     onFormChange('optionGroupIds', next);
+  };
+
+  const toggleKitchenPrinter = (printerId: string) => {
+    const current = form.kitchenPrinterIds ?? [];
+    const next = current.includes(printerId)
+      ? current.filter((id) => id !== printerId)
+      : [...current, printerId];
+    onFormChange('kitchenPrinterIds', next);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -261,6 +271,38 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                               ]
                                 .filter(Boolean)
                                 .join(' · ')}
+                            </Typography>
+                          </Box>
+                        }
+                      />
+                    ))}
+                  </FormGroup>
+                </Box>
+              </>
+            )}
+
+            {kitchenPrinters.length > 0 && (
+              <>
+                <Divider />
+                <Box>
+                  <Typography variant="subtitle1" gutterBottom>
+                    Imprimantes de commande
+                  </Typography>
+                  <FormGroup>
+                    {kitchenPrinters.map((printer) => (
+                      <FormControlLabel
+                        key={printer.id}
+                        control={
+                          <Checkbox
+                            checked={form.kitchenPrinterIds.includes(printer.id)}
+                            onChange={() => toggleKitchenPrinter(printer.id)}
+                          />
+                        }
+                        label={
+                          <Box>
+                            <Typography variant="body2">{printer.name}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {printer.slug} · {printer.connectionType === 'bridge' ? 'Bridge' : 'Réseau'}
                             </Typography>
                           </Box>
                         }

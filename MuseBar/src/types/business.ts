@@ -23,8 +23,24 @@ export interface Product {
   isActive: boolean;
   optionGroupIds?: string[];
   optionGroups?: ProductOptionGroup[];
+  kitchenPrinterIds?: string[];
+  kitchenPrinters?: KitchenPrinter[];
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface KitchenPrinter {
+  id: string;
+  name: string;
+  slug: string;
+  connectionType: 'bridge' | 'network_escpos';
+  connectionConfig: {
+    host?: string;
+    port?: number;
+    bridgeTarget?: string;
+  };
+  displayOrder: number;
+  isActive: boolean;
 }
 
 export interface ProductOptionChoice {

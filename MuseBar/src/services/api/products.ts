@@ -1,6 +1,6 @@
 import { request } from './core';
-import { Product, ProductOptionGroup } from '../../types';
-import type { ProductRecord, ProductOptionGroupRecord } from '@mosehxl/types';
+import { Product, ProductOptionGroup, KitchenPrinter } from '../../types';
+import type { ProductRecord, ProductOptionGroupRecord, KitchenPrinterRecord } from '@mosehxl/types';
 
 type ProductWriteResponse = ProductRecord;
 type ProductReadResponse = ProductRecord[];
@@ -53,6 +53,23 @@ function mapOptionGroup(group: ProductOptionGroupRecord): ProductOptionGroup {
   };
 }
 
+function mapKitchenPrinter(printer: KitchenPrinterRecord): KitchenPrinter {
+  const config = printer.connection_config ?? {};
+  return {
+    id: String(printer.id),
+    name: printer.name,
+    slug: printer.slug,
+    connectionType: printer.connection_type,
+    connectionConfig: {
+      host: typeof config.host === 'string' ? config.host : undefined,
+      port: typeof config.port === 'number' ? config.port : undefined,
+      bridgeTarget: typeof config.bridgeTarget === 'string' ? config.bridgeTarget : undefined,
+    },
+    displayOrder: printer.display_order ?? 0,
+    isActive: printer.is_active !== false,
+  };
+}
+
 function mapProduct(prod: ProductRecord): Product {
   const discount = mapProductDiscount(prod);
   return {
@@ -68,6 +85,8 @@ function mapProduct(prod: ProductRecord): Product {
     isActive: prod.is_active !== false,
     optionGroupIds: (prod.option_group_ids ?? []).map(String),
     optionGroups: (prod.option_groups ?? []).map(mapOptionGroup),
+    kitchenPrinterIds: (prod.kitchen_printer_ids ?? []).map(String),
+    kitchenPrinters: (prod.kitchen_printers ?? []).map(mapKitchenPrinter),
     createdAt: new Date(prod.created_at),
     updatedAt: new Date(prod.updated_at),
   };
@@ -89,7 +108,7 @@ export async function getAllProductsIncludingArchived(): Promise<Product[]> {
 }
 
 export async function createProduct(
-  product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'> & { optionGroupIds?: string[] }
+  product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'> & { optionGroupIds?: string[]; kitchenPrinterIds?: string[] }
 ): Promise<Product> {
   const result = await request<ProductWriteResponse>('/products', {
     method: 'POST',
@@ -102,6 +121,7 @@ export async function createProduct(
       happy_hour_discount_fixed: product.happyHourDiscountType === 'fixed' ? product.happyHourDiscountValue : null,
       is_happy_hour_eligible: product.isHappyHourEligible,
       option_group_ids: (product.optionGroupIds ?? []).map((id) => parseInt(id, 10)),
+      kitchen_printer_ids: (product.kitchenPrinterIds ?? []).map((id) => parseInt(id, 10)),
     }),
   });
   return mapProduct(result);
@@ -109,7 +129,7 @@ export async function createProduct(
 
 export async function updateProduct(
   id: string,
-  product: Partial<Product> & { optionGroupIds?: string[] }
+  product: Partial<Product> & { optionGroupIds?: string[]; kitchenPrinterIds?: string[] }
 ): Promise<Product> {
   const updateData: Record<string, string | number | boolean | null | number[]> = {};
   if (product.name !== undefined) updateData.name = product.name;
@@ -127,6 +147,9 @@ export async function updateProduct(
   if (product.isActive !== undefined) updateData.is_active = product.isActive;
   if (product.optionGroupIds !== undefined) {
     updateData.option_group_ids = product.optionGroupIds.map((groupId) => parseInt(groupId, 10));
+  }
+  if (product.kitchenPrinterIds !== undefined) {
+    updateData.kitchen_printer_ids = product.kitchenPrinterIds.map((printerId) => parseInt(printerId, 10));
   }
 
   const result = await request<ProductWriteResponse>(`/products/${id}`, { method: 'PUT', body: JSON.stringify(updateData) });

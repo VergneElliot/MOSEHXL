@@ -98,10 +98,12 @@ import printingRouter from './routes/printing';
 import printingCompatRouter from './routes/printingCompat';
 import settingsRouter from './routes/settings';
 import productOptionGroupsRouter from './routes/productOptionGroups';
+import kitchenPrintersRouter from './routes/kitchenPrinters';
 
 app.use('/api/categories', categoriesRouter);
 app.use('/api/products', productsRouter);
 app.use('/api/product-option-groups', productOptionGroupsRouter);
+app.use('/api/kitchen-printers', kitchenPrintersRouter);
 app.use('/api/orders', ordersRouter);
 app.use('/api/legal', legalRouter);
 app.use('/api/auth', authSessionRouter);

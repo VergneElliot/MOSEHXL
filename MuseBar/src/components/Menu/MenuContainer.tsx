@@ -9,7 +9,7 @@ import {
   useTheme,
   useMediaQuery,
 } from '@mui/material';
-import { Category, Product, ProductOptionGroup } from '../../types';
+import { Category, Product, ProductOptionGroup, KitchenPrinter } from '../../types';
 import { useMenuState } from '../../hooks/useMenuState';
 import { useMenuAPI } from '../../hooks/useMenuAPI';
 import {
@@ -24,6 +24,14 @@ import CategoryDialog from './CategoryDialog';
 import ProductDialog from './ProductDialog';
 import OptionGroupsSection from './OptionGroupsSection';
 import OptionGroupDialog from './OptionGroupDialog';
+import KitchenPrintersSection from './KitchenPrintersSection';
+import KitchenPrinterDialog from './KitchenPrinterDialog';
+import {
+  initialKitchenPrinterForm,
+  kitchenPrinterToForm,
+  useKitchenPrinters,
+  type KitchenPrinterFormData,
+} from '../../hooks/useKitchenPrinters';
 import { formatCurrency } from '../../utils/formatCurrency';
 
 interface MenuContainerProps {
@@ -51,11 +59,17 @@ const MenuContainer: React.FC<MenuContainerProps> = ({ categories, products, onD
   );
 
   const optionGroupsApi = useProductOptionGroups(actions.showSuccess, actions.showError);
+  const kitchenPrintersApi = useKitchenPrinters(actions.showSuccess, actions.showError);
   const [optionGroupDialogOpen, setOptionGroupDialogOpen] = useState(false);
   const [editingOptionGroup, setEditingOptionGroup] = useState<ProductOptionGroup | null>(null);
   const [optionGroupForm, setOptionGroupForm] = useState<OptionGroupFormData>(initialOptionGroupForm);
   const [optionGroupError, setOptionGroupError] = useState<string | null>(null);
   const [optionGroupSaving, setOptionGroupSaving] = useState(false);
+  const [kitchenPrinterDialogOpen, setKitchenPrinterDialogOpen] = useState(false);
+  const [editingKitchenPrinter, setEditingKitchenPrinter] = useState<KitchenPrinter | null>(null);
+  const [kitchenPrinterForm, setKitchenPrinterForm] = useState<KitchenPrinterFormData>(initialKitchenPrinterForm);
+  const [kitchenPrinterError, setKitchenPrinterError] = useState<string | null>(null);
+  const [kitchenPrinterSaving, setKitchenPrinterSaving] = useState(false);
 
   // Load archived data only when showArchived turns true (avoid re-running when api reference changes → 429 cascade)
   const showArchivedRef = React.useRef(state.showArchived);
@@ -152,6 +166,63 @@ const MenuContainer: React.FC<MenuContainerProps> = ({ categories, products, onD
     }
   };
 
+  const openKitchenPrinterDialog = (printer?: KitchenPrinter) => {
+    setKitchenPrinterError(null);
+    if (printer) {
+      setEditingKitchenPrinter(printer);
+      setKitchenPrinterForm(kitchenPrinterToForm(printer));
+    } else {
+      setEditingKitchenPrinter(null);
+      setKitchenPrinterForm(initialKitchenPrinterForm);
+    }
+    setKitchenPrinterDialogOpen(true);
+  };
+
+  const closeKitchenPrinterDialog = () => {
+    setKitchenPrinterDialogOpen(false);
+    setEditingKitchenPrinter(null);
+    setKitchenPrinterForm(initialKitchenPrinterForm);
+    setKitchenPrinterError(null);
+  };
+
+  const handleSubmitKitchenPrinter = async () => {
+    setKitchenPrinterSaving(true);
+    setKitchenPrinterError(null);
+    try {
+      if (editingKitchenPrinter) {
+        await kitchenPrintersApi.updatePrinter(editingKitchenPrinter.id, kitchenPrinterForm);
+      } else {
+        await kitchenPrintersApi.createPrinter(kitchenPrinterForm);
+      }
+      closeKitchenPrinterDialog();
+      await onDataUpdate();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur inconnue';
+      setKitchenPrinterError(message);
+    } finally {
+      setKitchenPrinterSaving(false);
+    }
+  };
+
+  const handleDeleteKitchenPrinter = async (id: string) => {
+    try {
+      await kitchenPrintersApi.deletePrinter(id);
+      await onDataUpdate();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur inconnue';
+      actions.showError(message);
+    }
+  };
+
+  const handleTestKitchenPrinter = async (id: string) => {
+    try {
+      await kitchenPrintersApi.testPrinter(id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur inconnue';
+      actions.showError(message);
+    }
+  };
+
   const handleCloseSnackbar = () => {
     actions.closeSnackbar();
   };
@@ -186,6 +257,14 @@ const MenuContainer: React.FC<MenuContainerProps> = ({ categories, products, onD
           onCreateGroup={() => openOptionGroupDialog()}
           onEditGroup={openOptionGroupDialog}
           onDeleteGroup={handleDeleteOptionGroup}
+        />
+
+        <KitchenPrintersSection
+          printers={kitchenPrintersApi.printers}
+          onCreatePrinter={() => openKitchenPrinterDialog()}
+          onEditPrinter={openKitchenPrinterDialog}
+          onDeletePrinter={handleDeleteKitchenPrinter}
+          onTestPrinter={handleTestKitchenPrinter}
         />
 
         {/* Category Section */}
@@ -255,8 +334,20 @@ const MenuContainer: React.FC<MenuContainerProps> = ({ categories, products, onD
         editingProduct={state.editingProduct}
         categories={categories}
         optionGroups={optionGroupsApi.groups}
+        kitchenPrinters={kitchenPrintersApi.printers}
         loading={false}
         error={null}
+      />
+
+      <KitchenPrinterDialog
+        open={kitchenPrinterDialogOpen}
+        onClose={closeKitchenPrinterDialog}
+        onSubmit={handleSubmitKitchenPrinter}
+        form={kitchenPrinterForm}
+        onFormChange={setKitchenPrinterForm}
+        editingPrinter={editingKitchenPrinter}
+        loading={kitchenPrinterSaving}
+        error={kitchenPrinterError}
       />
 
       <OptionGroupDialog

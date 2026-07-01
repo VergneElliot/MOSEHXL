@@ -18,6 +18,7 @@ export interface ProductFormData {
   happyHourDiscountType: 'percentage' | 'fixed';
   happyHourDiscountValue: string;
   optionGroupIds: string[];
+  kitchenPrinterIds: string[];
 }
 
 export interface MenuState {
@@ -94,6 +95,7 @@ const initialProductForm: ProductFormData = {
   happyHourDiscountType: 'percentage',
   happyHourDiscountValue: '0',
   optionGroupIds: [],
+  kitchenPrinterIds: [],
 };
 
 export const useMenuState = (): [MenuState, MenuActions] => {
@@ -149,6 +151,7 @@ export const useMenuState = (): [MenuState, MenuActions] => {
         happyHourDiscountType: product.happyHourDiscountType,
         happyHourDiscountValue: product.happyHourDiscountValue.toString(),
         optionGroupIds: product.optionGroupIds ?? [],
+        kitchenPrinterIds: product.kitchenPrinterIds ?? [],
       });
     } else {
       setEditingProduct(null);
