@@ -590,6 +590,154 @@ paths:
         '500':
           description: Server error
 
+  /product-option-groups:
+    get:
+      tags: [Menu Operations]
+      summary: List product option groups
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Active option groups with nested choices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductOptionGroup'
+    post:
+      tags: [Menu Operations]
+      summary: Create product option group
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductOptionGroupInput'
+      responses:
+        '201':
+          description: Option group created
+
+  /product-option-groups/{id}:
+    put:
+      tags: [Menu Operations]
+      summary: Update product option group
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductOptionGroupInput'
+      responses:
+        '200':
+          description: Option group updated
+    delete:
+      tags: [Menu Operations]
+      summary: Archive or delete product option group
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Option group removed or archived
+
+  /kitchen-printers:
+    get:
+      tags: [Menu Operations]
+      summary: List kitchen printers
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Active kitchen printers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/KitchenPrinter'
+    post:
+      tags: [Menu Operations]
+      summary: Create kitchen printer
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KitchenPrinterInput'
+      responses:
+        '201':
+          description: Kitchen printer created
+
+  /kitchen-printers/{id}:
+    put:
+      tags: [Menu Operations]
+      summary: Update kitchen printer
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KitchenPrinterInput'
+      responses:
+        '200':
+          description: Kitchen printer updated
+    delete:
+      tags: [Menu Operations]
+      summary: Archive or delete kitchen printer
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Kitchen printer removed or archived
+
+  /kitchen-printers/{id}/test-print:
+    post:
+      tags: [Menu Operations]
+      summary: Queue kitchen printer test ticket
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '202':
+          description: Test kitchen job queued
+
   /legal/compliance:
     get:
       tags:
@@ -863,6 +1011,118 @@ components:
           type: string
           format: date-time
           example: "2025-01-27T10:30:00Z"
+        option_group_ids:
+          type: array
+          items:
+            type: integer
+        kitchen_printer_ids:
+          type: array
+          items:
+            type: integer
+
+    ProductOptionGroup:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        is_required:
+          type: boolean
+        allow_free_text:
+          type: boolean
+        free_text_label:
+          type: string
+          nullable: true
+        free_text_max_length:
+          type: integer
+        display_order:
+          type: integer
+        choices:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              label:
+                type: string
+              display_order:
+                type: integer
+
+    ProductOptionGroupInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        is_required:
+          type: boolean
+        allow_free_text:
+          type: boolean
+        free_text_label:
+          type: string
+          nullable: true
+        free_text_max_length:
+          type: integer
+        choices:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              label:
+                type: string
+              display_order:
+                type: integer
+
+    KitchenPrinter:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        connection_type:
+          type: string
+          enum: [bridge, network_escpos]
+        connection_config:
+          type: object
+        display_order:
+          type: integer
+        is_active:
+          type: boolean
+
+    KitchenPrinterInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+        connection_type:
+          type: string
+          enum: [bridge, network_escpos]
+        connection_config:
+          type: object
+        display_order:
+          type: integer
+
+    OrderItemOption:
+      type: object
+      properties:
+        group_id:
+          type: integer
+        choice_id:
+          type: integer
+          nullable: true
+        free_text:
+          type: string
+          nullable: true
 
     Order:
       type: object
@@ -969,6 +1229,10 @@ components:
         description:
           type: string
           example: "Bière blonde 25cl"
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItemOption'
 
     CreateOrderRequest:
       type: object
@@ -995,6 +1259,10 @@ components:
                 type: number
                 format: float
                 example: 6.50
+              options:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderItemOption'
         payment_method:
           type: string
           enum: [cash, card, split]
@@ -1078,6 +1346,14 @@ components:
           type: number
           format: float
           example: 0.20
+        option_group_ids:
+          type: array
+          items:
+            type: integer
+        kitchen_printer_ids:
+          type: array
+          items:
+            type: integer
 
     UpdateProductRequest:
       type: object
@@ -1114,6 +1390,14 @@ components:
         is_active:
           type: boolean
           example: true
+        option_group_ids:
+          type: array
+          items:
+            type: integer
+        kitchen_printer_ids:
+          type: array
+          items:
+            type: integer
 
     ComplianceStatus:
       type: object

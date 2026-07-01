@@ -66,6 +66,15 @@ export function useProductOptionGroups(
     [dataService, loadGroups, showSuccess]
   );
 
+  const duplicateGroup = useCallback(
+    async (group: ProductOptionGroup) => {
+      await dataService.createProductOptionGroup(toFormInput(optionGroupToDuplicateForm(group)));
+      showSuccess('Paramètre dupliqué avec succès');
+      await loadGroups();
+    },
+    [dataService, loadGroups, showSuccess]
+  );
+
   const updateGroup = useCallback(
     async (id: string, form: OptionGroupFormData) => {
       await dataService.updateProductOptionGroup(id, toFormInput(form));
@@ -89,6 +98,7 @@ export function useProductOptionGroups(
     loading,
     loadGroups,
     createGroup,
+    duplicateGroup,
     updateGroup,
     deleteGroup,
   };
@@ -105,5 +115,14 @@ export function optionGroupToForm(group: ProductOptionGroup): OptionGroupFormDat
       group.choices.length > 0
         ? group.choices.map((choice) => ({ id: choice.id, label: choice.label }))
         : [{ label: '' }],
+  };
+}
+
+export function optionGroupToDuplicateForm(group: ProductOptionGroup): OptionGroupFormData {
+  const base = optionGroupToForm(group);
+  return {
+    ...base,
+    name: `${group.name} (copie)`,
+    choices: base.choices.map((choice) => ({ label: choice.label })),
   };
 }

@@ -8,12 +8,9 @@ import {
   Box,
   Typography,
   TextField,
-  FormControl,
-  FormLabel,
-  RadioGroup,
-  FormControlLabel,
-  Radio,
   Alert,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import { Product, ProductOptionGroup } from '../../types';
 
@@ -43,6 +40,15 @@ function buildInitialState(groups: ProductOptionGroup[]): SelectionState {
   }
   return state;
 }
+
+const choiceButtonSx = {
+  minHeight: 52,
+  justifyContent: 'flex-start',
+  px: 2,
+  py: 1.5,
+  fontSize: '1rem',
+  textTransform: 'none' as const,
+};
 
 const ProductOptionDialog: React.FC<ProductOptionDialogProps> = ({
   open,
@@ -108,7 +114,7 @@ const ProductOptionDialog: React.FC<ProductOptionDialogProps> = ({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>
+      <DialogTitle sx={{ fontSize: '1.25rem', pb: 1 }}>
         {product.name}
         {quantity > 1 ? ` × ${quantity}` : ''}
       </DialogTitle>
@@ -118,40 +124,37 @@ const ProductOptionDialog: React.FC<ProductOptionDialogProps> = ({
             {error}
           </Alert>
         )}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, mt: 1 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 1 }}>
           {sortedGroups.map((group) => {
             const current = selections[group.id] ?? {};
             return (
               <Box key={group.id}>
-                <Typography variant="subtitle1" gutterBottom>
+                <Typography variant="h6" gutterBottom>
                   {group.name}
                   {group.isRequired ? ' *' : ''}
                 </Typography>
 
                 {group.choices.length > 0 && (
-                  <FormControl component="fieldset" sx={{ width: '100%' }}>
-                    <FormLabel component="legend" sx={{ display: 'none' }}>
-                      {group.name}
-                    </FormLabel>
-                    <RadioGroup
-                      value={current.choiceId ?? ''}
-                      onChange={(event) =>
-                        setSelections((prev) => ({
-                          ...prev,
-                          [group.id]: { ...prev[group.id], choiceId: event.target.value, freeText: '' },
-                        }))
-                      }
-                    >
-                      {group.choices.map((choice) => (
-                        <FormControlLabel
-                          key={choice.id}
-                          value={choice.id}
-                          control={<Radio />}
-                          label={choice.label}
-                        />
-                      ))}
-                    </RadioGroup>
-                  </FormControl>
+                  <ToggleButtonGroup
+                    exclusive
+                    fullWidth
+                    orientation="vertical"
+                    value={current.choiceId ?? ''}
+                    onChange={(_event, value: string | null) => {
+                      if (!value) return;
+                      setSelections((prev) => ({
+                        ...prev,
+                        [group.id]: { choiceId: value, freeText: '' },
+                      }));
+                    }}
+                    sx={{ gap: 1 }}
+                  >
+                    {group.choices.map((choice) => (
+                      <ToggleButton key={choice.id} value={choice.id} sx={choiceButtonSx}>
+                        {choice.label}
+                      </ToggleButton>
+                    ))}
+                  </ToggleButtonGroup>
                 )}
 
                 {group.allowFreeText && (
@@ -171,7 +174,10 @@ const ProductOptionDialog: React.FC<ProductOptionDialogProps> = ({
                     multiline
                     minRows={2}
                     inputProps={{ maxLength: group.freeTextMaxLength }}
-                    sx={{ mt: group.choices.length > 0 ? 1.5 : 0 }}
+                    sx={{
+                      mt: group.choices.length > 0 ? 2 : 0,
+                      '& .MuiInputBase-root': { fontSize: '1rem', minHeight: 52 },
+                    }}
                   />
                 )}
               </Box>
@@ -179,9 +185,11 @@ const ProductOptionDialog: React.FC<ProductOptionDialogProps> = ({
           })}
         </Box>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Annuler</Button>
-        <Button variant="contained" onClick={handleConfirm}>
+      <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+        <Button onClick={onClose} size="large" sx={{ minHeight: 48 }}>
+          Annuler
+        </Button>
+        <Button variant="contained" onClick={handleConfirm} size="large" sx={{ minHeight: 48, px: 3 }}>
           Ajouter au panier
         </Button>
       </DialogActions>

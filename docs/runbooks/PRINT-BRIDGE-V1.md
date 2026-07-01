@@ -98,6 +98,18 @@ Leave the terminal running during service. V1 is intentionally a terminal proces
 5. Run a real sale and print the receipt from the POS flow.
 6. Stop the bridge, send another test print, then restart the bridge and verify the pending job drains.
 
+### Kitchen command tickets (product options feature)
+
+1. In **Menu**, create kitchen printers (e.g. `Bar`, `Cuisine`) with matching slugs.
+2. Assign printers to products; assign option groups (e.g. Cuisson) where needed.
+3. Configure `PRINTERS_JSON` on the bridge PC (see above).
+4. Complete a POS sale with options → bridge logs `kitchen_order` with `kitchenPrinterSlug`.
+5. Confirm ticket shows product lines and options **without prices**.
+6. Cancel the order (full or partial) → bridge logs `kitchen_cancellation` with `ANNULATION`.
+7. Confirm receipt printing still uses `PRINTER_HOST` and is unchanged.
+
+Kitchen enqueue failures are logged to the legal software journal (`KITCHEN_TICKET_ENQUEUE_FAILED`) but **do not** cancel the sale.
+
 ---
 
 ## Troubleshooting

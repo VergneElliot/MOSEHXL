@@ -166,6 +166,16 @@ const MenuContainer: React.FC<MenuContainerProps> = ({ categories, products, onD
     }
   };
 
+  const handleDuplicateOptionGroup = async (group: ProductOptionGroup) => {
+    try {
+      await optionGroupsApi.duplicateGroup(group);
+      await onDataUpdate();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur inconnue';
+      actions.showError(message);
+    }
+  };
+
   const openKitchenPrinterDialog = (printer?: KitchenPrinter) => {
     setKitchenPrinterError(null);
     if (printer) {
@@ -256,6 +266,7 @@ const MenuContainer: React.FC<MenuContainerProps> = ({ categories, products, onD
           groups={optionGroupsApi.groups}
           onCreateGroup={() => openOptionGroupDialog()}
           onEditGroup={openOptionGroupDialog}
+          onDuplicateGroup={handleDuplicateOptionGroup}
           onDeleteGroup={handleDeleteOptionGroup}
         />
 
