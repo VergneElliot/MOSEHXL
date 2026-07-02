@@ -17,6 +17,7 @@ import type { Theme } from '@mui/material/styles';
 import { VirtuosoGrid } from 'react-virtuoso';
 import { Product, Category } from '../../types';
 import { useGridColumnCount } from '../../hooks/useGridColumnCount';
+import { canUseVirtualization } from '../../utils/canUseVirtualization';
 
 interface ProductGridProps {
   products: Product[];
@@ -40,6 +41,7 @@ const ProductGrid = React.memo(function ProductGrid({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const isLarge = useMediaQuery(theme.breakpoints.up('lg'));
+  const useVirtualization = canUseVirtualization();
   const minColumnWidth = isMobile ? 190 : isLarge ? 230 : 220;
   const { containerRef, columnCount } = useGridColumnCount(minColumnWidth);
 
@@ -128,6 +130,38 @@ const ProductGrid = React.memo(function ProductGrid({
     return (
       <Box p={3} textAlign="center">
         <Typography color="textSecondary">Aucun produit trouvé</Typography>
+      </Box>
+    );
+  }
+
+  if (!useVirtualization) {
+    return (
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: 'repeat(auto-fill, minmax(190px, 1fr))',
+            sm: 'repeat(auto-fill, minmax(210px, 1fr))',
+            md: 'repeat(auto-fill, minmax(220px, 1fr))',
+            lg: 'repeat(auto-fill, minmax(230px, 1fr))',
+          },
+          gap: 2,
+          alignItems: 'stretch',
+        }}
+      >
+        {onDiversClick && <DiversCard onAdd={onDiversClick} isMobile={isMobile} theme={theme} />}
+        {products.map(product => (
+          <ProductCard
+            key={product.id}
+            product={product}
+            categoryColor={categoryColorMap[product.categoryId]}
+            isHappyHourActive={isHappyHourActive}
+            onRequestAddProduct={onRequestAddProduct}
+            calculateProductPrice={calculateProductPrice}
+            formatCurrency={formatCurrency}
+            isMobile={isMobile}
+          />
+        ))}
       </Box>
     );
   }
