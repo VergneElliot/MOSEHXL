@@ -74,3 +74,75 @@ export function groupKitchenTicketLinesByPrinter(
 
   return [...groups.values()].filter((group) => group.lines.length > 0);
 }
+
+function optionsSignature(options: KitchenTicketOptionLine[]): string {
+  if (!options.length) return '';
+  return [...options]
+    .sort(
+      (a, b) =>
+        (a.group_name || '').localeCompare(b.group_name || '') ||
+        (a.choice_label || '').localeCompare(b.choice_label || '') ||
+        (a.free_text || '').localeCompare(b.free_text || '')
+    )
+    .map((option) => `${option.group_name}\0${option.choice_label ?? ''}\0${option.free_text ?? ''}`)
+    .join('|');
+}
+
+/** Merge identical kitchen lines for print output while preserving option/note breakdowns. */
+export function consolidateKitchenTicketLinesForPrint(lines: KitchenTicketLine[]): KitchenTicketLine[] {
+  if (lines.length <= 1) return lines;
+
+  const productOrder: string[] = [];
+  const byProduct = new Map<string, KitchenTicketLine[]>();
+
+  for (const line of lines) {
+    const key = line.product_name.trim().toLowerCase();
+    if (!byProduct.has(key)) {
+      productOrder.push(key);
+      byProduct.set(key, []);
+    }
+    byProduct.get(key)!.push(line);
+  }
+
+  const result: KitchenTicketLine[] = [];
+  for (const productKey of productOrder) {
+    const productLines = byProduct.get(productKey)!;
+    const productName = productLines[0]!.product_name;
+    const variantMap = new Map<string, { quantity: number; options: KitchenTicketOptionLine[] }>();
+    let totalQty = 0;
+
+    for (const line of productLines) {
+      const qty = Math.max(0, Number(line.quantity) || 0);
+      if (qty === 0) continue;
+      totalQty += qty;
+      const signature = optionsSignature(line.options);
+      const existing = variantMap.get(signature);
+      if (existing) {
+        existing.quantity += qty;
+      } else {
+        variantMap.set(signature, { quantity: qty, options: line.options });
+      }
+    }
+
+    if (totalQty === 0) continue;
+
+    const variants = [...variantMap.values()];
+    if (variants.length === 1) {
+      result.push({
+        quantity: totalQty,
+        product_name: productName,
+        options: variants[0]!.options,
+      });
+      continue;
+    }
+
+    result.push({
+      quantity: totalQty,
+      product_name: productName,
+      options: [],
+      option_variants: variants,
+    });
+  }
+
+  return result;
+}

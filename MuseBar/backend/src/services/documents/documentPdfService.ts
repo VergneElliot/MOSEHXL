@@ -5,6 +5,7 @@ import {
   type ClosureExportData,
   type AccountingRow,
 } from './closureXlsxService';
+import { groupReceiptLineItemsForPrint } from '../../printing/printLineGrouping';
 
 type PdfDoc = InstanceType<typeof PDFDocument>;
 
@@ -72,7 +73,7 @@ function writeReceiptLines(doc: PdfDoc, data: ReceiptData): void {
   if (data.receipt_type === 'detailed' && Array.isArray(data.items) && data.items.length > 0) {
     doc.font('Helvetica-Bold').text('Détail');
     doc.font('Helvetica');
-    for (const item of data.items) {
+    for (const item of groupReceiptLineItemsForPrint(data.items)) {
       const line = `${item.quantity} x ${item.product_name} — ${formatEuro(item.total_price)} (TVA ${item.tax_rate}%)`;
       doc.text(line);
     }

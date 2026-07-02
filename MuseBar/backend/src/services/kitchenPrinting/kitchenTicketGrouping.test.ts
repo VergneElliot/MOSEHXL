@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { groupKitchenTicketLinesByPrinter } from './kitchenTicketGrouping';
+import { consolidateKitchenTicketLinesForPrint, groupKitchenTicketLinesByPrinter } from './kitchenTicketGrouping';
 
 describe('kitchenTicketGrouping', () => {
   it('groups lines by printer snapshot and duplicates multi-printer products', () => {
@@ -33,5 +33,39 @@ describe('kitchenTicketGrouping', () => {
     expect(bar?.lines).toHaveLength(2);
     expect(cuisine?.lines).toHaveLength(1);
     expect(bar?.lines[0]?.options[0]?.free_text).toBe('sans citron');
+  });
+
+  it('consolidates identical products for kitchen print output', () => {
+    const consolidated = consolidateKitchenTicketLinesForPrint([
+      { quantity: 1, product_name: 'Tartine', options: [] },
+      { quantity: 1, product_name: 'Tartine', options: [] },
+      { quantity: 1, product_name: 'Tartine', options: [] },
+    ]);
+
+    expect(consolidated).toHaveLength(1);
+    expect(consolidated[0]).toMatchObject({ quantity: 3, product_name: 'Tartine', options: [] });
+    expect(consolidated[0]?.option_variants).toBeUndefined();
+  });
+
+  it('keeps option breakdowns when the same product has different modifiers', () => {
+    const consolidated = consolidateKitchenTicketLinesForPrint([
+      {
+        quantity: 1,
+        product_name: 'Tartine',
+        options: [{ group_name: 'Cuisson', choice_label: 'Bien cuit' }],
+      },
+      {
+        quantity: 2,
+        product_name: 'Tartine',
+        options: [{ group_name: 'Cuisson', choice_label: 'A point' }],
+      },
+    ]);
+
+    expect(consolidated).toHaveLength(1);
+    expect(consolidated[0]).toMatchObject({ quantity: 3, product_name: 'Tartine', options: [] });
+    expect(consolidated[0]?.option_variants).toEqual([
+      { quantity: 1, options: [{ group_name: 'Cuisson', choice_label: 'Bien cuit' }] },
+      { quantity: 2, options: [{ group_name: 'Cuisson', choice_label: 'A point' }] },
+    ]);
   });
 });
