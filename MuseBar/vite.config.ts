@@ -1,9 +1,16 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import legacy from '@vitejs/plugin-legacy';
 import path from 'path';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    legacy({
+      // Cashier PCs may run older Chromium; CRA previously transpiled to ES5.
+      targets: ['defaults', 'not dead', 'chrome >= 49', 'firefox >= 52', 'safari >= 10'],
+    }),
+  ],
   resolve: {
     alias: {
       '@mosehxl/types': path.resolve(__dirname, 'packages/types/src/index.ts'),
