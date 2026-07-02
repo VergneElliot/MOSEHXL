@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from 'react';
-import { Box, Snackbar, Alert } from '@mui/material';
+import React, { Suspense, useCallback, useState } from 'react';
+import { Box, Snackbar, Alert, CircularProgress } from '@mui/material';
 import { Category, Product, OrderItem, Order } from '../../types';
 import { usePOSState } from '../../hooks/usePOSState';
 import { usePOSLogic } from '../../hooks/usePOSLogic';
@@ -9,11 +9,14 @@ import CategoryFilter from './CategoryFilter';
 import ProductGrid from './ProductGrid';
 import OrderSummary from './OrderSummary';
 import POSLayout from './POSLayout';
-import PaymentDialog from './PaymentDialog';
-import { DiversDialog, DiversFormData } from './DiversDialog';
-import PrintAfterSaleDialog from './PrintAfterSaleDialog';
-import ProductOptionDialog, { ProductOptionSelection } from './ProductOptionDialog';
+import type { DiversFormData } from './DiversDialog';
+import type { ProductOptionSelection } from './ProductOptionDialog';
 import { upsertLineNoteInOptions } from '../../utils/lineItemNote';
+
+const LazyPaymentDialog = React.lazy(() => import('./PaymentDialog'));
+const LazyPrintAfterSaleDialog = React.lazy(() => import('./PrintAfterSaleDialog'));
+const LazyDiversDialog = React.lazy(() => import('./DiversDialog'));
+const LazyProductOptionDialog = React.lazy(() => import('./ProductOptionDialog'));
 
 interface POSContainerProps {
   categories: Category[];
@@ -99,9 +102,19 @@ const POSContainer: React.FC<POSContainerProps> = ({
     [actions]
   );
 
+  const {
+    filteredProducts,
+    orderTotal,
+    orderTax,
+    orderSubtotal,
+    canProcessPayment,
+    calculateProductPrice,
+    formatCurrency,
+  } = logic;
+
   const buildOrderItem = useCallback(
     (product: Product, selections: ProductOptionSelection[]): OrderItem => {
-      const currentPrice = logic.calculateProductPrice(product, isHappyHourActive);
+      const currentPrice = calculateProductPrice(product, isHappyHourActive);
       const taxAmount = currentPrice * (product.taxRate / (1 + product.taxRate));
       return {
         id: `${Date.now()}-${Math.random()}`,
@@ -126,7 +139,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
         })),
       };
     },
-    [isHappyHourActive, logic]
+    [isHappyHourActive, calculateProductPrice]
   );
 
   const handleRequestAddProduct = useCallback(
@@ -167,18 +180,18 @@ const POSContainer: React.FC<POSContainerProps> = ({
       updateLineAt: actions.updateLineAt,
     });
 
-  const handleCheckout = () => {
+  const handleCheckout = useCallback(() => {
     actions.setPaymentDialogOpen(true);
-  };
+  }, [actions]);
 
   const handleQuickPayment = useCallback(
     async (method: 'cash' | 'card') => {
-      if (!logic.canProcessPayment || state.currentOrder.length === 0) return;
+      if (!canProcessPayment || state.currentOrder.length === 0) return;
       try {
         await createOrder({
           paymentMethod: method,
-          totalAmount: logic.orderTotal,
-          totalTax: logic.orderTax,
+          totalAmount: orderTotal,
+          totalTax: orderTax,
           items: state.currentOrder,
           tips: 0,
           change: 0,
@@ -188,16 +201,33 @@ const POSContainer: React.FC<POSContainerProps> = ({
         // Error already reported by usePOSAPI
       }
     },
-    [logic.canProcessPayment, logic.orderTotal, logic.orderTax, state.currentOrder, createOrder, actions]
+    [canProcessPayment, orderTotal, orderTax, state.currentOrder, createOrder, actions]
   );
 
-  const handleCloseSnackbar = () => {
+  const handleCloseSnackbar = useCallback(() => {
     actions.closeSnackbar();
-  };
+  }, [actions]);
 
-  const handleClosePaymentDialog = () => {
+  const handleClosePaymentDialog = useCallback(() => {
     actions.setPaymentDialogOpen(false);
-  };
+  }, [actions]);
+
+  const handleDiversClick = useCallback(() => {
+    setDiversDialogOpen(true);
+  }, []);
+
+  const handleCloseDiversDialog = useCallback(() => {
+    setDiversDialogOpen(false);
+  }, []);
+
+  const handleClosePrintDialog = useCallback(() => {
+    setPrintDialogOpen(false);
+  }, []);
+
+  const handleCloseOptionDialog = useCallback(() => {
+    setOptionDialogOpen(false);
+    setPendingProduct(null);
+  }, []);
 
   const handleDiversSubmit = useCallback(
     (data: DiversFormData) => {
@@ -236,13 +266,13 @@ const POSContainer: React.FC<POSContainerProps> = ({
       </Box>
       <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         <ProductGrid
-          products={logic.filteredProducts}
+          products={filteredProducts}
           categories={categories}
           isHappyHourActive={isHappyHourActive}
           onRequestAddProduct={handleRequestAddProduct}
-          calculateProductPrice={logic.calculateProductPrice}
-          formatCurrency={logic.formatCurrency}
-          onDiversClick={() => setDiversDialogOpen(true)}
+          calculateProductPrice={calculateProductPrice}
+          formatCurrency={formatCurrency}
+          onDiversClick={handleDiversClick}
         />
       </Box>
     </>
@@ -251,10 +281,10 @@ const POSContainer: React.FC<POSContainerProps> = ({
   const orderContent = (
     <OrderSummary
       currentOrder={state.currentOrder}
-      orderTotal={logic.orderTotal}
-      orderTax={logic.orderTax}
-      orderSubtotal={logic.orderSubtotal}
-      canProcessPayment={logic.canProcessPayment}
+      orderTotal={orderTotal}
+      orderTax={orderTax}
+      orderSubtotal={orderSubtotal}
+      canProcessPayment={canProcessPayment}
       onRemoveItem={actions.removeFromOrder}
       onClearOrder={actions.clearOrder}
       onCheckout={handleCheckout}
@@ -265,7 +295,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
       onApplyOffert={posLinePermissions.offert ? handleApplyOffert : undefined}
       onApplyPerso={posLinePermissions.perso ? handleApplyPerso : undefined}
       onUpdateLineNote={handleUpdateLineNote}
-      formatCurrency={logic.formatCurrency}
+      formatCurrency={formatCurrency}
     />
   );
 
@@ -296,43 +326,62 @@ const POSContainer: React.FC<POSContainerProps> = ({
         </Alert>
       </Snackbar>
 
-      {/* Payment Dialog */}
-      <PaymentDialog
-        open={state.paymentDialogOpen}
-        onClose={handleClosePaymentDialog}
-        currentOrder={state.currentOrder}
-        orderTotal={logic.orderTotal}
-        orderTax={logic.orderTax}
-        orderSubtotal={logic.orderSubtotal}
-        onOrderComplete={handlePaymentComplete}
-        onOrderError={handlePaymentError}
-        onDataUpdate={onDataUpdate}
-        onClearOrder={actions.clearOrder}
-      />
+      {/* Payment Dialog — lazy-loaded when opened */}
+      {state.paymentDialogOpen && (
+        <Suspense
+          fallback={
+            <Box display="flex" justifyContent="center" p={2}>
+              <CircularProgress />
+            </Box>
+          }
+        >
+          <LazyPaymentDialog
+            open={state.paymentDialogOpen}
+            onClose={handleClosePaymentDialog}
+            currentOrder={state.currentOrder}
+            orderTotal={orderTotal}
+            orderTax={orderTax}
+            orderSubtotal={orderSubtotal}
+            onOrderComplete={handlePaymentComplete}
+            onOrderError={handlePaymentError}
+            onDataUpdate={onDataUpdate}
+            onClearOrder={actions.clearOrder}
+          />
+        </Suspense>
+      )}
 
-      <PrintAfterSaleDialog
-        open={printDialogOpen}
-        orderId={lastOrderId}
-        onClose={() => setPrintDialogOpen(false)}
-      />
+      {printDialogOpen && (
+        <Suspense fallback={null}>
+          <LazyPrintAfterSaleDialog
+            open={printDialogOpen}
+            orderId={lastOrderId}
+            onClose={handleClosePrintDialog}
+          />
+        </Suspense>
+      )}
 
-      <DiversDialog
-        open={diversDialogOpen}
-        onClose={() => setDiversDialogOpen(false)}
-        onSubmit={handleDiversSubmit}
-        formatCurrency={logic.formatCurrency}
-      />
+      {diversDialogOpen && (
+        <Suspense fallback={null}>
+          <LazyDiversDialog
+            open={diversDialogOpen}
+            onClose={handleCloseDiversDialog}
+            onSubmit={handleDiversSubmit}
+            formatCurrency={formatCurrency}
+          />
+        </Suspense>
+      )}
 
-      <ProductOptionDialog
-        open={optionDialogOpen}
-        product={pendingProduct?.product ?? null}
-        quantity={pendingProduct?.quantity ?? 1}
-        onClose={() => {
-          setOptionDialogOpen(false);
-          setPendingProduct(null);
-        }}
-        onConfirm={handleConfirmProductOptions}
-      />
+      {(optionDialogOpen || pendingProduct) && (
+        <Suspense fallback={null}>
+          <LazyProductOptionDialog
+            open={optionDialogOpen}
+            product={pendingProduct?.product ?? null}
+            quantity={pendingProduct?.quantity ?? 1}
+            onClose={handleCloseOptionDialog}
+            onConfirm={handleConfirmProductOptions}
+          />
+        </Suspense>
+      )}
 
       {/* Future: Add other dialog components (retour, change, etc.) */}
     </Box>

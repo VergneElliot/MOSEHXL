@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { Suspense, useCallback, useMemo, useState } from 'react';
 import { Box, Tabs, Tab, Paper, useTheme, useMediaQuery } from '@mui/material';
 import {
   RestaurantMenu as MenuIcon,
@@ -8,16 +8,18 @@ import {
   Gavel as GavelIcon,
 } from '@mui/icons-material';
 
-// Component imports
-import { MenuContainer } from '../Menu';
 import POSContainer from '../POS/POSContainer';
-import { HistoryContainer } from '../History';
-import Settings from '../Settings';
-import { LegalComplianceDashboard } from '../Legal';
-import { ClosureContainer } from '../Closure';
-import { UserManagement, AuditTrailDashboard } from '../Admin';
+import {
+  LazyAuditTrailDashboard,
+  LazyClosureContainer,
+  LazyHistoryContainer,
+  LazyLegalComplianceDashboard,
+  LazyMenuContainer,
+  LazySettings,
+  LazyUserManagement,
+  TabPanelFallback,
+} from './appLazyTabPanels';
 
-// Types
 import { Category, Product, User } from '../../types';
 import { PERMISSIONS, type PermissionName } from '@mosehxl/types';
 
@@ -102,6 +104,15 @@ const AppRouter: React.FC<AppRouterProps> = ({
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
 
+  const posLinePermissions = useMemo(
+    () => ({
+      happyHourManual: user.permissions?.includes(PERMISSIONS.pos_happyhour_manual) ?? false,
+      offert: user.permissions?.includes(PERMISSIONS.pos_apply_offert) ?? false,
+      perso: user.permissions?.includes(PERMISSIONS.pos_apply_perso) ?? false,
+    }),
+    [user.permissions]
+  );
+
   const TABS: TabConfig[] = [
     { label: 'Caisse', icon: <POSIcon />, value: 'pos', permission: PERMISSIONS.access_pos },
     { label: 'Menu', icon: <MenuIcon />, value: 'menu', permission: PERMISSIONS.access_menu },
@@ -133,7 +144,6 @@ const AppRouter: React.FC<AppRouterProps> = ({
     if (tab.establishmentWide) {
       return !!user?.establishment_id;
     }
-    // Same rule as the tab content: owner/admin always, or staff with explicit grant.
     if (tab.value === 'user_management') {
       return (
         user?.role === 'establishment_admin' ||
@@ -144,9 +154,9 @@ const AppRouter: React.FC<AppRouterProps> = ({
     return true;
   });
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = useCallback((_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
-  };
+  }, []);
 
   return (
     <Paper
@@ -215,8 +225,6 @@ const AppRouter: React.FC<AppRouterProps> = ({
             value={tabValue}
             index={i}
             key={tab.value}
-            // POS (caisse) has its own nested scroll containers; keep outer panel non-scrollable
-            // All other tabs (menu, settings, history, etc.) should be able to scroll vertically
             scrollMode={tab.value === 'pos' ? 'hidden' : 'auto'}
           >
             {tab.value === 'pos' && (
@@ -225,39 +233,57 @@ const AppRouter: React.FC<AppRouterProps> = ({
                 products={products}
                 isHappyHourActive={isHappyHourActive}
                 onDataUpdate={onDataUpdate}
-                posLinePermissions={{
-                  happyHourManual: user.permissions?.includes(PERMISSIONS.pos_happyhour_manual) ?? false,
-                  offert: user.permissions?.includes(PERMISSIONS.pos_apply_offert) ?? false,
-                  perso: user.permissions?.includes(PERMISSIONS.pos_apply_perso) ?? false,
-                }}
+                posLinePermissions={posLinePermissions}
               />
             )}
             {tab.value === 'menu' && (
-              <MenuContainer
-                categories={categories}
-                products={products}
-                onDataUpdate={onDataUpdate}
-              />
+              <Suspense fallback={<TabPanelFallback />}>
+                <LazyMenuContainer
+                  categories={categories}
+                  products={products}
+                  onDataUpdate={onDataUpdate}
+                />
+              </Suspense>
             )}
             {tab.value === 'history' && (
-              <HistoryContainer
-                canCancelOrReturn={user?.permissions?.includes(PERMISSIONS.orders_cancel) ?? false}
-              />
+              <Suspense fallback={<TabPanelFallback />}>
+                <LazyHistoryContainer
+                  canCancelOrReturn={user?.permissions?.includes(PERMISSIONS.orders_cancel) ?? false}
+                />
+              </Suspense>
             )}
             {tab.value === 'settings' && (
-              <Settings
-                isHappyHourActive={isHappyHourActive}
-                timeUntilHappyHour={timeUntilHappyHour}
-                onHappyHourStatusUpdate={onHappyHourStatusUpdate}
-                products={products}
-              />
+              <Suspense fallback={<TabPanelFallback />}>
+                <LazySettings
+                  isHappyHourActive={isHappyHourActive}
+                  timeUntilHappyHour={timeUntilHappyHour}
+                  onHappyHourStatusUpdate={onHappyHourStatusUpdate}
+                  products={products}
+                />
+              </Suspense>
             )}
-            {tab.value === 'compliance' && <LegalComplianceDashboard />}
-            {tab.value === 'closures' && <ClosureContainer />}
-            {tab.value === 'user_management' && (user?.role === 'establishment_admin' || user?.permissions?.includes(PERMISSIONS.access_user_management)) && (
-              <UserManagement token={token} />
+            {tab.value === 'compliance' && (
+              <Suspense fallback={<TabPanelFallback />}>
+                <LazyLegalComplianceDashboard />
+              </Suspense>
             )}
-            {tab.value === 'audit_trail' && user?.role === 'establishment_admin' && <AuditTrailDashboard token={token} />}
+            {tab.value === 'closures' && (
+              <Suspense fallback={<TabPanelFallback />}>
+                <LazyClosureContainer />
+              </Suspense>
+            )}
+            {tab.value === 'user_management' &&
+              (user?.role === 'establishment_admin' ||
+                user?.permissions?.includes(PERMISSIONS.access_user_management)) && (
+                <Suspense fallback={<TabPanelFallback />}>
+                  <LazyUserManagement token={token} />
+                </Suspense>
+              )}
+            {tab.value === 'audit_trail' && user?.role === 'establishment_admin' && (
+              <Suspense fallback={<TabPanelFallback />}>
+                <LazyAuditTrailDashboard token={token} />
+              </Suspense>
+            )}
           </TabPanel>
         ))}
       </Box>
