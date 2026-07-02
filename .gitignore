@@ -16,6 +16,8 @@ MuseBar/backend/dist/
 backups/
 *.tar.gz
 docs/reports/
+!docs/reports/
+!docs/reports/**/*.md
 
 # Env files
 *.env
