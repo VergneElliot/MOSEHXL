@@ -4,6 +4,7 @@ import type { Category, Product } from '../../types';
 import { usePOSCatalogLogic } from '../../hooks/usePOSCatalogLogic';
 import CategoryFilter from './CategoryFilter';
 import ProductGrid from './ProductGrid';
+import { canUseVirtualization } from '../../utils/canUseVirtualization';
 
 export interface POSMenuPanelProps {
   categories: Category[];
@@ -47,7 +48,15 @@ const POSMenuPanel = React.memo(function POSMenuPanel({
           onSearchChange={onSearchChange}
         />
       </Box>
-      <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: canUseVirtualization() ? 'hidden' : 'auto',
+        }}
+      >
         <ProductGrid
           products={filteredProducts}
           categories={categories}

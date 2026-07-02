@@ -3,6 +3,7 @@ import {
   Card,
   CardContent,
   Typography,
+  List,
   IconButton,
   Divider,
   Button,
@@ -28,6 +29,7 @@ import { Virtuoso } from 'react-virtuoso';
 import OrderSummaryItem from './OrderSummaryItem';
 import LineNoteDialog from './LineNoteDialog';
 import { getLineNoteFromOptions } from '../../utils/lineItemNote';
+import { canUseVirtualization } from '../../utils/canUseVirtualization';
 
 interface OrderSummaryProps {
   currentOrder: OrderItem[];
@@ -76,6 +78,7 @@ const OrderSummary = React.memo(function OrderSummary({
 }: OrderSummaryProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const useVirtualization = canUseVirtualization();
   const [changeDialogOpen, setChangeDialogOpen] = useState(false);
   const [changeAmount, setChangeAmount] = useState('');
   const [changeSubmitting, setChangeSubmitting] = useState(false);
@@ -202,7 +205,7 @@ const OrderSummary = React.memo(function OrderSummary({
           )}
         </Box>
 
-        <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+        <Box sx={{ flex: 1, minHeight: 0, overflow: useVirtualization ? 'hidden' : 'auto' }}>
           {currentOrder.length === 0 ? (
             <Box
               display="flex"
@@ -214,13 +217,30 @@ const OrderSummary = React.memo(function OrderSummary({
             >
               <Typography color="textSecondary">Aucun article sélectionné</Typography>
             </Box>
-          ) : (
+          ) : useVirtualization ? (
             <Virtuoso
               style={{ height: '100%' }}
               totalCount={currentOrder.length}
               overscan={200}
               itemContent={renderOrderLine}
             />
+          ) : (
+            <List sx={{ py: 0 }}>
+              {currentOrder.map((item, index) => (
+                <OrderSummaryItem
+                  key={`${item.id}-${index}`}
+                  item={item}
+                  index={index}
+                  isLast={index === currentOrder.length - 1}
+                  formatCurrency={formatCurrency}
+                  onRemoveItem={onRemoveItem}
+                  onApplyHappyHour={onApplyHappyHour}
+                  onApplyOffert={onApplyOffert}
+                  onApplyPerso={onApplyPerso}
+                  onEditLineNote={onUpdateLineNote ? handleEditLineNote : undefined}
+                />
+              ))}
+            </List>
           )}
         </Box>
 

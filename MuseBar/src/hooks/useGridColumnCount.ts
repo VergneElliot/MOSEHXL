@@ -20,9 +20,15 @@ export function useGridColumnCount(minColumnWidthPx: number) {
     };
 
     update();
-    const observer = new ResizeObserver(update);
-    observer.observe(element);
-    return () => observer.disconnect();
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(update);
+      observer.observe(element);
+      return () => observer.disconnect();
+    }
+
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
   }, [minColumnWidthPx]);
 
   return { containerRef, columnCount, gridGapPx: GRID_GAP_PX };
