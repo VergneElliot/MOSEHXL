@@ -212,4 +212,4 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({
   );
 };
 
-export default CategoryFilter;
+export default React.memo(CategoryFilter);

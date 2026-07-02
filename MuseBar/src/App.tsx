@@ -1,18 +1,31 @@
-import React, { useEffect } from 'react';
+import React, { Suspense, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { Box, Container } from '@mui/material';
+import { Box, Container, CircularProgress } from '@mui/material';
 import { apiConfig } from './config/api';
 import { useAuth } from './hooks/useAuth';
 import { useHappyHour } from './hooks/useHappyHour';
 import { useDataManagement } from './hooks/useDataManagement';
 import AppRouter from './components/common/AppRouter';
-import SystemAdminRouter from './components/common/SystemAdminRouter';
 import { Login } from './components/auth';
 import type { User } from './types';
 import { AppHeader } from './components/common/AppHeader';
-import { BusinessSetupWizard } from './components/Setup';
-import EstablishmentAccountCreation from './components/EstablishmentAccountCreation';
 import { useTranslation } from 'react-i18next';
+
+const SystemAdminRouter = React.lazy(() => import('./components/common/SystemAdminRouter'));
+const BusinessSetupWizard = React.lazy(() =>
+  import('./components/Setup').then(mod => ({ default: mod.BusinessSetupWizard }))
+);
+const EstablishmentAccountCreation = React.lazy(
+  () => import('./components/EstablishmentAccountCreation')
+);
+
+function RouteFallback() {
+  return (
+    <Box display="flex" justifyContent="center" alignItems="center" minHeight="40vh">
+      <CircularProgress />
+    </Box>
+  );
+}
 
 function App() {
   const { t } = useTranslation('common');
@@ -96,10 +109,18 @@ function App() {
   return (
     <Routes>
       {/* Setup wizard route - no authentication required */}
-      <Route path="/setup/:token" element={<BusinessSetupWizard />} />
+      <Route path="/setup/:token" element={
+        <Suspense fallback={<RouteFallback />}>
+          <BusinessSetupWizard />
+        </Suspense>
+      } />
       
       {/* Establishment account creation route - no authentication required */}
-      <Route path="/establishment-setup/:token" element={<EstablishmentAccountCreation />} />
+      <Route path="/establishment-setup/:token" element={
+        <Suspense fallback={<RouteFallback />}>
+          <EstablishmentAccountCreation />
+        </Suspense>
+      } />
       
       {/* Main application routes */}
       <Route path="/*" element={
@@ -109,8 +130,9 @@ function App() {
               <Login onLogin={handleLogin} />
             </Container>
           ) : isSystemAdmin ? (
-            // System Admin Interface - Full screen, no container
-            <SystemAdminRouter user={user!} />
+            <Suspense fallback={<RouteFallback />}>
+              <SystemAdminRouter user={user!} />
+            </Suspense>
           ) : (
             // Business Interface - viewport-height chain so tab content can use flex/scroll
             <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>

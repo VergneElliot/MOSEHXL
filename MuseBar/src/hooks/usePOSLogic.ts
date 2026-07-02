@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { OrderItem, Product, Category } from '../types';
 import { formatCurrency } from '../utils/formatCurrency';
 import { HappyHourService } from '../services/happyHourService';
@@ -60,7 +60,7 @@ export const usePOSLogic = (
 
   // Calculate product price with happy hour discounts.
   // If the product has an individual discount (value > 0), use it; otherwise use the base discount from Parameters.
-  const calculateProductPrice = (product: Product, isHappyHour: boolean): number => {
+  const calculateProductPrice = useCallback((product: Product, isHappyHour: boolean): number => {
     if (!isHappyHour || !product.isHappyHourEligible) {
       return product.price;
     }
@@ -98,17 +98,17 @@ export const usePOSLogic = (
       return product.price * (1 - value);
     }
     return Math.max(0, product.price - value);
-  };
+  }, []);
 
   // Calculate item total (price * quantity)
-  const calculateItemTotal = (item: OrderItem): number => {
+  const calculateItemTotal = useCallback((item: OrderItem): number => {
     return item.unitPrice * item.quantity;
-  };
+  }, []);
 
   // Calculate order totals
   const orderSubtotal = useMemo(() => {
     return currentOrder.reduce((total, item) => total + calculateItemTotal(item), 0);
-  }, [currentOrder]);
+  }, [currentOrder, calculateItemTotal]);
 
   const orderTax = useMemo(() => {
     return currentOrder.reduce((total, item) => total + item.taxAmount, 0);

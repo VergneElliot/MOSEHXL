@@ -26,7 +26,7 @@ interface ProductGridProps {
   onDiversClick?: () => void;
 }
 
-const ProductGrid: React.FC<ProductGridProps> = ({
+const ProductGrid = React.memo(function ProductGrid({
   products,
   categories,
   isHappyHourActive,
@@ -34,7 +34,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({
   calculateProductPrice,
   formatCurrency,
   onDiversClick,
-}) => {
+}: ProductGridProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -86,7 +86,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({
       ))}
     </Box>
   );
-};
+});
 
 interface DiversCardProps {
   onAdd: () => void;
@@ -170,7 +170,7 @@ interface ProductCardProps {
   isMobile: boolean;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({
+const ProductCard = React.memo(function ProductCard({
   product,
   categoryColor,
   isHappyHourActive,
@@ -178,7 +178,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   calculateProductPrice,
   formatCurrency,
   isMobile,
-}) => {
+}: ProductCardProps) {
   const theme = useTheme();
   const [quantity, setQuantity] = useState(1);
 
@@ -374,6 +374,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
       </CardContent>
     </Card>
   );
-};
+});
 
 export default ProductGrid;
