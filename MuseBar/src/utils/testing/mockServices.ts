@@ -1,3 +1,5 @@
+import { vi, beforeEach, afterEach } from 'vitest';
+
 /**
  * Mock Services and API Responses
  * Provides mock API responses and service utilities for testing
@@ -38,7 +40,7 @@ export const mockApiResponses = {
  * Mock fetch implementation for testing API calls
  */
 export const mockFetch = (responses: Array<{ url?: string; response: any; status?: number }>) => {
-  const mockFn = jest.fn();
+  const mockFn = vi.fn();
   
   responses.forEach((response, index) => {
     if (response.url) {
@@ -70,18 +72,18 @@ export const mockFetch = (responses: Array<{ url?: string; response: any; status
  */
 export const mockTimers = () => {
   beforeEach(() => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
-    jest.runOnlyPendingTimers();
-    jest.useRealTimers();
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
   });
 
   return {
-    advanceBy: (ms: number) => jest.advanceTimersByTime(ms),
-    advanceToNext: () => jest.advanceTimersToNextTimer(),
-    runAll: () => jest.runAllTimers(),
-    runPending: () => jest.runOnlyPendingTimers(),
+    advanceBy: (ms: number) => vi.advanceTimersByTime(ms),
+    advanceToNext: () => vi.advanceTimersToNextTimer(),
+    runAll: () => vi.runAllTimers(),
+    runPending: () => vi.runOnlyPendingTimers(),
   };
 };

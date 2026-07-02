@@ -63,7 +63,7 @@ export const useErrorHandler = (): UseErrorHandlerReturn => {
   const reportError = useCallback(async (error: Error, errorInfo: ErrorInfo, errorId: string) => {
     try {
       // Don't report in development unless explicitly enabled
-      if (process.env.NODE_ENV === 'development' && !process.env.REACT_APP_REPORT_DEV_ERRORS) {
+      if (import.meta.env.DEV && !import.meta.env.VITE_REPORT_DEV_ERRORS) {
         return;
       }
 
@@ -116,12 +116,11 @@ export const useErrorHandler = (): UseErrorHandlerReturn => {
    */
   const shouldEnableReporting = useCallback((): boolean => {
     // Always enable in production
-    if (process.env.NODE_ENV === 'production') {
+    if (import.meta.env.PROD) {
       return true;
     }
 
-    // In development, only enable if explicitly configured
-    return Boolean(process.env.REACT_APP_REPORT_DEV_ERRORS);
+    return Boolean(import.meta.env.VITE_REPORT_DEV_ERRORS);
   }, []);
 
   /**

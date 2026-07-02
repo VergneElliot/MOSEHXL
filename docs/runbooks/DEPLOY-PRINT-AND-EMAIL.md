@@ -78,9 +78,11 @@ Optional: `PUBLIC_API_URL` if API base differs from `APP_URL`.
 Set frontend build values in production `.env.production` (current server path:
 `/var/www/MOSEHXL/MuseBar/.env.production`):
 
+> **Phase 7 (Vite):** use `VITE_*` prefixes (replaces `REACT_APP_*`).
+
 | Variable | Required | Example / note |
 |----------|----------|----------------|
-| `REACT_APP_API_URL` | yes | `https://mosehxl.com`; required at build time so the browser calls the proxied production API instead of `localhost:3001` |
+| `VITE_API_URL` | yes | `https://mosehxl.com`; required at build time so the browser calls the proxied production API instead of `localhost:3001` |
 
 Rebuild frontend after changing frontend env values:
 

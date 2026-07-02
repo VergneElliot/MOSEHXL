@@ -1,11 +1,12 @@
+import { vi } from 'vitest';
 import { getOrders, getOrdersPaginated } from './orders';
 import { request } from './core';
 
-jest.mock('./core', () => ({
-  request: jest.fn(),
+vi.mock('./core', () => ({
+  request: vi.fn(),
 }));
 
-const mockedRequest = request as jest.MockedFunction<typeof request>;
+const mockedRequest = vi.mocked(request);
 
 describe('orders API DTO mapper', () => {
   beforeEach(() => {

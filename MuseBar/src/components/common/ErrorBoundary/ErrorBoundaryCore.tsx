@@ -49,7 +49,7 @@ export class ErrorBoundaryCore extends Component<ErrorBoundaryProps, ErrorBounda
     this.setState({ errorInfo });
 
     // Log error in development
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.group(`🚨 Error Boundary [${errorId}]`);
       console.error('Error:', error);
       console.error('Component Stack:', errorInfo.componentStack);

@@ -1,7 +1,7 @@
 # MOSEHXL — Cleanup & Performance Roadmap
 
 **Date:** 2026-06-24  
-**Last updated:** 2026-07-02 (Phase 6B complete — pending venue retest)  
+**Last updated:** 2026-07-02 (Phase 7 complete — pending venue retest)  
 **Branch baseline:** `development`  
 **Author:** Engineering (full-repo clean-up pass)  
 **Scope:** (1) close the defects found in the 2026-06-24 code review, (2) define the performance/"lag" strategy, (3) sequence everything into an executable, low-risk plan.
@@ -14,9 +14,9 @@
 
 ## Pause checkpoint (2026-07-01)
 
-**Status:** Track A **complete**. Phase 6 **complete**. Phase 6B **complete** (venue retest pending). Resume **Track B** at deploy + lag gate.
+**Status:** Track A **complete**. Phase 6B **complete** (venue lag gate **failed**). Phase 7 **complete** (venue retest pending). Resume **Track B** at deploy + lag gate.
 
-**Last completed patch note:** `438-CLEANUP-PHASE6B-POS-HOT-PATH-IMPLEMENTATION.md`  
+**Last completed patch note:** `440-CLEANUP-PHASE7-VITE-MIGRATION-IMPLEMENTATION.md`  
 **Baseline report:** `docs/reports/2026-06-24-pos-perf-baseline.md` (Phase 6 main gzip: **189 KB**, was 271 KB)
 
 ### Completed at pause (Track A)
@@ -41,9 +41,9 @@
 |-------|-------|--------|-------------|
 | **5** | Performance baseline | **Done** | Report: `docs/reports/2026-06-24-pos-perf-baseline.md` |
 | **6** | React quick wins | **Done** | Main −82 KB gzip; lazy tabs + POS memo — patch 435–436 |
-| **6B** | POS hot-path runtime | **Done** | Batch cart, memo panels, split hooks — patch 437–438 |
-| **7** | CRA → Vite | **Not started** | After Phase 6B venue lag gate |
-| **8** | SvelteKit migration | **Not started** | Conditional on 5–6 |
+| **6B** | POS hot-path runtime | **Done** | Batch cart, memo panels — patch 437–438; venue lag **not resolved** |
+| **7** | CRA → Vite | **Done** | Vite 6 + Vitest + TS 5.7 — patch 439–440 |
+| **8** | SvelteKit migration | **Not started** | After Phase 7 venue lag gate |
 | **9** | Backend perf / deploy ergonomics | **Not started** | Conditional on on-site API latency |
 
 **Recommended resume order:** 6 → [lag gate] → 7 → 8 → 9. Fill on-site table in baseline report §4 when testing on venue hardware.
@@ -223,7 +223,7 @@ Targets per-tap / per-keypress main-thread work after Phase 6 bundle wins proved
 
 ### Phase 7 — Toolchain modernization: CRA → Vite (P1/P2) — effort: M
 
-**Status:** Not started (paused 2026-07-01).
+**Status:** **Complete 2026-07-02** — see patch notes 439–440.
 
 Independent of any framework decision; pure upside.
 
@@ -231,9 +231,9 @@ Independent of any framework decision; pure upside.
 2. Bump TypeScript off `4.9.5`.
 3. Update CI (`frontend-test` job) to the Vite build/test commands.
 
-**Acceptance:** identical app behavior; smaller bundle; faster cold start; CI green.
+**Venue result (6B):** still laggy on DISH PC. Phase 7 deployed for toolchain + bundle foundation; **Phase 8** likely needed for interactive perf.
 
-> If the team decides to go straight to SvelteKit (Phase 8), Vite comes for free (SvelteKit is Vite-based) and this phase folds into Phase 8 — but doing Vite-on-React first de-risks by separating the build change from the framework change.
+**Acceptance:** identical app behavior; CI green; venue retest pending.
 
 ---
 
