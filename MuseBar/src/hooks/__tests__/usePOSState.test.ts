@@ -70,6 +70,20 @@ describe('usePOSState', () => {
     expect(result.current[0].currentOrder[0]).toEqual(mockOrderItem);
   });
 
+  it('should add multiple lines in one update', () => {
+    const { result } = renderHook(() => usePOSState());
+    const [, actions] = result.current;
+
+    act(() => {
+      actions.addLinesToOrder([
+        { ...mockOrderItem, id: 'a' },
+        { ...mockOrderItem, id: 'b' },
+      ]);
+    });
+
+    expect(result.current[0].currentOrder).toHaveLength(2);
+  });
+
   it('should remove item from order', () => {
     const { result } = renderHook(() => usePOSState());
     const [, actions] = result.current;

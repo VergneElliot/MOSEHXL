@@ -1,7 +1,7 @@
 # MOSEHXL — Cleanup & Performance Roadmap
 
 **Date:** 2026-06-24  
-**Last updated:** 2026-07-02 (Phase 6 complete — pending venue retest)  
+**Last updated:** 2026-07-02 (Phase 6B complete — pending venue retest)  
 **Branch baseline:** `development`  
 **Author:** Engineering (full-repo clean-up pass)  
 **Scope:** (1) close the defects found in the 2026-06-24 code review, (2) define the performance/"lag" strategy, (3) sequence everything into an executable, low-risk plan.
@@ -14,9 +14,9 @@
 
 ## Pause checkpoint (2026-07-01)
 
-**Status:** Track A **complete**. Phase 6 **complete** (venue retest pending). Resume **Track B** at deploy + lag gate.
+**Status:** Track A **complete**. Phase 6 **complete**. Phase 6B **complete** (venue retest pending). Resume **Track B** at deploy + lag gate.
 
-**Last completed patch note:** `436-CLEANUP-PHASE6-REACT-QUICK-WINS-IMPLEMENTATION.md`  
+**Last completed patch note:** `438-CLEANUP-PHASE6B-POS-HOT-PATH-IMPLEMENTATION.md`  
 **Baseline report:** `docs/reports/2026-06-24-pos-perf-baseline.md` (Phase 6 main gzip: **189 KB**, was 271 KB)
 
 ### Completed at pause (Track A)
@@ -41,7 +41,8 @@
 |-------|-------|--------|-------------|
 | **5** | Performance baseline | **Done** | Report: `docs/reports/2026-06-24-pos-perf-baseline.md` |
 | **6** | React quick wins | **Done** | Main −82 KB gzip; lazy tabs + POS memo — patch 435–436 |
-| **7** | CRA → Vite | **Not started** | After Phase 6 venue lag gate |
+| **6B** | POS hot-path runtime | **Done** | Batch cart, memo panels, split hooks — patch 437–438 |
+| **7** | CRA → Vite | **Not started** | After Phase 6B venue lag gate |
 | **8** | SvelteKit migration | **Not started** | Conditional on 5–6 |
 | **9** | Backend perf / deploy ergonomics | **Not started** | Conditional on on-site API latency |
 
@@ -199,7 +200,24 @@ Often enough to resolve the lag without a rewrite.
 5. **Optimistic UI on the POS**: render the sale instantly while the authoritative legal-journal write completes async — *carefully*, since the journal write must still succeed and remain the source of truth (surface a clear error/rollback if it fails).
 6. **Re-measure against the Phase 5 baseline.**
 
-**Decision gate:** if the POS now feels instant on the target device, **Phase 7 becomes optional**. If not, proceed.
+**Decision gate:** if the POS now feels instant on the target device, **Phase 7 becomes optional**. If not, proceed to **Phase 6B** (runtime hot path), then Phase 7/8 as needed.
+
+---
+
+### Phase 6B — POS hot-path runtime (P1) — effort: M, low risk
+
+**Status:** **Complete 2026-07-02** — see patch notes 437–438.
+
+Targets per-tap / per-keypress main-thread work after Phase 6 bundle wins proved insufficient on venue hardware.
+
+1. **Batch cart updates** — `addLinesToOrder` (single React commit for multi-quantity adds).
+2. **Split catalog vs cart logic** — `usePOSCatalogLogic` + `usePOSOrderTotals`; menu hook no longer depends on `currentOrder`.
+3. **Isolated memo panels** — `POSMenuPanel` / `POSOrderPanel` skip re-render when sibling subtree props unchanged.
+4. **Stable POS state + order list memo** — `useCallback` actions; `React.memo` on `OrderSummary` / `OrderSummaryItem`.
+
+**Deferred:** product grid virtualization (Phase 6C) — measure after venue deploy.
+
+**Decision gate:** subjective feel on DISH cashier PC; if still laggy → virtualization and/or Phase 7 (Vite), then Phase 8 if needed.
 
 ---
 

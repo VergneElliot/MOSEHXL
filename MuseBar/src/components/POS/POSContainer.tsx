@@ -2,16 +2,17 @@ import React, { Suspense, useCallback, useState } from 'react';
 import { Box, Snackbar, Alert, CircularProgress } from '@mui/material';
 import { Category, Product, OrderItem, Order } from '../../types';
 import { usePOSState } from '../../hooks/usePOSState';
-import { usePOSLogic } from '../../hooks/usePOSLogic';
+import { usePOSOrderTotals } from '../../hooks/usePOSOrderTotals';
 import { usePOSAPI } from '../../hooks/usePOSAPI';
 import { usePOSOrderAdjustments } from '../../hooks/usePOSOrderAdjustments';
-import CategoryFilter from './CategoryFilter';
-import ProductGrid from './ProductGrid';
-import OrderSummary from './OrderSummary';
+import { usePOSCatalogLogic } from '../../hooks/usePOSCatalogLogic';
 import POSLayout from './POSLayout';
+import POSMenuPanel from './POSMenuPanel';
+import POSOrderPanel from './POSOrderPanel';
 import type { DiversFormData } from './DiversDialog';
 import type { ProductOptionSelection } from './ProductOptionDialog';
 import { upsertLineNoteInOptions } from '../../utils/lineItemNote';
+import { formatCurrency } from '../../utils/formatCurrency';
 
 const LazyPaymentDialog = React.lazy(() => import('./PaymentDialog'));
 const LazyPrintAfterSaleDialog = React.lazy(() => import('./PrintAfterSaleDialog'));
@@ -23,7 +24,6 @@ interface POSContainerProps {
   products: Product[];
   isHappyHourActive: boolean;
   onDataUpdate: () => void;
-  /** Server-enforced POS line actions (buttons hidden if false). */
   posLinePermissions?: {
     happyHourManual: boolean;
     offert: boolean;
@@ -42,7 +42,6 @@ const POSContainer: React.FC<POSContainerProps> = ({
     perso: true,
   },
 }) => {
-  // Custom hooks for state management
   const [state, actions] = usePOSState();
   const [diversDialogOpen, setDiversDialogOpen] = useState(false);
   const [optionDialogOpen, setOptionDialogOpen] = useState(false);
@@ -50,33 +49,40 @@ const POSContainer: React.FC<POSContainerProps> = ({
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [lastOrderId, setLastOrderId] = useState<number | null>(null);
 
-  // Custom hook for business logic
-  const logic = usePOSLogic(
+  const { orderTotal, orderTax, orderSubtotal } = usePOSOrderTotals(state.currentOrder);
+  const { calculateProductPrice } = usePOSCatalogLogic(
     products,
     categories,
-    state.currentOrder,
     state.selectedCategory,
     state.searchQuery,
     isHappyHourActive
   );
 
-  const handlePaymentComplete = (message: string, createdOrder?: Order) => {
-    actions.setSnackbar({ open: true, message, severity: 'success' });
-    const rawId = createdOrder?.id;
-    const parsedId =
-      typeof rawId === 'number'
-        ? rawId
-        : typeof rawId === 'string'
-          ? parseInt(rawId, 10)
-          : NaN;
-    if (Number.isFinite(parsedId) && parsedId > 0) {
-      setLastOrderId(parsedId);
-      setPrintDialogOpen(true);
-    }
-  };
-  const handlePaymentError = (message: string) => {
-    actions.setSnackbar({ open: true, message, severity: 'error' });
-  };
+  const handlePaymentComplete = useCallback(
+    (message: string, createdOrder?: Order) => {
+      actions.setSnackbar({ open: true, message, severity: 'success' });
+      const rawId = createdOrder?.id;
+      const parsedId =
+        typeof rawId === 'number'
+          ? rawId
+          : typeof rawId === 'string'
+            ? parseInt(rawId, 10)
+            : NaN;
+      if (Number.isFinite(parsedId) && parsedId > 0) {
+        setLastOrderId(parsedId);
+        setPrintDialogOpen(true);
+      }
+    },
+    [actions.setSnackbar]
+  );
+
+  const handlePaymentError = useCallback(
+    (message: string) => {
+      actions.setSnackbar({ open: true, message, severity: 'error' });
+    },
+    [actions.setSnackbar]
+  );
+
   const { createOrder, processChange } = usePOSAPI(handlePaymentComplete, handlePaymentError, onDataUpdate);
 
   const handleFaireDeLaMonnaie = useCallback(
@@ -86,31 +92,23 @@ const POSContainer: React.FC<POSContainerProps> = ({
     [processChange]
   );
 
-  // Add N copies as individual cart lines (each quantity 1). No grouping.
   const handleAddToOrder = useCallback(
     (item: OrderItem, quantity: number = 1) => {
       const base = { ...item, quantity: 1 };
+      const stamp = Date.now();
+      const lines: OrderItem[] = [];
       for (let i = 0; i < quantity; i++) {
-        actions.addToOrder({
+        lines.push({
           ...base,
-          id: `${base.id}-${Date.now()}-${i}`,
+          id: `${base.id}-${stamp}-${i}`,
           totalPrice: base.unitPrice,
           taxAmount: base.unitPrice * (base.taxRate / (1 + base.taxRate)),
         });
       }
+      actions.addLinesToOrder(lines);
     },
-    [actions]
+    [actions.addLinesToOrder]
   );
-
-  const {
-    filteredProducts,
-    orderTotal,
-    orderTax,
-    orderSubtotal,
-    canProcessPayment,
-    calculateProductPrice,
-    formatCurrency,
-  } = logic;
 
   const buildOrderItem = useCallback(
     (product: Product, selections: ProductOptionSelection[]): OrderItem => {
@@ -171,7 +169,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
         options: upsertLineNoteInOptions(line.options, note),
       });
     },
-    [actions, state.currentOrder]
+    [actions.updateLineAt, state.currentOrder]
   );
 
   const { handleApplyHappyHour, handleApplyOffert, handleApplyPerso } =
@@ -182,11 +180,11 @@ const POSContainer: React.FC<POSContainerProps> = ({
 
   const handleCheckout = useCallback(() => {
     actions.setPaymentDialogOpen(true);
-  }, [actions]);
+  }, [actions.setPaymentDialogOpen]);
 
   const handleQuickPayment = useCallback(
     async (method: 'cash' | 'card') => {
-      if (!canProcessPayment || state.currentOrder.length === 0) return;
+      if (state.currentOrder.length === 0) return;
       try {
         await createOrder({
           paymentMethod: method,
@@ -201,16 +199,24 @@ const POSContainer: React.FC<POSContainerProps> = ({
         // Error already reported by usePOSAPI
       }
     },
-    [canProcessPayment, orderTotal, orderTax, state.currentOrder, createOrder, actions]
+    [state.currentOrder, orderTotal, orderTax, createOrder, actions.clearOrder]
   );
+
+  const handleQuickCard = useCallback(() => {
+    void handleQuickPayment('card');
+  }, [handleQuickPayment]);
+
+  const handleQuickCash = useCallback(() => {
+    void handleQuickPayment('cash');
+  }, [handleQuickPayment]);
 
   const handleCloseSnackbar = useCallback(() => {
     actions.closeSnackbar();
-  }, [actions]);
+  }, [actions.closeSnackbar]);
 
   const handleClosePaymentDialog = useCallback(() => {
     actions.setPaymentDialogOpen(false);
-  }, [actions]);
+  }, [actions.setPaymentDialogOpen]);
 
   const handleDiversClick = useCallback(() => {
     setDiversDialogOpen(true);
@@ -253,63 +259,42 @@ const POSContainer: React.FC<POSContainerProps> = ({
     [handleAddToOrder]
   );
 
-  const menuContent = (
-    <>
-      <Box sx={{ flexShrink: 0 }}>
-        <CategoryFilter
-          categories={categories}
-          selectedCategory={state.selectedCategory}
-          searchQuery={state.searchQuery}
-          onCategorySelect={actions.setSelectedCategory}
-          onSearchChange={actions.setSearchQuery}
-        />
-      </Box>
-      <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-        <ProductGrid
-          products={filteredProducts}
-          categories={categories}
-          isHappyHourActive={isHappyHourActive}
-          onRequestAddProduct={handleRequestAddProduct}
-          calculateProductPrice={calculateProductPrice}
-          formatCurrency={formatCurrency}
-          onDiversClick={handleDiversClick}
-        />
-      </Box>
-    </>
-  );
-
-  const orderContent = (
-    <OrderSummary
-      currentOrder={state.currentOrder}
-      orderTotal={orderTotal}
-      orderTax={orderTax}
-      orderSubtotal={orderSubtotal}
-      canProcessPayment={canProcessPayment}
-      onRemoveItem={actions.removeFromOrder}
-      onClearOrder={actions.clearOrder}
-      onCheckout={handleCheckout}
-      onQuickCard={() => handleQuickPayment('card')}
-      onQuickCash={() => handleQuickPayment('cash')}
-      onFaireDeLaMonnaie={handleFaireDeLaMonnaie}
-      onApplyHappyHour={posLinePermissions.happyHourManual ? handleApplyHappyHour : undefined}
-      onApplyOffert={posLinePermissions.offert ? handleApplyOffert : undefined}
-      onApplyPerso={posLinePermissions.perso ? handleApplyPerso : undefined}
-      onUpdateLineNote={handleUpdateLineNote}
-      formatCurrency={formatCurrency}
-    />
-  );
-
   return (
     <Box sx={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', width: '100%' }}>
         <POSLayout
-          menuContent={menuContent}
-          orderContent={orderContent}
+          menuContent={
+            <POSMenuPanel
+              categories={categories}
+              products={products}
+              isHappyHourActive={isHappyHourActive}
+              selectedCategory={state.selectedCategory}
+              searchQuery={state.searchQuery}
+              onCategorySelect={actions.setSelectedCategory}
+              onSearchChange={actions.setSearchQuery}
+              onRequestAddProduct={handleRequestAddProduct}
+              onDiversClick={handleDiversClick}
+            />
+          }
+          orderContent={
+            <POSOrderPanel
+              currentOrder={state.currentOrder}
+              onRemoveItem={actions.removeFromOrder}
+              onClearOrder={actions.clearOrder}
+              onCheckout={handleCheckout}
+              onQuickCard={handleQuickCard}
+              onQuickCash={handleQuickCash}
+              onFaireDeLaMonnaie={handleFaireDeLaMonnaie}
+              onApplyHappyHour={posLinePermissions.happyHourManual ? handleApplyHappyHour : undefined}
+              onApplyOffert={posLinePermissions.offert ? handleApplyOffert : undefined}
+              onApplyPerso={posLinePermissions.perso ? handleApplyPerso : undefined}
+              onUpdateLineNote={handleUpdateLineNote}
+            />
+          }
           orderBadge={state.currentOrder.length}
         />
       </Box>
 
-      {/* Snackbar for notifications */}
       <Snackbar
         open={state.snackbar.open}
         autoHideDuration={4000}
@@ -326,7 +311,6 @@ const POSContainer: React.FC<POSContainerProps> = ({
         </Alert>
       </Snackbar>
 
-      {/* Payment Dialog — lazy-loaded when opened */}
       {state.paymentDialogOpen && (
         <Suspense
           fallback={
@@ -382,8 +366,6 @@ const POSContainer: React.FC<POSContainerProps> = ({
           />
         </Suspense>
       )}
-
-      {/* Future: Add other dialog components (retour, change, etc.) */}
     </Box>
   );
 };
