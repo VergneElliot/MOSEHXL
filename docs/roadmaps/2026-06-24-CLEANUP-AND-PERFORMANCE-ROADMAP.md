@@ -1,8 +1,8 @@
 # MOSEHXL — Cleanup & Performance Roadmap
 
 **Date:** 2026-06-24  
-**Last updated:** 2026-07-01 (pause checkpoint)  
-**Branch baseline:** `development` (paused at `4815a0a`)  
+**Last updated:** 2026-07-01 (Track A complete — resume Track B)  
+**Branch baseline:** `development`  
 **Author:** Engineering (full-repo clean-up pass)  
 **Scope:** (1) close the defects found in the 2026-06-24 code review, (2) define the performance/"lag" strategy, (3) sequence everything into an executable, low-risk plan.
 
@@ -14,13 +14,12 @@
 
 ## Pause checkpoint (2026-07-01)
 
-**Status:** Paused — feature work takes priority. Resume cleanup/perf from this section.
+**Status:** Track A **complete**. Resume **Track B** (performance) from Phase 5.
 
-**Git anchor:** `development` @ `4815a0a`  
-**Last completed patch note:** `422-SELF-CERTIFICATION-OPERATIONAL-EVIDENCE-TEMPLATES-IMPLEMENTATION.md`  
+**Last completed patch note:** `432-CLEANUP-PHASE4F-PRINTING-ROUTES-MODULARIZATION-IMPLEMENTATION.md`  
 **Self-cert pause record:** `docs/legal/self-certification/00-PAUSE-CHECKPOINT.md`
 
-### Completed at pause
+### Completed at pause (Track A)
 
 | Phase | Title | Status | Patch note |
 |-------|-------|--------|------------|
@@ -32,16 +31,9 @@
 | 4C | Session + refresh routes | **Done** | 418 |
 | 4D | Support + logout routes | **Done** | 419 |
 | 4E | Login routes (`authLogin.ts` → 15 LOC assembler) | **Done** | 420 |
+| **4F** | **`printing.ts` modularization (~735 LOC → 29 LOC assembler)** | **Done** | 431–432 |
 
-**Quality gate at pause:** backend type-check ✅, lint ✅, 68 test files / 292 tests ✅.
-
-### Resume here (Track A)
-
-| Phase | Title | Status | Next action |
-|-------|-------|--------|-------------|
-| **4F** | `printing.ts` modularization (~735 LOC) | **Not started** | Split transport (route handlers) from provider/config resolution; no behavior change. File: `MuseBar/backend/src/routes/printing.ts`. |
-
-After 4F, Track A cleanup is effectively complete (largest route files under control).
+**Quality gate:** backend type-check ✅, lint ✅, 80 test files / 324 tests ✅.
 
 ### Resume here (Track B)
 
@@ -51,9 +43,9 @@ After 4F, Track A cleanup is effectively complete (largest route files under con
 | **6** | React quick wins | **Not started** | Blocked on Phase 5 numbers |
 | **7** | CRA → Vite | **Not started** | After Phase 6 decision gate |
 | **8** | SvelteKit migration | **Not started** | Conditional on 5–6 |
-| **9** | Backend perf / deploy ergonomics | **Not started** | Conditional on 5 |
+| **9** | Backend perf / deploy ergonomics | **Not started** | Conditional on 5; Pi bridge kit in progress operationally |
 
-**Recommended resume order:** 4F → 5 → 6 → [lag gate] → 7 → 8 → 9.
+**Recommended resume order:** 5 → 6 → [lag gate] → 7 → 8 → 9.
 
 ### Self-certification (parallel, also paused)
 
@@ -154,7 +146,7 @@ The codebase is architecturally strong and fiscally aligned (CGI Art. 286-I-3 bi
 
 ### Phase 4 — Modularize remaining large files (P2) — effort: M
 
-**Status:** Paused — auth split complete; printing split pending (see **Pause checkpoint** above).
+**Status:** Paused — auth split complete; printing split **done** (see **Pause checkpoint** above).
 
 | Sub-phase | Status | Patch note |
 |-----------|--------|------------|
@@ -163,7 +155,7 @@ The codebase is architecturally strong and fiscally aligned (CGI Art. 286-I-3 bi
 | 4C Session + refresh routes | **Done** (2026-06-25) | 418 |
 | 4D Support + logout routes | **Done** (2026-06-25) | 419 |
 | 4E Login routes | **Done** (2026-06-25) | 420 |
-| 4F `printing.ts` split | **Not started** | — |
+| 4F `printing.ts` split | **Done** (2026-07-01) | 431–432 |
 
 **Goal:** eliminate the last monolith; no file mixing too many concerns.
 
