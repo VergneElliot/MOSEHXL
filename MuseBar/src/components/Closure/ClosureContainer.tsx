@@ -8,6 +8,10 @@ import {
   Tooltip,
   useTheme,
   useMediaQuery,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import { Add } from '@mui/icons-material';
 import { useClosureState } from '../../hooks/useClosureState';
@@ -31,6 +35,7 @@ const ClosureContainer: React.FC = () => {
   const [bulletinsPage, setBulletinsPage] = useState(0);
   const [bulletinsRowsPerPage, setBulletinsRowsPerPage] = useState(10);
   const [totalBulletins, setTotalBulletins] = useState(0);
+  const [closureTypeFilter, setClosureTypeFilter] = useState<ClosureType | 'ALL'>('ALL');
 
   // Custom hook for API calls
   const api = useClosureAPI(
@@ -71,8 +76,9 @@ const ClosureContainer: React.FC = () => {
     apiRef.current.loadBulletins({
       limit: bulletinsRowsPerPage,
       offset: bulletinsPage * bulletinsRowsPerPage,
+      type: closureTypeFilter === 'ALL' ? undefined : closureTypeFilter,
     });
-  }, [bulletinsPage, bulletinsRowsPerPage]);
+  }, [bulletinsPage, bulletinsRowsPerPage, closureTypeFilter]);
 
   // Event handlers
   const handleCreateClosure = () => {
@@ -153,6 +159,27 @@ const ClosureContainer: React.FC = () => {
         loading={state.loading}
         formatCurrency={formatCurrency}
       />
+
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+        <FormControl size="small" sx={{ minWidth: 220 }}>
+          <InputLabel id="closure-type-filter-label">Type de clôture</InputLabel>
+          <Select
+            labelId="closure-type-filter-label"
+            label="Type de clôture"
+            value={closureTypeFilter}
+            onChange={e => {
+              setClosureTypeFilter(e.target.value as ClosureType | 'ALL');
+              setBulletinsPage(0);
+            }}
+          >
+            <MenuItem value="ALL">Toutes</MenuItem>
+            <MenuItem value="DAILY">Journalières</MenuItem>
+            <MenuItem value="WEEKLY">Hebdomadaires</MenuItem>
+            <MenuItem value="MONTHLY">Mensuelles</MenuItem>
+            <MenuItem value="ANNUAL">Annuelles</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
 
       {/* Bulletins Table */}
       <BulletinsTable

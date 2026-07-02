@@ -22,9 +22,11 @@ export interface JournalEntry {
   created_at: Date;
 }
 
+export type ClosureType = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL';
+
 export interface ClosureBulletin {
   id: number;
-  closure_type: 'DAILY' | 'MONTHLY' | 'ANNUAL';
+  closure_type: ClosureType;
   period_start: Date;
   period_end: Date;
   total_transactions: number;
@@ -96,4 +98,3 @@ export interface OrderForJournal {
   change?: string;
 }
 
-export type ClosureType = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL';

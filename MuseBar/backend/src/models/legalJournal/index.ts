@@ -23,6 +23,8 @@ export type {
   ClosureType
 } from './types';
 
+import type { ClosureType } from './types';
+
 // Legacy compatibility - Main class that maintains the original API
 export class LegalJournalModel {
   static async addEntry(
@@ -184,13 +186,13 @@ export class LegalJournalModel {
     return await ClosureOperations.createAnnualClosure(date, establishmentId, force ?? false, fondDeCaisse, false);
   }
 
-  static async getClosureBulletins(establishmentId: string, type?: 'DAILY' | 'MONTHLY' | 'ANNUAL') {
+  static async getClosureBulletins(establishmentId: string, type?: ClosureType) {
     return await ClosureOperations.getClosureBulletins(establishmentId, type);
   }
 
   static async getClosureBulletinsPaginated(
     establishmentId: string,
-    type?: 'DAILY' | 'MONTHLY' | 'ANNUAL',
+    type?: ClosureType,
     opts?: { limit?: number; offset?: number }
   ) {
     return await ClosureOperations.getClosureBulletinsPaginated(establishmentId, type, opts);

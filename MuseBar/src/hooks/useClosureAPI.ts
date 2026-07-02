@@ -4,7 +4,7 @@ import { ClosureBulletin } from './useClosureState';
 import type { ClosureTodayStatus, LiveMonthlyStats } from '../types/api';
 
 export interface ClosureAPIActions {
-  loadBulletins: (pagination?: { limit: number; offset: number }) => Promise<void>;
+  loadBulletins: (pagination?: { limit: number; offset: number; type?: CreateClosureData['type'] }) => Promise<void>;
   loadTodayStatus: () => Promise<void>;
   loadClosureSettings: () => Promise<void>;
   loadMonthlyStats: () => Promise<void>;
@@ -38,13 +38,14 @@ export const useClosureAPI = (
 ): ClosureAPIActions => {
   const apiService = useMemo(() => ApiService.getInstance(), []);
 
-  const loadBulletins = useCallback(async (pagination?: { limit: number; offset: number }) => {
+  const loadBulletins = useCallback(async (pagination?: { limit: number; offset: number; type?: CreateClosureData['type'] }) => {
     try {
       setLoading(true);
       setError(null);
       const query = new URLSearchParams();
       if (pagination?.limit != null) query.set('limit', String(pagination.limit));
       if (pagination?.offset != null) query.set('offset', String(pagination.offset));
+      if (pagination?.type) query.set('type', pagination.type);
 
       const endpoint = `/legal/closure/bulletins${query.toString() ? `?${query.toString()}` : ''}`;
 

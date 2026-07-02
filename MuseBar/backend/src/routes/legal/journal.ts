@@ -7,7 +7,7 @@ import express from 'express';
 import LegalJournalModel from '../../models/legalJournal';
 import { Logger } from '../../utils/logger';
 import { JournalQueries } from '../../models/legalJournal';
-import { getEstablishmentId, requireAuth, requireAdmin, requirePermission } from '../auth';
+import { getEstablishmentId, requireAuth, requireAdmin, requireEstablishmentAdminOrPermission } from '../auth';
 import { AppError, asyncHandler, AuthorizationError } from '../../middleware/errorHandler';
 import { P } from '../../permissions/registry';
 
@@ -20,7 +20,7 @@ router.use(requireAuth);
  * GET legal journal integrity verification
  * GET /api/legal/journal/verify
  */
-router.get('/verify', requirePermission(P.access_compliance), asyncHandler(async (req, res) => {
+router.get('/verify', requireEstablishmentAdminOrPermission(P.access_compliance), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -45,7 +45,7 @@ router.get('/verify', requirePermission(P.access_compliance), asyncHandler(async
  * GET legal journal entries (read-only for auditing)
  * GET /api/legal/journal/entries
  */
-router.get('/entries', requirePermission(P.access_compliance), asyncHandler(async (req, res) => {
+router.get('/entries', requireEstablishmentAdminOrPermission(P.access_compliance), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -83,7 +83,7 @@ router.get('/entries', requirePermission(P.access_compliance), asyncHandler(asyn
  * GET journal statistics
  * GET /api/legal/journal/stats
  */
-router.get('/stats', requirePermission(P.access_compliance), asyncHandler(async (req, res) => {
+router.get('/stats', requireEstablishmentAdminOrPermission(P.access_compliance), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {

@@ -28,9 +28,10 @@ export const ComplianceAlerts: React.FC<ComplianceAlertsProps> = ({
   complianceStatus,
   loading = false,
 }) => {
-  const hasErrors = complianceStatus.compliance_status.integrity_errors.length > 0;
-  const isCertified = complianceStatus.compliance_status.is_certified;
-  const journalIntegrity = complianceStatus.compliance_status.journal_integrity;
+  const integrityErrors = complianceStatus.compliance_status?.integrity_errors ?? [];
+  const hasErrors = integrityErrors.length > 0;
+  const isCertified = complianceStatus.compliance_status?.is_certified ?? false;
+  const journalIntegrity = complianceStatus.compliance_status?.journal_integrity ?? '';
 
   // Don't render if loading
   if (loading) {
@@ -49,7 +50,7 @@ export const ComplianceAlerts: React.FC<ComplianceAlertsProps> = ({
           </Typography>
           
           <List dense>
-            {complianceStatus.compliance_status.integrity_errors.map((error, index) => (
+            {integrityErrors.map((error, index) => (
               <ListItem key={index} sx={{ pl: 0 }}>
                 <ListItemIcon>
                   <Error color="error" fontSize="small" />
@@ -84,7 +85,7 @@ export const ComplianceAlerts: React.FC<ComplianceAlertsProps> = ({
           <AlertTitle>Certification NF 525 Requise</AlertTitle>
           <Typography variant="body2" sx={{ mb: 2 }}>
             Votre système de caisse doit être certifié NF 525 avant le{' '}
-            <strong>{complianceStatus.compliance_status.certification_required_by}</strong>
+            <strong>{complianceStatus.compliance_status?.certification_required_by ?? '—'}</strong>
           </Typography>
           
           <Box sx={{ mt: 2 }}>

@@ -3,7 +3,7 @@
  * Keeps the legacy JournalQueries API stable while implementations are split by concern.
  */
 
-import { JournalEntry, ClosureBulletin } from './types';
+import { JournalEntry, ClosureBulletin, ClosureType } from './types';
 import * as journalAppend from './journalAppend';
 import * as journalRead from './journalRead';
 import * as journalStats from './journalStats';
@@ -127,14 +127,14 @@ export class JournalQueries {
 
   static async getClosureBulletins(
     establishmentId: string,
-    type?: 'DAILY' | 'MONTHLY' | 'ANNUAL'
+    type?: ClosureType
   ): Promise<ClosureBulletin[]> {
     return await journalRead.getClosureBulletins(establishmentId, type);
   }
 
   static async getClosureBulletinsPaginated(
     establishmentId: string,
-    type?: 'DAILY' | 'MONTHLY' | 'ANNUAL',
+    type?: ClosureType,
     opts?: { limit?: number; offset?: number }
   ): Promise<{ bulletins: ClosureBulletin[]; total: number }> {
     return await journalRead.getClosureBulletinsPaginated(establishmentId, type, opts);

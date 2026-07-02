@@ -1,5 +1,5 @@
 import { pool } from '../../db/pool';
-import { JournalEntry, ClosureBulletin } from './types';
+import { JournalEntry, ClosureBulletin, ClosureType } from './types';
 import { Logger } from '../../utils/logger';
 
 function logParseFailure(message: string, error: unknown): void {
@@ -132,7 +132,7 @@ export async function getEntriesForOrder(establishmentId: string, orderId: numbe
 
 export async function getClosureBulletins(
   establishmentId: string,
-  type?: 'DAILY' | 'MONTHLY' | 'ANNUAL'
+  type?: ClosureType
 ): Promise<ClosureBulletin[]> {
   let query = 'SELECT * FROM closure_bulletins';
   const values: Array<string | number> = [];
@@ -172,7 +172,7 @@ export async function getClosureBulletins(
 
 export async function getClosureBulletinsPaginated(
   establishmentId: string,
-  type?: 'DAILY' | 'MONTHLY' | 'ANNUAL',
+  type?: ClosureType,
   opts?: { limit?: number; offset?: number }
 ): Promise<{ bulletins: ClosureBulletin[]; total: number }> {
   const values: Array<string | number> = [];
@@ -247,7 +247,7 @@ export async function getLastFondDeCaisse(establishmentId: string): Promise<numb
 }
 
 export async function closureBulletinExists(
-  type: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL',
+  type: ClosureType,
   startDate: Date,
   endDate: Date,
   establishmentId: string

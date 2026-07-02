@@ -5,6 +5,7 @@
 
 import express from 'express';
 import LegalJournalModel from '../../models/legalJournal';
+import type { ClosureType } from '../../models/legalJournal/types';
 import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
 import { P } from '../../permissions/registry';
 import { Logger } from '../../utils/logger';
@@ -462,7 +463,7 @@ router.get('/bulletins', asyncHandler(async (req, res) => {
       (limit != null && Number.isFinite(limit) && limit > 0) ||
       (offset != null && Number.isFinite(offset) && offset >= 0);
 
-    const closureType = type as 'DAILY' | 'MONTHLY' | 'ANNUAL' | undefined;
+    const closureType = type as ClosureType | undefined;
 
     if (shouldPaginate) {
       const { bulletins, total } = await LegalJournalModel.getClosureBulletinsPaginated(
