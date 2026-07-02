@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -14,7 +14,9 @@ import {
 import { Add as AddIcon, Remove as RemoveIcon, Category as DiversIcon } from '@mui/icons-material';
 import { alpha } from '@mui/material/styles';
 import type { Theme } from '@mui/material/styles';
+import { VirtuosoGrid } from 'react-virtuoso';
 import { Product, Category } from '../../types';
+import { useGridColumnCount } from '../../hooks/useGridColumnCount';
 
 interface ProductGridProps {
   products: Product[];
@@ -37,6 +39,9 @@ const ProductGrid = React.memo(function ProductGrid({
 }: ProductGridProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isLarge = useMediaQuery(theme.breakpoints.up('lg'));
+  const minColumnWidth = isMobile ? 190 : isLarge ? 230 : 220;
+  const { containerRef, columnCount } = useGridColumnCount(minColumnWidth);
 
   const categoryColorMap = useMemo(() => {
     const map: Record<string, string | undefined> = {};
@@ -46,35 +51,55 @@ const ProductGrid = React.memo(function ProductGrid({
     return map;
   }, [categories]);
 
-  const showEmpty = !onDiversClick && products.length === 0;
-  if (showEmpty) {
-    return (
-      <Box p={3} textAlign="center">
-        <Typography color="textSecondary">Aucun produit trouvé</Typography>
-      </Box>
-    );
-  }
+  const hasDiversSlot = Boolean(onDiversClick);
+  const totalCount = products.length + (hasDiversSlot ? 1 : 0);
 
-  return (
-    <Box
-      sx={{
-        display: 'grid',
-        gridTemplateColumns: {
-          xs: 'repeat(auto-fill, minmax(190px, 1fr))',
-          sm: 'repeat(auto-fill, minmax(210px, 1fr))',
-          md: 'repeat(auto-fill, minmax(220px, 1fr))',
-          lg: 'repeat(auto-fill, minmax(230px, 1fr))',
-        },
-        gap: 2,
-        alignItems: 'stretch',
-      }}
-    >
-      {onDiversClick && (
-        <DiversCard onAdd={onDiversClick} isMobile={isMobile} theme={theme} />
-      )}
-      {products.map(product => (
+  const gridComponents = useMemo(
+    () => ({
+      List: React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+        function ProductGridList({ style, children, ...props }, ref) {
+          return (
+            <Box
+              ref={ref}
+              component="div"
+              {...props}
+              style={style}
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
+                gap: 2,
+              }}
+            >
+              {children}
+            </Box>
+          );
+        }
+      ),
+      Item: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+        <Box
+          component="div"
+          {...props}
+          sx={{ minHeight: isMobile ? 160 : 200, display: 'flex', width: '100%' }}
+        >
+          {children}
+        </Box>
+      ),
+    }),
+    [columnCount, isMobile]
+  );
+
+  const renderGridItem = useCallback(
+    (index: number) => {
+      if (hasDiversSlot && index === 0) {
+        return <DiversCard onAdd={onDiversClick!} isMobile={isMobile} theme={theme} />;
+      }
+
+      const productIndex = hasDiversSlot ? index - 1 : index;
+      const product = products[productIndex];
+      if (!product) return null;
+
+      return (
         <ProductCard
-          key={product.id}
           product={product}
           categoryColor={categoryColorMap[product.categoryId]}
           isHappyHourActive={isHappyHourActive}
@@ -83,7 +108,39 @@ const ProductGrid = React.memo(function ProductGrid({
           formatCurrency={formatCurrency}
           isMobile={isMobile}
         />
-      ))}
+      );
+    },
+    [
+      hasDiversSlot,
+      onDiversClick,
+      isMobile,
+      theme,
+      products,
+      categoryColorMap,
+      isHappyHourActive,
+      onRequestAddProduct,
+      calculateProductPrice,
+      formatCurrency,
+    ]
+  );
+
+  if (totalCount === 0) {
+    return (
+      <Box p={3} textAlign="center">
+        <Typography color="textSecondary">Aucun produit trouvé</Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <Box ref={containerRef} sx={{ height: '100%', minHeight: 0 }}>
+      <VirtuosoGrid
+        style={{ height: '100%' }}
+        totalCount={totalCount}
+        overscan={240}
+        components={gridComponents}
+        itemContent={renderGridItem}
+      />
     </Box>
   );
 });
@@ -101,6 +158,7 @@ const DiversCard: React.FC<DiversCardProps> = ({ onAdd, isMobile, theme }) => {
   return (
     <Card
       sx={{
+        width: '100%',
         height: '100%',
         minHeight: isMobile ? 160 : 200,
         display: 'flex',
@@ -217,6 +275,7 @@ const ProductCard = React.memo(function ProductCard({
   return (
     <Card
       sx={{
+        width: '100%',
         height: '100%',
         minHeight: isMobile ? 160 : 200,
         position: 'relative',
