@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -56,7 +56,7 @@ interface OrderSummaryProps {
   formatCurrency: (amount: number) => string;
 }
 
-const OrderSummary: React.FC<OrderSummaryProps> = ({
+const OrderSummary = React.memo(function OrderSummary({
   currentOrder,
   orderTotal,
   orderTax,
@@ -73,7 +73,7 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
   onApplyPerso,
   onUpdateLineNote,
   formatCurrency,
-}) => {
+}: OrderSummaryProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [changeDialogOpen, setChangeDialogOpen] = useState(false);
@@ -122,6 +122,16 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
       setChangeAmount('');
     }
   };
+
+  const handleEditLineNote = useCallback(
+    (index: number) => {
+      const line = currentOrder[index];
+      if (!line) return;
+      setLineNoteDialog({ index, productName: line.productName });
+    },
+    [currentOrder]
+  );
+
   const handleConfirmChange = async () => {
     const parsed = parseFloat(changeAmount.replace(',', '.'));
     if (!Number.isFinite(parsed) || parsed <= 0) return;
@@ -186,15 +196,7 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
                   onApplyHappyHour={onApplyHappyHour}
                   onApplyOffert={onApplyOffert}
                   onApplyPerso={onApplyPerso}
-                  onEditLineNote={
-                    onUpdateLineNote
-                      ? (index) => {
-                          const line = currentOrder[index];
-                          if (!line) return;
-                          setLineNoteDialog({ index, productName: line.productName });
-                        }
-                      : undefined
-                  }
+                  onEditLineNote={onUpdateLineNote ? handleEditLineNote : undefined}
                 />
               ))}
             </List>
@@ -353,6 +355,6 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
       />
     </Card>
   );
-};
+});
 
 export default OrderSummary;

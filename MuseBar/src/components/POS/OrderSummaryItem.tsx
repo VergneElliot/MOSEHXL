@@ -17,7 +17,7 @@ interface OrderSummaryItemProps {
   onEditLineNote?: (index: number) => void;
 }
 
-const OrderSummaryItem: React.FC<OrderSummaryItemProps> = ({
+const OrderSummaryItem = React.memo(function OrderSummaryItem({
   item,
   index,
   isLast,
@@ -27,7 +27,7 @@ const OrderSummaryItem: React.FC<OrderSummaryItemProps> = ({
   onApplyOffert,
   onApplyPerso,
   onEditLineNote,
-}) => {
+}: OrderSummaryItemProps) {
   const lineNote = getLineNoteFromOptions(item.options);
   const lineActionButtonSx = {
     minWidth: 'auto',
@@ -143,7 +143,7 @@ const OrderSummaryItem: React.FC<OrderSummaryItemProps> = ({
       {!isLast && <Divider />}
     </>
   );
-};
+});
 
 export default OrderSummaryItem;
 
