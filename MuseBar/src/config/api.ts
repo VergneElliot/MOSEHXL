@@ -49,8 +49,8 @@ class ApiConfig {
       'http://localhost:3001',
       'http://127.0.0.1:3001',
     ];
-    if (process.env.REACT_APP_API_URL) {
-      possibleUrls.unshift(process.env.REACT_APP_API_URL);
+    if (import.meta.env.VITE_API_URL) {
+      possibleUrls.unshift(import.meta.env.VITE_API_URL);
     }
 
     for (const url of possibleUrls) {

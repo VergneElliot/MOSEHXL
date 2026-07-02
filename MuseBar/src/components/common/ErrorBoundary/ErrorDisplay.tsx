@@ -157,7 +157,7 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
           </Button>
         </Box>
 
-        {process.env.NODE_ENV === 'development' && errorInfo && (
+        {import.meta.env.DEV && errorInfo && (
           <Accordion sx={{ width: '100%', mt: 2 }}>
             <AccordionSummary
               expandIcon={<ExpandMoreIcon />}

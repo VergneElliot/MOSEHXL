@@ -19,8 +19,8 @@ let windowErrorHandler: ((event: ErrorEvent) => void) | null = null;
 let windowRejectionHandler: ((event: PromiseRejectionEvent) => void) | null = null;
 
 function isReportingEnabled(): boolean {
-  if (process.env.NODE_ENV === 'production') return true;
-  return Boolean(process.env.REACT_APP_REPORT_DEV_ERRORS);
+  if (import.meta.env.PROD) return true;
+  return Boolean(import.meta.env.VITE_REPORT_DEV_ERRORS);
 }
 
 function resolveSeverity(message: string): ClientErrorPayload['severity'] {
@@ -82,7 +82,7 @@ async function sendClientError(payload: ClientErrorPayload): Promise<void> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
-    const reportKey = process.env.REACT_APP_CLIENT_ERROR_REPORT_KEY;
+    const reportKey = import.meta.env.VITE_CLIENT_ERROR_REPORT_KEY;
     if (reportKey) {
       headers['x-client-error-key'] = reportKey;
     }

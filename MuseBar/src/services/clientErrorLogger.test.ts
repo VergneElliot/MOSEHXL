@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import {
   __resetClientErrorLoggerForTests,
   initializeClientErrorLogging,
@@ -5,35 +6,32 @@ import {
 } from './clientErrorLogger';
 import { apiConfig } from '../config/api';
 
-jest.mock('../config/api', () => ({
+vi.mock('../config/api', () => ({
   apiConfig: {
-    isReady: jest.fn(() => true),
-    initialize: jest.fn(async () => {}),
-    getEndpoint: jest.fn(() => 'http://localhost:3001/api/client-errors'),
+    isReady: vi.fn(() => true),
+    initialize: vi.fn(async () => {}),
+    getEndpoint: vi.fn(() => 'http://localhost:3001/api/client-errors'),
   },
 }));
 
-const mockedApiConfig = apiConfig as jest.Mocked<typeof apiConfig>;
+const mockedApiConfig = vi.mocked(apiConfig);
 
 describe('clientErrorLogger', () => {
-  const originalEnv = { ...process.env };
   const originalFetch = global.fetch;
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    (mockedApiConfig.isReady as jest.Mock).mockReturnValue(true);
-    (mockedApiConfig.initialize as jest.Mock).mockResolvedValue(undefined);
-    (mockedApiConfig.getEndpoint as jest.Mock).mockImplementation(
-      () => 'http://localhost:3001/api/client-errors'
-    );
-    process.env.REACT_APP_REPORT_DEV_ERRORS = 'true';
-    process.env.REACT_APP_CLIENT_ERROR_REPORT_KEY = 'frontend-test-key';
-    global.fetch = jest.fn(async () => ({ ok: true } as Response));
+    vi.clearAllMocks();
+    mockedApiConfig.isReady.mockReturnValue(true);
+    mockedApiConfig.initialize.mockResolvedValue(undefined);
+    mockedApiConfig.getEndpoint.mockImplementation(() => 'http://localhost:3001/api/client-errors');
+    vi.stubEnv('VITE_REPORT_DEV_ERRORS', 'true');
+    vi.stubEnv('VITE_CLIENT_ERROR_REPORT_KEY', 'frontend-test-key');
+    global.fetch = vi.fn(async () => ({ ok: true }) as Response);
   });
 
   afterEach(() => {
     __resetClientErrorLoggerForTests();
-    process.env = { ...originalEnv };
+    vi.unstubAllEnvs();
     global.fetch = originalFetch;
   });
 
@@ -55,7 +53,7 @@ describe('clientErrorLogger', () => {
   });
 
   it('patches console.error and reports emitted errors', async () => {
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     initializeClientErrorLogging();
 
     console.error('Console emitted error', new Error('console-failure'));
@@ -66,4 +64,3 @@ describe('clientErrorLogger', () => {
     consoleSpy.mockRestore();
   });
 });
-

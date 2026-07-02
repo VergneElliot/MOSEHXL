@@ -1,31 +1,32 @@
+import { vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useAuth } from '../useAuth';
 import { apiService, ApiService } from '../../services/apiService';
 import { apiConfig } from '../../config/api';
 
-jest.mock('../../services/apiService', () => ({
+vi.mock('../../services/apiService', () => ({
   apiService: {
-    post: jest.fn(),
-    get: jest.fn(),
+    post: vi.fn(),
+    get: vi.fn(),
   },
   ApiService: {
-    setToken: jest.fn(),
+    setToken: vi.fn(),
   },
 }));
 
-jest.mock('../../config/api', () => ({
+vi.mock('../../config/api', () => ({
   apiConfig: {
-    isReady: jest.fn(),
-    initialize: jest.fn(),
+    isReady: vi.fn(),
+    initialize: vi.fn(),
   },
 }));
 
 describe('useAuth refresh rememberMe behavior', () => {
-  const mockPost = apiService.post as jest.Mock;
-  const mockGet = apiService.get as jest.Mock;
-  const mockSetToken = ApiService.setToken as jest.Mock;
-  const mockIsReady = apiConfig.isReady as jest.Mock;
-  const mockInitialize = apiConfig.initialize as jest.Mock;
+  const mockPost = vi.mocked(apiService.post);
+  const mockGet = vi.mocked(apiService.get);
+  const mockSetToken = vi.mocked(ApiService.setToken);
+  const mockIsReady = vi.mocked(apiConfig.isReady);
+  const mockInitialize = vi.mocked(apiConfig.initialize);
 
   beforeEach(() => {
     localStorage.clear();
