@@ -3,7 +3,6 @@ import {
   Card,
   CardContent,
   Typography,
-  List,
   IconButton,
   Divider,
   Button,
@@ -25,6 +24,7 @@ import {
   SwapHoriz as ChangeIcon,
 } from '@mui/icons-material';
 import { OrderItem } from '../../types';
+import { Virtuoso } from 'react-virtuoso';
 import OrderSummaryItem from './OrderSummaryItem';
 import LineNoteDialog from './LineNoteDialog';
 import { getLineNoteFromOptions } from '../../utils/lineItemNote';
@@ -132,6 +132,37 @@ const OrderSummary = React.memo(function OrderSummary({
     [currentOrder]
   );
 
+  const renderOrderLine = useCallback(
+    (index: number) => {
+      const item = currentOrder[index];
+      if (!item) return null;
+
+      return (
+        <OrderSummaryItem
+          item={item}
+          index={index}
+          isLast={index === currentOrder.length - 1}
+          formatCurrency={formatCurrency}
+          onRemoveItem={onRemoveItem}
+          onApplyHappyHour={onApplyHappyHour}
+          onApplyOffert={onApplyOffert}
+          onApplyPerso={onApplyPerso}
+          onEditLineNote={onUpdateLineNote ? handleEditLineNote : undefined}
+        />
+      );
+    },
+    [
+      currentOrder,
+      formatCurrency,
+      onRemoveItem,
+      onApplyHappyHour,
+      onApplyOffert,
+      onApplyPerso,
+      onUpdateLineNote,
+      handleEditLineNote,
+    ]
+  );
+
   const handleConfirmChange = async () => {
     const parsed = parseFloat(changeAmount.replace(',', '.'));
     if (!Number.isFinite(parsed) || parsed <= 0) return;
@@ -171,7 +202,7 @@ const OrderSummary = React.memo(function OrderSummary({
           )}
         </Box>
 
-        <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+        <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
           {currentOrder.length === 0 ? (
             <Box
               display="flex"
@@ -184,22 +215,12 @@ const OrderSummary = React.memo(function OrderSummary({
               <Typography color="textSecondary">Aucun article sélectionné</Typography>
             </Box>
           ) : (
-            <List sx={{ py: 0 }}>
-              {currentOrder.map((item, index) => (
-                <OrderSummaryItem
-                  key={`${item.id}-${index}`}
-                  item={item}
-                  index={index}
-                  isLast={index === currentOrder.length - 1}
-                  formatCurrency={formatCurrency}
-                  onRemoveItem={onRemoveItem}
-                  onApplyHappyHour={onApplyHappyHour}
-                  onApplyOffert={onApplyOffert}
-                  onApplyPerso={onApplyPerso}
-                  onEditLineNote={onUpdateLineNote ? handleEditLineNote : undefined}
-                />
-              ))}
-            </List>
+            <Virtuoso
+              style={{ height: '100%' }}
+              totalCount={currentOrder.length}
+              overscan={200}
+              itemContent={renderOrderLine}
+            />
           )}
         </Box>
 

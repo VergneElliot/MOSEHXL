@@ -41,8 +41,9 @@
 |-------|-------|--------|-------------|
 | **5** | Performance baseline | **Done** | Report: `docs/reports/2026-06-24-pos-perf-baseline.md` |
 | **6** | React quick wins | **Done** | Main −82 KB gzip; lazy tabs + POS memo — patch 435–436 |
-| **6B** | POS hot-path runtime | **Done** | Batch cart, memo panels — patch 437–438; venue lag **not resolved** |
-| **7** | CRA → Vite | **Done** | Vite 6 + Vitest + TS 5.7 — patch 439–440 |
+| **6B** | POS hot-path runtime | **Done** | Batch cart, memo panels — patch 437–438 |
+| **6C** | POS virtualization | **Done** (local) | Virtuoso grid + order list — patch 441–442 |
+| **7** | CRA → Vite | **Done** | Vite 6 + legacy — patch 439–440, `3b986b1` |
 | **8** | SvelteKit migration | **Not started** | After Phase 7 venue lag gate |
 | **9** | Backend perf / deploy ergonomics | **Not started** | Conditional on on-site API latency |
 
@@ -215,9 +216,21 @@ Targets per-tap / per-keypress main-thread work after Phase 6 bundle wins proved
 3. **Isolated memo panels** — `POSMenuPanel` / `POSOrderPanel` skip re-render when sibling subtree props unchanged.
 4. **Stable POS state + order list memo** — `useCallback` actions; `React.memo` on `OrderSummary` / `OrderSummaryItem`.
 
-**Deferred:** product grid virtualization (Phase 6C) — measure after venue deploy.
+**Deferred:** further MUI trimming on hot path — measure after 6C venue deploy.
 
-**Decision gate:** subjective feel on DISH cashier PC; if still laggy → virtualization and/or Phase 7 (Vite), then Phase 8 if needed.
+**Decision gate:** subjective feel on DISH cashier PC with large cart; if still laggy → Phase 8 (SvelteKit POS).
+
+---
+
+### Phase 6C — POS list virtualization (P1) — effort: S–M, low risk
+
+**Status:** **Complete 2026-07-02** (local) — see patch notes 441–442.
+
+1. **Product grid** — `react-virtuoso` `VirtuosoGrid` with responsive columns; Divers in grid slot 0.
+2. **Order list** — `Virtuoso` for cart lines; payment footer stays fixed below scroll region.
+3. **Layout** — menu panel passes fixed height into virtualized regions.
+
+**Venue gate:** pending deploy + large-cart test on DISH PC.
 
 ---
 

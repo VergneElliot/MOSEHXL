@@ -47,7 +47,7 @@ const POSMenuPanel = React.memo(function POSMenuPanel({
           onSearchChange={onSearchChange}
         />
       </Box>
-      <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+      <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <ProductGrid
           products={filteredProducts}
           categories={categories}
