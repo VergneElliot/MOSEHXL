@@ -14,10 +14,10 @@
 
 ## Pause checkpoint (2026-07-01)
 
-**Status:** Track A **complete**. Resume **Track B** (performance) from Phase 5.
+**Status:** Track A **complete**. Phase 5 **complete**. Resume **Track B** at Phase 6.
 
-**Last completed patch note:** `432-CLEANUP-PHASE4F-PRINTING-ROUTES-MODULARIZATION-IMPLEMENTATION.md`  
-**Self-cert pause record:** `docs/legal/self-certification/00-PAUSE-CHECKPOINT.md`
+**Last completed patch note:** `434-CLEANUP-PHASE5-POS-PERF-BASELINE-IMPLEMENTATION.md`  
+**Baseline report:** `docs/reports/2026-06-24-pos-perf-baseline.md`
 
 ### Completed at pause (Track A)
 
@@ -39,13 +39,13 @@
 
 | Phase | Title | Status | Next action |
 |-------|-------|--------|-------------|
-| **5** | Performance baseline | **Not started** | Profile on real POS device; deliverable `docs/reports/2026-06-24-pos-perf-baseline.md` |
-| **6** | React quick wins | **Not started** | Blocked on Phase 5 numbers |
+| **5** | Performance baseline | **Done** | Report: `docs/reports/2026-06-24-pos-perf-baseline.md` |
+| **6** | React quick wins | **Not started** | Lazy-load non-POS tabs; POS memoization — see baseline §5 |
 | **7** | CRA → Vite | **Not started** | After Phase 6 decision gate |
 | **8** | SvelteKit migration | **Not started** | Conditional on 5–6 |
-| **9** | Backend perf / deploy ergonomics | **Not started** | Conditional on 5; Pi bridge kit in progress operationally |
+| **9** | Backend perf / deploy ergonomics | **Not started** | Conditional on on-site API latency |
 
-**Recommended resume order:** 5 → 6 → [lag gate] → 7 → 8 → 9.
+**Recommended resume order:** 6 → [lag gate] → 7 → 8 → 9. Fill on-site table in baseline report §4 when testing on venue hardware.
 
 ### Self-certification (parallel, also paused)
 
@@ -172,7 +172,7 @@ The codebase is architecturally strong and fiscally aligned (CGI Art. 286-I-3 bi
 
 ### Phase 5 — Establish a performance baseline (P1) — effort: S
 
-**Status:** Not started (paused 2026-07-01).
+**Status:** Done on 2026-07-02. See `docs/patch-notes/434-CLEANUP-PHASE5-POS-PERF-BASELINE-IMPLEMENTATION.md` and `docs/reports/2026-06-24-pos-perf-baseline.md`.
 
 **Goal:** stop guessing. Capture real numbers on the actual POS device before changing anything.
 
