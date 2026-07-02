@@ -4,8 +4,8 @@
  */
 
 import express from 'express';
-import LegalJournalModel from '../../models/legalJournal';
-import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
+import LegalJournalModel, { JournalQueries } from '../../models/legalJournal';
+import { getEstablishmentId, requireAuth, requireEstablishmentAdminOrPermission } from '../auth';
 import { AppError, asyncHandler, ValidationError } from '../../middleware/errorHandler';
 import { Logger } from '../../utils/logger';
 import { P } from '../../permissions/registry';
@@ -20,27 +20,62 @@ router.use(requireAuth);
  * GET compliance status
  * GET /api/legal/compliance/status
  */
-router.get('/status', requirePermission(P.access_compliance), asyncHandler(async (req, res) => {
+router.get('/status', requireEstablishmentAdminOrPermission(P.access_compliance), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
     const integrity = await LegalJournalModel.verifyJournalIntegrity(establishmentId);
-    
-    // Get recent closures
+    const stats = await JournalQueries.getJournalStatsSummary(establishmentId);
+
     const recentClosures = await LegalJournalModel.getClosureBulletins(establishmentId, 'DAILY');
     const today = new Date();
     const todayClosure = recentClosures.find(bulletin => {
       const bulletinDate = new Date(bulletin.period_start);
       return bulletinDate.toDateString() === today.toDateString();
     });
-    
+
+    const integrityErrors = Array.isArray(integrity.errors) ? integrity.errors : [];
+    const journalIntegrityLabel = integrity.isValid
+      ? 'valide'
+      : integrityErrors.length > 0
+        ? 'erreur'
+        : 'avertissement';
+
+    const firstEntry = stats.first_entry_date;
+    const lastEntry = stats.last_entry_date;
+
     res.json({
-      compliance_status: integrity.isValid ? 'COMPLIANT' : 'NON_COMPLIANT',
-      journal_integrity: integrity.isValid,
-      integrity_errors: integrity.errors,
+      compliance_status: {
+        journal_integrity: journalIntegrityLabel,
+        certification_required_by: '2026-12-31',
+        is_certified: false,
+        integrity_errors: integrityErrors,
+      },
+      journal_statistics: {
+        total_entries: Number(stats.total_entries ?? 0),
+        total_transactions: Number(stats.sales_count ?? 0),
+        first_entry:
+          firstEntry instanceof Date
+            ? firstEntry.toISOString()
+            : firstEntry
+              ? new Date(String(firstEntry)).toISOString()
+              : null,
+        last_entry:
+          lastEntry instanceof Date
+            ? lastEntry.toISOString()
+            : lastEntry
+              ? new Date(String(lastEntry)).toISOString()
+              : null,
+      },
+      isca_pillars: {
+        inaltérabilité: integrity.isValid ? 'Journal chaîné — actif' : 'Vérification requise',
+        sécurisation: 'Traçabilité utilisateur active',
+        conservation: 'Données conservées (6 ans)',
+        archivage: 'Exports d\'archive disponibles',
+      },
+      legal_reference: 'Article 286-I-3 bis du CGI',
+      checked_at: new Date().toISOString(),
       daily_closure_status: todayClosure ? 'COMPLETED' : 'PENDING',
-      fiscal_requirements: 'Article 286-I-3 bis du CGI',
-      verified_at: new Date().toISOString()
     });
   } catch (error: unknown) {
     logger.error(
@@ -56,7 +91,7 @@ router.get('/status', requirePermission(P.access_compliance), asyncHandler(async
  * GET compliance report
  * GET /api/legal/compliance/report
  */
-router.get('/report', requirePermission(P.access_compliance), asyncHandler(async (req, res) => {
+router.get('/report', requireEstablishmentAdminOrPermission(P.access_compliance), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -127,7 +162,7 @@ router.get('/report', requirePermission(P.access_compliance), asyncHandler(async
  * GET regulatory requirements
  * GET /api/legal/compliance/requirements
  */
-router.get('/requirements', requirePermission(P.access_compliance), asyncHandler(async (_req, res) => {
+router.get('/requirements', requireEstablishmentAdminOrPermission(P.access_compliance), asyncHandler(async (_req, res) => {
   try {
     res.json({
       requirements: [

@@ -63,8 +63,8 @@ export const useCompliance = (): UseComplianceReturn => {
 
   const loadJournalEntries = useCallback(async () => {
     try {
-      const response = await apiService.get<JournalEntry[]>('/legal/journal/entries');
-      setState(prev => ({ ...prev, journalEntries: response.data }));
+      const response = await apiService.get<{ entries: JournalEntry[] }>('/legal/journal/entries');
+      setState(prev => ({ ...prev, journalEntries: response.data.entries ?? [] }));
     } catch {
       // Journal entries are non-critical; swallow to avoid blocking UI
     }

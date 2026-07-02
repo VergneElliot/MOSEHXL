@@ -96,4 +96,64 @@ export class AuditTrailModel {
     const result = await pool.query(query, values);
     return result.rows as AuditEntry[];
   }
+
+  static async getEstablishmentAuditTrail(
+    establishmentId: string,
+    opts: {
+      user_id?: string;
+      action_type?: string;
+      resource_type?: string;
+      start?: string;
+      end?: string;
+      limit?: number;
+      offset?: number;
+    } = {}
+  ): Promise<{ entries: AuditEntry[]; total: number }> {
+    const conditions = ['establishment_id = $1'];
+    const values: unknown[] = [establishmentId];
+
+    if (opts.user_id) {
+      values.push(opts.user_id);
+      conditions.push(`user_id = $${values.length}`);
+    }
+    if (opts.action_type) {
+      values.push(opts.action_type);
+      conditions.push(`action_type = $${values.length}`);
+    }
+    if (opts.resource_type) {
+      values.push(opts.resource_type);
+      conditions.push(`resource_type = $${values.length}`);
+    }
+    if (opts.start) {
+      values.push(opts.start);
+      conditions.push(`"timestamp" >= $${values.length}::date`);
+    }
+    if (opts.end) {
+      values.push(opts.end);
+      conditions.push(`"timestamp" < ($${values.length}::date + interval '1 day')`);
+    }
+
+    const where = conditions.join(' AND ');
+    const countResult = await pool.query(
+      `SELECT COUNT(*)::int AS total FROM audit_trail WHERE ${where}`,
+      values
+    );
+    const total = countResult.rows[0]?.total ?? 0;
+
+    const limit = opts.limit != null && opts.limit > 0 ? opts.limit : 25;
+    const offset = opts.offset != null && opts.offset >= 0 ? opts.offset : 0;
+    const pageValues = [...values, limit, offset];
+
+    const result = await pool.query(
+      `SELECT id, establishment_id, user_id, action_type, resource_type, resource_id,
+              action_details, ip_address, user_agent, session_id, "timestamp"
+       FROM audit_trail
+       WHERE ${where}
+       ORDER BY "timestamp" DESC, id DESC
+       LIMIT $${pageValues.length - 1} OFFSET $${pageValues.length}`,
+      pageValues
+    );
+
+    return { entries: result.rows as AuditEntry[], total };
+  }
 }

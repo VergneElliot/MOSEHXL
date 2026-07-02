@@ -86,8 +86,10 @@ interface TabConfig {
   permission?: PermissionName;
   /** Only establishment_admin (e.g. security journal). */
   adminOnly?: boolean;
-  /** Tab visible to any logged-in establishment user (e.g. Historique, Conformité légale). */
+  /** Tab visible to any logged-in establishment user (e.g. Historique). */
   establishmentWide?: boolean;
+  /** Visible to establishment_admin even without explicit permission (production explicit_only mode). */
+  establishmentAdminAlways?: boolean;
 }
 
 const AppRouter: React.FC<AppRouterProps> = ({
@@ -127,7 +129,8 @@ const AppRouter: React.FC<AppRouterProps> = ({
       label: 'Conformité Légale',
       icon: <GavelIcon />,
       value: 'compliance',
-      establishmentWide: true,
+      permission: PERMISSIONS.access_compliance,
+      establishmentAdminAlways: true,
     },
     {
       label: 'Bulletins de Clôture',
@@ -143,6 +146,9 @@ const AppRouter: React.FC<AppRouterProps> = ({
     if (tab.adminOnly) return user?.role === 'establishment_admin';
     if (tab.establishmentWide) {
       return !!user?.establishment_id;
+    }
+    if (tab.establishmentAdminAlways && user?.role === 'establishment_admin') {
+      return true;
     }
     if (tab.value === 'user_management') {
       return (

@@ -37,8 +37,8 @@ export const ComplianceOverview: React.FC<ComplianceOverviewProps> = ({
   onViewClosures,
   loading = false,
 }) => {
-  const getIntegrityStatusIcon = (status: string) => {
-    switch (status.toLowerCase()) {
+  const getIntegrityStatusIcon = (status: string | undefined) => {
+    switch ((status ?? '').toLowerCase()) {
       case 'valide':
       case 'valid':
         return <Security color="success" />;
@@ -53,8 +53,8 @@ export const ComplianceOverview: React.FC<ComplianceOverviewProps> = ({
     }
   };
 
-  const getIntegrityStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
+  const getIntegrityStatusColor = (status: string | undefined) => {
+    switch ((status ?? '').toLowerCase()) {
       case 'valide':
       case 'valid':
         return 'success';
@@ -95,29 +95,29 @@ export const ComplianceOverview: React.FC<ComplianceOverviewProps> = ({
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
               <Chip
                 icon={getIntegrityStatusIcon(
-                  complianceStatus.compliance_status.journal_integrity
+                  complianceStatus.compliance_status?.journal_integrity
                 )}
-                label={`Intégrité: ${complianceStatus.compliance_status.journal_integrity}`}
+                label={`Intégrité: ${complianceStatus.compliance_status?.journal_integrity ?? '—'}`}
                 color={
                   getIntegrityStatusColor(
-                    complianceStatus.compliance_status.journal_integrity
+                    complianceStatus.compliance_status?.journal_integrity
                   ) as 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning'
                 }
                 variant="outlined"
               />
             </Box>
 
-            {!complianceStatus.compliance_status.is_certified && (
+            {!complianceStatus.compliance_status?.is_certified && (
               <Alert severity="warning" sx={{ mb: 2 }}>
                 <AlertTitle>Certification Requise</AlertTitle>
                 Certification obligatoire avant le{' '}
-                {complianceStatus.compliance_status.certification_required_by}
+                {complianceStatus.compliance_status?.certification_required_by ?? '—'}
                 <br />
                 Contactez votre prestataire pour la certification NF 525.
               </Alert>
             )}
 
-            {complianceStatus.compliance_status.is_certified && (
+            {complianceStatus.compliance_status?.is_certified && (
               <Alert severity="success" sx={{ mb: 2 }}>
                 <AlertTitle>Système Certifié</AlertTitle>
                 Votre système de caisse est conforme NF 525 et certifié pour la loi anti-fraude.
@@ -159,7 +159,7 @@ export const ComplianceOverview: React.FC<ComplianceOverviewProps> = ({
 
             <Box sx={{ mb: 2 }}>
               <Typography variant="h4" color="primary" sx={{ mb: 1 }}>
-                {complianceStatus.journal_statistics.total_entries.toLocaleString()}
+                {complianceStatus.journal_statistics?.total_entries?.toLocaleString() ?? '0'}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Entrées totales dans le journal légal
@@ -168,7 +168,7 @@ export const ComplianceOverview: React.FC<ComplianceOverviewProps> = ({
 
             <Box sx={{ mb: 2 }}>
               <Typography variant="h5" color="secondary" sx={{ mb: 1 }}>
-                {complianceStatus.journal_statistics.total_transactions.toLocaleString()}
+                {complianceStatus.journal_statistics?.total_transactions?.toLocaleString() ?? '0'}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Transactions enregistrées
@@ -177,13 +177,13 @@ export const ComplianceOverview: React.FC<ComplianceOverviewProps> = ({
 
             <Typography variant="body2" color="text.secondary">
               <strong>Première entrée:</strong>{' '}
-              {complianceStatus.journal_statistics.first_entry
+              {complianceStatus.journal_statistics?.first_entry
                 ? formatDate(complianceStatus.journal_statistics.first_entry)
                 : 'Aucune'}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               <strong>Dernière entrée:</strong>{' '}
-              {complianceStatus.journal_statistics.last_entry
+              {complianceStatus.journal_statistics?.last_entry
                 ? formatDate(complianceStatus.journal_statistics.last_entry)
                 : 'Aucune'}
             </Typography>
@@ -210,7 +210,7 @@ export const ComplianceOverview: React.FC<ComplianceOverviewProps> = ({
                   <Lock color="primary" sx={{ fontSize: 40, mb: 1 }} />
                   <Typography variant="h6">Inaltérabilité</Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {complianceStatus.isca_pillars.inaltérabilité}
+                    {complianceStatus.isca_pillars?.inaltérabilité ?? '—'}
                   </Typography>
                 </Box>
               </Grid>
@@ -220,7 +220,7 @@ export const ComplianceOverview: React.FC<ComplianceOverviewProps> = ({
                   <Security color="primary" sx={{ fontSize: 40, mb: 1 }} />
                   <Typography variant="h6">Sécurisation</Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {complianceStatus.isca_pillars.sécurisation}
+                    {complianceStatus.isca_pillars?.sécurisation ?? '—'}
                   </Typography>
                 </Box>
               </Grid>
@@ -230,7 +230,7 @@ export const ComplianceOverview: React.FC<ComplianceOverviewProps> = ({
                   <Receipt color="primary" sx={{ fontSize: 40, mb: 1 }} />
                   <Typography variant="h6">Conservation</Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {complianceStatus.isca_pillars.conservation}
+                    {complianceStatus.isca_pillars?.conservation ?? '—'}
                   </Typography>
                 </Box>
               </Grid>
@@ -240,7 +240,7 @@ export const ComplianceOverview: React.FC<ComplianceOverviewProps> = ({
                   <Archive color="primary" sx={{ fontSize: 40, mb: 1 }} />
                   <Typography variant="h6">Archivage</Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {complianceStatus.isca_pillars.archivage}
+                    {complianceStatus.isca_pillars?.archivage ?? '—'}
                   </Typography>
                 </Box>
               </Grid>

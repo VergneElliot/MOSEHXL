@@ -357,14 +357,14 @@ export class ClosureOperations {
    */
   static async getClosureBulletins(
     establishmentId: string,
-    type?: 'DAILY' | 'MONTHLY' | 'ANNUAL'
+    type?: ClosureType
   ): Promise<ClosureBulletin[]> {
     return await JournalQueries.getClosureBulletins(establishmentId, type);
   }
 
   static async getClosureBulletinsPaginated(
     establishmentId: string,
-    type?: 'DAILY' | 'MONTHLY' | 'ANNUAL',
+    type?: ClosureType,
     opts?: { limit?: number; offset?: number }
   ): Promise<{ bulletins: ClosureBulletin[]; total: number }> {
     return await JournalQueries.getClosureBulletinsPaginated(establishmentId, type, opts);
