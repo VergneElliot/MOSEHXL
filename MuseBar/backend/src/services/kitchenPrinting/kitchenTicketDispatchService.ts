@@ -6,7 +6,7 @@ import {
   allocateKitchenTicketDayNumber,
   getKitchenTicketDayNumberForOrder,
 } from './kitchenTicketDayNumberService';
-import { groupKitchenTicketLinesByPrinter, type KitchenDispatchOrderItem } from './kitchenTicketGrouping';
+import { groupKitchenTicketLinesByPrinter, consolidateKitchenTicketLinesForPrint, type KitchenDispatchOrderItem } from './kitchenTicketGrouping';
 import {
   renderCustomerOrderNumberTicket,
   renderKitchenOrderTicket,
@@ -115,12 +115,13 @@ export async function dispatchKitchenTicketsForCompletedOrder(
   }
 
   for (const group of groups) {
+    const printLines = consolidateKitchenTicketLinesForPrint(group.lines);
     try {
       const payload = renderKitchenOrderTicket({
         ticketDayNumber: ticketDayNumber ?? input.order.id,
         createdAt: input.order.created_at,
         printerName: group.printer.name,
-        lines: group.lines,
+        lines: printLines,
       });
       const job = await createBridgePrintJob(pool, {
         establishmentId: input.establishmentId,
@@ -135,10 +136,11 @@ export async function dispatchKitchenTicketsForCompletedOrder(
           order_id: input.order.id,
           kitchen_ticket_day_number: ticketDayNumber ?? undefined,
           ticket_kind: 'order',
-          lines: group.lines.map((line) => ({
+          lines: printLines.map((line) => ({
             quantity: line.quantity,
             product_name: line.product_name,
             options: line.options,
+            option_variants: line.option_variants,
           })),
         },
       });
@@ -191,13 +193,14 @@ export async function dispatchKitchenTicketsForCancellation(
   const displayNumber = ticketDayNumber ?? input.originalOrderId;
 
   for (const group of groups) {
+    const printLines = consolidateKitchenTicketLinesForPrint(group.lines);
     try {
       const payload = renderKitchenCancellationTicket({
         ticketDayNumber: displayNumber,
         createdAt,
         printerName: group.printer.name,
         cancellationType: input.cancellationType,
-        lines: group.lines,
+        lines: printLines,
       });
       const job = await createBridgePrintJob(pool, {
         establishmentId: input.establishmentId,
@@ -214,10 +217,11 @@ export async function dispatchKitchenTicketsForCancellation(
           ...(ticketDayNumber != null ? { kitchen_ticket_day_number: ticketDayNumber } : {}),
           ticket_kind: 'cancellation',
           cancellation_type: input.cancellationType,
-          lines: group.lines.map((line) => ({
+          lines: printLines.map((line) => ({
             quantity: line.quantity,
             product_name: line.product_name,
             options: line.options,
+            option_variants: line.option_variants,
           })),
         },
       });

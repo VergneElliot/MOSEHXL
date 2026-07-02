@@ -5,6 +5,7 @@
  */
 
 import type { ClosureBulletinData, ReceiptData } from './types';
+import { groupReceiptLineItemsForPrint } from '../../printing/printLineGrouping';
 
 const EPOS_NS = 'http://www.epson-pos.com/schemas/2012/06/epos-print';
 
@@ -61,7 +62,7 @@ export function receiptToEposPrintXml(data: ReceiptData): string {
 
   if (data.items && data.items.length > 0 && data.receipt_type === 'detailed') {
     lines.push(line('ARTICLES:'));
-    for (const item of data.items) {
+    for (const item of groupReceiptLineItemsForPrint(data.items)) {
       lines.push(
         line(
           `${item.product_name} x${item.quantity}  ${money(item.total_price)}`

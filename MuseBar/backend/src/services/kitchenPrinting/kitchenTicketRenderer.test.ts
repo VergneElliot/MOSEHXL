@@ -55,4 +55,27 @@ describe('kitchenTicketRenderer', () => {
     expect(ticket).toContain('1x Entrecote');
     expect(ticket).toContain('Cuisson: Bien cuit');
   });
+
+  it('renders grouped option variants under a single product header', () => {
+    const ticket = renderKitchenOrderTicket({
+      ticketDayNumber: 7,
+      createdAt: '2026-07-01T14:30:00.000Z',
+      printerName: 'Cuisine',
+      lines: [
+        {
+          quantity: 3,
+          product_name: 'Tartine',
+          options: [],
+          option_variants: [
+            { quantity: 1, options: [{ group_name: 'Cuisson', choice_label: 'Bien cuit' }] },
+            { quantity: 2, options: [{ group_name: 'Cuisson', choice_label: 'A point' }] },
+          ],
+        },
+      ],
+    });
+
+    expect(ticket).toContain('3x Tartine');
+    expect(ticket).toContain('1x Bien cuit');
+    expect(ticket).toContain('2x A point');
+  });
 });

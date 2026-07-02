@@ -46,13 +46,39 @@ function formatOptionLine(option: KitchenTicketLine['options'][number]): string 
   return null;
 }
 
+function formatVariantLabel(options: KitchenTicketLine['options']): string {
+  const parts: string[] = [];
+  for (const option of options) {
+    const freeText = option.free_text?.trim();
+    if (freeText) {
+      parts.push(freeText);
+      continue;
+    }
+    const choice = option.choice_label?.trim();
+    if (choice) {
+      parts.push(choice);
+      continue;
+    }
+    const group = option.group_name?.trim();
+    if (group) parts.push(group);
+  }
+  return parts.join(', ');
+}
+
 function appendKitchenLineItems(parts: string[], lines: KitchenTicketLine[]): void {
   parts.push(ESC_POS.BOLD_ON, ESC_POS.DOUBLE_SIZE);
   for (const line of lines) {
     parts.push(`${line.quantity}x ${normalizeThermalText(line.product_name)}`);
-    for (const option of line.options) {
-      const rendered = formatOptionLine(option);
-      if (rendered) parts.push(normalizeThermalText(rendered));
+    if (line.option_variants?.length) {
+      for (const variant of line.option_variants) {
+        const label = formatVariantLabel(variant.options) || 'Classique';
+        parts.push(normalizeThermalText(`  ${variant.quantity}x ${label}`));
+      }
+    } else {
+      for (const option of line.options) {
+        const rendered = formatOptionLine(option);
+        if (rendered) parts.push(normalizeThermalText(rendered));
+      }
     }
     parts.push('');
   }

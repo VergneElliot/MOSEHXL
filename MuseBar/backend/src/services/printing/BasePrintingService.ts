@@ -9,6 +9,7 @@ import {
   ESC_POS 
 } from './types';
 import { formatEuroAmount } from '../../utils/formatCurrency';
+import { groupReceiptLineItemsForPrint } from '../../printing/printLineGrouping';
 
 function normalizeThermalText(content: string): string {
   const replaced = content
@@ -155,7 +156,7 @@ export abstract class BasePrintingService implements IPrintingService {
     if (data.items && data.receipt_type === 'detailed') {
       content += ESC_POS.BOLD_ON + 'ARTICLES\n' + ESC_POS.BOLD_OFF;
       
-      for (const item of data.items) {
+      for (const item of groupReceiptLineItemsForPrint(data.items)) {
         const itemLine = `${item.product_name} (${item.quantity} x ${formatEuroAmount(item.unit_price, 'EUR')})`;
         const totalLine = formatEuroAmount(item.total_price, 'EUR');
         content += this.padLine(itemLine, totalLine, 32) + '\n';
