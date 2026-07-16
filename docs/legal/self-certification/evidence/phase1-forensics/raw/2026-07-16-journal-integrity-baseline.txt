@@ -1,0 +1,74 @@
+SET
+BEGIN
+### A. Journal overview
+           establishment_id           | entries | min_seq | max_seq |        first_entry        |         last_entry         
+--------------------------------------+---------+---------+---------+---------------------------+----------------------------
+ ce1b61b1-10e7-430c-97aa-69297fafb780 |   21284 |       1 |   21284 | 2025-07-17 16:12:27.58+00 | 2026-07-16 16:54:29.024+00
+(1 row)
+
+### B. Sequence gaps and chain-link breaks
+ sequence_number | prior_seq | seq_ok | link_ok |          timestamp           
+-----------------+-----------+--------+---------+------------------------------
+             609 |       608 | t      | f       | 2025-07-30 10:12:25.81108+00
+(1 row)
+
+### C. Non-SHA marker entries (full)
+ sequence_number | transaction_type |                          previous_hash                           |                           current_hash                           |                                                                                                                                                                                                                                                                                                                                                                                  transaction_data                                                                                                                                                                                                                                                                                                                                                                                  |    register_id    |           timestamp           |          created_at           
+-----------------+------------------+------------------------------------------------------------------+------------------------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-------------------+-------------------------------+-------------------------------
+             608 | CORRECTION       | 99f0df35d11ec3265b73a5e362e69b7fbda16258eca075e5fdc75bc5813ae745 | MIGRATION_DOCUMENTED_CHAIN_VALID                                 | {"reason": "Production deployment migration - hash chain reconstruction", "hash_status": "CHAIN_RECONSTRUCTED_POST_MIGRATION", "legal_basis": "Article 286-I-3 bis du CGI - Digital preservation requirements", "data_integrity": "VERIFIED - All business transactions and amounts preserved", "migration_date": "2025-07-30", "business_impact": "NONE - All transaction data preserved and accurate", "compliance_note": "Full audit trail maintained - migration documented for legal compliance", "correction_type": "DATABASE_MIGRATION", "affected_sequences": "1-607"}                                                                                                                                                                                                     | SYSTEM-MIGRATION  | 2025-07-30 10:00:20.629403+00 | 2025-07-30 10:00:20.629403+00
+             609 | ARCHIVE          | 0000000000000000000000000000000000000000000000000000000000000000 | CHECKPOINT_MIGRATION_BASELINE                                    | {"legal_basis": "Article 286-I-3 bis du CGI", "archive_type": "MIGRATION_CHECKPOINT", "migration_date": "2025-07-30", "compliance_note": "New hash chain begins from this checkpoint - historical data maintained for audit", "checkpoint_reason": "Production migration - establishing verified baseline", "historical_entries": "1-607", "historical_data_status": "PRESERVED_AND_DOCUMENTED", "integrity_from_sequence": "609"}                                                                                                                                                                                                                                                                                                                                                 | SYSTEM-CHECKPOINT | 2025-07-30 10:12:25.81108+00  | 2025-07-30 10:12:25.81108+00
+             610 | SALE             | CHECKPOINT_MIGRATION_BASELINE                                    | 35b3c12ff4fd66e75e30a9e75b830fb73e4001c6d56d35304f891e8f3fb28109 | {"items": [{"id": 1494, "order_id": 754, "quantity": 1, "tax_rate": "0.20", "created_at": "2025-07-30T15:17:59.132Z", "product_id": 39, "tax_amount": "1.08", "unit_price": "6.50", "description": null, "sub_bill_id": null, "total_price": "6.50", "product_name": "IPA", "happy_hour_applied": true, "happy_hour_discount_amount": "0.00"}, {"id": 1495, "order_id": 754, "quantity": 1, "tax_rate": "0.20", "created_at": "2025-07-30T15:17:59.137Z", "product_id": 55, "tax_amount": "0.75", "unit_price": "4.50", "description": null, "sub_bill_id": null, "total_price": "4.50", "product_name": "Rouge", "happy_hour_applied": false, "happy_hour_discount_amount": "0.00"}], "order_id": 754, "timestamp": "2025-07-30T15:17:59.126Z", "register_id": "MUSEBAR-REG-001"} | MUSEBAR-REG-001   | 2025-07-30 13:17:59.149+00    | 2025-07-30 13:17:59.147992+00
+(3 rows)
+
+### D. Rows around migration splice (604-613)
+ sequence_number | transaction_type | amount  | vat_amount | payment_method |           timestamp           |          created_at           |      prev16      |      curr16      
+-----------------+------------------+---------+------------+----------------+-------------------------------+-------------------------------+------------------+------------------
+             604 | SALE             | 11.0000 |     1.8300 | card           | 2025-07-29 20:40:57.988+00    | 2025-07-29 20:40:57.988778+00 | c45ab8222a77b191 | 7357599cde3187e4
+             605 | SALE             | 18.0000 |     3.0000 | card           | 2025-07-29 20:56:52.315+00    | 2025-07-29 20:56:52.316099+00 | 7357599cde3187e4 | d39d690dd74576cb
+             606 | SALE             | 23.5000 |     3.9200 | card           | 2025-07-29 21:02:24.453+00    | 2025-07-29 21:02:24.453848+00 | d39d690dd74576cb | 7ea00db3b932d159
+             607 | SALE             |  8.0000 |     1.3300 | card           | 2025-07-29 21:10:23.992+00    | 2025-07-29 21:10:23.992923+00 | 7ea00db3b932d159 | 99f0df35d11ec326
+             608 | CORRECTION       |  0.0000 |     0.0000 | SYSTEM         | 2025-07-30 10:00:20.629403+00 | 2025-07-30 10:00:20.629403+00 | 99f0df35d11ec326 | MIGRATION_DOCUME
+             609 | ARCHIVE          |  0.0000 |     0.0000 | SYSTEM         | 2025-07-30 10:12:25.81108+00  | 2025-07-30 10:12:25.81108+00  | 0000000000000000 | CHECKPOINT_MIGRA
+             610 | SALE             | 11.0000 |     1.8300 | card           | 2025-07-30 13:17:59.149+00    | 2025-07-30 13:17:59.147992+00 | CHECKPOINT_MIGRA | 35b3c12ff4fd66e7
+             611 | SALE             |  9.5000 |     1.5800 | card           | 2025-07-30 13:44:37.307+00    | 2025-07-30 13:44:37.303222+00 | 35b3c12ff4fd66e7 | d2aca84c420386c5
+             612 | SALE             | 13.0000 |     2.1700 | card           | 2025-07-30 13:53:40.644+00    | 2025-07-30 13:53:40.639212+00 | d2aca84c420386c5 | a44001e7963770b5
+             613 | SALE             | 13.0000 |     2.1700 | card           | 2025-07-30 14:05:14.95+00     | 2025-07-30 14:05:14.943832+00 | a44001e7963770b5 | 9fd145b421d67692
+(10 rows)
+
+### E. Hash recomputation with CURRENT trigger format, bucketed by month
+         month          | entries | pass | fail 
+------------------------+---------+------+------
+ 2025-07-01 00:00:00+00 |     781 |    0 |  781
+ 2025-08-01 00:00:00+00 |    2746 |    0 | 2746
+ 2025-09-01 00:00:00+00 |    2015 |    0 | 2015
+ 2025-10-01 00:00:00+00 |    1849 |    0 | 1849
+ 2025-11-01 00:00:00+00 |    1794 |    0 | 1794
+ 2025-12-01 00:00:00+00 |    1084 |    0 | 1084
+ 2026-01-01 00:00:00+00 |    1604 |    0 | 1604
+ 2026-02-01 00:00:00+00 |    1598 |    0 | 1598
+ 2026-03-01 00:00:00+00 |    1494 |    0 | 1494
+ 2026-04-01 00:00:00+00 |    1802 |    0 | 1802
+ 2026-05-01 00:00:00+00 |    1650 |    0 | 1650
+ 2026-06-01 00:00:00+00 |    1829 |  884 |  945
+ 2026-07-01 00:00:00+00 |    1038 | 1038 |    0
+(13 rows)
+
+### F. First and last failing/passing timestamps in June 2026 (deployment boundary)
+ passes | count |          first_ts          |          last_ts           | first_seq | last_seq 
+--------+-------+----------------------------+----------------------------+-----------+----------
+ f      |   945 | 2026-06-01 15:49:31.696+00 | 2026-06-17 23:41:22.325+00 |     18418 |    19362
+ t      |   884 | 2026-06-18 13:10:36.124+00 | 2026-06-30 23:54:52.883+00 |     19363 |    20246
+(2 rows)
+
+### G. Transaction type distribution
+ transaction_type | count 
+------------------+-------
+ SALE             | 20948
+ REFUND           |   172
+ CORRECTION       |   116
+ CLOSURE          |    34
+ CHANGE           |    12
+ ARCHIVE          |     2
+(6 rows)
+
+COMMIT

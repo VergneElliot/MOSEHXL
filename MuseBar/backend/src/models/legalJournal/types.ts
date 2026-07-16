@@ -54,9 +54,22 @@ export interface ClosureBulletin {
   created_at: Date;
 }
 
+export interface DocumentedIntegrityException {
+  sequence_number: number;
+  reason: string;
+  /** When true, the hash chain is allowed to restart after this entry (genesis previous_hash on next). */
+  chain_restart?: boolean;
+}
+
 export interface IntegrityCheckResult {
   isValid: boolean;
   errors: string[];
+  /**
+   * Historical entries that do not verify under the current hash payload format
+   * but are accounted for (format-era evolution, or self-documented CORRECTION/ARCHIVE markers).
+   * Presence of documented exceptions does not invalidate the journal.
+   */
+  documentedExceptions?: DocumentedIntegrityException[];
 }
 
 export interface VATBreakdownItem {

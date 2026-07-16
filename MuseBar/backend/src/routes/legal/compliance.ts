@@ -35,6 +35,9 @@ router.get('/status', requireEstablishmentAdminOrPermission(P.access_compliance)
     });
 
     const integrityErrors = Array.isArray(integrity.errors) ? integrity.errors : [];
+    const documentedExceptions = Array.isArray(integrity.documentedExceptions)
+      ? integrity.documentedExceptions
+      : [];
     const journalIntegrityLabel = integrity.isValid
       ? 'valide'
       : integrityErrors.length > 0
@@ -50,6 +53,7 @@ router.get('/status', requireEstablishmentAdminOrPermission(P.access_compliance)
         certification_required_by: '2026-12-31',
         is_certified: false,
         integrity_errors: integrityErrors,
+        documented_exceptions: documentedExceptions,
       },
       journal_statistics: {
         total_entries: Number(stats.total_entries ?? 0),

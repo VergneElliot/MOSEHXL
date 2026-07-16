@@ -17,6 +17,7 @@ export type {
   JournalEntry,
   ClosureBulletin,
   IntegrityCheckResult,
+  DocumentedIntegrityException,
   VATBreakdown,
   PaymentBreakdown,
   OrderForJournal,
