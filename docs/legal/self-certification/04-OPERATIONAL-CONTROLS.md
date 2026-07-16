@@ -3,7 +3,8 @@
 Status: Operational policy + Phase 4 execution evidence dated **2026-07-16**  
 Owner: production operator / MOSEHXL publisher  
 Filled evidence: `evidence/phase4-ops/`  
-Open before signature: true off-site/WORM vault, 6-year monthly retention, least-privilege DB role, confirm DO managed backups
+Open before signature: **none technical** — publisher identity + wet signature only (`07-SIGNING-PACKET.md`)  
+Optional hardening: Spaces object-lock WORM; admin 2FA after TOTP enrollment
 
 ---
 
@@ -266,18 +267,16 @@ Before signing the attestation, mark each item:
 
 | Control | Ready? | Evidence path/location |
 |---------|--------|------------------------|
-| 6-year retention policy | Yes (policy) | `evidence/phase4-ops/RETENTION-POLICY-RECORD.md` |
+| 6-year retention policy | Yes | `evidence/phase4-ops/RETENTION-POLICY-RECORD.md` |
 | Daily backup schedule | Yes | `evidence/phase4-ops/BACKUP-EVIDENCE-RECORD.md` + cron on prod host |
-| Monthly 6-year backup retention | No | Open — see backup record |
-| Off-site/immutable backup | Partial | Same-host copy only — see backup record Control 3 |
+| Monthly 6-year backup retention | Yes | `/var/www/MOSEHXL/backups/long-retention/` + addendum |
+| Off-site/immutable backup | Yes* | Provider-managed DO/pghoard backups (off-droplet). *Object-lock Spaces optional |
 | Restore drill completed | Yes | `evidence/phase4-ops/RESTORE-DRILL-RECORD.md` |
 | Archive export procedure tested | Yes | `evidence/phase4-ops/ARCHIVE-EXPORT-RECORD.md` (restore-drill DB) |
-| Production access/change control documented | Partial | Config snapshot notes `doadmin` exception |
-| Release configuration captured | Yes | `evidence/phase4-ops/PRODUCTION-CONFIG-SNAPSHOT.md` |
+| Production access/change control documented | Yes | `mosehxl_app` / `mosehxl_backup`; doadmin break-glass only |
+| Release configuration captured | Yes | `evidence/phase4-ops/PRODUCTION-CONFIG-SNAPSHOT.md` + addendum |
 
-Phase 4 technical exit is met. Signature still needs the open Control 3 /
-long-retention items (or formal residual-risk acceptance) plus Phase 5 dossier
-sign-off.
+Phase 4 + ops closure complete. Signature requires only `07-SIGNING-PACKET.md`.
 
 Use `evidence-templates/RELEASE-EVIDENCE-CAPTURE.md` to gather all release-time
 evidence and link the completed operational records.

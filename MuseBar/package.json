@@ -1,6 +1,6 @@
 {
   "name": "musebar",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Point of Sale & Bar Management System",
   "type": "module",
   "scripts": {

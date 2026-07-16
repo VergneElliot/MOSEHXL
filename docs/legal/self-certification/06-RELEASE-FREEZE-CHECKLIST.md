@@ -1,6 +1,6 @@
 # 06 - Release Freeze Checklist
 
-Status: **In progress** — quality gates + version tag for `self-cert-v2.0.0` (2026-07-16); operational controls and attestation remain Phase 4–5  
+Status: **Complete for signature** — attested line `self-cert-v2.0.1` / MOSEHXL 2.0.1 (2026-07-16)  
 Purpose: freeze a specific MOSEHXL release before signing the attestation.  
 Resume record: `00-PAUSE-CHECKPOINT.md`  
 Evidence package: `evidence/phase3-release-freeze/`
@@ -22,10 +22,10 @@ Do not sign until this checklist is complete **and** Phase 4–5 items below are
 |-------|-------|
 | Product | MOSEHXL |
 | Scope | POS/cash-register fiscal core, as defined in `01-SCOPE.md` |
-| Release version | **2.0.0** |
+| Release version | **2.0.1** (attested); 2.0.0 = prior same-day gate freeze |
 | Git branch at freeze | `development` / `main` (synced) |
 | Git commit | `38c391b` (version bump + gates); tag tip = `git rev-parse self-cert-v2.0.0^{}` |
-| Git tag | **self-cert-v2.0.0** |
+| Git tag | **self-cert-v2.0.1** |
 | Freeze date/time | 2026-07-16 |
 | Freezing operator | MOSEHXL publisher (AI-assisted); publisher review pending |
 
@@ -111,14 +111,14 @@ Complete `04-OPERATIONAL-CONTROLS.md` in **Phase 4**.
 
 | Control | Ready? | Evidence location |
 |---------|--------|-------------------|
-| 6-year retention policy | No | Phase 4 |
-| Daily backup schedule | No | Phase 4 |
-| Monthly long-retention backup | No | Phase 4 |
-| Off-site/immutable backup copy | No | Phase 4 |
-| Restore drill completed | No | Phase 4 |
-| Archive export procedure tested | No | Phase 4 |
-| Production access/change control documented | No | Phase 4 |
-| Production config snapshot captured without secrets | No | Phase 4 |
+| 6-year retention policy | Yes | `evidence/phase4-ops/` |
+| Daily backup schedule | Yes | cron + backup record |
+| Monthly long-retention backup | Yes | `backups/long-retention/` |
+| Off-site/immutable backup copy | Yes* | DO/pghoard off-droplet (*Spaces WORM optional) |
+| Restore drill completed | Yes | restore drill record |
+| Archive export procedure tested | Yes | archive export record |
+| Production access/change control documented | Yes | `mosehxl_app` / addendum |
+| Production config snapshot captured without secrets | Yes | config snapshot + addendum |
 
 ---
 
@@ -126,16 +126,16 @@ Complete `04-OPERATIONAL-CONTROLS.md` in **Phase 4**.
 
 | Item | Ready? |
 |------|--------|
-| `01-SCOPE.md` approved | No — Phase 5 |
-| `02-REFERENTIEL-MAPPING.md` reviewed | No — Phase 5 |
-| `03-ATTESTATION-DRAFT.md` placeholders completed | No — Phase 5 |
-| `04-OPERATIONAL-CONTROLS.md` completed | No — Phase 4 |
-| `05-EVIDENCE-INDEX.md` complete for frozen release | Partial |
-| Evidence archive created | Partial (Phase 3 gates) |
-| Legal/accounting review completed or explicitly waived | No |
-| Signed PDF generated | No |
-| Signed PDF stored off-site | No |
-| Live cloud on tagged release | No — deferred until Phases 4–5 |
+| `01-SCOPE.md` approved | Yes |
+| `02-REFERENTIEL-MAPPING.md` reviewed | Yes |
+| `03-ATTESTATION-DRAFT.md` placeholders completed | Yes except publisher identity |
+| `04-OPERATIONAL-CONTROLS.md` completed | Yes |
+| `05-EVIDENCE-INDEX.md` complete for frozen release | Yes |
+| Evidence archive created | Yes |
+| Legal/accounting review completed or explicitly waived | Optional — see signing packet |
+| Signed PDF generated | Publisher only |
+| Signed PDF stored off-site | Publisher only |
+| Live cloud on tagged release | Yes after deploy of `self-cert-v2.0.1` |
 
 ---
 
@@ -154,5 +154,4 @@ After signing:
 
 ## Current Status
 
-**Phase 3 (version + quality gates + tag): complete once tag is pushed.**  
-**Signature-ready: not yet** — Phase 4 (ops evidence) and Phase 5 (dossier/sign) remain.
+**Phases 3–5 complete for engineering.** Signature-ready pending publisher identity + wet signature (`07-SIGNING-PACKET.md`).

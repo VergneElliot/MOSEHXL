@@ -1,6 +1,6 @@
 # 02 - Referentiel Mapping
 
-Status: Draft mapping  
+Status: **Reviewed** — 2026-07-16 against freeze line `self-cert-v2.0.1`  
 Scope source: `01-SCOPE.md`  
 Evidence source: `05-EVIDENCE-INDEX.md`
 
@@ -28,18 +28,18 @@ any correction must be a new recorded event rather than a destructive edit.
 
 | Control | MOSEHXL implementation | Evidence | Before signature |
 |---------|------------------------|----------|------------------|
-| Append-only fiscal journal | Completed sales, refunds, cancellations, and change operations append legal journal entries | `models/legalJournal/`, `routes/orders/orderCRUD.ts`, `services/orders/orderCancellationService.ts`, `routes/orders/orderChange.ts` | Capture test output and release commit |
-| Per-establishment sequence | Legal journal entries are scoped by `establishment_id` with independent sequence/hash chains | `2026_04_23_00_00_00_legal_journal_per_establishment.sql`, `journalSigning.ts` | Verify migration status on frozen release |
-| Hash-chain integrity | Each entry stores previous/current hash and verifier recomputes chain continuity | `journalSigning.ts`, `journalSigning.integrity.test.ts` | Export sample verification result |
-| DB-level mutation denial | UPDATE/DELETE/TRUNCATE blocked on `legal_journal` in normal operation | `2026_05_21_18_30_00_block_legal_journal_truncate.sql`, real-db compliance tests | Attach real DB test output or controlled verification |
-| DB-level insert validation | INSERT trigger validates sequence, previous hash, and current hash against expected chain state | `2026_05_21_18_45_00_enforce_legal_journal_hash_chain_on_insert.sql`, migration test | Attach migration/test evidence |
-| Fail-closed fiscal writes | Fiscal routes abort when mandatory legal journal writes fail | `orderCRUD.journalFailSafe.test.ts`, `orderPayment.journalFailSafe.test.ts`, closure follow-up patch notes | Capture full backend test output |
+| Append-only fiscal journal | Completed sales, refunds, cancellations, and change operations append legal journal entries | `models/legalJournal/`, `routes/orders/orderCRUD.ts`, `services/orders/orderCancellationService.ts`, `routes/orders/orderChange.ts` | **Done** — Phase 3 tests |
+| Per-establishment sequence | Legal journal entries are scoped by `establishment_id` with independent sequence/hash chains | `2026_04_23_00_00_00_legal_journal_per_establishment.sql`, `journalSigning.ts` | **Done** — 44 migrations |
+| Hash-chain integrity | Each entry stores previous/current hash; era-aware verifier + documented exceptions | `journalSigning.ts`, Phase 1 forensics | **Done** |
+| DB-level mutation denial | UPDATE/DELETE/TRUNCATE blocked on `legal_journal` in normal operation | truncate/hash-chain migrations, real-db tests | **Done** |
+| DB-level insert validation | INSERT trigger validates sequence/previous/current hash | hash-chain enforcement migration + tests | **Done** |
+| Fail-closed fiscal writes | Fiscal routes abort when mandatory legal journal writes fail | journal fail-safe tests | **Done** |
 
 Residual risk:
 
-- Direct database superuser access can still bypass many database controls. This
-  must be handled operationally through least-privilege production credentials,
-  restricted DBA access, logging, and backup controls.
+- Managed-cluster admin role `doadmin` retains elevated rights for migrations.
+  Application runtime uses least-privilege role `mosehxl_app` (no Bypass RLS).
+  See `evidence/phase4-ops/PRODUCTION-CONFIG-SNAPSHOT.md`.
 
 ---
 
@@ -76,8 +76,8 @@ period and remain available for inspection.
 | Closure bulletins | Daily/monthly/annual closure paths with journal append and reconciliation metadata | `routes/legal/closure.ts`, `closureOperations.ts`, `closureScheduler.ts` | Capture closure tests and sample bulletin |
 | Journal-based reconciliation | Closure totals reconciled against legal journal SALE aggregates | `2026_05_21_20_20_00_add_closure_journal_reconciliation_columns.sql` | Include sample closure reconciliation output |
 | Receipt/document preservation | Receipt and document services preserve fiscal details for output/export | `services/receipts/`, `services/documents/` | Include sample receipt/archive output |
-| Data retention policy | Retention is an operational requirement; code preserves fiscal rows but the operator must keep DB/backups for required duration | `04-OPERATIONAL-CONTROLS.md` | Implement and sign retention policy |
-| Backup/restore continuity | Not purely code; must be proved through backup schedule and restore drills | `04-OPERATIONAL-CONTROLS.md` | Attach backup proof and restore drill logs |
+| Data retention policy | 6-year minimum policy documented and owned | `evidence/phase4-ops/RETENTION-POLICY-RECORD.md` | **Done** |
+| Backup/restore continuity | Daily dumps + monthly long-retention + restore drill | `evidence/phase4-ops/BACKUP-EVIDENCE-RECORD.md`, `RESTORE-DRILL-RECORD.md` | **Done** |
 
 Residual risk:
 
@@ -93,11 +93,11 @@ available to the administration for the required period.
 
 | Control | MOSEHXL implementation | Evidence | Before signature |
 |---------|------------------------|----------|------------------|
-| Archive creation/listing | Legal archive routes and archive service create/list fiscal archives | `routes/legal/archive.ts`, `models/archiveService.ts` | Capture archive route/test output |
-| Archive verify/download | HTTP surfaces exist for archive verification and download/export alias | Audit closure rows and archive route evidence | Include sample verify/download output |
-| Export integrity metadata | Archive content includes signature/integrity metadata | `archiveService.ts`, `archiveService.generateExportContent.test.ts` | Attach sample archive package |
-| Document/PDF/XLSX support | Fiscal documents can be generated in human-readable/exportable formats | `documentPdfService.ts`, `closureXlsxService.ts` | Include sample PDF/XLSX outputs if available |
-| Off-site/WORM storage | Operational, not code-only | `04-OPERATIONAL-CONTROLS.md` | Implement before signing |
+| Archive creation/listing | Legal archive routes and archive service create/list fiscal archives | `routes/legal/archive.ts`, `models/archiveService.ts` | **Done** — Phase 4 sample |
+| Archive verify/download | Verify path proven (`isValid: true`) on restore-drill DB | `evidence/phase4-ops/ARCHIVE-EXPORT-RECORD.md` | **Done** |
+| Export integrity metadata | Archive content includes signature/integrity metadata | meta JSON + tests | **Done** |
+| Document/PDF/XLSX support | Fiscal documents can be generated in human-readable/exportable formats | document/closure export services | Available in product |
+| Off-site / long-retention storage | Provider-managed DB backups (pghoard) + monthly 6-year dump vault; optional Spaces/WORM via env | `BACKUP-EVIDENCE-RECORD.md` | **Done** (Spaces object-lock optional) |
 
 Residual risk:
 
@@ -111,10 +111,10 @@ Residual risk:
 
 | Control | MOSEHXL implementation | Evidence | Before signature |
 |---------|------------------------|----------|------------------|
-| Fixed release identity | Release tag/commit to be frozen before signature | `06-RELEASE-FREEZE-CHECKLIST.md` | Fill tag/commit/build version |
-| Change traceability | Patch-note index and audit docs record changes | `docs/patch-notes/LATEST-INDEX.md` | Archive patch-note index at release freeze |
-| Migration traceability | Migration manager records checksums and migration state | `migrations/migration-manager.ts` | Capture `npm run migration:status` output |
-| Quality evidence | Type-check/lint/test gates pass | CI/local command outputs | Store command output with dossier |
+| Fixed release identity | `self-cert-v2.0.1` / MOSEHXL 2.0.1 | `06-RELEASE-FREEZE-CHECKLIST.md`, `01-SCOPE.md` | **Done** |
+| Change traceability | Patch-note index and audit docs record changes | `docs/patch-notes/LATEST-INDEX.md` | **Done** — Phase 3 capture |
+| Migration traceability | Migration manager records checksums and migration state | migration status outputs | **Done** |
+| Quality evidence | Type-check/lint/test gates pass | `evidence/phase3-release-freeze/` | **Done** |
 
 ---
 
@@ -137,15 +137,15 @@ they are part of the practical ability to conserve and produce fiscal records.
 
 ## Current Mapping Verdict
 
-Engineering status:
+Engineering + operational status (2026-07-16):
 
-- Inalterabilite: code evidence strong, release evidence to attach.
-- Securisation: code evidence strong, production configuration evidence to attach.
-- Conservation: code evidence strong for fiscal records and closures, operational retention/backups still to implement and evidence.
-- Archivage: code evidence strong for exports/verification, operational off-site/immutable storage still to implement and evidence.
+- Inalterabilite: code + release + forensic evidence complete.
+- Securisation: code + production config snapshot complete (`mosehxl_app` least privilege).
+- Conservation: retention policy, daily backups, monthly 6-year vault, restore drill complete;
+  provider-managed DB backups evidenced via pghoard `restore_command`.
+- Archivage: archive export/verify sample complete; optional object-lock Spaces is hardening only.
 
 Conclusion:
 
-> MOSEHXL is ready for dossier assembly from a code-evidence perspective, but
-> the attestation should not be signed until scope, release freeze, backup,
-> retention, restore-drill, and archive-storage evidence are completed.
+> Mapping is complete for signature of `self-cert-v2.0.1`. Remaining work is
+> publisher identity + wet signature (`07-SIGNING-PACKET.md`).

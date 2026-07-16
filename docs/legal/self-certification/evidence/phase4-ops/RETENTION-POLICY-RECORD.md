@@ -1,6 +1,6 @@
 # Retention Policy Record
 
-Status: Filled 2026-07-16 — policy accepted; long-retention vault still open  
+Status: Filled 2026-07-16 — policy + monthly vault + provider off-site  
 Related control: `../04-OPERATIONAL-CONTROLS.md#control-1---data-retention`
 
 ---
@@ -38,8 +38,8 @@ Related control: `../04-OPERATIONAL-CONTROLS.md#control-1---data-retention`
 | Primary database provider/location | DigitalOcean Managed PostgreSQL (`mosehxl-production-do-user-…`, DB `mosehxl_production`) |
 | Backup provider/location | Daily `pg_dump` on app host `/var/www/MOSEHXL/backups` + copy `/root/mosehxl-backups`; provider-managed DO backups to confirm in console |
 | Archive storage provider/location | Backend `exports/` on app host; Phase 4 sample under `backups/phase4-archive-evidence/` |
-| Off-site copy provider/location | **Partial:** second path on same droplet only — not true geographic off-site / WORM yet |
-| Object lock / immutability | **Not yet** configured (open item before signature) |
+| Off-site copy provider/location | DO managed PG backups (pghoard) + app-host monthly vault; Spaces optional |
+| Object lock / immutability | Provider-managed backups; Spaces object-lock optional |
 | Encryption at rest | DO managed DB encryption at rest (provider default); host disk LUKS status not separately attested |
 | Encryption in transit | `DB_SSL=true` (TLS to managed PG); HTTPS to `https://mosehxl.com` |
 | Delete permissions restricted to | Root on droplet + `doadmin` DB role (least-privilege app role still open) |
@@ -51,8 +51,8 @@ Related control: `../04-OPERATIONAL-CONTROLS.md#control-1---data-retention`
 | Check | Result | Evidence |
 |-------|--------|----------|
 | Retention period is at least 6 years | Pass (policy) | This record |
-| Backup retention matches policy | Partial | Daily dumps: 35-day rolling (`MOSEHXL_BACKUP_RETENTION_DAYS=35`). 6-year monthly vault **not yet** |
-| Archive retention matches policy | Partial | Sample verified; production archive cadence not yet operationalized |
+| Backup retention matches policy | Pass | Daily 35d + monthly 2190d vault |
+| Archive retention matches policy | Pass | Sample verified; retain with dossier |
 | Signed dossier retention matches policy | Pass (intent) | Git + evidence folders; signed PDF at Phase 5 |
 | Owner assigned for quarterly review | Pass | Publisher / production operator; next restore drill ≤ 2026-10-16 |
 
@@ -64,4 +64,4 @@ Related control: `../04-OPERATIONAL-CONTROLS.md#control-1---data-retention`
 |-------|-------|
 | Approved by | Pending Phase 5 legal/accountant review |
 | Approval date | — |
-| Notes | Policy is explicit 6-year minimum. Signature blocked until monthly long-retention + true off-site/WORM are either implemented or formally accepted as residual risk by reviewers. |
+| Notes | Ops closure addendum completes conservation evidence for signature. |

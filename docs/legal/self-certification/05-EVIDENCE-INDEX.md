@@ -1,6 +1,6 @@
 # 05 - Evidence Index
 
-Status: Draft  
+Status: Complete for `self-cert-v2.0.1` signature packet  
 Purpose: catalogue the technical and operational evidence used by the
 self-certification dossier.
 
@@ -29,6 +29,7 @@ Evidence used for a signed attestation must be:
 | Cleanup/performance roadmap | `docs/roadmaps/2026-06-24-CLEANUP-AND-PERFORMANCE-ROADMAP.md` | Tracks latest green baseline and remaining non-cert tasks |
 | Patch-note index | `docs/patch-notes/LATEST-INDEX.md` | Chronological change evidence |
 | Invoice verification runbook | `docs/runbooks/INVOICE-COMPLIANCE-VERIFICATION.md` | B2B invoice compliance verification support evidence |
+| Signing packet (human steps) | `docs/legal/self-certification/07-SIGNING-PACKET.md` | Only remaining publisher actions |
 | Self-cert / e-reporting roadmap | `docs/roadmaps/2026-07-16-SELF-CERTIFICATION-RELEASE-AND-EREPORTING-PLAN.md` | Execution plan for freeze, attestation, and reform readiness |
 | Hash-format eras forensic report | `docs/legal/self-certification/evidence/phase1-forensics/2026-07-16-HASH-FORMAT-ERAS.md` | Proves historical “tamper” flags are format-era artefacts |
 | Closure anomaly analysis | `docs/legal/self-certification/evidence/phase1-forensics/2026-07-16-CLOSURE-ANOMALIES.md` | Explains zero/duplicate/backfilled/gap closures |
@@ -150,7 +151,7 @@ Filled Phase 4 copies live under `evidence/phase4-ops/`. Templates remain in
 | Migration status output | Yes | Phase 3 + restore drill (44 migrations) |
 | Production env control checklist | Yes | `evidence/phase4-ops/PRODUCTION-CONFIG-SNAPSHOT.md` |
 | Backup schedule proof | Yes | `evidence/phase4-ops/BACKUP-EVIDENCE-RECORD.md` |
-| Off-site/WORM backup proof | Yes | **Open** — partial same-host copy only |
+| Off-site/WORM backup proof | Yes | DO/pghoard + monthly vault (`phase4-ops` addendum) |
 | Restore drill record | Yes | `evidence/phase4-ops/RESTORE-DRILL-RECORD.md` |
 | Archive export sample | Strongly recommended | `evidence/phase4-ops/ARCHIVE-EXPORT-RECORD.md` |
 | Journal integrity verification output | Strongly recommended | Phase 1 forensics + restore drill raw summary |

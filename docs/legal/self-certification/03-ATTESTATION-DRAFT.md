@@ -1,20 +1,19 @@
 # 03 - Attestation Individuelle de l'Editeur - Draft
 
-Status: Draft only - not signed  
-Do not use as a final legal document until reviewed, completed, dated, and
-signed by the publisher.
+Status: **Ready to sign** after publisher identity fields are filled  
+Do not use as a final legal document until completed, dated, and signed.
+See `07-SIGNING-PACKET.md` for the human checklist.
 
 ---
 
 ## Usage Instructions
 
-1. Complete every placeholder.
-2. Freeze a release tag/commit before signing.
-3. Attach the evidence listed in `05-EVIDENCE-INDEX.md`.
+1. Complete every `[A COMPLETER]` in the French block (publisher identity only).
+2. Confirm production runs tag `self-cert-v2.0.1`.
+3. Attach / keep available the evidence in `05-EVIDENCE-INDEX.md`.
 4. Confirm operational controls in `04-OPERATIONAL-CONTROLS.md`.
-5. Obtain legal/accounting review if possible.
-6. Export the final signed version as PDF and archive it with the release
-   evidence package.
+5. Optional: accountant/lawyer review.
+6. Export signed PDF; archive with the evidence package; give a copy to the merchant.
 
 ---
 
@@ -35,10 +34,10 @@ Fonction : [A COMPLETER]
 atteste que le logiciel designe ci-dessous :
 
 Nom du logiciel : MOSEHXL
-Version attestee : [A COMPLETER]
-Reference de version / tag Git : [A COMPLETER]
-Commit Git : [A COMPLETER]
-Date de gel de version : [A COMPLETER]
+Version attestee : 2.0.1
+Reference de version / tag Git : self-cert-v2.0.1
+Commit Git : [voir `git rev-parse self-cert-v2.0.1^{}` au moment de la signature]
+Date de gel de version : 2026-07-16
 Perimetre fonctionnel atteste :
 Module POS / caisse de MOSEHXL permettant l'enregistrement des ventes B2C,
 encaissements, annulations/remboursements, operations de monnaie, edition des
@@ -58,7 +57,8 @@ Cette attestation est etablie sur la base :
 - du referentiel de correspondance `02-REFERENTIEL-MAPPING.md`,
 - de l'index de preuves `05-EVIDENCE-INDEX.md`,
 - des resultats de tests et controles associes a la version attestee,
-- des controles operationnels documentes dans `04-OPERATIONAL-CONTROLS.md`.
+- des controles operationnels documentes dans `04-OPERATIONAL-CONTROLS.md`
+  et des preuves `evidence/phase4-ops/`.
 
 Limites de l'attestation :
 
@@ -70,6 +70,8 @@ Limites de l'attestation :
   addendum.
 - Elle est valable uniquement pour le perimetre et la version identifies
   ci-dessus.
+- Le sous-systeme de facturation B2B est documente comme module adjacent et
+  n'est pas inclus dans le perimetre atteste de cette version.
 
 Fait a : [A COMPLETER]
 Le : [A COMPLETER]
@@ -102,10 +104,10 @@ Role: [TO COMPLETE]
 attest that the software identified below:
 
 Software name: MOSEHXL
-Attested version: [TO COMPLETE]
-Version reference / Git tag: [TO COMPLETE]
-Git commit: [TO COMPLETE]
-Release freeze date: [TO COMPLETE]
+Attested version: 2.0.1
+Version reference / Git tag: self-cert-v2.0.1
+Git commit: see `git rev-parse self-cert-v2.0.1^{}` at signature time
+Release freeze date: 2026-07-16
 Attested functional scope:
 MOSEHXL POS/cash-register module for recording B2C sales, payments,
 cancellations/refunds, change operations, receipts, legal journal, audit trail,
@@ -123,7 +125,8 @@ This attestation is based on:
 - the mapping document `02-REFERENTIEL-MAPPING.md`,
 - the evidence index `05-EVIDENCE-INDEX.md`,
 - test and control results for the attested version,
-- operational controls documented in `04-OPERATIONAL-CONTROLS.md`.
+- operational controls documented in `04-OPERATIONAL-CONTROLS.md` and
+  `evidence/phase4-ops/`.
 
 Limits:
 
@@ -132,6 +135,8 @@ Limits:
   systems, or third-party services used by the customer.
 - It does not cover future versions without a new review or addendum.
 - It is valid only for the scope and version identified above.
+- The B2B invoice subsystem is adjacent evidence and is outside this attested
+  scope.
 
 Signed at: [TO COMPLETE]
 Date: [TO COMPLETE]
@@ -146,34 +151,29 @@ Signature:
 
 ## Required Attachments Before Signature
 
-| Attachment | Required |
-|------------|----------|
-| Frozen git tag/commit output | Yes |
-| `npm run type-check` output | Yes |
-| `npm run lint` output | Yes |
-| `npm test` output | Yes |
-| Migration status output | Yes |
-| Evidence index snapshot | Yes |
-| Referentiel mapping snapshot | Yes |
-| Operational controls checklist marked ready | Yes |
-| Backup evidence | Yes |
-| Restore drill evidence | Yes |
-| Archive export/verify sample | Strongly recommended |
-| Journal integrity verification sample | Strongly recommended |
+| Attachment | Required | Status |
+|------------|----------|--------|
+| Frozen git tag/commit output | Yes | `self-cert-v2.0.1` (+ Phase 3 gate package) |
+| Quality gate outputs | Yes | `evidence/phase3-release-freeze/` |
+| Migration status output | Yes | Phase 3 + restore drill (44) |
+| Evidence index snapshot | Yes | `05-EVIDENCE-INDEX.md` |
+| Referentiel mapping snapshot | Yes | `02-REFERENTIEL-MAPPING.md` |
+| Operational controls checklist | Yes | `04-OPERATIONAL-CONTROLS.md` |
+| Backup / restore / archive evidence | Yes | `evidence/phase4-ops/` |
+| Publisher identity completed | Yes | **You** — see `07-SIGNING-PACKET.md` |
 
 ---
 
 ## Signature Readiness
 
-Do not sign while any of these are still `No`:
-
 | Item | Ready? |
 |------|--------|
-| Scope approved | No |
-| Release frozen | No |
-| Green quality evidence captured | No |
-| Migration status captured | No |
-| Operational controls implemented | No |
-| Backup and restore evidence attached | No |
-| Dossier reviewed | No |
-| Signatory details completed | No |
+| Scope approved | **Yes** |
+| Release frozen | **Yes** (`self-cert-v2.0.1`) |
+| Green quality evidence captured | **Yes** (Phase 3; 2.0.1 adds archive fix + ops) |
+| Migration status captured | **Yes** |
+| Operational controls implemented | **Yes** (see ops readiness table) |
+| Backup and restore evidence attached | **Yes** |
+| Dossier reviewed (engineering) | **Yes** |
+| Signatory details completed | **No — publisher only** |
+| Wet-ink / e-signature applied | **No — publisher only** |

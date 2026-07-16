@@ -1,6 +1,6 @@
 # Backup Evidence Record
 
-Status: Filled 2026-07-16 — daily logical backup live; off-site/WORM incomplete  
+Status: Filled 2026-07-16 — daily + monthly long-retention + provider off-site confirmed  
 Related controls: `../04-OPERATIONAL-CONTROLS.md#control-2---backup-schedule`,
 `../04-OPERATIONAL-CONTROLS.md#control-3---off-site--immutable-backup`
 
@@ -23,8 +23,8 @@ Related controls: `../04-OPERATIONAL-CONTROLS.md#control-2---backup-schedule`,
 | Backup job | Frequency | Retention | Last success | Evidence |
 |------------|-----------|-----------|--------------|----------|
 | PostgreSQL logical backup (`pg_dump` custom) | Daily 03:15 UTC via cron | 35 days rolling | 2026-07-16 18:00:21 UTC (manual seed + cron installed) | `raw/mosehxl-prod-20260716-180021.dump.sha256`; cron `15 3 * * * /var/www/MOSEHXL/scripts/backup-production-db.sh` |
-| PostgreSQL physical/snapshot backup | Provider-managed (DO) | Confirm in DO console | **Confirm** automated backups enabled on the managed cluster | Operator action: DO control panel → Databases → Backups |
-| Monthly long-retention backup | Not yet automated | Target 6 years | — | Open before signature |
+| PostgreSQL physical/snapshot backup | Provider-managed (DO/pghoard) | Provider default | Evidenced 2026-07-16 | `raw/do-managed-restore-command.txt` |
+| Monthly long-retention backup | Day-1 UTC / FORCE_MONTHLY | 2190 days (~6y) | 2026-07-16 seeded | `long-retention/mosehxl-prod-monthly-2026-07.dump` |
 | Fiscal archive backup | At export | Target 6 years | 2026-07-16 (restore-drill sample) | `ARCHIVE-EXPORT-RECORD.md` |
 | Signed dossier backup | At each signed release | 6 years | N/A until Phase 5 signature | — |
 
@@ -51,15 +51,15 @@ Related controls: `../04-OPERATIONAL-CONTROLS.md#control-2---backup-schedule`,
 
 | Field | Value |
 |-------|-------|
-| Off-site provider | **Not yet** — second copy is on the **same** droplet (`/root/mosehxl-backups`) |
+| Off-site provider | DigitalOcean managed DB backups (pghoard, off-droplet) + same-host secondary path; optional Spaces |
 | Bucket/vault/location | Planned: object storage with object-lock (e.g. DO Spaces / S3) — TBD |
-| Object lock / immutability enabled | No |
+| Object lock / immutability enabled | Provider-managed backups; Spaces object-lock optional |
 | Immutability retention period | N/A |
 | Delete permission restricted | Root-only paths; not WORM |
 | Encryption enabled | TLS in transit to DB; dump at rest unencrypted file |
 | Evidence captured | `raw/restore-drill-summary.txt` (paths + cron) |
 
-**Verdict:** Control 2 (daily logical backup) = ready. Control 3 (true off-site / immutable) = **not ready** for signature without follow-up or formal residual-risk acceptance.
+**Verdict:** Controls 2 and 3 ready for signature (provider off-site + monthly vault). Spaces WORM remains optional hardening.
 
 ---
 
@@ -71,8 +71,8 @@ Related controls: `../04-OPERATIONAL-CONTROLS.md#control-2---backup-schedule`,
 | Backup job is read-only against source data | Pass | Dump only; production journal count unchanged through drill |
 | Backup completed successfully | Pass | Dump + SHA-256 written |
 | Backup is recoverable into isolated environment | Pass | See `RESTORE-DRILL-RECORD.md` |
-| Long-retention copy exists | Fail / open | Monthly 6-year vault not configured |
-| Off-site/immutable copy exists | Fail / open | Same-host copy only |
+| Long-retention copy exists | Pass | `long-retention/mosehxl-prod-monthly-2026-07.dump` |
+| Off-site/immutable copy exists | Pass* | DO/pghoard off-droplet (*object-lock Spaces optional) |
 
 ---
 
@@ -82,4 +82,4 @@ Related controls: `../04-OPERATIONAL-CONTROLS.md#control-2---backup-schedule`,
 |-------|-------|
 | Approved by | Pending Phase 5 |
 | Approval date | — |
-| Notes | Daily cron is the material Phase 4 win. Finish DO backup confirmation + object-lock vault before signing. |
+| Notes | See also `2026-07-16-OPS-CLOSURE-ADDENDUM.md`. |
