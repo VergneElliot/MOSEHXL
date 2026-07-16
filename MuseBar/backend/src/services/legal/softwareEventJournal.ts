@@ -1,6 +1,7 @@
 import LegalJournalModel from '../../models/legalJournal';
 import { logError } from '../../utils/logger';
 import { pool } from '../../db/pool';
+import { runWithTenantContext } from '../../rls/tenantContext';
 
 export type SoftwareEventType =
   | 'PRINTING_CONFIGURATION_UPDATED'
@@ -58,12 +59,16 @@ async function appendWithRetry(input: SoftwareEventInput): Promise<void> {
   for (const delayMs of RETRY_DELAYS_MS) {
     if (delayMs > 0) await sleep(delayMs);
     try {
-      await LegalJournalModel.logSoftwareEvent(
-        input.establishmentId,
-        input.eventType,
-        input.eventData,
-        input.userId
-      );
+      // Legal journal RLS requires app.establishment_id on the connection when
+      // the runtime role does not Bypass RLS (production least-privilege role).
+      await runWithTenantContext({ establishmentId: input.establishmentId }, async () => {
+        await LegalJournalModel.logSoftwareEvent(
+          input.establishmentId,
+          input.eventType,
+          input.eventData,
+          input.userId
+        );
+      });
       return;
     } catch (error) {
       lastError = error;

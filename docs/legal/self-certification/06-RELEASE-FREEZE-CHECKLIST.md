@@ -1,6 +1,6 @@
 # 06 - Release Freeze Checklist
 
-Status: **Complete for signature** — attested line `self-cert-v2.0.1` / MOSEHXL 2.0.1 (2026-07-16)  
+Status: **Complete for signature** — attested line `self-cert-v2.0.2` / MOSEHXL 2.0.2 (2026-07-16)  
 Purpose: freeze a specific MOSEHXL release before signing the attestation.  
 Resume record: `00-PAUSE-CHECKPOINT.md`  
 Evidence package: `evidence/phase3-release-freeze/`
@@ -22,10 +22,10 @@ Do not sign until this checklist is complete **and** Phase 4–5 items below are
 |-------|-------|
 | Product | MOSEHXL |
 | Scope | POS/cash-register fiscal core, as defined in `01-SCOPE.md` |
-| Release version | **2.0.1** (attested); 2.0.0 = prior same-day gate freeze |
+| Release version | **2.0.2** (attested); 2.0.0 = prior same-day gate freeze |
 | Git branch at freeze | `development` / `main` (synced) |
-| Git commit | Tip of **`self-cert-v2.0.1`** (`git rev-parse self-cert-v2.0.1^{}`) |
-| Git tag | **self-cert-v2.0.1** |
+| Git commit | Tip of **`self-cert-v2.0.2`** (`git rev-parse self-cert-v2.0.2^{}`) |
+| Git tag | **self-cert-v2.0.2** |
 | Freeze date/time | 2026-07-16 |
 | Freezing operator | MOSEHXL publisher (AI-assisted); publisher review pending |
 
@@ -135,7 +135,7 @@ Complete `04-OPERATIONAL-CONTROLS.md` in **Phase 4**.
 | Legal/accounting review completed or explicitly waived | Optional — see signing packet |
 | Signed PDF generated | Publisher only |
 | Signed PDF stored off-site | Publisher only |
-| Live cloud on tagged release | Yes after deploy of `self-cert-v2.0.1` |
+| Live cloud on tagged release | Yes after deploy of `self-cert-v2.0.2` |
 
 ---
 

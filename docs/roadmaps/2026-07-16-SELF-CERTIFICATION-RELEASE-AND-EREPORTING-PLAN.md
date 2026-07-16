@@ -240,7 +240,7 @@ least-privilege app DB role; live deploy of `self-cert-v2.0.0`.
 ## 8. Phase 5 — Dossier finalization and signature
 
 **Status (2026-07-16): Dossier ready to sign** — engineering complete.
-Attested identity: **MOSEHXL 2.0.1** / **`self-cert-v2.0.1`**.
+Attested identity: **MOSEHXL 2.0.2** / **`self-cert-v2.0.2`**.
 Human checklist: `docs/legal/self-certification/07-SIGNING-PACKET.md`.
 
 **Done:**
@@ -253,7 +253,7 @@ Human checklist: `docs/legal/self-certification/07-SIGNING-PACKET.md`.
 
 **Owner (Thomas) only:** fill publisher identity → optional counsel review → print/sign/archive → give copy to bar.
 
-**Exit criteria:** signed attestation naming `self-cert-v2.0.1`, filed in the
+**Exit criteria:** signed attestation naming `self-cert-v2.0.2`, filed in the
 dossier; bar holds its copy.
 
 **⚠ After signature:** the § 2.2 policy is in force — fiscal-module changes require

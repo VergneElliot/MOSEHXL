@@ -38,3 +38,12 @@ Optional hardening (not required to sign): Spaces bucket with Object Lock +
 
 Still deferred: no user has `mfa_totp_enabled=true`. Enabling
 `AUTH_ENFORCE_ADMIN_2FA=true` would lock operators out. Documented residual.
+
+## Least-privilege runtime note (same evening)
+
+Switching the API to `mosehxl_app` initially failed because critical software
+events (`SERVER_STARTED`) insert into `legal_journal` without ALS tenant
+context. Fixed in **2.0.2** (`softwareEventJournal.ts` wraps appends with
+`runWithTenantContext`). After that deploy, runtime uses `mosehxl_app` again;
+`doadmin` remains break-glass only. Backup role password was rotated after a
+log exposure during the incident response.

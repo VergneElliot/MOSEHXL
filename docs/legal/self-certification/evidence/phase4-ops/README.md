@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-16  
 **Environment:** production host `209.38.223.91` + DigitalOcean managed PostgreSQL  
-**Covered release/tag:** `self-cert-v2.0.1`  
+**Covered release/tag:** `self-cert-v2.0.2`  
 **Operator:** MOSEHXL publisher (Thomas / Cursor-assisted execution)  
 **Closure addendum:** `2026-07-16-OPS-CLOSURE-ADDENDUM.md`
 

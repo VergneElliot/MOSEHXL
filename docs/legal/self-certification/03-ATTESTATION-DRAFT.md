@@ -9,7 +9,7 @@ See `07-SIGNING-PACKET.md` for the human checklist.
 ## Usage Instructions
 
 1. Complete every `[A COMPLETER]` in the French block (publisher identity only).
-2. Confirm production runs tag `self-cert-v2.0.1`.
+2. Confirm production runs tag `self-cert-v2.0.2`.
 3. Attach / keep available the evidence in `05-EVIDENCE-INDEX.md`.
 4. Confirm operational controls in `04-OPERATIONAL-CONTROLS.md`.
 5. Optional: accountant/lawyer review.
@@ -34,9 +34,9 @@ Fonction : [A COMPLETER]
 atteste que le logiciel designe ci-dessous :
 
 Nom du logiciel : MOSEHXL
-Version attestee : 2.0.1
-Reference de version / tag Git : self-cert-v2.0.1
-Commit Git : tip du tag self-cert-v2.0.1 (joindre la sortie de `git rev-parse self-cert-v2.0.1^{}`)
+Version attestee : 2.0.2
+Reference de version / tag Git : self-cert-v2.0.2
+Commit Git : tip du tag self-cert-v2.0.2 (joindre la sortie de `git rev-parse self-cert-v2.0.2^{}`)
 Date de gel de version : 2026-07-16
 Perimetre fonctionnel atteste :
 Module POS / caisse de MOSEHXL permettant l'enregistrement des ventes B2C,
@@ -104,9 +104,9 @@ Role: [TO COMPLETE]
 attest that the software identified below:
 
 Software name: MOSEHXL
-Attested version: 2.0.1
-Version reference / Git tag: self-cert-v2.0.1
-Git commit: tip of tag self-cert-v2.0.1 (attach `git rev-parse self-cert-v2.0.1^{}`)
+Attested version: 2.0.2
+Version reference / Git tag: self-cert-v2.0.2
+Git commit: tip of tag self-cert-v2.0.2 (attach `git rev-parse self-cert-v2.0.2^{}`)
 Release freeze date: 2026-07-16
 Attested functional scope:
 MOSEHXL POS/cash-register module for recording B2C sales, payments,
@@ -153,7 +153,7 @@ Signature:
 
 | Attachment | Required | Status |
 |------------|----------|--------|
-| Frozen git tag/commit output | Yes | `self-cert-v2.0.1` (+ Phase 3 gate package) |
+| Frozen git tag/commit output | Yes | `self-cert-v2.0.2` (+ Phase 3 gate package) |
 | Quality gate outputs | Yes | `evidence/phase3-release-freeze/` |
 | Migration status output | Yes | Phase 3 + restore drill (44) |
 | Evidence index snapshot | Yes | `05-EVIDENCE-INDEX.md` |
@@ -169,8 +169,8 @@ Signature:
 | Item | Ready? |
 |------|--------|
 | Scope approved | **Yes** |
-| Release frozen | **Yes** (`self-cert-v2.0.1`) |
-| Green quality evidence captured | **Yes** (Phase 3; 2.0.1 adds archive fix + ops) |
+| Release frozen | **Yes** (`self-cert-v2.0.2`) |
+| Green quality evidence captured | **Yes** (Phase 3; 2.0.2 adds archive fix + ops) |
 | Migration status captured | **Yes** |
 | Operational controls implemented | **Yes** (see ops readiness table) |
 | Backup and restore evidence attached | **Yes** |

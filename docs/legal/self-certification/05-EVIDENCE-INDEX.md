@@ -1,6 +1,6 @@
 # 05 - Evidence Index
 
-Status: Complete for `self-cert-v2.0.1` signature packet  
+Status: Complete for `self-cert-v2.0.2` signature packet  
 Purpose: catalogue the technical and operational evidence used by the
 self-certification dossier.
 

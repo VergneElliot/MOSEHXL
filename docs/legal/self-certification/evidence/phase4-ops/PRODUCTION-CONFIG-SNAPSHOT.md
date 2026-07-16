@@ -13,7 +13,7 @@ Related controls: `../04-OPERATIONAL-CONTROLS.md#control-7---environment-configu
 | Snapshot date/time | 2026-07-16 |
 | Operator | Thomas (MOSEHXL publisher) |
 | Reviewed by | Pending Phase 5 |
-| Covered release/tag | `self-cert-v2.0.1` (after deploy) |
+| Covered release/tag | `self-cert-v2.0.2` (after deploy) |
 | Environment | Production (`mosehxl.com`) |
 
 ---

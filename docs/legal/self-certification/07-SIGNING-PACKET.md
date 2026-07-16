@@ -1,7 +1,7 @@
 # 07 — Signing packet (human-only remaining steps)
 
 Status: **Ready for signature** as of 2026-07-16 (after Phase 5 dossier close + ops closures)  
-Attested software identity: **MOSEHXL 2.0.1** / git tag **`self-cert-v2.0.1`**
+Attested software identity: **MOSEHXL 2.0.2** / git tag **`self-cert-v2.0.2`**
 
 This page is the only checklist you still need to walk through by hand.
 Everything else in the dossier is prepared.
@@ -18,7 +18,7 @@ Everything else in the dossier is prepared.
 | Ops controls + evidence | `04-OPERATIONAL-CONTROLS.md`, `evidence/phase4-ops/` |
 | Evidence index | `05-EVIDENCE-INDEX.md` |
 | Release freeze checklist | `06-RELEASE-FREEZE-CHECKLIST.md` |
-| Production on attested line | live deploy of `self-cert-v2.0.1` (see freeze checklist) |
+| Production on attested line | live deploy of `self-cert-v2.0.2` (see freeze checklist) |
 
 ---
 
@@ -61,7 +61,7 @@ draft, re-export PDF, then sign.
 
 ### 4. After signature — operational discipline
 
-- Do not move tag `self-cert-v2.0.1`.
+- Do not move tag `self-cert-v2.0.2`.
 - Any change under legal journal / archive / closure fiscal paths ⇒ new attestation (MAJOR).
 - Quarterly restore drill (next due ≤ 2026-10-16).
 - Optional upgrade: create a DigitalOcean Spaces bucket with **Object Lock**, set
@@ -85,7 +85,7 @@ draft, re-export PDF, then sign.
 
 | Field | Value |
 |-------|-------|
-| I confirm production runs `self-cert-v2.0.1` | ☐ |
+| I confirm production runs `self-cert-v2.0.2` | ☐ |
 | I completed publisher identity fields | ☐ |
 | I signed and archived the PDF | ☐ |
 | Merchant holds a copy | ☐ |
