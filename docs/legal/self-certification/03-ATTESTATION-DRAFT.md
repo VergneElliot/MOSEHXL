@@ -36,7 +36,7 @@ atteste que le logiciel designe ci-dessous :
 Nom du logiciel : MOSEHXL
 Version attestee : 2.0.1
 Reference de version / tag Git : self-cert-v2.0.1
-Commit Git : [voir `git rev-parse self-cert-v2.0.1^{}` au moment de la signature]
+Commit Git : tip du tag self-cert-v2.0.1 (joindre la sortie de `git rev-parse self-cert-v2.0.1^{}`)
 Date de gel de version : 2026-07-16
 Perimetre fonctionnel atteste :
 Module POS / caisse de MOSEHXL permettant l'enregistrement des ventes B2C,
@@ -106,7 +106,7 @@ attest that the software identified below:
 Software name: MOSEHXL
 Attested version: 2.0.1
 Version reference / Git tag: self-cert-v2.0.1
-Git commit: see `git rev-parse self-cert-v2.0.1^{}` at signature time
+Git commit: tip of tag self-cert-v2.0.1 (attach `git rev-parse self-cert-v2.0.1^{}`)
 Release freeze date: 2026-07-16
 Attested functional scope:
 MOSEHXL POS/cash-register module for recording B2C sales, payments,
