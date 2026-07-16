@@ -1,0 +1,29 @@
+SET
+BEGIN
+### The 5 entries matching no standard format variant
+ sequence_number | transaction_type | order_id |  amount  | vat_amount | payment_method |    register_id    |           timestamp           |                                                                                               data_preview                                                                                               
+-----------------+------------------+----------+----------+------------+----------------+-------------------+-------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+             128 | SALE             |       87 | 116.5000 |    19.4200 | card           | MUSEBAR-CR-001    | 2025-07-17 16:37:18.849986+00 | {"items": [{"quantity": 1, "tax_rate": 10.00, "tax_amount": 0.73, "unit_price": 8.00, "total_price": 8.00, "product_name": "Focaccia "}, {"quantity": 1, "tax_rate": 10.00, "tax_amount": 1.91, "unit_pr
+             129 | CORRECTION       |          |   0.0000 |     0.0000 | SYSTEM         | MUSEBAR-REG-001   | 2025-07-18 10:53:45.344713+00 | {"audit_trail": "This correction entry provides legal documentation of the integrity issue", "detected_at": "2025-07-18T12:53:45.344713+02:00", "business_impact": "NONE - All transaction data preserve
+             130 | CORRECTION       |          |   0.0000 |     0.0000 | SYSTEM         | MUSEBAR-REG-001   | 2025-07-18 10:53:54.312957+00 | {"audit_trail": "This correction entry provides legal documentation of the integrity issue", "detected_at": "2025-07-18T12:53:54.312957+02:00", "business_impact": "NONE - All transaction data preserve
+             608 | CORRECTION       |          |   0.0000 |     0.0000 | SYSTEM         | SYSTEM-MIGRATION  | 2025-07-30 10:00:20.629403+00 | {"reason": "Production deployment migration - hash chain reconstruction", "hash_status": "CHAIN_RECONSTRUCTED_POST_MIGRATION", "legal_basis": "Article 286-I-3 bis du CGI - Digital preservation require
+             609 | ARCHIVE          |          |   0.0000 |     0.0000 | SYSTEM         | SYSTEM-CHECKPOINT | 2025-07-30 10:12:25.81108+00  | {"legal_basis": "Article 286-I-3 bis du CGI", "archive_type": "MIGRATION_CHECKPOINT", "migration_date": "2025-07-30", "compliance_note": "New hash chain begins from this checkpoint - historical data m
+(5 rows)
+
+### Test genesis-format for seq 1 (empty orderId, 0.00 amounts, literal payload)
+ sequence_number | genesis_utc | genesis_paris 
+-----------------+-------------+---------------
+               1 | f           | f
+(1 row)
+
+### Era boundaries by sequence (for the record): last paris_d2 / first utc_f, etc.
+   fmt    | count | first_seq | last_seq |           first_ts            |           last_ts            
+----------+-------+-----------+----------+-------------------------------+------------------------------
+ utc_d2   |   611 |         1 |    14589 | 2025-07-17 16:12:27.58+00     | 2026-03-23 19:08:52.227+00
+ none     |     5 |       128 |      609 | 2025-07-17 16:37:18.849986+00 | 2025-07-30 10:12:25.81108+00
+ paris_d2 | 13973 |       610 |    14582 | 2025-07-30 13:17:59.149+00    | 2026-03-21 23:47:53.022+00
+ utc_f    |  4773 |     14590 |    19362 | 2026-03-23 19:16:44.138+00    | 2026-06-17 23:41:22.325+00
+ utc_d4   |  1924 |     19363 |    21286 | 2026-06-18 13:10:36.124+00    | 2026-07-16 17:00:18.401+00
+(5 rows)
+
+COMMIT

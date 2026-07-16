@@ -28,6 +28,7 @@ router.get('/verify', requireEstablishmentAdminOrPermission(P.access_compliance)
     res.json({
       integrity_status: verification.isValid ? 'VALID' : 'COMPROMISED',
       errors: verification.errors,
+      documented_exceptions: verification.documentedExceptions ?? [],
       verified_at: new Date().toISOString(),
       compliance: 'Article 286-I-3 bis du CGI'
     });

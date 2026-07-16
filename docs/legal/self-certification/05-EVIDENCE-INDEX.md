@@ -29,6 +29,11 @@ Evidence used for a signed attestation must be:
 | Cleanup/performance roadmap | `docs/roadmaps/2026-06-24-CLEANUP-AND-PERFORMANCE-ROADMAP.md` | Tracks latest green baseline and remaining non-cert tasks |
 | Patch-note index | `docs/patch-notes/LATEST-INDEX.md` | Chronological change evidence |
 | Invoice verification runbook | `docs/runbooks/INVOICE-COMPLIANCE-VERIFICATION.md` | B2B invoice compliance verification support evidence |
+| Self-cert / e-reporting roadmap | `docs/roadmaps/2026-07-16-SELF-CERTIFICATION-RELEASE-AND-EREPORTING-PLAN.md` | Execution plan for freeze, attestation, and reform readiness |
+| Hash-format eras forensic report | `docs/legal/self-certification/evidence/phase1-forensics/2026-07-16-HASH-FORMAT-ERAS.md` | Proves historical “tamper” flags are format-era artefacts |
+| Closure anomaly analysis | `docs/legal/self-certification/evidence/phase1-forensics/2026-07-16-CLOSURE-ANOMALIES.md` | Explains zero/duplicate/backfilled/gap closures |
+| Dev→prod migration incident | `docs/legal/self-certification/evidence/INCIDENT-2025-07-DEV-TO-PROD-MIGRATION.md` | Dated incident record for seq 608/609 migration |
+| Anomaly register | `docs/legal/self-certification/evidence/ANOMALY-REGISTER.md` | Inspector-facing index of all known anomalies |
 
 ---
 
