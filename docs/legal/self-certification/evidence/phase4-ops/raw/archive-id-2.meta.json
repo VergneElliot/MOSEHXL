@@ -1,0 +1,20 @@
+{
+  "id": 2,
+  "establishment_id": "ce1b61b1-10e7-430c-97aa-69297fafb780",
+  "establishment_name": "MuseBar",
+  "export_type": "MONTHLY",
+  "format": "JSON",
+  "export_status": "VERIFIED",
+  "period_start": "2026-06-01T00:00:00.000Z",
+  "period_end": "2026-06-30T23:59:59.999Z",
+  "file_path": "/var/www/MOSEHXL/MuseBar/backend/exports/temp_1784224951819.json",
+  "file_hash": "a2fd4cd9a445e1f6498b7a228a4dbc857ce6a25ff4b14a220f196eb9950aa77f",
+  "file_size": 5042565,
+  "digital_signature_present": true,
+  "verification": {
+    "isValid": true,
+    "errors": []
+  },
+  "db": "mosehxl_restore_drill",
+  "note": "Export + verify executed against isolated restore-drill DB; production archive_exports count remained 0"
+}

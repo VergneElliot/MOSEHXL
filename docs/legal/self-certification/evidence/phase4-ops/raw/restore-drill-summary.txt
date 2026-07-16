@@ -1,0 +1,45 @@
+=== backup ===
+-rw-r--r-- 1 root root 6.0M Jul 16 18:00 /var/www/MOSEHXL/backups/mosehxl-prod-20260716-180021.dump
+-rw-r--r-- 1 root root  125 Jul 16 18:00 /var/www/MOSEHXL/backups/mosehxl-prod-20260716-180021.dump.sha256
+6505821e2ecec01d2b4fb8dded61abae56b524dc0e28572c88772ca21c8f30f9  /var/www/MOSEHXL/backups/mosehxl-prod-20260716-180021.dump
+-rw-r--r-- 1 root root 6.0M Jul 16 18:00 /root/mosehxl-backups/mosehxl-prod-20260716-180021.dump
+-rw-r--r-- 1 root root  125 Jul 16 18:00 /root/mosehxl-backups/mosehxl-prod-20260716-180021.dump.sha256
+=== cron ===
+15 3 * * * /var/www/MOSEHXL/scripts/backup-production-db.sh
+=== drill counts ===
+     e      |   c   
+------------+-------
+ production | 21293
+(1 row)
+
+       e       |   c   
+---------------+-------
+ restore_drill | 21293
+(1 row)
+
+=== era-D on drill ===
+ entries | pass | fail 
+---------+------+------
+    1931 | 1931 |    0
+(1 row)
+
+=== triggers ===
+                     tgname                     | tgenabled 
+------------------------------------------------+-----------
+ trigger_enforce_legal_journal_insert_integrity | O
+ trigger_prevent_legal_journal_modification     | O
+ trigger_prevent_legal_journal_truncate         | O
+(3 rows)
+
+=== archive on drill ===
+ id | export_type | format | export_status | file_size |       left       
+----+-------------+--------+---------------+-----------+------------------
+  2 | MONTHLY     | JSON   | VERIFIED      |   5042565 | a2fd4cd9a445e1f6
+(1 row)
+
+=== prod archives (must stay 0) ===
+ count 
+-------
+     0
+(1 row)
+

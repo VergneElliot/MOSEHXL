@@ -78,7 +78,19 @@ export class ArchiveService {
   static async exportData(exportData: ExportData): Promise<ArchiveExport> {
     await this.initialize();
 
-    // Create archive export record
+    const tempFilePath = path.join(
+      this.EXPORT_DIR,
+      `temp_${Date.now()}.${exportData.format.toLowerCase()}`
+    );
+
+    // Generate content before INSERT so we satisfy file_size > 0 and never
+    // leave a PENDING row with a zero-byte placeholder.
+    const exportContent = await this.generateExportContent(exportData);
+    fs.writeFileSync(tempFilePath, exportContent);
+    const fileHash = this.generateFileHash(exportContent);
+    const digitalSignature = this.createDigitalSignature(exportContent);
+    const fileSize = fs.statSync(tempFilePath).size;
+
     const query = `
       INSERT INTO archive_exports (
         export_type, period_start, period_end, file_path, file_hash,
@@ -87,59 +99,29 @@ export class ArchiveService {
       RETURNING *
     `;
 
-    const tempFilePath = path.join(this.EXPORT_DIR, `temp_${Date.now()}.${exportData.format.toLowerCase()}`);
-    const values = [
-      exportData.export_type,
-      exportData.period_start,
-      exportData.period_end,
-      tempFilePath,
-      '', // Will be updated after file creation
-      0,  // Will be updated after file creation
-      exportData.format,
-      '', // Will be updated after file creation
-      'PENDING',
-      exportData.created_by,
-      exportData.establishment_id ?? null
-    ];
-
-    const result = await pool.query(query, values);
-    const archiveExport = result.rows[0];
-
     try {
-      // Generate export data based on type
-      const exportContent = await this.generateExportContent(exportData);
-      
-      // Write file
-      fs.writeFileSync(tempFilePath, exportContent);
-      
-      // Generate file hash and digital signature
-      const fileHash = this.generateFileHash(exportContent);
-      const digitalSignature = this.createDigitalSignature(exportContent);
-      const fileSize = fs.statSync(tempFilePath).size;
-
-      // Update archive export record
-      const updateQuery = `
-        UPDATE archive_exports 
-        SET file_hash = $1, file_size = $2, digital_signature = $3, export_status = $4
-        WHERE id = $5
-        RETURNING *
-      `;
-      
-      const updateResult = await pool.query(updateQuery, [
+      const result = await pool.query(query, [
+        exportData.export_type,
+        exportData.period_start,
+        exportData.period_end,
+        tempFilePath,
         fileHash,
         fileSize,
+        exportData.format,
         digitalSignature,
         'COMPLETED',
-        archiveExport.id
+        exportData.created_by,
+        exportData.establishment_id ?? null,
       ]);
-
-      return updateResult.rows[0];
+      return result.rows[0];
     } catch (error) {
-      // Update status to failed
-      await pool.query(
-        'UPDATE archive_exports SET export_status = $1 WHERE id = $2',
-        ['FAILED', archiveExport.id]
-      );
+      try {
+        if (fs.existsSync(tempFilePath)) {
+          fs.unlinkSync(tempFilePath);
+        }
+      } catch {
+        // ignore cleanup errors
+      }
       throw error;
     }
   }
@@ -494,9 +476,9 @@ export class ArchiveService {
         errors.push('Digital signature verification failed - file authenticity compromised');
       }
 
-      // Verify file size
+      // Verify file size (pg may return bigint as string)
       const currentSize = fs.statSync(exportRecord.file_path).size;
-      if (currentSize !== exportRecord.file_size) {
+      if (currentSize !== Number(exportRecord.file_size)) {
         errors.push('File size mismatch - file may have been modified');
       }
 

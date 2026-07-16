@@ -1,8 +1,9 @@
 # 04 - Operational Controls
 
-Status: Draft operational policy — **paused 2026-07-01** (controls not executed)  
-Owner to complete: production operator / MOSEHXL publisher  
-Resume record: `00-PAUSE-CHECKPOINT.md`
+Status: Operational policy + Phase 4 execution evidence dated **2026-07-16**  
+Owner: production operator / MOSEHXL publisher  
+Filled evidence: `evidence/phase4-ops/`  
+Open before signature: true off-site/WORM vault, 6-year monthly retention, least-privilege DB role, confirm DO managed backups
 
 ---
 
@@ -265,17 +266,18 @@ Before signing the attestation, mark each item:
 
 | Control | Ready? | Evidence path/location |
 |---------|--------|------------------------|
-| 6-year retention policy | No | To fill |
-| Daily backup schedule | No | To fill |
-| Monthly 6-year backup retention | No | To fill |
-| Off-site/immutable backup | No | To fill |
-| Restore drill completed | No | To fill |
-| Archive export procedure tested | No | To fill |
-| Production access/change control documented | No | To fill |
-| Release configuration captured | No | To fill |
+| 6-year retention policy | Yes (policy) | `evidence/phase4-ops/RETENTION-POLICY-RECORD.md` |
+| Daily backup schedule | Yes | `evidence/phase4-ops/BACKUP-EVIDENCE-RECORD.md` + cron on prod host |
+| Monthly 6-year backup retention | No | Open — see backup record |
+| Off-site/immutable backup | Partial | Same-host copy only — see backup record Control 3 |
+| Restore drill completed | Yes | `evidence/phase4-ops/RESTORE-DRILL-RECORD.md` |
+| Archive export procedure tested | Yes | `evidence/phase4-ops/ARCHIVE-EXPORT-RECORD.md` (restore-drill DB) |
+| Production access/change control documented | Partial | Config snapshot notes `doadmin` exception |
+| Release configuration captured | Yes | `evidence/phase4-ops/PRODUCTION-CONFIG-SNAPSHOT.md` |
 
-Until these are marked ready, the dossier is technically strong but not yet
-complete for a signed self-certification claim.
+Phase 4 technical exit is met. Signature still needs the open Control 3 /
+long-retention items (or formal residual-risk acceptance) plus Phase 5 dossier
+sign-off.
 
 Use `evidence-templates/RELEASE-EVIDENCE-CAPTURE.md` to gather all release-time
 evidence and link the completed operational records.

@@ -214,22 +214,26 @@ commit with captured evidence; attestation draft references the tag.
 
 ## 7. Phase 4 — Operational controls execution
 
-**Objective:** produce the operational evidence the attestation's claims rest on.
-Reference: `04-OPERATIONAL-CONTROLS.md` + `evidence-templates/`.
+**Status (2026-07-16): DONE for technical exit** — filled records in
+`docs/legal/self-certification/evidence/phase4-ops/`. Scripts:
+`scripts/backup-production-db.sh`, `scripts/restore-drill.sh`. Daily cron installed
+on the production host. Restore drill + archive verify on `mosehxl_restore_drill`
+only (production `archive_exports` stayed 0).
+
+**Still open before signature (not blocking Phase 4 exit):** true off-site/WORM
+object vault; 6-year monthly retention; confirm DO managed DB backups in console;
+least-privilege app DB role; live deploy of `self-cert-v2.0.0`.
 
 | Control | Action | Evidence file (filled copy) |
 |---------|--------|------------------------------|
-| Backups | Verify/configure automated production DB backups (daily), off-site copy | `BACKUP-EVIDENCE-RECORD.md` |
-| Restore drill | Restore a production backup into an **isolated non-production DB**; run migration status, journal integrity check, closure/archive readability; confirm production untouched | `RESTORE-DRILL-RECORD.md` (then quarterly) |
-| Archive export | Produce a real archive export from production, verify its HMAC signature, store off-site | `ARCHIVE-EXPORT-RECORD.md` |
-| Retention | Document 6-year retention setup (DB + archives + bulletins) | `RETENTION-POLICY-RECORD.md` |
-| Config snapshot | Capture production configuration (env var names, TLS, DB privileges — least-privilege check on DB roles) | `PRODUCTION-CONFIG-SNAPSHOT.md` |
-
-A helper script (`scripts/restore-drill.sh`) will be written so the quarterly drill
-is a ten-minute routine producing paste-ready output.
+| Backups | Daily `pg_dump` cron + 35-day rolling; same-host secondary path | `evidence/phase4-ops/BACKUP-EVIDENCE-RECORD.md` |
+| Restore drill | Isolated restore of prod dump; integrity + closures + archive | `evidence/phase4-ops/RESTORE-DRILL-RECORD.md` |
+| Archive export | MONTHLY JSON on restore-drill DB; verify VALID | `evidence/phase4-ops/ARCHIVE-EXPORT-RECORD.md` |
+| Retention | 6-year policy documented | `evidence/phase4-ops/RETENTION-POLICY-RECORD.md` |
+| Config snapshot | Redacted prod config + documented exceptions | `evidence/phase4-ops/PRODUCTION-CONFIG-SNAPSHOT.md` |
 
 **Exit criteria:** every template has a dated, filled counterpart under
-`docs/legal/self-certification/evidence/`.
+`docs/legal/self-certification/evidence/` — **met** (see `evidence/phase4-ops/`).
 
 ---
 
