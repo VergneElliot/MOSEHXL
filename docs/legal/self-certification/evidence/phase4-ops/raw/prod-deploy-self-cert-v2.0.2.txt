@@ -1,0 +1,10 @@
+Thu Jul 16 18:23:10 UTC 2026
+HEAD=504a135602f8bd702155da491aa98e38858d81ee
+self-cert-v2.0.2
+NODE_ENV=production
+DB_USER=mosehxl_app
+AUTH_ENFORCE_ADMIN_2FA=false
+DB_BACKUP_USER=mosehxl_backup
+{"status":"OK","message":"MuseBar API is running"}
+pkg 2.0.2
+pm2 mosehxl-backend online restarts 17
