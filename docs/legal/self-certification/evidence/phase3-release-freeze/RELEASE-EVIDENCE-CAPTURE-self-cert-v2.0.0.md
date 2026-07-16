@@ -15,7 +15,7 @@ Raw command outputs: `./raw/`
 | Reviewed by | To fill (publisher sign-off before attestation) |
 | Release version | **2.0.0** |
 | Git tag | **self-cert-v2.0.0** |
-| Git commit | Filled after freeze commit (see § Source Control) |
+| Git commit | 38c391b25df849afbdfbf1174739229aac658dfd |
 | Branch | `development` / `main` (kept in sync) |
 
 ---
