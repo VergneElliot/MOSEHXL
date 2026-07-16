@@ -35,6 +35,7 @@ Evidence used for a signed attestation must be:
 | Dev→prod migration incident | `docs/legal/self-certification/evidence/INCIDENT-2025-07-DEV-TO-PROD-MIGRATION.md` | Dated incident record for seq 608/609 migration |
 | Anomaly register | `docs/legal/self-certification/evidence/ANOMALY-REGISTER.md` | Inspector-facing index of all known anomalies |
 | Release freeze evidence (v2.0.0) | `docs/legal/self-certification/evidence/phase3-release-freeze/` | Quality-gate outputs and capture record for `self-cert-v2.0.0` |
+| Operational controls (Phase 4) | `docs/legal/self-certification/evidence/phase4-ops/` | Backup, restore drill, archive export, retention, config snapshot |
 | Changelog | `CHANGELOG.md` | SemVer + fiscal-impact statements per release |
 
 ---
@@ -136,28 +137,30 @@ exact patch-note paths.
 
 ---
 
-## Operational Evidence To Attach Later
+## Operational Evidence
 
-| Evidence | Required before signature? | Storage recommendation |
-|----------|----------------------------|------------------------|
-| Signed attestation PDF | Yes | Dossier archive + off-site copy |
-| Release tag/commit output | Yes | Dossier archive |
-| Test command outputs | Yes | Dossier archive |
-| Migration status output | Yes | Dossier archive |
-| Production env control checklist | Yes | Dossier archive |
-| Backup schedule proof | Yes | Operations folder |
-| Off-site/WORM backup proof | Yes | Operations folder |
-| Restore drill record | Yes | Operations folder |
-| Archive export sample | Strongly recommended | Dossier archive |
-| Journal integrity verification output | Strongly recommended | Dossier archive |
+Filled Phase 4 copies live under `evidence/phase4-ops/`. Templates remain in
+`evidence-templates/` for quarterly repeats.
 
-Use the fillable templates in `evidence-templates/` to create these records:
+| Evidence | Required before signature? | Status / path |
+|----------|----------------------------|---------------|
+| Signed attestation PDF | Yes | Pending Phase 5 |
+| Release tag/commit output | Yes | Phase 3 freeze folder + tag `self-cert-v2.0.0` |
+| Test command outputs | Yes | `evidence/phase3-release-freeze/` |
+| Migration status output | Yes | Phase 3 + restore drill (44 migrations) |
+| Production env control checklist | Yes | `evidence/phase4-ops/PRODUCTION-CONFIG-SNAPSHOT.md` |
+| Backup schedule proof | Yes | `evidence/phase4-ops/BACKUP-EVIDENCE-RECORD.md` |
+| Off-site/WORM backup proof | Yes | **Open** — partial same-host copy only |
+| Restore drill record | Yes | `evidence/phase4-ops/RESTORE-DRILL-RECORD.md` |
+| Archive export sample | Strongly recommended | `evidence/phase4-ops/ARCHIVE-EXPORT-RECORD.md` |
+| Journal integrity verification output | Strongly recommended | Phase 1 forensics + restore drill raw summary |
+| Retention policy record | Yes | `evidence/phase4-ops/RETENTION-POLICY-RECORD.md` |
 
-| Template | Evidence produced |
+| Template | Filled counterpart |
 |----------|-------------------|
-| `evidence-templates/RETENTION-POLICY-RECORD.md` | Approved 6-year retention policy and storage ownership |
-| `evidence-templates/BACKUP-EVIDENCE-RECORD.md` | Backup schedule, latest successful backup, long-retention/off-site/immutable proof |
-| `evidence-templates/RESTORE-DRILL-RECORD.md` | Restore drill result and corrective actions |
-| `evidence-templates/ARCHIVE-EXPORT-RECORD.md` | Archive export/verify/download evidence |
-| `evidence-templates/PRODUCTION-CONFIG-SNAPSHOT.md` | Non-secret production configuration evidence |
-| `evidence-templates/RELEASE-EVIDENCE-CAPTURE.md` | Release tag/commit, command outputs, and linked operational evidence |
+| `evidence-templates/RETENTION-POLICY-RECORD.md` | `evidence/phase4-ops/RETENTION-POLICY-RECORD.md` |
+| `evidence-templates/BACKUP-EVIDENCE-RECORD.md` | `evidence/phase4-ops/BACKUP-EVIDENCE-RECORD.md` |
+| `evidence-templates/RESTORE-DRILL-RECORD.md` | `evidence/phase4-ops/RESTORE-DRILL-RECORD.md` |
+| `evidence-templates/ARCHIVE-EXPORT-RECORD.md` | `evidence/phase4-ops/ARCHIVE-EXPORT-RECORD.md` |
+| `evidence-templates/PRODUCTION-CONFIG-SNAPSHOT.md` | `evidence/phase4-ops/PRODUCTION-CONFIG-SNAPSHOT.md` |
+| `evidence-templates/RELEASE-EVIDENCE-CAPTURE.md` | `evidence/phase3-release-freeze/` (release gates) |
