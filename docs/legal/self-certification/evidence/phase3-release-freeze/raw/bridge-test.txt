@@ -1,0 +1,55 @@
+
+> musebar-print-bridge@0.1.0 test
+> npm run build && node --test test/*.test.js
+
+
+> musebar-print-bridge@0.1.0 build
+> tsc -p tsconfig.json
+
+TAP version 13
+# Subtest: loadDotEnv reads key value pairs without overriding process env
+ok 1 - loadDotEnv reads key value pairs without overriding process env
+  ---
+  duration_ms: 1.565872
+  type: 'test'
+  ...
+# Subtest: printEscPosJob rejects unsupported payload formats
+ok 2 - printEscPosJob rejects unsupported payload formats
+  ---
+  duration_ms: 1.098947
+  type: 'test'
+  ...
+# Subtest: parsePrintersJson validates slug host and port
+ok 3 - parsePrintersJson validates slug host and port
+  ---
+  duration_ms: 1.398066
+  type: 'test'
+  ...
+# Subtest: resolvePrinterEndpoint routes kitchen jobs by slug
+ok 4 - resolvePrinterEndpoint routes kitchen jobs by slug
+  ---
+  duration_ms: 0.261139
+  type: 'test'
+  ...
+# Subtest: resolvePrinterEndpoint routes pickup number slips to default printer
+ok 5 - resolvePrinterEndpoint routes pickup number slips to default printer
+  ---
+  duration_ms: 0.157456
+  type: 'test'
+  ...
+# Subtest: resolvePrinterEndpoint falls back to default printer for receipts
+ok 6 - resolvePrinterEndpoint falls back to default printer for receipts
+  ---
+  duration_ms: 0.172043
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 70.353932
+EXIT:0

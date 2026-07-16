@@ -1,0 +1,372 @@
+
+> mosehxl-backend@2.0.0 test
+> vitest run
+
+
+ RUN  v4.1.5 /home/zone01student/Projects/MOSEHXL/MuseBar/backend
+
+✅ Environment validation passed
+[ERROR_HANDLER] Establishment context required {
+  "stack": "ValidationError: Establishment context required\n    at ensureEstablishment (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/context.ts:36:11)\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)\n    at authenticateToken (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing.routes.test.ts:56:14)\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)\n    at Route.dispatch (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:119:3)\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/index.js:284:15\n    at Function.process_params (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/index.js:346:12)",
+  "url": "/printing/status",
+  "method": "GET",
+  "userId": 7
+}
+[ERROR_HANDLER] Internal error {
+  "stack": "AppError: Internal error\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/epsonRoutes.ts:19:11\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/printing/epson/poll",
+  "method": "GET"
+}
+[ERROR_HANDLER] Invalid bridge key {
+  "stack": "AppError: Invalid bridge key\n    at validateBridgeRequest (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/bridgeAuth.ts:32:11)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/bridgeRoutes.ts:21:27",
+  "url": "/printing/bridge/poll?establishment_id=est-1",
+  "method": "GET"
+}
+[ERROR_HANDLER] Failed to check printer status {
+  "stack": "AppError: Failed to check printer status\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/statusRoutes.ts:20:11\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/printing/status",
+  "method": "GET",
+  "userId": 8
+}
+[ERROR_HANDLER] Failed to list printers {
+  "stack": "AppError: Failed to list printers\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/statusRoutes.ts:38:11\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/printing/printers",
+  "method": "GET",
+  "userId": 8
+}
+[ERROR_HANDLER] Test print failed {
+  "stack": "AppError: Test print failed\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/statusRoutes.ts:50:11\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/printing/test",
+  "method": "POST",
+  "userId": 8
+}
+[ERROR_HANDLER] Provider must be one of: epson-server-direct, digital {
+  "stack": "ValidationError: Provider must be one of: epson-server-direct, digital\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/configurationRoutes.ts:71:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/printing/configuration",
+  "method": "POST",
+  "userId": 8
+}
+[ERROR_HANDLER] Provider is required {
+  "stack": "ValidationError: Provider is required\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/configurationRoutes.ts:71:13\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/middleware/errorHandler.ts:105:21\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)\n    at ensureEstablishment (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/context.ts:39:3)\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)\n    at authenticateToken (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing.routes.test.ts:66:12)\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)",
+  "url": "/printing/configuration",
+  "method": "POST",
+  "userId": 8
+}
+[ERROR_HANDLER] Establishment context required {
+  "stack": "ValidationError: Establishment context required\n    at ensureEstablishment (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/context.ts:36:11)\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)\n    at authenticateToken (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing.routes.test.ts:56:14)\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)\n    at Route.dispatch (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:119:3)\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/index.js:284:15\n    at Function.process_params (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/index.js:346:12)",
+  "url": "/printing/configuration",
+  "method": "GET",
+  "userId": 7
+}
+[ERROR_HANDLER] Failed to get printing configuration {
+  "stack": "AppError: Failed to get printing configuration\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/configurationRoutes.ts:29:11\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/printing/configuration",
+  "method": "GET",
+  "userId": 8
+}
+[ERROR_HANDLER] Failed to get printing history {
+  "stack": "AppError: Failed to get printing history\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/historyRoutes.ts:42:11\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/printing/history",
+  "method": "GET",
+  "userId": 8
+}
+[ERROR_HANDLER] Invalid order id {
+  "stack": "ValidationError: Invalid order id\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/documentRoutes.ts:28:13\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/middleware/errorHandler.ts:105:21\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)\n    at ensureEstablishment (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/context.ts:39:3)\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)\n    at authenticateToken (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing.routes.test.ts:66:12)\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)",
+  "url": "/printing/receipt/not-a-number/preview",
+  "method": "GET",
+  "userId": 8
+}
+[ERROR_HANDLER] Receipt not found {
+  "stack": "NotFoundError: Receipt not found\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/documentRoutes.ts:37:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/printing/receipt/42/preview",
+  "method": "GET",
+  "userId": 8
+}
+[ERROR_HANDLER] Receipt not found {
+  "stack": "NotFoundError: Receipt not found\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/documentRoutes.ts:63:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/printing/receipt/42",
+  "method": "POST",
+  "userId": 8
+}
+[ERROR_HANDLER] Invalid order id {
+  "stack": "ValidationError: Invalid order id\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/documentRoutes.ts:54:13\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/middleware/errorHandler.ts:105:21\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)\n    at ensureEstablishment (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/context.ts:39:3)\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)\n    at authenticateToken (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing.routes.test.ts:66:12)\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)",
+  "url": "/printing/receipt/not-a-number",
+  "method": "POST",
+  "userId": 8
+}
+[ERROR_HANDLER] Closure bulletin not found {
+  "stack": "NotFoundError: Closure bulletin not found\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/documentRoutes.ts:113:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/printing/closure/19",
+  "method": "POST",
+  "userId": 8
+}
+[ERROR_HANDLER] Invoice compliance blocked: missing legal fields {
+  "stack": "ValidationError: Invoice compliance blocked: missing legal fields\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/documentRoutes.ts:169:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/printing/invoice/1",
+  "method": "POST",
+  "userId": 8
+}
+[ERROR_HANDLER] Invalid closure bulletin id {
+  "stack": "ValidationError: Invalid closure bulletin id\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/documentRoutes.ts:105:13\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/middleware/errorHandler.ts:105:21\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)\n    at ensureEstablishment (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/context.ts:39:3)\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)\n    at authenticateToken (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing.routes.test.ts:66:12)\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)",
+  "url": "/printing/closure/not-a-number",
+  "method": "POST",
+  "userId": 8
+}
+[ERROR_HANDLER] Invoice compliance blocked: missing legal fields {
+  "stack": "ValidationError: Invoice compliance blocked: missing legal fields\n    at mapDocumentRouteError (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/documentHelpers.ts:26:36)\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/printing/documentExportRoutes.ts:100:5\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/printing/invoice/1/email",
+  "method": "POST",
+  "userId": 8
+}
+[ERROR_HANDLER] Refresh token cookie is required {
+  "stack": "ValidationError: Refresh token cookie is required\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/authLogin/sessionRoutes.ts:164:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/auth/refresh",
+  "method": "POST"
+}
+[ERROR_HANDLER] Refresh token cookie is required {
+  "stack": "ValidationError: Refresh token cookie is required\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/authLogin/sessionRoutes.ts:164:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/auth/refresh",
+  "method": "POST"
+}
+[ERROR_HANDLER] Invalid or expired refresh token {
+  "stack": "AuthenticationError: Invalid or expired refresh token\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/authLogin/sessionRoutes.ts:174:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/auth/refresh",
+  "method": "POST"
+}
+[ERROR_HANDLER] CSRF token is required {
+  "stack": "ValidationError: CSRF token is required\n    at validateRefreshCsrf (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/authLogin/cookies.ts:148:11)\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/authLogin/sessionRoutes.ts:166:5\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/auth/refresh",
+  "method": "POST"
+}
+[ERROR_HANDLER] Invalid CSRF token {
+  "stack": "AuthenticationError: Invalid CSRF token\n    at validateRefreshCsrf (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/authLogin/cookies.ts:157:11)\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/authLogin/sessionRoutes.ts:166:5\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/auth/refresh",
+  "method": "POST"
+}
+[ERROR_HANDLER] Invalid or expired refresh token {
+  "stack": "AuthenticationError: Invalid or expired refresh token\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/authLogin/sessionRoutes.ts:305:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/auth/refresh",
+  "method": "POST"
+}
+[ERROR_HANDLER] Session expired. Please log in again. {
+  "stack": "AuthenticationError: Session expired. Please log in again.\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/authLogin/sessionRoutes.ts:253:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/auth/refresh",
+  "method": "POST"
+}
+[ERROR_HANDLER] Account is inactive {
+  "stack": "AuthorizationError: Account is inactive\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/authLogin/sessionRoutes.ts:205:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/auth/refresh",
+  "method": "POST"
+}
+[ERROR_HANDLER] Account is locked {
+  "stack": "AuthorizationError: Account is locked\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/authLogin/sessionRoutes.ts:223:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/auth/refresh",
+  "method": "POST"
+}
+✅ Environment validation passed
+[ERROR_HANDLER] Archive not found {
+  "stack": "NotFoundError: Archive not found\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/legal/archive.ts:102:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/archive/999",
+  "method": "GET",
+  "userId": 22
+}
+[ERROR_HANDLER] Failed to create audit entry {
+  "stack": "AppError: Failed to create audit entry\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/orders/orderAudit.ts:53:11\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/audit/log",
+  "method": "POST",
+  "userId": 42
+}
+[ERROR_HANDLER] Invalid archive ID {
+  "stack": "ValidationError: Invalid archive ID\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/legal/archive.ts:97:13\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/middleware/errorHandler.ts:105:21\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)\n    at Route.dispatch (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:119:3)\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/index.js:284:15\n    at param (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/index.js:365:14)\n    at param (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/index.js:376:14)\n    at Function.process_params (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/index.js:421:3)",
+  "url": "/archive/not-a-number",
+  "method": "GET",
+  "userId": 22
+}
+[ERROR_HANDLER] Archive type, start date, and end date are required {
+  "stack": "ValidationError: Archive type, start date, and end date are required\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/legal/archive.ts:32:13\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/middleware/errorHandler.ts:105:21\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)\n    at Route.dispatch (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:119:3)\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/index.js:284:15\n    at Function.process_params (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/index.js:346:12)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/index.js:280:10)\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/middleware/auth.ts:191:5",
+  "url": "/archive/create",
+  "method": "POST",
+  "userId": 22
+}
+[ERROR_HANDLER] Two-factor authentication setup is required for support impersonation {
+  "stack": "AppError: Two-factor authentication setup is required for support impersonation\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/authLogin/supportRoutes.ts:102:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/auth/support/impersonation/start",
+  "method": "POST",
+  "userId": 1
+}
+[ERROR_HANDLER] Invalid archive ID {
+  "stack": "ValidationError: Invalid archive ID\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/legal/archive.ts:194:13\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/middleware/errorHandler.ts:105:21\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)\n    at Route.dispatch (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:119:3)\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/index.js:284:15\n    at param (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/index.js:365:14)\n    at param (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/index.js:376:14)\n    at Function.process_params (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/index.js:421:3)",
+  "url": "/archive/not-a-number/export",
+  "method": "POST",
+  "userId": 22
+}
+[ERROR_HANDLER] Invalid two-factor authentication code {
+  "stack": "AppError: Invalid two-factor authentication code\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/authLogin/supportRoutes.ts:129:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/auth/support/impersonation/start",
+  "method": "POST",
+  "userId": 1
+}
+[ERROR_HANDLER] Archive not found {
+  "stack": "NotFoundError: Archive not found\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/legal/archive.ts:135:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/archive/77/verify",
+  "method": "POST",
+  "userId": 22
+}
+[ERROR_HANDLER] Monthly closure bulletin for the current month not found {
+  "stack": "NotFoundError: Monthly closure bulletin for the current month not found\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/legal/closure.ts:573:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/closure/monthly-latest",
+  "method": "GET",
+  "userId": 22
+}
+[ERROR_HANDLER] Invalid or expired reset token {
+  "stack": "AppError: Invalid or expired reset token\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/authPassword.ts:178:11\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/auth/password/reset",
+  "method": "POST"
+}
+[ERROR_HANDLER] Failed to persist legal journal entry for closure bulletin {
+  "stack": "AppError: Failed to persist legal journal entry for closure bulletin\n    at createClosureWithFailClosedJournal (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/legal/closure.ts:99:11)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/legal/closure.ts:419:21",
+  "url": "/closure/create",
+  "method": "POST",
+  "userId": 22
+}
+[ERROR_HANDLER] Password has appeared in known data breaches. Please choose a different password. {
+  "stack": "ValidationError: Password has appeared in known data breaches. Please choose a different password.\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/authPassword.ts:173:11\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/auth/password/reset",
+  "method": "POST"
+}
+[ERROR_HANDLER] Failed to persist legal journal entry for cash register change {
+  "stack": "AppError: Failed to persist legal journal entry for cash register change\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/orders/orderChange.ts:79:15\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/orders/payment/change",
+  "method": "POST",
+  "userId": 42
+}
+[ERROR_HANDLER] Failed to persist legal journal entry for change cancellation {
+  "stack": "AppError: Failed to persist legal journal entry for change cancellation\n    at Function.cancelUnified (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/services/orders/orderCancellationService.ts:139:15)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/orders/orderCancel.ts:57:22",
+  "url": "/orders/payment/cancel-unified",
+  "method": "POST",
+  "userId": 42
+}
+[ERROR_HANDLER] Failed to persist legal journal entry for order cancellation {
+  "stack": "AppError: Failed to persist legal journal entry for order cancellation\n    at Function.cancelUnified (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/services/orders/orderCancellationService.ts:367:13)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/orders/orderCancel.ts:57:22",
+  "url": "/orders/payment/cancel-unified",
+  "method": "POST",
+  "userId": 42
+}
+[ERROR_HANDLER] Failed to persist legal journal entry for tip reversal {
+  "stack": "AppError: Failed to persist legal journal entry for tip reversal\n    at Function.cancelUnified (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/services/orders/orderCancellationService.ts:329:15)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/orders/orderCancel.ts:57:22",
+  "url": "/orders/payment/cancel-unified",
+  "method": "POST",
+  "userId": 42
+}
+✅ Environment validation passed
+✅ Environment validation passed
+[ERROR_HANDLER] Start date and end date are required {
+  "stack": "ValidationError: Start date and end date are required\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/legal/compliance.ts:105:13\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/middleware/errorHandler.ts:105:21\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/middleware/auth.ts:191:5\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/compliance/report",
+  "method": "GET",
+  "userId": 12
+}
+[ERROR_HANDLER] Invalid date format {
+  "stack": "ValidationError: Invalid date format\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/legal/compliance.ts:112:13\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/middleware/errorHandler.ts:105:21\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/middleware/auth.ts:191:5\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/compliance/report?start_date=nope&end_date=still-nope",
+  "method": "GET",
+  "userId": 12
+}
+[ERROR_HANDLER] A required preset-only group must include at least one choice {
+  "stack": "ValidationError: A required preset-only group must include at least one choice\n    at validateGroupPayload (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/productOptionGroups.ts:71:11)\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/productOptionGroups.ts:107:3\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/middleware/errorHandler.ts:105:21\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/productOptionGroups.routes.test.ts:44:107\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)\n    at Route.dispatch (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:119:3)\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)",
+  "url": "/api/product-option-groups",
+  "method": "POST",
+  "userId": 3
+}
+[ERROR_HANDLER] Failed to persist legal journal entry; order creation aborted for compliance safety {
+  "stack": "AppError: Failed to persist legal journal entry; order creation aborted for compliance safety\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/orders/orderCRUD.ts:122:15\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/orders",
+  "method": "POST",
+  "userId": 42
+}
+[ERROR_HANDLER] Refresh token cookie is required to revoke other sessions {
+  "stack": "ValidationError: Refresh token cookie is required to revoke other sessions\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/authLogin/sessionRoutes.ts:121:11\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/middleware/errorHandler.ts:105:21\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/middleware/auth.ts:153:88\n    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)\n    at runWithTenantContext (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/rls/tenantContext.ts:13:18)\n    at requireAuth (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/middleware/auth.ts:153:5)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/auth/sessions/revoke-others",
+  "method": "POST",
+  "userId": 42
+}
+[ERROR_HANDLER] Invalid order id {
+  "stack": "ValidationError: Invalid order id\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/legal/invoices.ts:125:11\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/middleware/errorHandler.ts:105:21\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at next (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:149:13)\n    at Route.dispatch (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/route.js:119:3)\n    at Layer.handle [as handle_request] (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/layer.js:95:5)\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/index.js:284:15\n    at param (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/index.js:365:14)\n    at param (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/index.js:376:14)\n    at Function.process_params (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/node_modules/express/lib/router/index.js:421:3)",
+  "url": "/invoices/from-order/not-a-number",
+  "method": "POST",
+  "userId": 8
+}
+[ERROR_HANDLER] Customer name is required {
+  "stack": "ValidationError: Customer name is required\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/legal/invoices.ts:163:28\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/invoices/from-order/42",
+  "method": "POST",
+  "userId": 8
+}
+[ERROR_HANDLER] Invoice compliance blocked: missing legal fields (payment_due_date, payment_terms, late_penalty_terms, recovery_fee_note). Update invoice legal metadata before export/print. {
+  "stack": "ValidationError: Invoice compliance blocked: missing legal fields (payment_due_date, payment_terms, late_penalty_terms, recovery_fee_note). Update invoice legal metadata before export/print.\n    at assertPersistedInvoiceCompliance (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/legal/invoices.ts:103:11)\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/legal/invoices.ts:137:5\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/invoices/from-order/42",
+  "method": "POST",
+  "userId": 8
+}
+[ERROR_HANDLER] Invoice compliance blocked: missing seller identity fields (business_address, business_siret, business_tax_identification). Complete Settings > Establishment legal identity fields before generating invoices. {
+  "stack": "ValidationError: Invoice compliance blocked: missing seller identity fields (business_address, business_siret, business_tax_identification). Complete Settings > Establishment legal identity fields before generating invoices.\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/legal/invoices.ts:187:11\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/invoices/from-order/42",
+  "method": "POST",
+  "userId": 8
+}
+[ERROR_HANDLER] Legal field payment_due_date is required {
+  "stack": "ValidationError: Legal field payment_due_date is required\n    at parseIsoDateOnly (/home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/legal/invoices.ts:55:11)\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/legal/invoices.ts:153:26\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/invoices/from-order/42",
+  "method": "POST",
+  "userId": 8
+}
+[ERROR_HANDLER] Password must be at least 8 characters long {
+  "stack": "ValidationError: Password must be at least 8 characters long\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/authRegister.ts:75:11\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/auth/register",
+  "method": "POST",
+  "userId": 99
+}
+[ERROR_HANDLER] Password must be at least 8 characters long {
+  "stack": "ValidationError: Password must be at least 8 characters long\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/authRegister.ts:222:11\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/auth/users",
+  "method": "POST",
+  "userId": 99
+}
+[ERROR_HANDLER] Password has appeared in known data breaches. Please choose a different password. {
+  "stack": "ValidationError: Password has appeared in known data breaches. Please choose a different password.\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/authRegister.ts:75:11\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/auth/register",
+  "method": "POST",
+  "userId": 99
+}
+[ERROR_HANDLER] Two-factor authentication setup is required for this admin account {
+  "stack": "AppError: Two-factor authentication setup is required for this admin account\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/authLogin/loginRoutes.ts:150:15\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/auth/login",
+  "method": "POST"
+}
+[ERROR_HANDLER] Invalid two-factor authentication code {
+  "stack": "AppError: Invalid two-factor authentication code\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/authLogin/loginRoutes.ts:178:15\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/auth/login",
+  "method": "POST"
+}
+✅ Environment validation passed
+✅ Environment validation passed
+[ERROR_HANDLER] Only system administrators can grant establishment_admin role {
+  "stack": "AuthorizationError: Only system administrators can grant establishment_admin role\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/authRegister.ts:321:11\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/auth/users/9/role",
+  "method": "PUT",
+  "userId": 22
+}
+[ERROR_HANDLER] Password must be at least 8 characters long {
+  "stack": "ValidationError: Password must be at least 8 characters long\n    at /home/zone01student/Projects/MOSEHXL/MuseBar/backend/src/routes/authRegister.ts:390:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "url": "/auth/setup",
+  "method": "POST"
+}
+✅ Environment validation passed
+✅ Environment validation passed
+
+ Test Files  82 passed (82)
+      Tests  338 passed (338)
+   Start at  19:48:57
+   Duration  7.65s (transform 6.67s, setup 1.48s, import 21.56s, tests 7.84s, environment 16ms)
+
+EXIT:0

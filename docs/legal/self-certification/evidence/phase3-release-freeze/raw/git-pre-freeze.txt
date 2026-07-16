@@ -1,0 +1,16 @@
+=== git status -sb (pre-commit, after version bump) ===
+## development...origin/development
+ M MuseBar/backend/package.json
+ M MuseBar/package.json
+ M MuseBar/packages/types/package.json
+?? CHANGELOG.md
+?? docs/legal/self-certification/evidence/phase3-release-freeze/
+
+=== git rev-parse HEAD (parent of freeze commit will supersede) ===
+2683223529b47a1a3babf6d7f0f51eff6bde516f
+
+=== git log -1 ===
+2683223 fix(legal): resolve TypeScript errors in era-aware journal verifier
+
+=== date ===
+2026-07-16T17:51:21Z
