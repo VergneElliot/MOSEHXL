@@ -43,7 +43,7 @@ No secrets pasted. Secret keys confirmed present only as `[REDACTED]`.
 |--------------|----------------|-----------------------|
 | DB TLS enabled | Yes | `DB_SSL=true` |
 | DB TLS certificate verification | Enabled unless documented exception | **Exception:** `DB_SSL_REJECT_UNAUTHORIZED=false` (DO managed cert chain) |
-| Application DB role | Least privilege | **`DB_USER=mosehxl_app`** (no Bypass RLS, no CreateDB) |
+| Application DB role | Least privilege | **`DB_USER=mosehxl_app`** (live on `self-cert-v2.0.2`) |
 | Superuser access | Restricted/audited | `doadmin` break-glass only (`/root/.mosehxl-doadmin.env`) |
 | Backup user | Read-only where possible | **`DB_BACKUP_USER=mosehxl_backup`** (SELECT + BYPASSRLS for dump completeness) |
 | Migration role | Controlled | Same credentials; migrations tracked in git |
