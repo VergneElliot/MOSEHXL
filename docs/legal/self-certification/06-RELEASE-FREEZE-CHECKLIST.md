@@ -24,7 +24,7 @@ Do not sign until this checklist is complete **and** Phase 4–5 items below are
 | Scope | POS/cash-register fiscal core, as defined in `01-SCOPE.md` |
 | Release version | **2.0.1** (attested); 2.0.0 = prior same-day gate freeze |
 | Git branch at freeze | `development` / `main` (synced) |
-| Git commit | `38c391b` (version bump + gates); tag tip = `git rev-parse self-cert-v2.0.0^{}` |
+| Git commit | Tip of **`self-cert-v2.0.1`** (`git rev-parse self-cert-v2.0.1^{}`) |
 | Git tag | **self-cert-v2.0.1** |
 | Freeze date/time | 2026-07-16 |
 | Freezing operator | MOSEHXL publisher (AI-assisted); publisher review pending |

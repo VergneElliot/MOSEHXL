@@ -56,7 +56,7 @@ closure, receipt, audit, and archive flows.
 | Product family | Restaurant/bar POS and fiscal compliance backend |
 | Covered release version | **2.0.1** |
 | Covered git tag | **`self-cert-v2.0.1`** |
-| Covered git commit | Fill at tag time (`git rev-parse self-cert-v2.0.1^{}`) |
+| Covered git commit | Tip of tag `self-cert-v2.0.1` (attach `git rev-parse self-cert-v2.0.1^{}` at signature) |
 | Covered deployment environment | Production `mosehxl.com` + DigitalOcean managed PostgreSQL `mosehxl_production` |
 | Database migration state | 44 migrations (captured in Phase 3 + restore drill) |
 
