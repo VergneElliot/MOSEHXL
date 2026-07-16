@@ -1,0 +1,1 @@
+pghoard_postgres_command_go --mode restore --port 9702 --site 18ff4d94-de90-4ec5-a541-ee57ef361b4f --output %p --xlog %f

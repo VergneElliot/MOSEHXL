@@ -1,7 +1,7 @@
 # Self-Certification Release Plan & E-Reporting Readiness Roadmap
 
 Date: 2026-07-16
-Status: APPROVED PLAN — execution in progress
+Status: APPROVED PLAN — Phases 1–5 complete for signature (`07-SIGNING-PACKET.md`)
 Owner: MOSEHXL publisher (Thomas Martins) with AI agent assistance
 Supersedes nothing; complements `docs/legal/self-certification/` (the dossier) and
 `docs/roadmaps/2026-07-01-PRODUCT-OPTIONS-AND-KITCHEN-PRINTING.md` (product track).
@@ -239,22 +239,21 @@ least-privilege app DB role; live deploy of `self-cert-v2.0.0`.
 
 ## 8. Phase 5 — Dossier finalization and signature
 
-**Objective:** a signable dossier.
+**Status (2026-07-16): Dossier ready to sign** — engineering complete.
+Attested identity: **MOSEHXL 2.0.1** / **`self-cert-v2.0.1`**.
+Human checklist: `docs/legal/self-certification/07-SIGNING-PACKET.md`.
 
-**Tasks:**
+**Done:**
 
-1. `01-SCOPE.md`: finalize per decision D2, mark Approved.
-2. `02-REFERENTIEL-MAPPING.md`: re-read against the frozen tag; update file paths
-   if refactors moved code; mark Reviewed.
-3. `03-ATTESTATION-DRAFT.md`: fill all placeholders (publisher identity, software
-   name, **tag/version**, date, scope), aligned with the official attestation model
-   (BOFiP annex).
-4. `05-EVIDENCE-INDEX.md`: point every line at real evidence produced in
-   Phases 1-4.
-5. External review: accountant and/or lawyer appointment (**owner: Thomas**).
-   Print, sign, archive the signed original; deliver a copy to the merchant (bar).
+1. `01-SCOPE.md` Approved (D2).
+2. `02-REFERENTIEL-MAPPING.md` Reviewed against freeze.
+3. `03-ATTESTATION-DRAFT.md` filled for version/tag/scope; publisher identity left for signer.
+4. `05-EVIDENCE-INDEX.md` points at Phases 1–4 evidence.
+5. Ops closure: least-privilege DB roles, monthly 6y vault, DO/pghoard off-site evidence.
 
-**Exit criteria:** signed attestation naming `self-cert-v2.0.0`, filed in the
+**Owner (Thomas) only:** fill publisher identity → optional counsel review → print/sign/archive → give copy to bar.
+
+**Exit criteria:** signed attestation naming `self-cert-v2.0.1`, filed in the
 dossier; bar holds its copy.
 
 **⚠ After signature:** the § 2.2 policy is in force — fiscal-module changes require

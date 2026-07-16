@@ -2,8 +2,9 @@
 
 **Date:** 2026-07-16  
 **Environment:** production host `209.38.223.91` + DigitalOcean managed PostgreSQL  
-**Covered release/tag:** `self-cert-v2.0.0` (live deploy of this tag still deferred)  
-**Operator:** MOSEHXL publisher (Thomas / Cursor-assisted execution)
+**Covered release/tag:** `self-cert-v2.0.1`  
+**Operator:** MOSEHXL publisher (Thomas / Cursor-assisted execution)  
+**Closure addendum:** `2026-07-16-OPS-CLOSURE-ADDENDUM.md`
 
 ## Filled records
 
@@ -27,8 +28,8 @@
 
 1. **Production journal untouched** during drill and archive test (`legal_journal` count stayed 21293; production `archive_exports` stayed 0).
 2. Archive export/verify ran against isolated DB `mosehxl_restore_drill` only.
-3. Daily logical backup cron is now installed; **true off-site / WORM** and **6-year monthly vault** remain open follow-ups before signature.
-4. Live cloud still runs a pre-freeze build until explicit deploy of `self-cert-v2.0.0`.
+3. Daily cron + monthly 6-year vault + DO/pghoard off-site evidence closed for signature.
+4. Optional hardening only: Spaces object-lock; admin 2FA after TOTP enrollment.
 
 ## Repo companions
 

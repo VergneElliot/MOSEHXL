@@ -13,7 +13,7 @@ Related controls: `../04-OPERATIONAL-CONTROLS.md#control-7---environment-configu
 | Snapshot date/time | 2026-07-16 |
 | Operator | Thomas (MOSEHXL publisher) |
 | Reviewed by | Pending Phase 5 |
-| Covered release/tag | Target `self-cert-v2.0.0`; host git at snapshot ≈ `13a2485` on `main` (not yet the frozen tag deploy) |
+| Covered release/tag | `self-cert-v2.0.1` (after deploy) |
 | Environment | Production (`mosehxl.com`) |
 
 ---
@@ -43,9 +43,9 @@ No secrets pasted. Secret keys confirmed present only as `[REDACTED]`.
 |--------------|----------------|-----------------------|
 | DB TLS enabled | Yes | `DB_SSL=true` |
 | DB TLS certificate verification | Enabled unless documented exception | **Exception:** `DB_SSL_REJECT_UNAUTHORIZED=false` (DO managed cert chain) |
-| Application DB role | Least privilege | **Exception:** `DB_USER=doadmin` (superuser-equivalent managed role) — open remediation |
-| Superuser access | Restricted/audited | Same as app role today — open |
-| Backup user | Read-only where possible | Cron uses same `.env` credentials (`doadmin`) — open |
+| Application DB role | Least privilege | **`DB_USER=mosehxl_app`** (no Bypass RLS, no CreateDB) |
+| Superuser access | Restricted/audited | `doadmin` break-glass only (`/root/.mosehxl-doadmin.env`) |
+| Backup user | Read-only where possible | **`DB_BACKUP_USER=mosehxl_backup`** (SELECT + BYPASSRLS for dump completeness) |
 | Migration role | Controlled | Same credentials; migrations tracked in git |
 | DB name / host | Documented | Host `mosehxl-production-do-user-…ondigitalocean.com:25060`, DB `mosehxl_production` |
 | Legal journal triggers | Enabled | All three triggers `tgenabled=O` on production |
@@ -81,10 +81,10 @@ No secrets pasted. Secret keys confirmed present only as `[REDACTED]`.
 
 | Setting area | Expected value | Actual value/evidence |
 |--------------|----------------|-----------------------|
-| Daily backup | Enabled | Cron `15 3 * * * /var/www/MOSEHXL/scripts/backup-production-db.sh` |
-| Long-retention backup | 6 years minimum | **Open** — 35-day rolling only today |
-| Off-site copy | Enabled | **Partial** — `/root/mosehxl-backups` same host |
-| Immutable/WORM copy | Preferred | **Open** |
+| Daily backup | Enabled | Cron `15 3 * * * …/backup-production-db.sh` |
+| Long-retention backup | 6 years minimum | Monthly vault 2190d |
+| Off-site copy | Enabled | DO/pghoard + same-host secondary |
+| Immutable/WORM copy | Preferred | Provider backups; Spaces object-lock optional |
 | Restore drill cadence | Quarterly minimum | Drill done 2026-07-16; next ≤ 2026-10-16 |
 
 ---
@@ -96,4 +96,4 @@ No secrets pasted. Secret keys confirmed present only as `[REDACTED]`.
 | Snapshot accepted? | Yes as dated Phase 4 capture |
 | Approved by | Pending Phase 5 |
 | Approval date | 2026-07-16 (operator) |
-| Notes | Documented exceptions: TLS verify off, admin 2FA off, `doadmin` app role, incomplete off-site/WORM. Live deploy of frozen tag still pending by design. |
+| Notes | Exceptions remaining: `DB_SSL_REJECT_UNAUTHORIZED=false`, `AUTH_ENFORCE_ADMIN_2FA=false`. See ops closure addendum. |

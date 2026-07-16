@@ -1,20 +1,18 @@
 # 01 - Self-Certification Scope
 
-Status: Draft  
-Owner to complete: MOSEHXL publisher/operator  
+Status: **Approved** — 2026-07-16 (decision D2)  
+Owner: MOSEHXL publisher  
 
 ---
 
-## Recommended Scope Decision
-
-Recommended initial claim:
+## Approved Scope Claim
 
 > MOSEHXL self-certifies the fiscal cash-register/POS module used to record B2C
 > sales, cancellations/refunds, cash-register change operations, receipts,
 > closure bulletins, legal journal entries, audit trail, and legal archives for
 > French restaurant/bar establishments.
 
-This is the safest first scope because it maps directly to the strongest code
+This is the first signed scope because it maps directly to the strongest code
 evidence: order completion, payment, refund/cancellation, journal append,
 closure, receipt, audit, and archive flows.
 
@@ -39,13 +37,9 @@ closure, receipt, audit, and archive flows.
 
 ## Adjacent But Separately Scoped Modules
 
-These modules can be documented in the evidence package but should not broaden
-the initial self-certification claim unless the publisher intentionally chooses
-to include them:
-
 | Area | Recommendation | Rationale |
 |------|----------------|-----------|
-| B2B invoice subsystem | Adjacent module | It has strong compliance hardening, but invoices have separate legal requirements and a broader functional surface |
+| B2B invoice subsystem | Adjacent module (not in first signed claim) | Strong compliance hardening exists; invoices have separate legal requirements |
 | SaaS billing/subscription management | Exclude | Not the cash-register fiscal core |
 | Hardware/OS/device configuration | Exclude | Operational environment, not software fiscal logic |
 | Payment processor/acquirer behavior | Exclude | External system; MOSEHXL records the payment facts |
@@ -56,44 +50,39 @@ to include them:
 
 ## Version and Build Scope
 
-The final signed attestation must name a fixed release:
-
 | Field | Value |
 |-------|-------|
 | Product name | MOSEHXL |
 | Product family | Restaurant/bar POS and fiscal compliance backend |
-| Covered release version | To fill at release freeze |
-| Covered git commit | To fill at release freeze |
-| Covered git tag | To fill at release freeze |
-| Covered deployment environment | Production configuration documented at release freeze |
-| Database migration state | Migration status output captured at release freeze |
+| Covered release version | **2.0.1** |
+| Covered git tag | **`self-cert-v2.0.1`** |
+| Covered git commit | Fill at tag time (`git rev-parse self-cert-v2.0.1^{}`) |
+| Covered deployment environment | Production `mosehxl.com` + DigitalOcean managed PostgreSQL `mosehxl_production` |
+| Database migration state | 44 migrations (captured in Phase 3 + restore drill) |
 
-Do not sign against `development` as a moving branch. Freeze a release tag, then
-reference that tag and commit in the attestation.
+Do not sign against `development` as a moving branch. The attestation names the
+tag above only.
 
 ---
 
 ## Explicit Non-Claims
 
-The self-certification dossier should explicitly state:
-
 1. MOSEHXL is **not** currently NF-525/LNE certified by an external body.
 2. MOSEHXL does **not** claim that customer hardware, network equipment,
    printers, or payment terminals are certified by this document.
-3. MOSEHXL does **not** claim that operational backups/retention are compliant
-   until the operator implements and records the controls in
-   `04-OPERATIONAL-CONTROLS.md`.
+3. Operational conservation relies on the controls evidenced in
+   `04-OPERATIONAL-CONTROLS.md` and `evidence/phase4-ops/`.
 4. MOSEHXL does **not** certify unreleased future code changes automatically.
    Each material fiscal change must produce a new evidence entry and, when
-   needed, an attestation addendum.
+   needed, a new attestation (MAJOR per BOFiP).
 
 ---
 
-## Open Decisions Before Signature
+## Decisions Closed Before Signature
 
-| Decision | Recommendation | Status |
-|----------|----------------|--------|
-| Include B2B invoice subsystem in first signed scope? | No, document as adjacent evidence first | Open |
-| Include print bridge in first signed scope? | Only as print transport, not fiscal authority | Open |
-| Freeze a release tag before signing? | Yes, mandatory | Open |
-| Obtain legal/accounting review before signing? | Strongly recommended | Open |
+| Decision | Resolution | Status |
+|----------|------------|--------|
+| Include B2B invoice subsystem in first signed scope? | No — adjacent evidence only | **Closed** |
+| Include print bridge in first signed scope? | Only as print transport, not fiscal authority | **Closed** |
+| Freeze a release tag before signing? | Yes — `self-cert-v2.0.1` | **Closed** |
+| Obtain legal/accounting review before signing? | Strongly recommended; not a technical blocker — see `07-SIGNING-PACKET.md` | **Owner action** |
