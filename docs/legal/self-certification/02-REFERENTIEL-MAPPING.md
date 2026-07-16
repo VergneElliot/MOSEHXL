@@ -1,6 +1,6 @@
 # 02 - Referentiel Mapping
 
-Status: **Reviewed** — 2026-07-16 against freeze line `self-cert-v2.0.1`  
+Status: **Reviewed** — 2026-07-16 against freeze line `self-cert-v2.0.2`  
 Scope source: `01-SCOPE.md`  
 Evidence source: `05-EVIDENCE-INDEX.md`
 
@@ -111,7 +111,7 @@ Residual risk:
 
 | Control | MOSEHXL implementation | Evidence | Before signature |
 |---------|------------------------|----------|------------------|
-| Fixed release identity | `self-cert-v2.0.1` / MOSEHXL 2.0.1 | `06-RELEASE-FREEZE-CHECKLIST.md`, `01-SCOPE.md` | **Done** |
+| Fixed release identity | `self-cert-v2.0.2` / MOSEHXL 2.0.2 | `06-RELEASE-FREEZE-CHECKLIST.md`, `01-SCOPE.md` | **Done** |
 | Change traceability | Patch-note index and audit docs record changes | `docs/patch-notes/LATEST-INDEX.md` | **Done** — Phase 3 capture |
 | Migration traceability | Migration manager records checksums and migration state | migration status outputs | **Done** |
 | Quality evidence | Type-check/lint/test gates pass | `evidence/phase3-release-freeze/` | **Done** |
@@ -147,5 +147,5 @@ Engineering + operational status (2026-07-16):
 
 Conclusion:
 
-> Mapping is complete for signature of `self-cert-v2.0.1`. Remaining work is
+> Mapping is complete for signature of `self-cert-v2.0.2`. Remaining work is
 > publisher identity + wet signature (`07-SIGNING-PACKET.md`).

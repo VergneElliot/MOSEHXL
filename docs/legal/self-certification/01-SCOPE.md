@@ -54,9 +54,9 @@ closure, receipt, audit, and archive flows.
 |-------|-------|
 | Product name | MOSEHXL |
 | Product family | Restaurant/bar POS and fiscal compliance backend |
-| Covered release version | **2.0.1** |
-| Covered git tag | **`self-cert-v2.0.1`** |
-| Covered git commit | Tip of tag `self-cert-v2.0.1` (attach `git rev-parse self-cert-v2.0.1^{}` at signature) |
+| Covered release version | **2.0.2** |
+| Covered git tag | **`self-cert-v2.0.2`** |
+| Covered git commit | Tip of tag `self-cert-v2.0.2` (attach `git rev-parse self-cert-v2.0.2^{}` at signature) |
 | Covered deployment environment | Production `mosehxl.com` + DigitalOcean managed PostgreSQL `mosehxl_production` |
 | Database migration state | 44 migrations (captured in Phase 3 + restore drill) |
 
@@ -84,5 +84,5 @@ tag above only.
 |----------|------------|--------|
 | Include B2B invoice subsystem in first signed scope? | No — adjacent evidence only | **Closed** |
 | Include print bridge in first signed scope? | Only as print transport, not fiscal authority | **Closed** |
-| Freeze a release tag before signing? | Yes — `self-cert-v2.0.1` | **Closed** |
+| Freeze a release tag before signing? | Yes — `self-cert-v2.0.2` | **Closed** |
 | Obtain legal/accounting review before signing? | Strongly recommended; not a technical blocker — see `07-SIGNING-PACKET.md` | **Owner action** |

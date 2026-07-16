@@ -1,7 +1,7 @@
 # MOSEHXL Self-Certification Dossier
 
 Status: **Ready to sign** — 2026-07-16  
-Attested line: MOSEHXL **2.0.1** / tag **`self-cert-v2.0.1`**  
+Attested line: MOSEHXL **2.0.2** / tag **`self-cert-v2.0.2`**  
 Human checklist: **`07-SIGNING-PACKET.md`**
 
 ---
@@ -26,7 +26,7 @@ engineering evidence package, not legal advice.
 | `03-ATTESTATION-DRAFT.md` | French attestation draft (fill publisher identity, then sign) |
 | `04-OPERATIONAL-CONTROLS.md` | Ops policy + readiness table |
 | `05-EVIDENCE-INDEX.md` | Evidence catalogue |
-| `06-RELEASE-FREEZE-CHECKLIST.md` | Freeze checklist (complete for 2.0.1) |
+| `06-RELEASE-FREEZE-CHECKLIST.md` | Freeze checklist (complete for 2.0.2) |
 | `evidence/` | Phase 1–4 dated evidence |
 | `evidence-templates/` | Templates for quarterly repeats |
 
@@ -38,6 +38,6 @@ engineering evidence package, not legal advice.
 |------|--------|
 | Scope approved | Done |
 | Operational controls + evidence | Done |
-| Release freeze + tag | `self-cert-v2.0.1` |
+| Release freeze + tag | `self-cert-v2.0.2` |
 | Live production on tag | Done at deploy |
 | Publisher identity + signature | **You** — `07-SIGNING-PACKET.md` |
