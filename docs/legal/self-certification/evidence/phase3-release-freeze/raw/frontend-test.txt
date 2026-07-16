@@ -1,0 +1,18 @@
+
+> musebar@2.0.0 test
+> vitest --run
+
+
+ RUN  v3.2.6 /home/zone01student/Projects/MOSEHXL/MuseBar
+
+ ✓ src/services/api/orders.mapper.test.ts (2 tests) 11ms
+ ✓ src/services/clientErrorLogger.test.ts (2 tests) 22ms
+ ✓ src/hooks/__tests__/useAuth.test.ts (3 tests) 44ms
+ ✓ src/hooks/__tests__/usePOSState.test.ts (17 tests) 77ms
+
+ Test Files  4 passed (4)
+      Tests  24 passed (24)
+   Start at  19:49:04
+   Duration  1.76s (transform 444ms, setup 776ms, collect 871ms, tests 154ms, environment 2.85s, prepare 629ms)
+
+EXIT:0

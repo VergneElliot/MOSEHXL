@@ -1,0 +1,5 @@
+
+> mosehxl-backend@2.0.0 type-check
+> tsc --noEmit
+
+EXIT:0

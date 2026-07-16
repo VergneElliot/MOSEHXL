@@ -1,0 +1,6 @@
+
+> mosehxl-backend@2.0.0 check:schema-drift
+> node scripts/check-legal-schema-drift.js
+
+Schema drift check passed: no migration files changed.
+EXIT:0

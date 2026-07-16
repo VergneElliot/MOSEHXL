@@ -1,0 +1,58 @@
+
+> mosehxl-backend@2.0.0 migration:status
+> ts-node src/migrations/cli.ts status
+
+◇ injected env (26) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ⌘ override existing { override: true }
+📊 Migration Status:
+==================
+✅ EXECUTED 2025_09_12_07_30_00 - remove email unique constraints (sha256:dc6868340b40)
+✅ EXECUTED 2025_09_15_00_00_00 - add establishment fields (sha256:16b244eda40a)
+✅ EXECUTED 2026_02_25_00_00_00 - add pos columns and establishment isolation (sha256:3e909a567402)
+✅ EXECUTED 2026_02_25_00_15_00 - create setup progress tables (sha256:9102a4e31fe3)
+✅ EXECUTED 2026_02_25_00_30_00 - create status transitions table (sha256:30cb33b833d2)
+✅ EXECUTED 2026_02_25_01_00_00 - convert timestamps to timestamptz (sha256:c22ba115f3ec)
+✅ EXECUTED 2026_02_26_01_00_00 - accounting decimal precision (sha256:5c7dfed9e58d)
+✅ EXECUTED 2026_02_26_02_00_00 - add establishment id to closure bulletins (sha256:495e9d763b2b)
+✅ EXECUTED 2026_02_26_02_30_00 - add closure tips change weekly (sha256:1863db0b3e99)
+✅ EXECUTED 2026_02_26_03_00_00 - add users is active (sha256:e7e268767287)
+✅ EXECUTED 2026_03_05_01_00_00 - faire de la monnaie (sha256:0b204fc1d770)
+✅ EXECUTED 2026_03_05_12_00_00 - rate limit store (sha256:076a44a3371e)
+✅ EXECUTED 2026_03_05_13_00_00 - v1 data backfill (sha256:e17e1278d0ae)
+✅ EXECUTED 2026_03_11_00_00_00 - establishment settings (sha256:8b4c27d229d7)
+✅ EXECUTED 2026_03_12_10_00_00 - fix nan orders (sha256:4dabfac88e19)
+✅ EXECUTED 2026_03_13_00_00_00 - total amount exclude tips (sha256:6ba2c9cc225f)
+✅ EXECUTED 2026_03_19_00_00_00 - backfill establishment id for closure bulletins (sha256:d032704a159b)
+✅ EXECUTED 2026_03_25_16_30_00 - backfill closure bulletins vat buckets from ttc (sha256:5369a51e9771)
+✅ EXECUTED 2026_04_07_12_00_00 - add fond de caisse to closure bulletins (sha256:2b966c37538e)
+✅ EXECUTED 2026_04_22_00_00_00 - auth roles admin separation (sha256:bffe79592863)
+✅ EXECUTED 2026_04_22_12_00_00 - granular permissions (sha256:16deffb6691e)
+✅ EXECUTED 2026_04_22_12_01_00 - backfill pos permissions for access pos (sha256:b91c9a7194ab)
+✅ EXECUTED 2026_04_23_00_00_00 - legal journal per establishment (sha256:72466647a9cb)
+✅ EXECUTED 2026_04_23_22_00_00 - token blocklist (sha256:5bdd34ec493e)
+✅ EXECUTED 2026_04_24_00_00_00 - row level security tenant isolation (sha256:91888f9df9c9)
+✅ EXECUTED 2026_04_24_01_00_00 - order items establishment denormalization (sha256:704edda721e0)
+✅ EXECUTED 2026_04_24_02_00_00 - printing tables in migration chain (sha256:c44ed1a74d93)
+✅ EXECUTED 2026_04_29_18_00_00 - a3 constraints hardening (sha256:bb55517c7515)
+✅ EXECUTED 2026_04_30_20_20_00 - add user token revocation cutoffs (sha256:4fac3e94e499)
+✅ EXECUTED 2026_05_21_18_30_00 - block legal journal truncate (sha256:5e2fb7d95402)
+✅ EXECUTED 2026_05_21_18_45_00 - enforce legal journal hash chain on insert (sha256:406a8f51248c)
+✅ EXECUTED 2026_05_21_19_10_00 - add refresh session tokens (sha256:5da9001b9a90)
+✅ EXECUTED 2026_05_21_19_45_00 - add login lockout columns (sha256:440f767bc4fb)
+✅ EXECUTED 2026_05_21_20_20_00 - add closure journal reconciliation columns (sha256:3b5cb9e72f52)
+✅ EXECUTED 2026_05_21_21_40_00 - add user totp mfa columns (sha256:819b6f3e6578)
+✅ EXECUTED 2026_05_28_17_10_00 - add refresh token device session fields (sha256:12c30b073934)
+✅ EXECUTED 2026_05_28_20_30_00 - add legal invoices (sha256:80b58192ee94)
+✅ EXECUTED 2026_05_28_21_15_00 - add invoice legal fields (sha256:59d36cd5552c)
+✅ EXECUTED 2026_06_18_16_00_00 - add printing jobs bridge queue (sha256:1d672a47ade5)
+✅ EXECUTED 2026_07_01_10_00_00 - add product option groups (sha256:c8cc14646851)
+✅ EXECUTED 2026_07_01_11_00_00 - add order item options (sha256:2f8dad614993)
+✅ EXECUTED 2026_07_01_12_00_00 - add kitchen printers (sha256:6e590f418fe1)
+✅ EXECUTED 2026_07_01_13_00_00 - add product print pickup slip (sha256:c968ff4b9be5)
+✅ EXECUTED 2026_07_01_14_00_00 - add kitchen ticket day number (sha256:7fd264b82976)
+
+📈 Summary:
+   Total migrations: 44
+   Executed: 44
+   Pending: 0
+EXIT:0

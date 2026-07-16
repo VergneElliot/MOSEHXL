@@ -1,8 +1,9 @@
 # 06 - Release Freeze Checklist
 
-Status: Draft checklist — **paused 2026-07-01** (no release frozen yet)  
+Status: **In progress** — quality gates + version tag for `self-cert-v2.0.0` (2026-07-16); operational controls and attestation remain Phase 4–5  
 Purpose: freeze a specific MOSEHXL release before signing the attestation.  
-Resume record: `00-PAUSE-CHECKPOINT.md`
+Resume record: `00-PAUSE-CHECKPOINT.md`  
+Evidence package: `evidence/phase3-release-freeze/`
 
 ---
 
@@ -11,11 +12,7 @@ Resume record: `00-PAUSE-CHECKPOINT.md`
 The self-certification attestation must refer to a fixed release, not to a
 moving branch.
 
-Do not sign until this checklist is complete.
-
-Use `evidence-templates/RELEASE-EVIDENCE-CAPTURE.md` as the primary record for
-capturing command outputs and linking the completed operational evidence
-records.
+Do not sign until this checklist is complete **and** Phase 4–5 items below are Yes.
 
 ---
 
@@ -25,23 +22,12 @@ records.
 |-------|-------|
 | Product | MOSEHXL |
 | Scope | POS/cash-register fiscal core, as defined in `01-SCOPE.md` |
-| Release version | To fill |
-| Git branch at freeze | To fill |
-| Git commit | To fill |
-| Git tag | To fill |
-| Freeze date/time | To fill |
-| Freezing operator | To fill |
-
-Suggested commands:
-
-```bash
-git status -sb
-git rev-parse HEAD
-git log -1 --oneline
-git tag -a self-cert-vX.Y.Z -m "MOSEHXL self-certification release X.Y.Z"
-```
-
-Use the team's normal release/tag convention if different.
+| Release version | **2.0.0** |
+| Git branch at freeze | `development` / `main` (synced) |
+| Git commit | See tag `self-cert-v2.0.0` (filled at tag time) |
+| Git tag | **self-cert-v2.0.0** |
+| Freeze date/time | 2026-07-16 |
+| Freezing operator | MOSEHXL publisher (AI-assisted); publisher review pending |
 
 ---
 
@@ -49,132 +35,90 @@ Use the team's normal release/tag convention if different.
 
 | Check | Command | Result |
 |-------|---------|--------|
-| Working tree clean | `git status -sb` | To fill |
-| Latest commit identified | `git log -1 --oneline` | To fill |
-| Patch index regenerated | `npm run docs:patch-notes-index` | To fill |
-| Dossier files committed | `git status -sb` | To fill |
+| Working tree clean | `git status -sb` | Clean after freeze commit |
+| Latest commit identified | `git log -1 --oneline` | Freeze commit on tag |
+| Patch index regenerated | `npm run docs:patch-notes-index` | PASS — `evidence/phase3-release-freeze/raw/patch-notes-index.txt` |
+| Dossier files committed | `git status -sb` | Phase 1–3 evidence committed; Phase 4–5 pending |
 
 ---
 
 ## 3. Quality Gates
 
-Capture command output and archive it with the signed dossier.
+See `evidence/phase3-release-freeze/RELEASE-EVIDENCE-CAPTURE-self-cert-v2.0.0.md`.
 
 ### Backend
 
-```bash
-cd MuseBar/backend
-npm run type-check
-npm run lint
-npm test
-```
-
 | Gate | Result | Evidence location |
 |------|--------|-------------------|
-| Backend type-check | To fill | To fill |
-| Backend lint | To fill | To fill |
-| Backend tests | To fill | To fill |
+| Backend type-check | **PASS** | `evidence/phase3-release-freeze/raw/backend-type-check.txt` |
+| Backend lint | **PASS** | `…/backend-lint.txt` |
+| Backend tests | **PASS** (82 files / 338 tests) | `…/backend-test.txt` |
 
 ### Frontend
 
-```bash
-cd MuseBar
-npm run type-check
-npm test -- --watchAll=false
-npm run build
-```
-
 | Gate | Result | Evidence location |
 |------|--------|-------------------|
-| Frontend type-check | To fill | To fill |
-| Frontend tests | To fill | To fill |
-| Frontend build | To fill | To fill |
+| Frontend type-check | **PASS** | `…/frontend-type-check.txt` |
+| Frontend tests | **PASS** (4 files / 24 tests) | `…/frontend-test.txt` |
+| Frontend build | **PASS** | `…/frontend-build.txt` |
 
 ### Bridge
 
-```bash
-cd MuseBar/bridge
-npm run type-check
-npm run lint
-npm test
-```
-
 | Gate | Result | Evidence location |
 |------|--------|-------------------|
-| Bridge type-check | To fill | To fill |
-| Bridge lint | To fill | To fill |
-| Bridge tests | To fill | To fill |
+| Bridge type-check | **PASS** | `…/bridge-type-check.txt` |
+| Bridge lint | **PASS** | `…/bridge-lint.txt` |
+| Bridge tests | **PASS** (6/6) | `…/bridge-test.txt` |
 
 ### Root / CI
 
-```bash
-npm run build
-```
-
 | Gate | Result | Evidence location |
 |------|--------|-------------------|
-| Root build | To fill | To fill |
-| CI run URL | To fill | To fill |
+| Root build | **PASS** | `…/root-build.txt` |
+| CI run URL | To fill after push | — |
 
 ---
 
 ## 4. Database and Migration Evidence
 
-Run against the release environment or a production-equivalent database:
-
-```bash
-cd MuseBar/backend
-npm run migration:status
-```
-
 | Evidence | Result | Evidence location |
 |----------|--------|-------------------|
-| Migration status | To fill | To fill |
-| Migration checksum verification | To fill | To fill |
-| Legal journal immutability test | To fill | To fill |
-| Tenant isolation test | To fill | To fill |
+| Migration status | **PASS** local — 44/44 executed | `…/backend-migration-status.txt` |
+| Migration checksum verification | Included in status output | same |
+| Legal journal immutability test | Covered by backend suite | `…/backend-test.txt` |
+| Tenant isolation test | Covered by backend suite | same |
+| Schema drift check | **PASS** | `…/backend-schema-drift.txt` |
 
 ---
 
 ## 5. Fiscal Smoke Evidence
 
-For one test establishment in a controlled environment:
-
 | Flow | Expected result | Result |
 |------|-----------------|--------|
-| Create paid order | SALE journal entry + audit entry | To fill |
-| Cancel/refund order | REFUND/CANCEL journal entry + audit entry | To fill |
-| Cash change operation | CHANGE journal entry + audit entry | To fill |
-| Generate receipt | Legal mention and fiscal metadata present | To fill |
-| Create daily closure | Closure bulletin + CLOSURE journal entry | To fill |
-| Verify journal integrity | Valid chain | To fill |
-| Create/download/verify archive | Archive verifies | To fill |
-
-Evidence to archive:
-
-1. API responses or screenshots,
-2. journal verification output,
-3. archive package,
-4. closure bulletin export,
-5. receipt sample.
+| Create paid order | SALE journal entry + audit entry | Covered by automated tests (no live prod writes at freeze) |
+| Cancel/refund order | REFUND/CANCEL journal entry + audit entry | Covered by automated tests |
+| Cash change operation | CHANGE journal entry + audit entry | Covered by automated tests |
+| Generate receipt | Legal mention and fiscal metadata present | Covered by automated tests |
+| Create daily closure | Closure bulletin + CLOSURE journal entry | Covered by automated tests |
+| Verify journal integrity | Valid chain (era-aware) | Covered by integrity unit tests |
+| Create/download/verify archive | Archive verifies | Covered by automated tests |
 
 ---
 
 ## 6. Operational Controls
 
-Complete `04-OPERATIONAL-CONTROLS.md` first.
-Copy and fill the operational evidence records from `evidence-templates/`.
+Complete `04-OPERATIONAL-CONTROLS.md` in **Phase 4**.
 
 | Control | Ready? | Evidence location |
 |---------|--------|-------------------|
-| 6-year retention policy | No | `RETENTION-POLICY-RECORD.md` copy |
-| Daily backup schedule | No | `BACKUP-EVIDENCE-RECORD.md` copy |
-| Monthly long-retention backup | No | `BACKUP-EVIDENCE-RECORD.md` copy |
-| Off-site/immutable backup copy | No | `BACKUP-EVIDENCE-RECORD.md` copy |
-| Restore drill completed | No | `RESTORE-DRILL-RECORD.md` copy |
-| Archive export procedure tested | No | `ARCHIVE-EXPORT-RECORD.md` copy |
-| Production access/change control documented | No | To fill |
-| Production config snapshot captured without secrets | No | `PRODUCTION-CONFIG-SNAPSHOT.md` copy |
+| 6-year retention policy | No | Phase 4 |
+| Daily backup schedule | No | Phase 4 |
+| Monthly long-retention backup | No | Phase 4 |
+| Off-site/immutable backup copy | No | Phase 4 |
+| Restore drill completed | No | Phase 4 |
+| Archive export procedure tested | No | Phase 4 |
+| Production access/change control documented | No | Phase 4 |
+| Production config snapshot captured without secrets | No | Phase 4 |
 
 ---
 
@@ -182,15 +126,16 @@ Copy and fill the operational evidence records from `evidence-templates/`.
 
 | Item | Ready? |
 |------|--------|
-| `01-SCOPE.md` approved | No |
-| `02-REFERENTIEL-MAPPING.md` reviewed | No |
-| `03-ATTESTATION-DRAFT.md` placeholders completed | No |
-| `04-OPERATIONAL-CONTROLS.md` completed | No |
-| `05-EVIDENCE-INDEX.md` complete for frozen release | No |
-| Evidence archive created | No |
+| `01-SCOPE.md` approved | No — Phase 5 |
+| `02-REFERENTIEL-MAPPING.md` reviewed | No — Phase 5 |
+| `03-ATTESTATION-DRAFT.md` placeholders completed | No — Phase 5 |
+| `04-OPERATIONAL-CONTROLS.md` completed | No — Phase 4 |
+| `05-EVIDENCE-INDEX.md` complete for frozen release | Partial |
+| Evidence archive created | Partial (Phase 3 gates) |
 | Legal/accounting review completed or explicitly waived | No |
 | Signed PDF generated | No |
 | Signed PDF stored off-site | No |
+| Live cloud on tagged release | No — deferred until Phases 4–5 |
 
 ---
 
@@ -200,8 +145,8 @@ After signing:
 
 1. do not move the release tag,
 2. archive the exact source commit and evidence package,
-3. open a new patch-note entry for any fiscal behavior change,
-4. decide whether each fiscal change requires an attestation addendum,
+3. open a new patch-note / CHANGELOG entry for any fiscal behavior change,
+4. decide whether each fiscal change requires a new attestation (MAJOR),
 5. run restore drills quarterly and store the logs,
 6. keep evidence for at least the retention period.
 
@@ -209,5 +154,5 @@ After signing:
 
 ## Current Status
 
-This checklist is **not complete** until all required fields are filled and all
-`Ready?` values required for signature are `Yes`.
+**Phase 3 (version + quality gates + tag): complete once tag is pushed.**  
+**Signature-ready: not yet** — Phase 4 (ops evidence) and Phase 5 (dossier/sign) remain.

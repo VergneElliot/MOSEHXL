@@ -1,0 +1,5 @@
+
+> musebar-print-bridge@0.1.0 type-check
+> tsc --noEmit -p tsconfig.json
+
+EXIT:0

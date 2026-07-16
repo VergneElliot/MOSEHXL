@@ -34,6 +34,8 @@ Evidence used for a signed attestation must be:
 | Closure anomaly analysis | `docs/legal/self-certification/evidence/phase1-forensics/2026-07-16-CLOSURE-ANOMALIES.md` | Explains zero/duplicate/backfilled/gap closures |
 | Dev→prod migration incident | `docs/legal/self-certification/evidence/INCIDENT-2025-07-DEV-TO-PROD-MIGRATION.md` | Dated incident record for seq 608/609 migration |
 | Anomaly register | `docs/legal/self-certification/evidence/ANOMALY-REGISTER.md` | Inspector-facing index of all known anomalies |
+| Release freeze evidence (v2.0.0) | `docs/legal/self-certification/evidence/phase3-release-freeze/` | Quality-gate outputs and capture record for `self-cert-v2.0.0` |
+| Changelog | `CHANGELOG.md` | SemVer + fiscal-impact statements per release |
 
 ---
 

@@ -1,0 +1,6 @@
+
+> docs:patch-notes-index
+> node scripts/generate-patch-notes-index.js
+
+Generated docs/patch-notes/LATEST-INDEX.md
+EXIT:0
