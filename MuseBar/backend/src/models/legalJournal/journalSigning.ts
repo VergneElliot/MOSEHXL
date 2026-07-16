@@ -102,7 +102,11 @@ function timestampVariants(timestamp: Date | string): string[] {
 }
 
 function orderIdForHash(orderId: number | null | undefined): string {
-  return orderId === null || orderId === undefined ? 'null' : orderId || '';
+  if (orderId === null || orderId === undefined) {
+    return 'null';
+  }
+  // Match append-path: falsy order ids (e.g. 0) hash as empty string.
+  return orderId ? String(orderId) : '';
 }
 
 function parseTransactionData(
@@ -249,10 +253,14 @@ export class JournalSigning {
 
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i];
+      if (!entry) {
+        continue;
+      }
+      const previousEntry = i > 0 ? entries[i - 1] : undefined;
 
-      if (i > 0 && entry.sequence_number <= entries[i - 1].sequence_number) {
+      if (previousEntry && entry.sequence_number <= previousEntry.sequence_number) {
         errors.push(
-          `Non-monotonic sequence for establishment: ${entry.sequence_number} after ${entries[i - 1].sequence_number}`
+          `Non-monotonic sequence for establishment: ${entry.sequence_number} after ${previousEntry.sequence_number}`
         );
       }
 
