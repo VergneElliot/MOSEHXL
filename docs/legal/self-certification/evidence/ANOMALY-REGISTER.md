@@ -1,6 +1,6 @@
 # Anomaly Register — Legal Journal & Closures
 
-**Last updated:** 2026-07-16  
+**Last updated:** 2026-07-23  
 **Purpose:** One-line index from any known production anomaly to its explanation
 and evidence. Used by the self-certification dossier and by operators answering
 inspector questions.
@@ -26,8 +26,8 @@ product follow-up; **Watch** = monitoring only.
 | C-DUP | 23 Paris days with >1 DAILY bulletin | 2025-07 → 2026-04 | Empty bursts (§ C-ZERO) or early partial close + later full close | same § 2.2 | Closed |
 | C-BACKFILL | Dec 1 2025 closed 2026-01-02 (~32 days late) | 2026-01-02 | Manual catch-up of missed daily close | same § 2.3 | Closed |
 | C-0TX | 9 bulletins with 0 tx but non-zero amount | 2025-07 → 2026-03 | Historical early-close bug; superseded same day by correct bulletin | same § 2.4 | Closed |
-| C-GAP | 22 days with journal SALE but no positive DAILY bulletin | 2025-08 → 2026-07 | Auto-closure coverage gaps (Sundays / low volume); sales still in journal | same § 2.5 | Watch — optional backfill if accountant asks |
-| C-RECON | 25 DAILY with `reconciliation_ok = false` | mostly ≥ 2026-06-18 | Sub-cent VAT rounding, or small late sale/refund deltas | same § 2.6 | Open — sample with accountant; consider 0.01 € tolerance (minor) |
+| C-GAP | 22 days with journal SALE but no positive DAILY bulletin | 2025-08 → 2026-07 | Auto-closure coverage gaps; sales still in journal | same § 2.5 | Watch — historical; **forward mitigation in 2.0.3** (scheduler gap backfill). Optional historical backfill if accountant asks (IRL-8) |
+| C-RECON | 25 DAILY with `reconciliation_ok = false` | mostly ≥ 2026-06-18 | Sub-cent VAT rounding drift | same § 2.6 | Closed for new closures — **€0.01 VAT tolerance in 2.0.3**; historical rows unchanged |
 
 ## C. Reconciliation (accountant)
 

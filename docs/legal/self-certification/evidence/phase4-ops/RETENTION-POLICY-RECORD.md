@@ -42,7 +42,7 @@ Related control: `../04-OPERATIONAL-CONTROLS.md#control-1---data-retention`
 | Object lock / immutability | Provider-managed backups; Spaces object-lock optional |
 | Encryption at rest | DO managed DB encryption at rest (provider default); host disk LUKS status not separately attested |
 | Encryption in transit | `DB_SSL=true` (TLS to managed PG); HTTPS to `https://mosehxl.com` |
-| Delete permissions restricted to | Root on droplet + `doadmin` DB role (least-privilege app role still open) |
+| Delete permissions restricted to | Root on droplet; app uses `mosehxl_app`; `doadmin` break-glass only |
 
 ---
 

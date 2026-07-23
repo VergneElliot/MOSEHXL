@@ -1,6 +1,9 @@
 # Release Evidence Capture — self-cert-v2.0.0
 
-Status: Quality gates captured 2026-07-16; operational controls deferred to Phase 4; live deploy deferred until Phases 4–5 complete  
+Status: Quality gates captured 2026-07-16 (**historical freeze record**).  
+**Supersession (2026-07-23):** operational controls completed in Phase 4; live production
+now runs **`self-cert-v2.0.2`** (see `evidence/phase4-ops/raw/prod-deploy-self-cert-v2.0.2.txt`
+and `07-SIGNING-PACKET.md`). This file remains the gate evidence for the 2.0.0 tag tip.  
 Related checklist: `../06-RELEASE-FREEZE-CHECKLIST.md`  
 Raw command outputs: `./raw/`
 
@@ -127,6 +130,6 @@ Manual UAT on a non-production establishment: optional before live deploy; not b
 | Operational controls complete? | **No** — Phase 4 |
 | Evidence package archived? | Quality-gate package yes (`phase3-release-freeze/`); ops package pending |
 | Attestation ready to sign? | **No** — Phases 4–5 remaining |
-| Live cloud running this tag? | **No** — deliberately deferred until process complete |
+| Live cloud running this tag? | **No at capture time** — deliberately deferred; **superseded:** live cloud later deployed `self-cert-v2.0.2` |
 | Approved by | To fill |
 | Approval date | To fill |

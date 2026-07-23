@@ -214,4 +214,16 @@ export class JournalQueries {
   ): Promise<boolean> {
     return await journalRead.closureBulletinExists(type, startDate, endDate, establishmentId);
   }
+
+  static async findClosedDailyBulletinsForBusinessDay(
+    establishmentId: string,
+    businessDayStart: Date,
+    timezone: string
+  ): Promise<Array<{ id: number; closure_hash: string; total_amount: number }>> {
+    return await journalRead.findClosedDailyBulletinsForBusinessDay(
+      establishmentId,
+      businessDayStart,
+      timezone
+    );
+  }
 }

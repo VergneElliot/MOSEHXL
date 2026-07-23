@@ -1,0 +1,93 @@
+# Fiscal path guard (CI)
+
+name: Fiscal Path Guard
+
+on:
+  pull_request:
+    branches: [main, development]
+    paths:
+      - 'MuseBar/backend/src/models/legalJournal/**'
+      - 'MuseBar/backend/src/models/archiveService.ts'
+      - 'MuseBar/backend/src/models/archiveService*.ts'
+      - 'MuseBar/backend/src/routes/legal/**'
+      - 'MuseBar/backend/src/utils/closureScheduler.ts'
+      - 'MuseBar/backend/src/utils/closureScheduler*.ts'
+      - 'MuseBar/backend/src/services/legal/**'
+      - 'MuseBar/backend/src/migrations/files/**legal*'
+      - 'MuseBar/backend/src/migrations/files/**closure*'
+      - 'MuseBar/backend/src/migrations/files/**archive*'
+      - 'MuseBar/backend/src/migrations/files/**journal*'
+      - 'CHANGELOG.md'
+
+jobs:
+  fiscal-impact-checklist:
+    name: Fiscal impact checklist
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect fiscal path changes vs base
+        id: detect
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          CHANGED=$(git diff --name-only "$BASE_SHA...$HEAD_SHA" || true)
+          echo "Changed files:"
+          echo "$CHANGED"
+          FISCAL=0
+          echo "$CHANGED" | grep -E \
+            'MuseBar/backend/src/models/legalJournal/|MuseBar/backend/src/models/archiveService|MuseBar/backend/src/routes/legal/|MuseBar/backend/src/utils/closureScheduler|MuseBar/backend/src/services/legal/|MuseBar/backend/src/migrations/files/.*legal|MuseBar/backend/src/migrations/files/.*closure|MuseBar/backend/src/migrations/files/.*archive|MuseBar/backend/src/migrations/files/.*journal' \
+            && FISCAL=1 || true
+          echo "fiscal=$FISCAL" >> "$GITHUB_OUTPUT"
+          if [ "$FISCAL" = "1" ]; then
+            echo "::notice::Fiscal / ISCA-related paths changed. Changelog fiscal-impact statement is required."
+          fi
+
+      - name: Require CHANGELOG fiscal-impact when fiscal paths change
+        if: steps.detect.outputs.fiscal == '1'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if ! git diff --name-only "$BASE_SHA...$HEAD_SHA" | grep -qx 'CHANGELOG.md'; then
+            echo "::error::Fiscal paths changed but CHANGELOG.md was not updated."
+            echo "Add a SemVer entry with an explicit **Fiscal impact:** MAJOR | MINOR | PATCH line."
+            echo "MAJOR = ISCA parameter change → new publisher attestation required after merge/deploy."
+            exit 1
+          fi
+          # New changelog hunk must mention fiscal impact
+          if ! git diff "$BASE_SHA...$HEAD_SHA" -- CHANGELOG.md | grep -qiE 'Fiscal impact|\*\*Fiscal impact\*\*'; then
+            echo "::error::CHANGELOG.md changed but no 'Fiscal impact' line found in the diff."
+            echo "Example: **Fiscal impact:** PATCH (no ISCA parameter change)."
+            exit 1
+          fi
+          echo "CHANGELOG fiscal-impact line present — OK."
+
+      - name: Post reminder on fiscal PRs
+        if: steps.detect.outputs.fiscal == '1' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `## Fiscal path guard
+
+            This PR touches cash-register / ISCA-related paths (legal journal, closures, archives, legal routes, or related migrations).
+
+            **Checklist before merge**
+            - [ ] \`CHANGELOG.md\` states **Fiscal impact:** \`MAJOR\` | \`MINOR\` | \`PATCH\`
+            - [ ] If **MAJOR**: plan a new publisher attestation after deploy (existing \`self-cert-v2.0.2\` will not cover the new behavior)
+            - [ ] If **MINOR/PATCH**: confirm no change to journal hash rules, DB immutability triggers, or closure/archive *write semantics*
+
+            Policy: \`docs/roadmaps/2026-07-16-SELF-CERTIFICATION-RELEASE-AND-EREPORTING-PLAN.md\` § 2.2
+            `;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });

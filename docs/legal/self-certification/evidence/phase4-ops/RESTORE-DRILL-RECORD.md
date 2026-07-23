@@ -15,7 +15,7 @@ Related control: `../04-OPERATIONAL-CONTROLS.md#control-4---restore-drill`
 | Backup used | `/var/www/MOSEHXL/backups/mosehxl-prod-20260716-180021.dump` |
 | Backup date/time | 2026-07-16 18:00:21 UTC |
 | Restored environment | Isolated DB `mosehxl_restore_drill` on same DO managed cluster (created via `defaultdb`, not `template1`) |
-| Covered release/tag | `self-cert-v2.0.0` (drill data = live production snapshot; live app binary still pre-deploy) |
+| Covered release/tag | `self-cert-v2.0.0` era snapshot (drill 2026-07-16); **live app since then:** `self-cert-v2.0.2` |
 
 ---
 
@@ -62,10 +62,10 @@ Repo helper for repeats: `scripts/restore-drill.sh`.
 
 | Issue | Severity | Corrective action | Owner | Due date | Closed? |
 |-------|----------|-------------------|-------|----------|---------|
-| `archiveService` INSERT PENDING with `file_size=0` violated `file_size_positive` | Medium | Generate file before INSERT; verify with `Number(file_size)` for pg bigint | Engineering | 2026-07-16 | Yes (code in repo; live deploy deferred) |
+| `archiveService` INSERT PENDING with `file_size=0` violated `file_size_positive` | Medium | Generate file before INSERT; verify with `Number(file_size)` for pg bigint | Engineering | 2026-07-16 | Yes — shipped in 2.0.1 / live on 2.0.2 |
 | First verify reported size mismatch (stale meta) | Low | Re-verify after fix; keep `raw/archive-id-2.meta.json` | Engineering | 2026-07-16 | Yes |
-| Same-host “off-site” copy only | Medium | Add object-lock vault | Operator | Before signature | Open |
-| App DB role is `doadmin` (not least privilege) | Medium | Create app role with least privileges | Operator | Before signature | Open |
+| Same-host “off-site” copy only | Medium | Provider pghoard + monthly vault; Spaces WORM optional (COMP-1) | Operator | 2026-07-16 | Closed for signature; Spaces optional |
+| App DB role is `doadmin` (not least privilege) | Medium | Create `mosehxl_app` / `mosehxl_backup` | Operator | 2026-07-16 | Yes — live `DB_USER=mosehxl_app` on 2.0.2 |
 
 ---
 

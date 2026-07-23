@@ -72,6 +72,9 @@ draft, re-export PDF, then sign.
 
 ## Explicit non-blockers left as residual (accepted for signature)
 
+Full beginner-friendly action plan for every leftover (IRL vs computer):
+`docs/roadmaps/2026-07-23-POST-FREEZE-THOROUGHNESS-ROADMAP.md`.
+
 | Item | Status |
 |------|--------|
 | Object-lock WORM bucket | Optional hardening; provider-managed DB backups + 6-year monthly dumps cover conservation |
