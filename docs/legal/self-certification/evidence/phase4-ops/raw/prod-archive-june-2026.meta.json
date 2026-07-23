@@ -1,0 +1,18 @@
+{
+  "id": 1,
+  "export_type": "MONTHLY",
+  "format": "JSON",
+  "export_status": "COMPLETED",
+  "period_start": "2026-06-01T00:00:00.000Z",
+  "period_end": "2026-06-30T23:59:59.999Z",
+  "file_path": "/var/www/MOSEHXL/MuseBar/backend/exports/temp_1784824784984.json",
+  "file_hash": "c5ad0d4dda5c09ddc45802b79db091bf1046ed98c48cdb2f02c07c96b77769e9",
+  "file_size": 5042565,
+  "digital_signature_present": true,
+  "verification": {
+    "isValid": true,
+    "errors": []
+  },
+  "db": "mosehxl_production",
+  "note": "COMP-4 production MONTHLY archive 2026-06"
+}

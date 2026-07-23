@@ -1,6 +1,8 @@
 import { pool } from '../db/pool';
 import { DEFAULT_APP_TIMEZONE } from '../config/timezone';
 import { LegalJournalModel } from '../models/legalJournal';
+import { getBusinessDayPeriod } from '../models/legalJournal/businessDayPeriod';
+import { JournalQueries } from '../models/legalJournal/journalQueries';
 import { AuditTrailModel } from '../models/auditTrail';
 import moment from 'moment-timezone';
 import { runWithTenantContext } from '../rls/tenantContext';
@@ -66,6 +68,9 @@ export class ClosureScheduler {
           const settings = await this.getClosureSettings(establishmentId);
           if (!settings.auto_closure_enabled) return;
 
+          // Outside the grace window: still backfill at most one missed day with sales.
+          await this.backfillOneMissingDailyClosure(establishmentId, settings, now);
+
           const nowTz = moment.tz(now, settings.timezone);
           const shouldClose = await this.shouldExecuteClosure(settings, nowTz);
           if (!shouldClose) return;
@@ -126,20 +131,32 @@ export class ClosureScheduler {
   }
 
   // Execute automatic closure for one establishment.
-  static async executeAutomaticClosureForEstablishment(establishmentId: string, now: Date) {
+  // Optional businessDayOverride closes a specific Paris calendar day (gap backfill).
+  static async executeAutomaticClosureForEstablishment(
+    establishmentId: string,
+    now: Date,
+    businessDayOverride?: Date
+  ) {
     try {
       const settings = await this.getClosureSettings(establishmentId);
       const closureTime = settings.daily_closure_time || '02:00';
       const timezone = settings.timezone || DEFAULT_APP_TIMEZONE;
 
-      const nowTz = moment.tz(now, timezone);
-      const closureHour = parseInt(closureTime.split(':')[0] ?? '0', 10);
-      let businessDay = nowTz.clone();
-      if (closureHour < 12 && nowTz.hour() < closureHour) {
-        businessDay = businessDay.subtract(1, 'day');
+      let businessDayDate: Date;
+      let businessDay: moment.Moment;
+      if (businessDayOverride) {
+        businessDay = moment.tz(businessDayOverride, timezone).startOf('day');
+        businessDayDate = businessDay.toDate();
+      } else {
+        const nowTz = moment.tz(now, timezone);
+        const closureHour = parseInt(closureTime.split(':')[0] ?? '0', 10);
+        businessDay = nowTz.clone();
+        if (closureHour < 12 && nowTz.hour() < closureHour) {
+          businessDay = businessDay.subtract(1, 'day');
+        }
+        businessDay.set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
+        businessDayDate = businessDay.toDate();
       }
-      businessDay.set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
-      const businessDayDate = businessDay.toDate();
 
       let closureBulletin;
       try {
@@ -150,7 +167,10 @@ export class ClosureScheduler {
           timezone
         );
       } catch (err) {
-        if (err instanceof Error && err.message.includes('already exists')) {
+        if (
+          err instanceof Error &&
+          (err.message.includes('already exists') || err.message.includes('equal or higher amount'))
+        ) {
           return null;
         }
         throw err;
@@ -258,6 +278,49 @@ export class ClosureScheduler {
       });
       
       throw error;
+    }
+  }
+
+  /**
+   * Close at most one past Paris business day that has ≥1 SALE and no positive
+   * closed DAILY bulletin (C-GAP prevention going forward).
+   */
+  static async backfillOneMissingDailyClosure(
+    establishmentId: string,
+    settings: { daily_closure_time: string; timezone: string },
+    now: Date
+  ): Promise<void> {
+    const timezone = settings.timezone || DEFAULT_APP_TIMEZONE;
+    const closureTime = settings.daily_closure_time || '02:00';
+    const nowTz = moment.tz(now, timezone);
+    // Do not backfill "today" — same rule as forensics (in-progress day).
+    const yesterday = nowTz.clone().subtract(1, 'day').startOf('day');
+    const lookbackStart = yesterday.clone().subtract(89, 'days');
+
+    for (
+      let cursor = lookbackStart.clone();
+      cursor.isSameOrBefore(yesterday, 'day');
+      cursor.add(1, 'day')
+    ) {
+      const dayDate = cursor.toDate();
+      const { start, end } = getBusinessDayPeriod(dayDate, closureTime, timezone);
+      const sales = await JournalQueries.getSaleSummaryForPeriod(
+        establishmentId,
+        start.toDate(),
+        end.toDate()
+      );
+      if (sales.count < 1) continue;
+
+      const existing = await JournalQueries.findClosedDailyBulletinsForBusinessDay(
+        establishmentId,
+        start.toDate(),
+        timezone
+      );
+      const hasPositive = existing.some((b) => b.total_amount > 0);
+      if (hasPositive) continue;
+
+      await this.executeAutomaticClosureForEstablishment(establishmentId, now, dayDate);
+      return; // one day per scheduler tick
     }
   }
 

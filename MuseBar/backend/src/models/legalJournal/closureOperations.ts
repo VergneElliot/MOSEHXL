@@ -31,10 +31,16 @@ function computeReconciliation(
   closureTotals: { transactions: number; amount: number; vat: number },
   journalTotals: { count: number; amount: number; vat: number }
 ): { ok: boolean; details: Record<string, unknown> } {
+  // Amount stays strict at sub-cent; VAT allows €0.01 slack for reverse-TTC vs
+  // journal total_tax float/cent drift (see C-RECON in anomaly register).
+  const RECON_VAT_TOLERANCE_EUR = 0.01;
   const txDelta = closureTotals.transactions - journalTotals.count;
   const amountDelta = roundTo4(closureTotals.amount - journalTotals.amount);
   const vatDelta = roundTo4(closureTotals.vat - journalTotals.vat);
-  const ok = txDelta === 0 && Math.abs(amountDelta) < 0.0001 && Math.abs(vatDelta) < 0.0001;
+  const ok =
+    txDelta === 0 &&
+    Math.abs(amountDelta) < 0.0001 &&
+    Math.abs(vatDelta) <= RECON_VAT_TOLERANCE_EUR;
 
   return {
     ok,
@@ -48,10 +54,14 @@ function computeReconciliation(
       closure_total_vat: roundTo4(closureTotals.vat),
       journal_sale_vat: roundTo4(journalTotals.vat),
       vat_delta: vatDelta,
+      vat_tolerance_eur: RECON_VAT_TOLERANCE_EUR,
       compared_at: new Date().toISOString(),
     },
   };
 }
+
+/** Exported for unit tests only. */
+export const __testComputeReconciliation = computeReconciliation;
 
 export class ClosureOperations {
   /**
@@ -128,6 +138,24 @@ export class ClosureOperations {
     // Generate closure hash
     const closureData = `DAILY|${date.toISOString().split('T')[0]}|${totalTransactions}|${computedTotalAmount}|${computedTotalVat}|${firstSequence}|${lastSequence}`;
     const closureHash = JournalSigning.generateClosureHash(closureData);
+
+    if (!force) {
+      const sameDay = await JournalQueries.findClosedDailyBulletinsForBusinessDay(
+        establishmentId,
+        start.toDate(),
+        timezone
+      );
+      for (const existing of sameDay) {
+        if (existing.closure_hash === closureHash) {
+          throw new Error('Daily closure bulletin already exists for this period');
+        }
+        if (existing.total_amount >= computedTotalAmount) {
+          throw new Error(
+            'Daily closure bulletin already exists with equal or higher amount for this day'
+          );
+        }
+      }
+    }
 
     const lastFondDeCaisse = await JournalQueries.getLastFondDeCaisse(establishmentId);
     const fondDeCaisseToStore = Number.isFinite(fondDeCaisse as number) ? (fondDeCaisse as number) : (lastFondDeCaisse ?? 0);

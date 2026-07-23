@@ -260,3 +260,30 @@ export async function closureBulletinExists(
   const result = await pool.query(query, [type, startDate, endDate, establishmentId]);
   return result.rows.length > 0;
 }
+
+/**
+ * Closed DAILY bulletins whose period_start falls on the same calendar date
+ * in the establishment timezone as `businessDayStart` (typically the period start
+ * from getBusinessDayPeriod).
+ */
+export async function findClosedDailyBulletinsForBusinessDay(
+  establishmentId: string,
+  businessDayStart: Date,
+  timezone: string
+): Promise<Array<{ id: number; closure_hash: string; total_amount: number }>> {
+  const query = `
+    SELECT id, closure_hash, total_amount
+    FROM closure_bulletins
+    WHERE closure_type = 'DAILY'
+      AND is_closed = TRUE
+      AND (establishment_id IS NOT DISTINCT FROM $1)
+      AND (timezone($2, period_start))::date = (timezone($2, $3::timestamptz))::date
+    ORDER BY total_amount DESC, closed_at DESC NULLS LAST, id DESC
+  `;
+  const result = await pool.query(query, [establishmentId, timezone, businessDayStart]);
+  return result.rows.map((row: { id: number; closure_hash: string; total_amount: string | number }) => ({
+    id: Number(row.id),
+    closure_hash: String(row.closure_hash ?? ''),
+    total_amount: typeof row.total_amount === 'number' ? row.total_amount : parseFloat(String(row.total_amount ?? 0)),
+  }));
+}

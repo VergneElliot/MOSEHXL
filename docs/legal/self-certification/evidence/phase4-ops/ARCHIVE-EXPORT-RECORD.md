@@ -13,7 +13,7 @@ Related control: `../04-OPERATIONAL-CONTROLS.md#control-5---archive-export-proce
 | Exported by | Thomas (MOSEHXL publisher) / Cursor-assisted |
 | Reviewed by | Pending Phase 5 |
 | Reason | Release evidence — prove export + HMAC verify path without mutating production fiscal archives |
-| Covered release/tag | `self-cert-v2.0.0` (archive code includes Phase 4 `archiveService` fixes not yet live-deployed) |
+| Covered release/tag | Drill on restore-DB under 2.0.0-era code; **fixes live on `self-cert-v2.0.2`** — see also production archive record if present |
 
 ---
 
@@ -81,4 +81,4 @@ raw/archive-id-2.meta.json
 | Export accepted? | Yes as procedure proof |
 | Approved by | Pending Phase 5 |
 | Approval date | 2026-07-16 (operator) |
-| Notes | After live deploy of fixed `archiveService`, optionally repeat one MONTHLY export into production `archive_exports` for inspector-facing production row evidence. |
+| Notes | After live deploy of fixed `archiveService`, optionally repeat one MONTHLY export into production `archive_exports` for inspector-facing production row evidence. **Done 2026-07-23:** see `ARCHIVE-EXPORT-RECORD-production.md`. |

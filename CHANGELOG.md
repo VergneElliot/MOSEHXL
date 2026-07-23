@@ -16,6 +16,26 @@ Fiscal sequence counters are never reset across versions.
 
 ---
 
+## [2.0.3] — 2026-07-23 — post-freeze thoroughness (COMP batch)
+
+**Fiscal impact:** PATCH (no ISCA parameter change — reconciliation tolerance,
+duplicate DAILY guard, gap backfill; hash/trigger semantics unchanged).
+Attestation `self-cert-v2.0.2` remains valid.
+
+### Fixed
+
+- Closure VAT reconciliation tolerates ≤ €0.01 drift (C-RECON)
+- Block same-Paris-day DAILY duplicates with matching hash or ≥ amount
+- Auto-closure backfills one missed sale-day per tick (C-GAP going forward)
+
+### Added
+
+- CI fiscal-path guard workflow
+- Production MONTHLY archive evidence (COMP-4)
+- COMP-1/2/3 operator setup docs; dossier hygiene supersession notes
+
+---
+
 ## [2.0.2] — 2026-07-16 — `self-cert-v2.0.2`
 
 **Fiscal impact:** PATCH (RLS tenant context for software-event journal writes).
