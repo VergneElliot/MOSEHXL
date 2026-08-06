@@ -18,6 +18,7 @@ export interface CreateClosureData {
   type: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL';
   force?: boolean;
   fond_de_caisse: number;
+  email_recipients?: string[];
 }
 
 export const useClosureAPI = (
@@ -73,8 +74,37 @@ export const useClosureAPI = (
 
   const loadClosureSettings = useCallback(async () => {
     try {
-      const { data } = await apiService.get<Record<string, string>>('/legal/closure-settings');
-      setClosureSettings(data ?? {});
+      const { data } = await apiService.get<{
+        settings?: {
+          auto_closure_enabled: boolean;
+          daily_closure_time: string;
+          timezone: string;
+          grace_period_minutes: number;
+        };
+        auto_closure_enabled?: string;
+        daily_closure_time?: string;
+        timezone?: string;
+        grace_period_minutes?: string;
+        closure_grace_period_minutes?: string;
+      }>('/legal/closure-settings');
+
+      if (data?.settings) {
+        setClosureSettings({
+          auto_closure_enabled: String(data.settings.auto_closure_enabled),
+          daily_closure_time: data.settings.daily_closure_time,
+          timezone: data.settings.timezone,
+          grace_period_minutes: String(data.settings.grace_period_minutes),
+          closure_grace_period_minutes: String(data.settings.grace_period_minutes),
+        });
+        return;
+      }
+
+      setClosureSettings({
+        auto_closure_enabled: data?.auto_closure_enabled ?? '',
+        daily_closure_time: data?.daily_closure_time ?? '',
+        timezone: data?.timezone ?? '',
+        grace_period_minutes: data?.grace_period_minutes ?? data?.closure_grace_period_minutes ?? '',
+      });
     } catch (err) {
       console.error('Error loading closure settings:', err);
     }
@@ -103,6 +133,9 @@ export const useClosureAPI = (
           type: closureData.type,
           force: closureData.force === true,
           fond_de_caisse: closureData.fond_de_caisse,
+          ...(closureData.email_recipients && closureData.email_recipients.length > 0
+            ? { email_recipients: closureData.email_recipients }
+            : {}),
         }
         );
         addBulletin(result.closure ?? (result as unknown as ClosureBulletin));
@@ -136,11 +169,40 @@ export const useClosureAPI = (
   const updateClosureSettings = useCallback(
     async (newSettings: Record<string, string>) => {
       try {
-        const { data: updatedSettings } = await apiService.put<Record<string, string>>('/legal/closure-settings', {
+        const { data: updated } = await apiService.put<{
+          settings?: {
+            auto_closure_enabled: boolean;
+            daily_closure_time: string;
+            timezone: string;
+            grace_period_minutes: number;
+          };
+          auto_closure_enabled?: string;
+          daily_closure_time?: string;
+          timezone?: string;
+          grace_period_minutes?: string;
+          closure_grace_period_minutes?: string;
+        }>('/legal/closure-settings', {
           settings: newSettings,
           updated_by: 'UI',
         });
-        setClosureSettings(updatedSettings ?? {});
+
+        if (updated?.settings) {
+          setClosureSettings({
+            auto_closure_enabled: String(updated.settings.auto_closure_enabled),
+            daily_closure_time: updated.settings.daily_closure_time,
+            timezone: updated.settings.timezone,
+            grace_period_minutes: String(updated.settings.grace_period_minutes),
+            closure_grace_period_minutes: String(updated.settings.grace_period_minutes),
+          });
+        } else {
+          setClosureSettings({
+            auto_closure_enabled: updated?.auto_closure_enabled ?? '',
+            daily_closure_time: updated?.daily_closure_time ?? '',
+            timezone: updated?.timezone ?? '',
+            grace_period_minutes:
+              updated?.grace_period_minutes ?? updated?.closure_grace_period_minutes ?? '',
+          });
+        }
         showSuccess('Paramètres de clôture mis à jour avec succès');
       } catch (err) {
         const errorMessage =

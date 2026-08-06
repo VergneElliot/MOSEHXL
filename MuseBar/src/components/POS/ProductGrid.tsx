@@ -29,6 +29,13 @@ interface ProductGridProps {
   onDiversClick?: () => void;
 }
 
+/**
+ * Tall enough for Happy Hour cards (badge + strikethrough + price + qty/add).
+ * Prefer minHeight over maxHeight/overflow:hidden so controls are never clipped.
+ */
+const CARD_MIN_HEIGHT_MOBILE = 200;
+const CARD_MIN_HEIGHT_DESKTOP = 280;
+
 const ProductGrid = React.memo(function ProductGrid({
   products,
   categories,
@@ -55,7 +62,9 @@ const ProductGrid = React.memo(function ProductGrid({
 
   const hasDiversSlot = Boolean(onDiversClick);
   const totalCount = products.length + (hasDiversSlot ? 1 : 0);
+  const cardMinHeight = isMobile ? CARD_MIN_HEIGHT_MOBILE : CARD_MIN_HEIGHT_DESKTOP;
 
+  // Stable Virtuoso components: column count via CSS var (avoids remount flicker).
   const gridComponents = useMemo(
     () => ({
       List: React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
@@ -68,8 +77,9 @@ const ProductGrid = React.memo(function ProductGrid({
               style={style}
               sx={{
                 display: 'grid',
-                gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
+                gridTemplateColumns: 'repeat(var(--pos-grid-cols, 2), minmax(0, 1fr))',
                 gap: 2,
+                alignContent: 'start',
               }}
             >
               {children}
@@ -81,13 +91,27 @@ const ProductGrid = React.memo(function ProductGrid({
         <Box
           component="div"
           {...props}
-          sx={{ minHeight: isMobile ? 160 : 200, display: 'flex', width: '100%' }}
+          sx={{
+            minHeight: 'var(--pos-grid-item-min-height, 280px)',
+            display: 'flex',
+            width: '100%',
+          }}
         >
           {children}
         </Box>
       ),
     }),
-    [columnCount, isMobile]
+    []
+  );
+
+  const computeItemKey = useCallback(
+    (index: number) => {
+      if (hasDiversSlot && index === 0) return 'divers';
+      const productIndex = hasDiversSlot ? index - 1 : index;
+      const product = products[productIndex];
+      return product?.id ?? `idx-${index}`;
+    },
+    [hasDiversSlot, products]
   );
 
   const renderGridItem = useCallback(
@@ -167,12 +191,22 @@ const ProductGrid = React.memo(function ProductGrid({
   }
 
   return (
-    <Box ref={containerRef} sx={{ height: '100%', minHeight: 0 }}>
+    <Box
+      ref={containerRef}
+      sx={{
+        height: '100%',
+        minHeight: 0,
+        scrollbarGutter: 'stable',
+        ['--pos-grid-cols' as string]: columnCount,
+        ['--pos-grid-item-min-height' as string]: `${cardMinHeight}px`,
+      }}
+    >
       <VirtuosoGrid
         style={{ height: '100%' }}
         totalCount={totalCount}
-        overscan={240}
+        overscan={200}
         components={gridComponents}
+        computeItemKey={computeItemKey}
         itemContent={renderGridItem}
       />
     </Box>
@@ -194,15 +228,14 @@ const DiversCard: React.FC<DiversCardProps> = ({ onAdd, isMobile, theme }) => {
       sx={{
         width: '100%',
         height: '100%',
-        minHeight: isMobile ? 160 : 200,
+        minHeight: isMobile ? CARD_MIN_HEIGHT_MOBILE : CARD_MIN_HEIGHT_DESKTOP,
         display: 'flex',
         flexDirection: 'column',
         border: `1px solid ${border}`,
         backgroundColor: bg,
-        transition: 'box-shadow 0.15s ease, transform 0.15s ease',
+        transition: 'box-shadow 0.15s ease',
         '&:hover': {
           boxShadow: 3,
-          transform: 'translateY(-2px)',
         },
       }}
     >
@@ -311,16 +344,15 @@ const ProductCard = React.memo(function ProductCard({
       sx={{
         width: '100%',
         height: '100%',
-        minHeight: isMobile ? 160 : 200,
+        minHeight: isMobile ? CARD_MIN_HEIGHT_MOBILE : CARD_MIN_HEIGHT_DESKTOP,
         position: 'relative',
         display: 'flex',
         flexDirection: 'column',
         border: `1px solid ${resolvedBorder}`,
         backgroundColor: resolvedBackground,
-        transition: 'box-shadow 0.15s ease, transform 0.15s ease',
+        transition: 'box-shadow 0.15s ease',
         '&:hover': {
           boxShadow: 3,
-          transform: 'translateY(-2px)',
         },
       }}
     >
@@ -343,7 +375,8 @@ const ProductCard = React.memo(function ProductCard({
           p: isMobile ? 1 : 2,
           display: 'flex',
           flexDirection: 'column',
-          height: '100%',
+          flex: 1,
+          minHeight: 0,
         }}
       >
         <Typography
@@ -354,11 +387,13 @@ const ProductCard = React.memo(function ProductCard({
             mb: 1,
             fontSize: isMobile ? '1.3rem' : '2.4rem',
             lineHeight: 1.2,
-            height: isMobile ? '2.4em' : 'auto',
+            minHeight: '2.4em',
             overflow: 'hidden',
             display: '-webkit-box',
             WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical',
+            flexShrink: 0,
+            pr: isDiscounted ? 10 : 0,
           }}
         >
           {product.name}
@@ -369,7 +404,7 @@ const ProductCard = React.memo(function ProductCard({
           flexDirection="column"
           alignItems="stretch"
           gap={1}
-          sx={{ flex: 1, justifyContent: 'space-between' }}
+          sx={{ flex: 1, minHeight: 0 }}
         >
           {isDiscounted && (
             <Typography
@@ -399,7 +434,7 @@ const ProductCard = React.memo(function ProductCard({
             display="flex"
             alignItems="center"
             gap={0.5}
-            sx={{ width: '100%', mt: 0.5 }}
+            sx={{ width: '100%', mt: 'auto', pt: 0.5, flexShrink: 0 }}
           >
             <IconButton
               size="small"

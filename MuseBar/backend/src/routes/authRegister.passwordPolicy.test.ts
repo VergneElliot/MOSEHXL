@@ -6,7 +6,9 @@ import { errorHandler } from '../middleware/errorHandler';
 
 const mocks = vi.hoisted(() => ({
   createUser: vi.fn(),
+  createSystemAdmin: vi.fn(),
   createUserForEstablishment: vi.fn(),
+  findByEmail: vi.fn(),
   auditLogAction: vi.fn(),
 }));
 
@@ -21,14 +23,25 @@ vi.mock('../middleware/auth', () => ({
 vi.mock('../models/user', () => ({
   UserModel: {
     createUser: mocks.createUser,
+    createSystemAdmin: mocks.createSystemAdmin,
     createUserForEstablishment: mocks.createUserForEstablishment,
     bootstrapSystemAdmin: vi.fn(),
     listUsersByEstablishment: vi.fn(),
+    listSystemAdmins: vi.fn(),
+    setSystemAdminActive: vi.fn(),
     getUserPermissions: vi.fn(),
     userBelongsToEstablishment: vi.fn(),
     setUserPermissions: vi.fn(),
     deleteUserById: vi.fn(),
     updateUserRoleById: vi.fn(),
+    findByEmail: mocks.findByEmail,
+  },
+}));
+
+vi.mock('../models/membership', () => ({
+  MembershipModel: {
+    upsert: vi.fn(),
+    remove: vi.fn(),
   },
 }));
 
@@ -76,12 +89,16 @@ describe('authRegister password policy enforcement', () => {
 
   beforeEach(() => {
     mocks.createUser.mockReset();
+    mocks.createSystemAdmin.mockReset();
     mocks.createUserForEstablishment.mockReset();
+    mocks.findByEmail.mockReset();
+    mocks.findByEmail.mockResolvedValue(null);
     mocks.auditLogAction.mockReset();
     mocks.auditLogAction.mockResolvedValue(undefined);
     process.env.PASSWORD_BREACH_CHECK_ENABLED = originalBreachToggle;
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    mocks.findByEmail.mockResolvedValue(null);
   });
 
   it('rejects weak passwords on POST /auth/register', async () => {
@@ -91,7 +108,7 @@ describe('authRegister password policy enforcement', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error?.message).toBe('Password must be at least 8 characters long');
-    expect(mocks.createUser).not.toHaveBeenCalled();
+    expect(mocks.createSystemAdmin).not.toHaveBeenCalled();
   });
 
   it('rejects weak passwords on POST /auth/users', async () => {
@@ -119,6 +136,6 @@ describe('authRegister password policy enforcement', () => {
 
     expect(res.status).toBe(400);
     expect(String(res.body.error?.message)).toContain('known data breaches');
-    expect(mocks.createUser).not.toHaveBeenCalled();
+    expect(mocks.createSystemAdmin).not.toHaveBeenCalled();
   });
 });

@@ -5,9 +5,19 @@
  */
 
 import express from 'express';
-import { requireAuth, getEstablishmentId, requireAnyPermission, requirePermission } from './auth';
+import {
+  requireAuth,
+  getEstablishmentId,
+  requireAnyPermission,
+  requirePermission,
+  requireEstablishmentAdminOrPermission,
+} from './auth';
 import { P } from '../permissions/registry';
 import { HappyHourSettingsModel, defaultHappyHour } from '../models/happyHourSettings';
+import {
+  OpeningHoursSettingsModel,
+  normalizeOpeningHours,
+} from '../models/openingHoursSettings';
 import { logSoftwareEventBestEffort } from '../services/legal/softwareEventJournal';
 import { logError } from '../utils/logger';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
@@ -95,5 +105,46 @@ router.put('/happy-hour', requirePermission(P.access_settings), asyncHandler(asy
     );
   }
 }));
+
+/**
+ * GET /api/settings/opening-hours
+ */
+router.get(
+  '/opening-hours',
+  requireEstablishmentAdminOrPermission(P.access_settings),
+  asyncHandler(async (req, res) => {
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
+    const settings = await OpeningHoursSettingsModel.get(establishmentId);
+    const configured = await OpeningHoursSettingsModel.isConfigured(establishmentId);
+    return res.json({ settings, configured });
+  })
+);
+
+/**
+ * PUT /api/settings/opening-hours
+ */
+router.put(
+  '/opening-hours',
+  requireEstablishmentAdminOrPermission(P.access_settings),
+  asyncHandler(async (req, res) => {
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
+    const body = req.body || {};
+    const raw =
+      body.settings && typeof body.settings === 'object' ? body.settings : body;
+    const settings = await OpeningHoursSettingsModel.upsert(
+      establishmentId,
+      normalizeOpeningHours(raw)
+    );
+    await logSoftwareEventBestEffort({
+      establishmentId,
+      eventType: 'OPENING_HOURS_UPDATED',
+      userId: req.user ? String(req.user.id) : undefined,
+      eventData: { timezone: settings.timezone },
+    });
+    return res.json({ settings, configured: true });
+  })
+);
 
 export default router;

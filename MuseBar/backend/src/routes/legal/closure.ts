@@ -70,7 +70,8 @@ async function createClosureWithFailClosedJournal(
   closureType: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL',
   forceCreate: boolean,
   userId: string | undefined,
-  createOpenClosure: () => Promise<ClosureJournalPayload>
+  createOpenClosure: () => Promise<ClosureJournalPayload>,
+  emailRecipients?: string[]
 ): Promise<ClosureJournalPayload> {
   const closure = await createOpenClosure();
   const closureId = Number(closure.id);
@@ -108,6 +109,16 @@ async function createClosureWithFailClosedJournal(
     throw new AppError('Failed to finalize closure bulletin', 500, 'LEGAL_CLOSURE_FINALIZE_FAILED');
   }
 
+  // Best-effort accounting email — must not fail fiscal create.
+  void import('../../services/documents/closureAutoEmail').then(({ maybeAutoEmailClosureBulletin }) =>
+    maybeAutoEmailClosureBulletin({
+      establishmentId,
+      bulletinId: closureId,
+      operatorId: userId,
+      extraRecipients: emailRecipients,
+    })
+  );
+
   return finalized as unknown as ClosureJournalPayload;
 }
 
@@ -126,6 +137,34 @@ function parseFondDeCaisse(value: unknown): number | null {
   if (!Number.isFinite(n)) return null;
   if (n < 0) return null;
   return n;
+}
+
+/** Optional one-off recipients from create dialog; empty = no extras (settings auto-mail still applies). */
+function parseOptionalEmailRecipients(value: unknown): string[] {
+  if (value == null || value === '') return [];
+  if (Array.isArray(value) && value.length === 0) return [];
+  if (typeof value === 'string' && !value.trim()) return [];
+
+  const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const parts: unknown[] = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(/[,;\n]+/)
+      : [value];
+
+  const unique: string[] = [];
+  const seen = new Set<string>();
+  for (const part of parts) {
+    const email = String(part ?? '').trim().toLowerCase();
+    if (!email) continue;
+    if (!EMAIL_REGEX.test(email)) {
+      throw new ValidationError(`Adresse email destinataire invalide: ${email}`);
+    }
+    if (seen.has(email)) continue;
+    seen.add(email);
+    unique.push(email);
+  }
+  return unique;
 }
 
 // All closure routes require authentication and clôture access.
@@ -354,7 +393,7 @@ router.post('/create', asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const { date, type, force, fond_de_caisse } = req.body;
+    const { date, type, force, fond_de_caisse, email_recipients } = req.body;
 
     if (!date) {
       throw new ValidationError('Date is required (YYYY-MM-DD format)');
@@ -372,6 +411,7 @@ router.post('/create', asyncHandler(async (req, res) => {
     if (fondDeCaisse === null) {
       throw new ValidationError('fond_de_caisse is required and must be a number >= 0');
     }
+    const emailRecipients = parseOptionalEmailRecipients(email_recipients);
 
     let closureCreator!: () => Promise<ClosureJournalPayload>;
     switch (type) {
@@ -421,7 +461,8 @@ router.post('/create', asyncHandler(async (req, res) => {
       type as 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL',
       forceCreate,
       userId,
-      closureCreator
+      closureCreator,
+      emailRecipients
     );
 
     res.status(201).json({

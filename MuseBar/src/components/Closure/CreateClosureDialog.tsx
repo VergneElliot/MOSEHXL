@@ -14,13 +14,20 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { apiCore } from '../../services/api';
 
 export type ClosureType = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL';
 
 interface CreateClosureDialogProps {
   open: boolean;
   onClose: () => void;
-  onCreate: (payload: { date: string; type: ClosureType; force?: boolean; fond_de_caisse: number }) => Promise<void>;
+  onCreate: (payload: {
+    date: string;
+    type: ClosureType;
+    force?: boolean;
+    fond_de_caisse: number;
+    email_recipients?: string[];
+  }) => Promise<void>;
   creating: boolean;
   selectedDate: string;
   selectedClosureType: ClosureType;
@@ -45,11 +52,31 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
   const todayISO = useMemo(() => new Date().toISOString().split('T')[0] ?? '', []);
   const [forceCreation, setForceCreation] = useState(false);
   const [fondDeCaisse, setFondDeCaisse] = useState<string>('');
+  const [emailRecipients, setEmailRecipients] = useState('');
 
   useEffect(() => {
     if (!open) return;
     const initial = defaultFondDeCaisse ?? 0;
     setFondDeCaisse(String(initial));
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const settingsRes = await apiCore.request<{ settings?: { accounting_emails?: string[] } }>(
+          '/legal/closure-settings',
+          { method: 'GET' }
+        );
+        if (cancelled) return;
+        const defaults = settingsRes?.settings?.accounting_emails;
+        setEmailRecipients(Array.isArray(defaults) && defaults.length > 0 ? defaults.join(', ') : '');
+      } catch {
+        if (!cancelled) setEmailRecipients('');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [open, defaultFondDeCaisse]);
 
   const fondDeCaisseNumber = useMemo(() => {
@@ -57,6 +84,15 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
     if (!Number.isFinite(n) || n < 0) return null;
     return n;
   }, [fondDeCaisse]);
+
+  const parsedEmails = useMemo(
+    () =>
+      emailRecipients
+        .split(/[,;\n]+/)
+        .map((part) => part.trim())
+        .filter(Boolean),
+    [emailRecipients]
+  );
 
   const canCreate =
     !creating &&
@@ -112,6 +148,18 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
             inputMode="decimal"
           />
 
+          <TextField
+            label="Emails destinataires (optionnel)"
+            value={emailRecipients}
+            onChange={(e) => setEmailRecipients(e.target.value)}
+            size="small"
+            fullWidth
+            multiline
+            minRows={2}
+            placeholder="comptable@exemple.com, associe@exemple.com"
+            helperText="Envoi ponctuel pour ce bulletin. Prérempli depuis les paramètres — ajoutez d'autres adresses ici sans les enregistrer. Les emails comptables des paramètres restent envoyés automatiquement s'ils sont configurés. Séparez par des virgules ; laissez vide pour n'utiliser que les paramètres."
+          />
+
           <Tooltip
             title={
               disableForceCreation
@@ -150,6 +198,7 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
               type: selectedClosureType,
               force: forceCreation,
               fond_de_caisse: fondDeCaisseNumber ?? 0,
+              email_recipients: parsedEmails.length > 0 ? parsedEmails : undefined,
             })
           }
           variant="contained"
@@ -164,4 +213,3 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
 };
 
 export default CreateClosureDialog;
-

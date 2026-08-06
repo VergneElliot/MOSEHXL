@@ -120,7 +120,7 @@ export class EstablishmentSetupTemplate {
                 <li>📚 <a href="{{supportUrl}}">Comprehensive Documentation</a></li>
                 <li>💬 24/7 Chat Support (available in your dashboard)</li>
                 <li>📞 Phone Support: 1-800-MUSEBAR</li>
-                <li>📧 Email Support: support@musebar.com</li>
+                <li>📧 Email Support: support@mosehxl.com</li>
             </ul>
             
             <div style="background: #f8f9fa; border: 1px solid #dee2e6; padding: 20px; border-radius: 8px; margin: 25px 0;">
@@ -185,7 +185,7 @@ NEED HELP?
 - Documentation: {{supportUrl}}
 - 24/7 Chat Support (available in your dashboard)
 - Phone Support: 1-800-MUSEBAR
-- Email Support: support@musebar.com
+- Email Support: support@mosehxl.com
 
 ACCOUNT INFORMATION:
 - Dashboard URL: {{dashboardUrl}}

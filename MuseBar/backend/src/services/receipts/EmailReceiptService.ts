@@ -27,7 +27,7 @@ export class EmailReceiptService {
 
   constructor(config?: EmailConfig) {
     this.config = config || {
-      from: process.env.EMAIL_FROM || 'noreply@musebar.com',
+      from: process.env.EMAIL_FROM || process.env.FROM_EMAIL || 'noreply@mosehxl.com',
       smtp: {
         host: process.env.SMTP_HOST || 'smtp.gmail.com',
         port: parseInt(process.env.SMTP_PORT || '587'),

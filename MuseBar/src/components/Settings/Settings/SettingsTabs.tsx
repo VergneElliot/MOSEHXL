@@ -10,9 +10,13 @@ import {
   Schedule as ScheduleIcon,
   Print as PrintIcon,
   LocalBar as HappyHourIcon,
+  AccessTime as HoursIcon,
+  Wifi as WifiIcon,
 } from '@mui/icons-material';
 import { SettingsTab } from './types';
 import { EstablishmentSettings } from './EstablishmentSettings';
+import { OpeningHoursSettingsPanel } from './OpeningHoursSettings';
+import { TimeClockNetworkSettings } from './TimeClockNetworkSettings';
 import { ClosureSettings } from './ClosureSettings';
 import { PrinterSetup } from '../../PrinterSetup';
 import { HappyHourControl } from '../../HappyHour';
@@ -87,14 +91,20 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
             loading: settingsHook.infoSaving,
             message: settingsHook.infoMessage,
           }}
-          generalSettingsProps={{
-            settings: settingsHook.state.generalSettings,
-            onUpdate: settingsHook.updateGeneralSettings,
-            onSave: settingsHook.saveGeneralSettings,
-            loading: settingsHook.saving,
-          }}
         />
       ),
+    },
+    {
+      id: 'opening_hours',
+      label: 'Plages de réservations',
+      icon: <HoursIcon />,
+      component: <OpeningHoursSettingsPanel />,
+    },
+    {
+      id: 'time_clock_network',
+      label: 'Pointage',
+      icon: <WifiIcon />,
+      component: <TimeClockNetworkSettings />,
     },
     {
       id: 'happy_hour',

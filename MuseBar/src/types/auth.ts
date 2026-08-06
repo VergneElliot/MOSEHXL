@@ -1,6 +1,19 @@
 // Authentication and user management types
 
 /**
+ * Roles assignable in "Gestion des utilisateurs" (establishment scope).
+ * System-level accounts use `system_admin` elsewhere, not in this flow.
+ */
+export type EstablishmentAssignableRole = 'establishment_admin' | 'staff';
+
+/** One venue membership returned by login /me / switch-establishment. */
+export interface EstablishmentMembershipSummary {
+  establishment_id: string;
+  name: string;
+  role: EstablishmentAssignableRole | string;
+}
+
+/**
  * Logged-in user as returned by GET /auth/me.
  * Single source of truth for the frontend — import from here, don't redefine.
  */
@@ -13,6 +26,9 @@ export interface User {
   first_name: string;
   last_name: string;
   permissions: string[];
+  memberships?: EstablishmentMembershipSummary[];
+  email_verified?: boolean;
+  support_impersonation?: unknown;
 }
 
 /**
@@ -28,13 +44,6 @@ export interface EstablishmentMember {
   establishment_id: string | null;
   permissions?: string[];
 }
-
-/**
- * Roles assignable in "Gestion des utilisateurs" (establishment scope).
- * System-level accounts use `system_admin` elsewhere, not in this flow.
- */
-export type EstablishmentAssignableRole = 'establishment_admin' | 'staff';
-
 export interface LoginCredentials {
   email: string;
   password: string;
@@ -65,6 +74,10 @@ export const ALL_PERMISSIONS: Permission[] = [
   { key: 'access_settings', label: 'Paramètres' },
   { key: 'access_closure', label: 'Clôtures' },
   { key: 'access_user_management', label: 'Gestion des utilisateurs' },
+  { key: 'access_documents', label: 'Administration — Documents' },
+  { key: 'access_inbox', label: 'Administration — Boîte mail' },
+  { key: 'access_reservations', label: 'Administration — Réservations' },
+  { key: 'access_planning', label: 'Administration — Planning' },
   { key: 'pos_happyhour_manual', label: 'POS — Happy Hour (bouton manuel)' },
   { key: 'pos_apply_offert', label: 'POS — Offert' },
   { key: 'pos_apply_perso', label: 'POS — Perso' },

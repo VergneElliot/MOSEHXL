@@ -6,8 +6,11 @@ const mocks = vi.hoisted(() => ({
   userBelongsToEstablishment: vi.fn(),
   setUserPermissions: vi.fn(),
   createUserForEstablishment: vi.fn(),
+  findByEmail: vi.fn(),
   deleteUserById: vi.fn(),
   updateUserRoleById: vi.fn(),
+  membershipRemove: vi.fn(),
+  membershipUpsert: vi.fn(),
   auditLogAction: vi.fn(),
   logSoftwareEventBestEffort: vi.fn(),
 }));
@@ -25,12 +28,20 @@ vi.mock('../models/user', () => ({
     userBelongsToEstablishment: mocks.userBelongsToEstablishment,
     setUserPermissions: mocks.setUserPermissions,
     createUserForEstablishment: mocks.createUserForEstablishment,
+    findByEmail: mocks.findByEmail,
     deleteUserById: mocks.deleteUserById,
     updateUserRoleById: mocks.updateUserRoleById,
     createUser: vi.fn(),
     bootstrapSystemAdmin: vi.fn(),
     listUsersByEstablishment: vi.fn(),
     getUserPermissions: vi.fn(),
+  },
+}));
+
+vi.mock('../models/membership', () => ({
+  MembershipModel: {
+    remove: mocks.membershipRemove,
+    upsert: mocks.membershipUpsert,
   },
 }));
 
@@ -77,16 +88,22 @@ describe('authRegister software-event journaling', () => {
     mocks.userBelongsToEstablishment.mockReset();
     mocks.setUserPermissions.mockReset();
     mocks.createUserForEstablishment.mockReset();
+    mocks.findByEmail.mockReset();
     mocks.deleteUserById.mockReset();
     mocks.updateUserRoleById.mockReset();
+    mocks.membershipRemove.mockReset();
+    mocks.membershipUpsert.mockReset();
     mocks.auditLogAction.mockReset();
     mocks.logSoftwareEventBestEffort.mockReset();
 
     mocks.userBelongsToEstablishment.mockResolvedValue(true);
     mocks.setUserPermissions.mockResolvedValue(undefined);
     mocks.createUserForEstablishment.mockResolvedValue({ id: 9, email: 'staff@example.com' });
+    mocks.findByEmail.mockResolvedValue(null);
     mocks.deleteUserById.mockResolvedValue(undefined);
     mocks.updateUserRoleById.mockResolvedValue(undefined);
+    mocks.membershipRemove.mockResolvedValue(true);
+    mocks.membershipUpsert.mockResolvedValue({});
     mocks.auditLogAction.mockResolvedValue(undefined);
     mocks.logSoftwareEventBestEffort.mockResolvedValue(undefined);
   });

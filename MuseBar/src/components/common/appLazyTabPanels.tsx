@@ -35,3 +35,7 @@ export const LazyClosureContainer = React.lazy(() =>
 export const LazyUserManagement = React.lazy(() => import('../Admin/UserManagement'));
 
 export const LazyAuditTrailDashboard = React.lazy(() => import('../Admin/AuditTrailDashboard'));
+
+export const LazyAdministrationContainer = React.lazy(() =>
+  import('../Administration').then(mod => ({ default: mod.AdministrationContainer }))
+);

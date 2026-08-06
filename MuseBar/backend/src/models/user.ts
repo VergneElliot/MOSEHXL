@@ -75,6 +75,55 @@ export class UserModel {
     return result.rows[0];
   }
 
+  /** Create a platform system_admin (no establishment). */
+  static async createSystemAdmin(input: {
+    email: string;
+    password: string;
+    first_name?: string;
+    last_name?: string;
+  }): Promise<UserRow> {
+    await this.assertPasswordPolicy(input.password);
+    const password_hash = await bcrypt.hash(input.password, 12);
+    const result = await pool.query(
+      `INSERT INTO users (
+         email, password_hash, is_admin, role, establishment_id,
+         first_name, last_name, email_verified, is_active
+       ) VALUES ($1, $2, true, 'system_admin', NULL, $3, $4, true, true)
+       RETURNING *`,
+      [
+        input.email,
+        password_hash,
+        input.first_name?.trim() || null,
+        input.last_name?.trim() || null,
+      ]
+    );
+    return result.rows[0];
+  }
+
+  static async listSystemAdmins(): Promise<UserRow[]> {
+    const result = await pool.query(
+      `SELECT *
+       FROM users
+       WHERE role = 'system_admin'
+         AND establishment_id IS NULL
+       ORDER BY created_at ASC, id ASC`
+    );
+    return result.rows;
+  }
+
+  static async setSystemAdminActive(userId: number, isActive: boolean): Promise<UserRow | null> {
+    const result = await pool.query(
+      `UPDATE users
+       SET is_active = $2, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+         AND role = 'system_admin'
+         AND establishment_id IS NULL
+       RETURNING *`,
+      [userId, isActive]
+    );
+    return result.rows[0] || null;
+  }
+
   static async createUserForEstablishment(
     email: string,
     password: string,
@@ -83,23 +132,27 @@ export class UserModel {
   ): Promise<UserRow> {
     await this.assertPasswordPolicy(password);
     const password_hash = await bcrypt.hash(password, 12);
+    const normalizedEmail = email.toLowerCase().trim();
     const result = await pool.query(
       `INSERT INTO users (email, password_hash, is_admin, role, establishment_id, email_verified)
        VALUES ($1, $2, false, $3, $4, true) RETURNING *`,
-      [email, password_hash, role, establishmentId]
+      [normalizedEmail, password_hash, role, establishmentId]
     );
-    return result.rows[0];
+    const user = result.rows[0] as UserRow;
+    const { MembershipModel } = await import('./membership');
+    await MembershipModel.upsert({
+      user_id: user.id,
+      establishment_id: establishmentId,
+      role: role as 'establishment_admin' | 'staff',
+    });
+    return user;
   }
 
   static async findByEmail(email: string): Promise<UserRow | null> {
-    const result = await pool.query(`
-      SELECT * FROM users 
-      WHERE email = $1 
-      ORDER BY 
-        CASE WHEN establishment_id IS NOT NULL THEN 0 ELSE 1 END,
-        id DESC
-      LIMIT 1
-    `, [email]);
+    const result = await pool.query(
+      `SELECT * FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+      [email.trim()]
+    );
     return result.rows[0] || null;
   }
 
@@ -216,50 +269,83 @@ export class UserModel {
     return (result.rowCount ?? 0) > 0;
   }
 
-  // Permission management.
-  // Returns explicit permissions from user_permissions, falling back to role-based defaults
-  // so newly created establishment users always get the correct access without manual seeding.
-  static async getUserPermissions(userId: number): Promise<string[]> {
-    const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [userId]);
-    const role: string = userResult.rows[0]?.role || '';
+  // Permission management (venue-scoped via establishmentId).
+  // When establishmentId is omitted, uses users.establishment_id (active context).
+  static async getUserPermissions(
+    userId: number,
+    establishmentId?: string | null
+  ): Promise<string[]> {
+    const userResult = await pool.query(
+      'SELECT role, establishment_id FROM users WHERE id = $1',
+      [userId]
+    );
+    const userRow = userResult.rows[0] as { role?: string; establishment_id?: string | null } | undefined;
+    if (!userRow) return [];
+
+    // Resolve membership role when an establishment context is available.
+    let role = userRow.role || '';
+    const activeEstablishmentId = establishmentId ?? userRow.establishment_id ?? null;
+    if (activeEstablishmentId && role !== 'system_admin') {
+      const mem = await pool.query(
+        `SELECT role FROM user_establishment_memberships
+         WHERE user_id = $1 AND establishment_id = $2 AND is_active = TRUE`,
+        [userId, activeEstablishmentId]
+      );
+      if (mem.rows[0]?.role) role = String(mem.rows[0].role);
+    }
+
     const establishmentAdminPermissionMode = this.getEstablishmentAdminPermissionMode();
 
-    // Default mode in production (`explicit_only`): establishment_admin must have explicit rows.
-    // Non-production default (`implicit_all`) remains available to avoid local lockout during setup.
     if (role === 'establishment_admin' && establishmentAdminPermissionMode === 'implicit_all') {
       const allPerms = await pool.query('SELECT name FROM permissions');
       return allPerms.rows.map((row) => (row as { name: string }).name);
     }
 
+    if (!activeEstablishmentId) {
+      return [];
+    }
+
     const result = await pool.query(
       `SELECT p.name FROM permissions p
        JOIN user_permissions up ON up.permission_id = p.id
-       WHERE up.user_id = $1`,
-      [userId]
+       WHERE up.user_id = $1 AND up.establishment_id = $2`,
+      [userId, activeEstablishmentId]
     );
 
-    if (result.rows.length > 0) {
-      return result.rows.map((row) => (row as { name: string }).name);
-    }
-
-    // No explicit permissions for non–establishment_admin roles: none granted.
-    return [];
+    return result.rows.map((row) => (row as { name: string }).name);
   }
 
   /**
-   * Replace all permissions for a user in one transaction.
-   * Uses a single DELETE plus one INSERT...SELECT (batch) instead of 2N+1 queries.
+   * Replace all permissions for a user in one establishment.
    */
-  static async setUserPermissions(userId: number, permissions: string[]): Promise<void> {
+  static async setUserPermissions(
+    userId: number,
+    permissions: string[],
+    establishmentId?: string | null
+  ): Promise<void> {
+    let estId = establishmentId;
+    if (!estId) {
+      const u = await pool.query('SELECT establishment_id FROM users WHERE id = $1', [userId]);
+      estId = u.rows[0]?.establishment_id ?? null;
+    }
+    if (!estId) {
+      throw Object.assign(new Error('establishment_id required to set permissions'), {
+        statusCode: 400,
+      });
+    }
+
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      await client.query('DELETE FROM user_permissions WHERE user_id = $1', [userId]);
+      await client.query(
+        'DELETE FROM user_permissions WHERE user_id = $1 AND establishment_id = $2',
+        [userId, estId]
+      );
       if (permissions.length > 0) {
         await client.query(
-          `INSERT INTO user_permissions (user_id, permission_id)
-           SELECT $1, p.id FROM permissions p WHERE p.name = ANY($2::text[])`,
-          [userId, permissions]
+          `INSERT INTO user_permissions (user_id, permission_id, establishment_id)
+           SELECT $1, p.id, $3 FROM permissions p WHERE p.name = ANY($2::text[])`,
+          [userId, permissions, estId]
         );
       }
       await client.query('COMMIT');
@@ -322,7 +408,7 @@ export class UserModel {
   }
 
   /**
-   * List users for an establishment (establishment-scoped admin view).
+   * List users for an establishment (membership-scoped admin view).
    */
   static async listUsersByEstablishment(
     establishmentId: string
@@ -338,19 +424,17 @@ export class UserModel {
       created_at: Date;
     }>
   > {
-    const result = await pool.query(
-      'SELECT id, email, is_admin, role, establishment_id, first_name, last_name, created_at FROM users WHERE establishment_id = $1 ORDER BY id',
-      [establishmentId]
-    );
-    return result.rows;
+    const { MembershipModel } = await import('./membership');
+    return MembershipModel.listUsersForEstablishment(establishmentId);
   }
 
   /**
-   * Ownership check: does `userId` belong to `establishmentId`?
+   * Ownership check: does `userId` have an active membership in `establishmentId`?
    */
   static async userBelongsToEstablishment(userId: number, establishmentId: string): Promise<boolean> {
     const result = await pool.query(
-      'SELECT id FROM users WHERE id = $1 AND establishment_id = $2',
+      `SELECT 1 FROM user_establishment_memberships
+       WHERE user_id = $1 AND establishment_id = $2 AND is_active = TRUE`,
       [userId, establishmentId]
     );
     return result.rows.length > 0;
@@ -358,7 +442,7 @@ export class UserModel {
 
   /**
    * Delete a user by id.
-   * Ownership checks should be performed by callers at the establishment level.
+   * Prefer MembershipModel.remove for establishment-scoped removal.
    */
   static async deleteUserById(userId: number): Promise<boolean> {
     const result = await pool.query('DELETE FROM users WHERE id = $1', [userId]);
@@ -366,10 +450,33 @@ export class UserModel {
   }
 
   /**
-   * Update a user's role.
-   * Ownership checks should be performed by callers at the establishment level.
+   * Update a user's role for one establishment (membership + users cache when active).
    */
-  static async updateUserRoleById(userId: number, role: string): Promise<boolean> {
+  static async updateUserRoleById(
+    userId: number,
+    role: string,
+    establishmentId?: string | null
+  ): Promise<boolean> {
+    if (establishmentId) {
+      const { MembershipModel } = await import('./membership');
+      await MembershipModel.upsert({
+        user_id: userId,
+        establishment_id: establishmentId,
+        role: role as 'establishment_admin' | 'staff',
+      });
+      const active = await pool.query(
+        'SELECT establishment_id FROM users WHERE id = $1',
+        [userId]
+      );
+      if (active.rows[0]?.establishment_id === establishmentId) {
+        await MembershipModel.setActiveEstablishment(
+          userId,
+          establishmentId,
+          role as 'establishment_admin' | 'staff'
+        );
+      }
+      return true;
+    }
     const result = await pool.query('UPDATE users SET role = $1 WHERE id = $2', [role, userId]);
     return (result.rowCount ?? 0) > 0;
   }

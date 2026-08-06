@@ -56,5 +56,14 @@ export enum BuiltInTemplateId {
   PASSWORD_RESET = 'password_reset',
   EMAIL_VERIFICATION = 'email_verification',
   ESTABLISHMENT_SETUP = 'establishment_setup',
-  ESTABLISHMENT_CREATED = 'establishment_created'
+  ESTABLISHMENT_CREATED = 'establishment_created',
+  RESERVATION_REQUESTED_GUEST = 'reservation_requested_guest',
+  RESERVATION_REQUESTED_VENUE = 'reservation_requested_venue',
+  RESERVATION_REMINDER_VENUE = 'reservation_reminder_venue',
+  RESERVATION_CONFIRMED = 'reservation_confirmed',
+  RESERVATION_REFUSED = 'reservation_refused',
+  RESERVATION_ON_HOLD = 'reservation_on_hold',
+  RESERVATION_CANCELLED_GUEST = 'reservation_cancelled_guest',
+  RESERVATION_CANCELLED_VENUE = 'reservation_cancelled_venue',
+  SHIFT_CONFIRMATION_EMPLOYEE = 'shift_confirmation_employee',
 }

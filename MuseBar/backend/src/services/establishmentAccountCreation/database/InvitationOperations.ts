@@ -81,8 +81,8 @@ export class InvitationOperations {
       await client.query(
         `INSERT INTO audit_trail (
           user_id, action_type, resource_type, resource_id, 
-          action_details, ip_address, user_agent, session_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          action_details, ip_address, user_agent, session_id, establishment_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [
           userId,
           'INVITATION_COMPLETED',
@@ -96,7 +96,8 @@ export class InvitationOperations {
           }),
           ipAddress,
           userAgent,
-          null // session_id
+          null, // session_id
+          establishmentId,
         ]
       );
       this.logger.info('Audit trail logged for invitation completion', { 

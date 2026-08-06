@@ -106,7 +106,7 @@ describe('enhancedEstablishments software-event journaling', () => {
     });
   });
 
-  it('logs software event after successful establishment deletion', async () => {
+  it('logs software event before successful establishment deletion', async () => {
     const targetId = '33333333-3333-4333-8333-333333333333';
     const res = await request(app).delete(`/establishments/${targetId}`);
 

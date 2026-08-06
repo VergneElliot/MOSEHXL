@@ -28,6 +28,14 @@ vi.mock('../models/user', () => ({
     getUserPermissions: vi.fn(),
     setUserPermissions: vi.fn(),
     deleteUserById: vi.fn(),
+    findByEmail: vi.fn().mockResolvedValue(null),
+  },
+}));
+
+vi.mock('../models/membership', () => ({
+  MembershipModel: {
+    upsert: vi.fn(),
+    remove: vi.fn(),
   },
 }));
 

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Box, Typography } from '@mui/material';
+import { Alert, Box, Typography } from '@mui/material';
 import { SecurityLogsStats } from './SecurityLogsStats';
 import { SecurityLogsList } from './SecurityLogsList';
 import { SecurityLogsFilter } from './SecurityLogsFilter';
+import { useSystemSecurityLogs } from '../../../hooks/useSystemSecurityLogs';
 import type { SecurityLogFilters } from '../../../types/system';
 
 const SystemSecurityLogsPage: React.FC = () => {
@@ -10,8 +11,10 @@ const SystemSecurityLogsPage: React.FC = () => {
     severity: [],
     dateRange: { start: null, end: null },
     actionType: [],
-    userId: ''
+    userId: '',
   });
+
+  const { logs, total, loading, error } = useSystemSecurityLogs(filters);
 
   return (
     <Box sx={{ px: 3, pb: 3 }}>
@@ -19,14 +22,17 @@ const SystemSecurityLogsPage: React.FC = () => {
         Journal de Sécurité Système
       </Typography>
 
-      <SecurityLogsStats />
-      
-      <SecurityLogsFilter 
-        filters={filters}
-        onChange={setFilters}
-      />
-      
-      <SecurityLogsList filters={filters} />
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      <SecurityLogsStats logs={logs} total={total} />
+
+      <SecurityLogsFilter filters={filters} onChange={setFilters} />
+
+      <SecurityLogsList logs={logs} loading={loading} />
     </Box>
   );
 };

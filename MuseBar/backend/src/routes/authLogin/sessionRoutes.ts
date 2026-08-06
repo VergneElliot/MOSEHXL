@@ -17,6 +17,7 @@ import {
   NotFoundError,
   ValidationError,
 } from '../../middleware/errorHandler';
+import { MembershipModel } from '../../models/membership';
 import { RefreshTokenModel } from '../../models/refreshToken';
 import { TokenBlocklistModel } from '../../models/tokenBlocklist';
 import { UserModel } from '../../models/user';
@@ -43,15 +44,16 @@ const sessionRoutes = Router();
 
 // ---------------------------------------------------------------------------
 // GET /api/auth/me — returns current user info and permissions
-// Two lightweight indexed queries: users by PK + permissions join
 // ---------------------------------------------------------------------------
 sessionRoutes.get('/me', requireAuth, asyncHandler(async (req, res) => {
   try {
     const userId = req.user!.id;
+    const establishmentId = req.user!.establishment_id ?? null;
 
-    const [userResult, permissions] = await Promise.all([
+    const [userResult, permissions, memberships] = await Promise.all([
       UserModel.getAuthMeProfile(userId),
-      UserModel.getUserPermissions(userId).catch(() => [] as string[]),
+      UserModel.getUserPermissions(userId, establishmentId).catch(() => [] as string[]),
+      MembershipModel.listForUser(userId).catch(() => []),
     ]);
 
     const userRow = userResult;
@@ -61,16 +63,93 @@ sessionRoutes.get('/me', requireAuth, asyncHandler(async (req, res) => {
       email: req.user!.email,
       is_admin: req.user!.is_admin,
       role: req.user!.role,
-      establishment_id: req.user!.establishment_id,
+      establishment_id: establishmentId,
       first_name: userRow?.first_name || '',
       last_name: userRow?.last_name || '',
       email_verified: userRow?.email_verified ?? false,
       permissions,
+      memberships: MembershipModel.toApiList(memberships),
       support_impersonation: req.user!.support_impersonation ?? null,
     });
   } catch {
     throw new AppError('Internal server error', 500, 'AUTH_ME_FAILED');
   }
+}));
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/switch-establishment — re-issue JWT for another membership
+// ---------------------------------------------------------------------------
+sessionRoutes.post('/switch-establishment', requireAuth, asyncHandler(async (req, res) => {
+  const userId = req.user!.id;
+  const establishmentIdRaw = req.body?.establishment_id;
+  const establishment_id =
+    typeof establishmentIdRaw === 'string' ? establishmentIdRaw.trim() : '';
+
+  if (!establishment_id) {
+    throw new ValidationError('establishment_id is required');
+  }
+
+  if (req.user!.role === 'system_admin' && !req.user!.support_impersonation) {
+    throw new AuthorizationError('System administrators cannot switch establishments this way');
+  }
+
+  const membership = await MembershipModel.get(userId, establishment_id);
+  if (!membership) {
+    throw new AuthorizationError('No active membership for this establishment');
+  }
+
+  await MembershipModel.setActiveEstablishment(userId, establishment_id, membership.role);
+
+  const role = deriveCanonicalRole({
+    roleFromDb: membership.role,
+    isAdminFlag: false,
+    establishmentId: establishment_id,
+  });
+
+  const rememberMe = req.body?.rememberMe === true ||
+    (typeof req.headers.cookie === 'string' && /refresh_token=/.test(req.headers.cookie));
+
+  const token = generateToken(
+    { id: userId, email: req.user!.email, role, establishment_id },
+    rememberMe,
+    ACCESS_TOKEN_EXPIRES_IN as Parameters<typeof generateToken>[2]
+  );
+
+  const [userRow, permissions, memberships] = await Promise.all([
+    UserModel.getAuthMeProfile(userId),
+    UserModel.getUserPermissions(userId, establishment_id).catch(() => [] as string[]),
+    MembershipModel.listForUser(userId),
+  ]);
+
+  await logAuditOrThrow({
+    user_id: String(userId),
+    action_type: 'SWITCH_ESTABLISHMENT',
+    action_details: {
+      establishment_id,
+      role: membership.role,
+      previous_establishment_id: req.user!.establishment_id ?? null,
+    },
+    ip_address: req.ip,
+    user_agent: req.headers['user-agent'],
+  }, 'SWITCH_ESTABLISHMENT');
+
+  return res.json({
+    token,
+    expiresIn: ACCESS_TOKEN_EXPIRES_IN,
+    user: {
+      id: userId,
+      email: req.user!.email,
+      is_admin: false,
+      role,
+      establishment_id,
+      first_name: userRow?.first_name || '',
+      last_name: userRow?.last_name || '',
+      email_verified: userRow?.email_verified ?? false,
+      permissions,
+      memberships: MembershipModel.toApiList(memberships),
+      support_impersonation: req.user!.support_impersonation ?? null,
+    },
+  });
 }));
 
 sessionRoutes.get('/sessions', requireAuth, asyncHandler(async (req, res) => {

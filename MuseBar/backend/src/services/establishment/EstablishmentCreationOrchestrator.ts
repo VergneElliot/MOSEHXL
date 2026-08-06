@@ -217,7 +217,7 @@ export class EstablishmentCreationOrchestrator {
           subscription_plan: data.subscription_plan || 'basic',
           invitation_link: invitationData.link,
           setup_instructions: invitationData.setup_instructions,
-          support_email: process.env.SUPPORT_EMAIL || 'support@musebar.com'
+          support_email: process.env.SUPPORT_EMAIL || 'support@mosehxl.com'
         }
       );
 

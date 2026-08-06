@@ -1,15 +1,32 @@
-import React from 'react';
-import { AppBar, Toolbar, Typography, Box, Chip, Button } from '@mui/material';
-import { Restaurant as RestaurantIcon } from '@mui/icons-material';
+import React, { useState } from 'react';
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  Box,
+  Chip,
+  Button,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+} from '@mui/material';
+import {
+  Restaurant as RestaurantIcon,
+  Check as CheckIcon,
+  ExpandMore as ExpandMoreIcon,
+} from '@mui/icons-material';
 import { User } from '../../types/auth';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from './LanguageSwitcher';
+import { TimeClockHeaderControl } from './TimeClockHeaderControl';
 
 interface AppHeaderProps {
   isHappyHourActive: boolean;
   timeUntilHappyHour: string;
   onLogout: () => void;
   user: User | null;
+  onSwitchEstablishment?: (establishmentId: string) => Promise<void> | void;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
@@ -17,8 +34,38 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   timeUntilHappyHour,
   onLogout,
   user,
+  onSwitchEstablishment,
 }) => {
   const { t } = useTranslation('common');
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [switching, setSwitching] = useState(false);
+
+  const memberships = user?.memberships ?? [];
+  const showSwitcher =
+    Boolean(onSwitchEstablishment) &&
+    user?.role !== 'system_admin' &&
+    memberships.length > 1;
+
+  const handleOpen = (event: React.MouseEvent<HTMLElement>) => {
+    if (!showSwitcher) return;
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleClose = () => setAnchorEl(null);
+
+  const handleSelect = async (establishmentId: string) => {
+    if (!onSwitchEstablishment || establishmentId === user?.establishment_id) {
+      handleClose();
+      return;
+    }
+    setSwitching(true);
+    try {
+      await onSwitchEstablishment(establishmentId);
+    } finally {
+      setSwitching(false);
+      handleClose();
+    }
+  };
 
   return (
     <AppBar position="static" sx={{ backgroundColor: '#1a1a1a' }}>
@@ -30,6 +77,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <LanguageSwitcher />
+          {user && user.role !== 'system_admin' && user.establishment_id && (
+            <TimeClockHeaderControl />
+          )}
           {isHappyHourActive ? (
             <Chip
               label={t('happyHour.active')}
@@ -47,9 +97,54 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           
           {user && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="body2" sx={{ color: 'white' }}>
-                {user.first_name} {user.last_name}
-              </Typography>
+              <Button
+                color="inherit"
+                onClick={handleOpen}
+                disabled={switching}
+                endIcon={showSwitcher ? <ExpandMoreIcon /> : undefined}
+                sx={{
+                  textTransform: 'none',
+                  cursor: showSwitcher ? 'pointer' : 'default',
+                  minWidth: 0,
+                  px: showSwitcher ? 1 : 0,
+                }}
+              >
+                <Typography variant="body2" sx={{ color: 'white' }}>
+                  {user.first_name} {user.last_name}
+                </Typography>
+              </Button>
+              {showSwitcher && (
+                <Menu
+                  anchorEl={anchorEl}
+                  open={Boolean(anchorEl)}
+                  onClose={handleClose}
+                  anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                  transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                >
+                  {memberships.map((m) => {
+                    const selected = m.establishment_id === user.establishment_id;
+                    return (
+                      <MenuItem
+                        key={m.establishment_id}
+                        selected={selected}
+                        disabled={switching}
+                        onClick={() => void handleSelect(m.establishment_id)}
+                      >
+                        {selected && (
+                          <ListItemIcon>
+                            <CheckIcon fontSize="small" />
+                          </ListItemIcon>
+                        )}
+                        <ListItemText
+                          inset={!selected}
+                          primary={m.name || m.establishment_id}
+                          secondary={m.role}
+                        />
+                      </MenuItem>
+                    );
+                  })}
+                </Menu>
+              )}
               <Button
                 color="inherit"
                 onClick={onLogout}
@@ -63,4 +158,4 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       </Toolbar>
     </AppBar>
   );
-}; 
+};

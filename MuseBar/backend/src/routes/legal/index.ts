@@ -13,6 +13,7 @@ import businessDayStatsRouter from './businessDayStats';
 import statsRouter from './stats';
 import auditRouter from './audit';
 import invoicesRouter from './invoices';
+import closureSettingsRouter from './closureSettings';
 
 const router = express.Router();
 
@@ -27,6 +28,7 @@ router.use('/audit', auditRouter);
 // Mount `business-day-stats` before `businessInfo` for stable path routing.
 // business-day-stats is now permission-gated (`access_compliance`) like other legal data surfaces.
 router.use('/', businessDayStatsRouter);
+router.use('/', closureSettingsRouter);
 router.use('/', businessInfoRouter);
 
 export default router; 

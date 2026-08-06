@@ -18,6 +18,12 @@ export function sendXlsxDownload(res: ExpressResponse, buffer: Buffer, filename:
   res.send(buffer);
 }
 
+export function sendXmlDownload(res: ExpressResponse, buffer: Buffer, filename: string): void {
+  res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(buffer);
+}
+
 export function mapDocumentRouteError(error: unknown, fallbackCode: string): never {
   if (error instanceof AppError) throw error;
   const e = error as { statusCode?: number; message?: string };

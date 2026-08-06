@@ -99,6 +99,12 @@ import printingCompatRouter from './routes/printingCompat';
 import settingsRouter from './routes/settings';
 import productOptionGroupsRouter from './routes/productOptionGroups';
 import kitchenPrintersRouter from './routes/kitchenPrinters';
+import adminSpaceRouter from './routes/admin';
+import inboundEmailRouter from './routes/inboundEmail';
+import icsFeedsRouter from './routes/public/icsFeeds';
+import publicReservationsRouter from './routes/public/reservations';
+import publicPlanningRouter from './routes/public/planning';
+import { DocumentExpiryScheduler } from './utils/documentExpiryScheduler';
 
 app.use('/api/categories', categoriesRouter);
 app.use('/api/products', productsRouter);
@@ -115,6 +121,11 @@ app.use('/api/setup', setupRouter);
 app.use('/api/establishment-account-creation', establishmentAccountCreationRouter);
 app.use('/api/printing', printingRouter);
 app.use('/api/settings', settingsRouter);
+app.use('/api/admin', adminSpaceRouter);
+app.use('/api/inbound-email', inboundEmailRouter);
+app.use('/api/public/ics', icsFeedsRouter);
+app.use('/api/public/reservations', publicReservationsRouter);
+app.use('/api/public/planning', publicPlanningRouter);
 app.use('/', printingCompatRouter);
 
 // Development-only email test routes
@@ -224,6 +235,9 @@ const server = app.listen(config.server.port, '0.0.0.0', async () => {
     });
     TimeChangeMonitor.start();
 
+    // Document expiry reminders (admin space) — hourly check
+    DocumentExpiryScheduler.start();
+
     // Start the automatic closure scheduler (only in production)
     if (NODE_ENV === 'production') {
       ClosureScheduler.start()
@@ -275,6 +289,7 @@ async function handleShutdownSignal(signal: NodeJS.Signals) {
 
   try {
     ClosureScheduler.stop();
+    DocumentExpiryScheduler.stop();
     TimeChangeMonitor.stop();
     await logRuntimeLifecycleEvent('SERVER_SHUTDOWN', signal);
   } catch (error) {

@@ -74,6 +74,7 @@ const PrintClosureDialog: React.FC<PrintClosureDialogProps> = ({
   const [exporting, setExporting] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingFlux103, setExportingFlux103] = useState(false);
   const [emailing, setEmailing] = useState(false);
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -91,15 +92,28 @@ const PrintClosureDialog: React.FC<PrintClosureDialogProps> = ({
 
     setLoadingPreview(true);
     setError(null);
+    setSuccess(null);
     setPreview(null);
+    setEmail('');
 
     (async () => {
       try {
-        const data = await apiCore.request<{ bulletin_data: ClosurePreviewData }>(
-          `/printing/closure/${bulletinId}/preview`,
-          { method: 'GET' }
-        );
-        setPreview(data.bulletin_data);
+        const [previewRes, settingsRes] = await Promise.all([
+          apiCore.request<{ bulletin_data: ClosurePreviewData }>(
+            `/printing/closure/${bulletinId}/preview`,
+            { method: 'GET' }
+          ),
+          apiCore
+            .request<{ settings?: { accounting_emails?: string[] } }>('/legal/closure-settings', {
+              method: 'GET',
+            })
+            .catch(() => null),
+        ]);
+        setPreview(previewRes.bulletin_data);
+        const defaults = settingsRes?.settings?.accounting_emails;
+        if (Array.isArray(defaults) && defaults.length > 0) {
+          setEmail(defaults.join(', '));
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Impossible de charger l’aperçu du bulletin');
       } finally {
@@ -183,17 +197,37 @@ const PrintClosureDialog: React.FC<PrintClosureDialogProps> = ({
     }
   };
 
+  const handleExportFlux103 = async () => {
+    if (!hasValidId || bulletinId == null) return;
+    try {
+      setExportingFlux103(true);
+      setError(null);
+      await printingApi.exportClosureBulletinFlux103(bulletinId);
+      onPrintSuccess('Export Flux 10.3 XML du bulletin téléchargé.');
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Échec export Flux 10.3';
+      setError(message);
+      onPrintError(message);
+    } finally {
+      setExportingFlux103(false);
+    }
+  };
+
   const handleSendEmail = async () => {
     if (!hasValidId || bulletinId == null) return;
-    if (!email.trim()) {
-      setError('Adresse email destinataire requise.');
+    const recipients = email
+      .split(/[,;\n]+/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (recipients.length === 0) {
+      setError('Au moins une adresse email destinataire est requise.');
       return;
     }
     try {
       setEmailing(true);
       setError(null);
       setSuccess(null);
-      const result = await printingApi.emailClosureBulletin(bulletinId, email.trim());
+      const result = await printingApi.emailClosureBulletin(bulletinId, recipients);
       setSuccess(result.message);
       onPrintSuccess(result.message);
     } catch (e) {
@@ -212,10 +246,13 @@ const PrintClosureDialog: React.FC<PrintClosureDialogProps> = ({
         <TextField
           fullWidth
           size="small"
-          label="Email destinataire"
+          label="Emails destinataires"
           value={email}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
-          placeholder="comptable@exemple.com"
+          placeholder="comptable@exemple.com, associe@exemple.com"
+          multiline
+          minRows={2}
+          helperText="Envoi ponctuel de ce bulletin. Prérempli avec les emails comptables des paramètres — ajoutez ou retirez des adresses ici sans modifier les paramètres. Séparez par des virgules."
           sx={{ mb: 2 }}
         />
         {loadingPreview && (
@@ -224,10 +261,18 @@ const PrintClosureDialog: React.FC<PrintClosureDialogProps> = ({
           </Box>
         )}
 
-        {error && <Alert severity="error">{error}</Alert>}
-        {success && <Alert severity="success">{success}</Alert>}
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+        {success && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            {success}
+          </Alert>
+        )}
 
-        {!loadingPreview && !error && preview && (
+        {!loadingPreview && preview && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Typography variant="subtitle2" color="text.secondary">
               Établissement
@@ -355,6 +400,13 @@ const PrintClosureDialog: React.FC<PrintClosureDialogProps> = ({
         </Button>
         <Button onClick={handleExportXlsx} variant="outlined" disabled={loadingPreview || exportingXlsx || !preview}>
           {exportingXlsx ? 'Excel...' : 'Excel comptable'}
+        </Button>
+        <Button
+          onClick={handleExportFlux103}
+          variant="outlined"
+          disabled={loadingPreview || exportingFlux103 || !preview}
+        >
+          {exportingFlux103 ? 'XML...' : 'Flux 10.3 XML'}
         </Button>
         <Button
           onClick={handleSendEmail}

@@ -1,32 +1,23 @@
 /**
  * Settings State Management Hook
  * Centralized state management for all settings functionality
- * 
+ *
  * @deprecated Use individual modules from './hooks/' instead for better modularity
  * This file is maintained for backward compatibility
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { SettingsState, UseSettingsReturn } from './types';
-import { useGeneralSettings, useBusinessInfo, useClosureSettings } from './hooks';
+import { useBusinessInfo, useClosureSettings } from './hooks';
 
-// Extended state for the hook with loading states
 interface ExtendedSettingsState extends SettingsState {
   loading: boolean;
   saving: boolean;
 }
 
 export const useSettings = (): UseSettingsReturn => {
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [state, setState] = useState<ExtendedSettingsState>({
-    generalSettings: {
-      barName: 'MuseBar',
-      address: '',
-      phone: '',
-      email: '',
-      taxIdentification: '',
-      currency: 'EUR',
-      language: 'fr',
-    },
     businessInfo: {
       name: '',
       address: '',
@@ -40,12 +31,7 @@ export const useSettings = (): UseSettingsReturn => {
       daily_closure_time: '02:00',
       timezone: 'Europe/Paris',
       grace_period_minutes: 30,
-    },
-    printerSettings: {
-      enabled: false,
-      printerName: '',
-      printReceipts: true,
-      printReports: false,
+      accounting_emails: [],
     },
     schedulerStatus: {
       is_running: false,
@@ -56,23 +42,12 @@ export const useSettings = (): UseSettingsReturn => {
     saving: false,
   });
 
-  // Initialize modular hooks
-  const generalHook = useGeneralSettings({
-    generalSettings: state.generalSettings,
-    onUpdate: (settings) => setState(prev => ({ ...prev, generalSettings: settings })),
-    onSave: async () => {
-      setState(prev => ({ ...prev, saving: true }));
-      try {
-        // General settings API not yet implemented -- save is a no-op for now
-      } finally {
-        setState(prev => ({ ...prev, saving: false }));
-      }
-    },
-  });
-
   const businessHook = useBusinessInfo({
     businessInfo: state.businessInfo,
-    onUpdate: (info) => setState(prev => ({ ...prev, businessInfo: info })),
+    onUpdate: (info) => {
+      setInfoMessage(null);
+      setState(prev => ({ ...prev, businessInfo: info }));
+    },
     onLoadingChange: (loading) => setState(prev => ({ ...prev, loading })),
     onSavingChange: (saving) => setState(prev => ({ ...prev, saving })),
   });
@@ -80,21 +55,16 @@ export const useSettings = (): UseSettingsReturn => {
   const closureHook = useClosureSettings({
     closureSettings: state.closureSettings,
     onUpdate: (settings) => setState(prev => ({ ...prev, closureSettings: settings })),
+    onSchedulerUpdate: (scheduler) => setState(prev => ({ ...prev, schedulerStatus: scheduler })),
     onLoadingChange: (loading) => setState(prev => ({ ...prev, loading })),
     onSavingChange: (saving) => setState(prev => ({ ...prev, saving })),
   });
 
-  /**
-   * Load all settings on component mount
-   */
   useEffect(() => {
     loadAllSettings();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /**
-   * Load all settings from API
-   */
   const loadAllSettings = async () => {
     setState(prev => ({ ...prev, loading: true }));
     try {
@@ -102,56 +72,40 @@ export const useSettings = (): UseSettingsReturn => {
         businessHook.loadBusinessInfo(),
         closureHook.loadClosureSettings(),
       ]);
-    } catch (error) {
-      // Error loading settings
+    } catch {
+      // Individual hooks log their own errors; keep partial state.
     } finally {
       setState(prev => ({ ...prev, loading: false }));
     }
   };
 
-  /**
-   * Test printer connection
-   */
-  const testPrinter = async (): Promise<void> => {
-    setState(prev => ({ ...prev, saving: true }));
+  const saveBusinessInfo = useCallback(async () => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000)); // TODO: Replace with real printer test API
+      await businessHook.saveBusinessInfo();
+      setInfoMessage("Informations de l'établissement enregistrées.");
     } catch (error) {
+      setInfoMessage(null);
       throw error;
-    } finally {
-      setState(prev => ({ ...prev, saving: false }));
     }
-  };
+  }, [businessHook.saveBusinessInfo]);
 
   return {
-    // State and core properties
     state: {
-      generalSettings: state.generalSettings,
       businessInfo: state.businessInfo,
       closureSettings: state.closureSettings,
-      printerSettings: state.printerSettings,
       schedulerStatus: state.schedulerStatus,
     },
     loading: state.loading,
     saving: state.saving,
-    infoSaving: state.saving, // Use same saving state for info
-    infoMessage: null, // TODO: Implement info messages
-    
-    // Settings update functions
-    updateGeneralSettings: generalHook.updateGeneralSettings,
+    infoSaving: state.saving,
+    infoMessage,
+
     updateBusinessInfo: businessHook.updateBusinessInfo,
     updateClosureSettings: closureHook.updateClosureSettings,
-    
-    // Save functions
-    saveGeneralSettings: generalHook.saveWithValidation,
-    saveBusinessInfo: businessHook.saveBusinessInfo,
+
+    saveBusinessInfo,
     saveClosureSettings: closureHook.saveClosureSettings,
-    
-    // Special functions
+
     triggerManualCheck: closureHook.triggerManualCheck,
-    testPrinter,
-    checkPrinterStatus: async () => {
-      // TODO: Implement printer status check
-    },
   };
 };

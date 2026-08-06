@@ -194,6 +194,29 @@ export const ClosureSettings: React.FC<ClosureSettingsProps> = ({
             />
           </Grid>
 
+          {/* Accounting emails */}
+          <Grid item xs={12}>
+            <TextField
+              label="Emails comptables (envoi automatique des bulletins)"
+              fullWidth
+              multiline
+              minRows={2}
+              value={(closureSettings.accounting_emails ?? []).join(', ')}
+              onChange={(event) =>
+                onUpdate({
+                  ...closureSettings,
+                  accounting_emails: event.target.value
+                    .split(/[,;\n]+/)
+                    .map((part) => part.trim())
+                    .filter(Boolean),
+                })
+              }
+              disabled={loading}
+              placeholder="comptable@cabinet.fr, associe@cabinet.fr"
+              helperText="Si renseigné, chaque bulletin de clôture (manuel ou automatique) est envoyé à ces adresses. Laissez vide pour désactiver l'envoi automatique. Séparez les adresses par des virgules."
+            />
+          </Grid>
+
           {/* Information Alert */}
           <Grid item xs={12}>
             <Alert severity="warning" sx={{ mt: 2 }}>

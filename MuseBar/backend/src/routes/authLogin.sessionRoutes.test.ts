@@ -6,6 +6,8 @@ import { errorHandler } from '../middleware/errorHandler';
 const mocks = vi.hoisted(() => ({
   getAuthMeProfile: vi.fn(),
   getUserPermissions: vi.fn(),
+  listForUser: vi.fn(),
+  toApiList: vi.fn((rows: unknown[]) => rows),
   legacyMetrics: vi.fn(),
 }));
 
@@ -43,6 +45,15 @@ vi.mock('../models/user', () => ({
   },
 }));
 
+vi.mock('../models/membership', () => ({
+  MembershipModel: {
+    listForUser: mocks.listForUser,
+    toApiList: mocks.toApiList,
+    get: vi.fn(),
+    setActiveEstablishment: vi.fn(),
+  },
+}));
+
 vi.mock('../models/refreshToken', () => ({
   RefreshTokenModel: {
     findActiveByRawToken: vi.fn(),
@@ -72,6 +83,8 @@ describe('auth sessionRoutes profile and metrics endpoints', () => {
   beforeEach(() => {
     mocks.getAuthMeProfile.mockReset();
     mocks.getUserPermissions.mockReset();
+    mocks.listForUser.mockReset();
+    mocks.toApiList.mockClear();
     mocks.legacyMetrics.mockReset();
 
     mocks.getAuthMeProfile.mockResolvedValue({
@@ -80,6 +93,8 @@ describe('auth sessionRoutes profile and metrics endpoints', () => {
       email_verified: true,
     });
     mocks.getUserPermissions.mockResolvedValue(['legal:read', 'orders:write']);
+    mocks.listForUser.mockResolvedValue([]);
+    mocks.toApiList.mockImplementation((rows: unknown[]) => rows);
     mocks.legacyMetrics.mockReturnValue({
       tokens_with_legacy_is_admin_claim: 0,
     });
@@ -99,6 +114,7 @@ describe('auth sessionRoutes profile and metrics endpoints', () => {
       last_name: 'Lovelace',
       email_verified: true,
       permissions: ['legal:read', 'orders:write'],
+      memberships: [],
       support_impersonation: null,
     });
   });

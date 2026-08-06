@@ -30,6 +30,7 @@ import {
   Email
 } from '@mui/icons-material';
 import { BusinessInfo } from '../types';
+import { businessTypeLabel } from '../businessTypes';
 
 interface CompletionStepProps {
   businessInfo: BusinessInfo | null;
@@ -56,12 +57,9 @@ const CompletionStep: React.FC<CompletionStepProps> = ({
     switch (businessType.toLowerCase()) {
       case 'restaurant':
       case 'bar':
-      case 'café':
-      case 'bistro':
-      case 'brasserie':
+      case 'cafe':
         return <Store />;
-      case 'fast food':
-      case 'food truck':
+      case 'retail':
         return <Receipt />;
       default:
         return <Business />;
@@ -114,7 +112,7 @@ const CompletionStep: React.FC<CompletionStepProps> = ({
                 <Box display="flex" alignItems="center" gap={1} mb={1}>
                   {getBusinessTypeIcon(businessInfo.businessType)}
                   <Typography variant="body2" color="text.secondary">
-                    {businessInfo.businessType}
+                    {businessTypeLabel(businessInfo.businessType)}
                   </Typography>
                 </Box>
                 <Box display="flex" alignItems="center" gap={1}>

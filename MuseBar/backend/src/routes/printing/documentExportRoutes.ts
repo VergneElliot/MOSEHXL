@@ -21,11 +21,13 @@ import {
   emailClosureBulletinDocument,
   emailReceiptDocument,
   validateRecipientEmail,
+  validateRecipientEmails,
 } from '../../services/documents/documentEmailService';
 import type { AuthenticatedRequest } from '../userManagement/types';
 import { asyncHandler, ValidationError } from '../../middleware/errorHandler';
 import { ensureEstablishment, getPrintingUser } from './context';
-import { mapDocumentRouteError, sendPdfDownload, sendXlsxDownload } from './documentHelpers';
+import { buildFlux103Attachment } from '../../services/documents/flux103Service';
+import { mapDocumentRouteError, sendPdfDownload, sendXlsxDownload, sendXmlDownload } from './documentHelpers';
 
 const router = Router();
 
@@ -131,6 +133,20 @@ router.get('/closure/:bulletinId/export-xlsx', authenticateToken, ensureEstablis
   }
 }));
 
+// GET /api/printing/closure/:bulletinId/export-flux103
+router.get('/closure/:bulletinId/export-flux103', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = getPrintingUser(req)!;
+    const bulletinId = parseInt(req.params.bulletinId ?? '', 10);
+    if (!Number.isFinite(bulletinId) || bulletinId <= 0) throw new ValidationError('Invalid closure bulletin id');
+    const bulletinData = await buildClosureBulletinData(pool, user, bulletinId);
+    const flux = buildFlux103Attachment(bulletinData);
+    sendXmlDownload(res, flux.buffer, flux.filename);
+  } catch (error) {
+    mapDocumentRouteError(error, 'PRINTING_CLOSURE_FLUX103_EXPORT_FAILED');
+  }
+}));
+
 // POST /api/printing/closure/:bulletinId/email
 router.post('/closure/:bulletinId/email', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -138,12 +154,13 @@ router.post('/closure/:bulletinId/email', authenticateToken, ensureEstablishment
     const bulletinId = parseInt(req.params.bulletinId ?? '', 10);
     if (!Number.isFinite(bulletinId) || bulletinId <= 0) throw new ValidationError('Invalid closure bulletin id');
     const bulletinData = await buildClosureBulletinData(pool, user, bulletinId);
-    const to = validateRecipientEmail(req.body?.to);
+    const to = validateRecipientEmails(req.body?.to);
     const result = await emailClosureBulletinDocument(pool, user.establishment_id, bulletinData, to);
     await logPrintingHistory(pool, user.establishment_id, 'closure_bulletin', { success: true, message: result.message }, {
       bulletin_id: bulletinId,
       action: 'email',
-      recipient: to,
+      recipient: to.join(', '),
+      recipients: to,
       tracking_id: result.trackingId,
       attachments: result.attachments,
     });

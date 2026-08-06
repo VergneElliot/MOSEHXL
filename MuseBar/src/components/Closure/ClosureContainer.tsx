@@ -219,8 +219,8 @@ const ClosureContainer: React.FC = () => {
       <CreateClosureDialog
         open={state.showCreateDialog}
         onClose={() => actions.setShowCreateDialog(false)}
-        onCreate={async ({ date, type, force, fond_de_caisse }: { date: string; type: ClosureType; force?: boolean; fond_de_caisse: number }) =>
-          api.createClosure({ date, type, force, fond_de_caisse })
+        onCreate={async ({ date, type, force, fond_de_caisse, email_recipients }) =>
+          api.createClosure({ date, type, force, fond_de_caisse, email_recipients })
         }
         creating={state.creating}
         selectedDate={state.selectedDate}

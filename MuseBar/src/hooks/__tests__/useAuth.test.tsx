@@ -1,6 +1,7 @@
+import React from 'react';
 import { vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { useAuth } from '../useAuth';
+import { AuthProvider, useAuth } from '../useAuth';
 import { apiService, ApiService } from '../../services/apiService';
 import { apiConfig } from '../../config/api';
 
@@ -20,6 +21,10 @@ vi.mock('../../config/api', () => ({
     initialize: vi.fn(),
   },
 }));
+
+function wrapper({ children }: { children: React.ReactNode }) {
+  return <AuthProvider>{children}</AuthProvider>;
+}
 
 describe('useAuth refresh rememberMe behavior', () => {
   const mockPost = vi.mocked(apiService.post);
@@ -53,7 +58,7 @@ describe('useAuth refresh rememberMe behavior', () => {
   });
 
   it('sends rememberMe=true during refresh after remembered login', async () => {
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper });
 
     act(() => {
       result.current.login(
@@ -86,7 +91,7 @@ describe('useAuth refresh rememberMe behavior', () => {
 
   it('falls back to localStorage remember_me when refreshing', async () => {
     localStorage.setItem('remember_me', 'true');
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper });
 
     await act(async () => {
       await result.current.refreshToken();
@@ -99,7 +104,7 @@ describe('useAuth refresh rememberMe behavior', () => {
 
   it('coalesces concurrent refresh calls into one request', async () => {
     localStorage.setItem('remember_me', 'true');
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper });
 
     await act(async () => {
       await Promise.all([

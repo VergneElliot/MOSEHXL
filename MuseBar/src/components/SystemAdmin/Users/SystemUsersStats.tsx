@@ -1,48 +1,45 @@
-import React from 'react';
-import { Grid, Card, CardContent, Typography } from '@mui/material';
+import React, { useMemo } from 'react';
+import { Grid, Paper, Typography, Box } from '@mui/material';
+import {
+  People as PeopleIcon,
+  AdminPanelSettings as AdminIcon,
+  CheckCircle as ActiveIcon,
+} from '@mui/icons-material';
 import { SystemUser } from '../../../types/system';
 
-export const SystemUsersStats: React.FC = () => {
-  // TODO: Replace with actual hook when implemented
-  const users: SystemUser[] = [
-    {
-      id: 3,
-      email: 'elliot.vergne@gmail.com',
-      first_name: 'Elliot',
-      last_name: 'Vergne',
-      role: 'system_admin',
-      is_active: true,
-      last_login: '2025-08-01T10:00:00Z',
-      created_at: '2025-07-31T20:30:05Z'
-    }
-  ]; // Mock data
+interface SystemUsersStatsProps {
+  users: SystemUser[];
+}
 
-  const stats = {
-    total: users.length,
-    admins: users.filter(u => u.role === 'system_admin').length,
-    active: users.filter(u => u.is_active).length
-  };
+export const SystemUsersStats: React.FC<SystemUsersStatsProps> = ({ users }) => {
+  const stats = useMemo(
+    () => ({
+      total: users.length,
+      admins: users.filter((u) => u.role === 'system_admin').length,
+      active: users.filter((u) => u.is_active).length,
+    }),
+    [users]
+  );
 
-  const statCards = [
-    { label: 'Total Utilisateurs', value: stats.total },
-    { label: 'Administrateurs', value: stats.admins },
-    { label: 'Actifs', value: stats.active }
+  const cards = [
+    { label: 'Total', value: stats.total, icon: <PeopleIcon color="primary" /> },
+    { label: 'Administrateurs', value: stats.admins, icon: <AdminIcon color="error" /> },
+    { label: 'Actifs', value: stats.active, icon: <ActiveIcon color="success" /> },
   ];
 
   return (
     <Grid container spacing={2} sx={{ mb: 3 }}>
-      {statCards.map((stat, index) => (
-        <Grid item xs={12} sm={6} md={3} key={index}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                {stat.label}
+      {cards.map((card) => (
+        <Grid item xs={12} sm={4} key={card.label}>
+          <Paper sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+            {card.icon}
+            <Box>
+              <Typography variant="h5">{card.value}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {card.label}
               </Typography>
-              <Typography variant="h4">
-                {stat.value}
-              </Typography>
-            </CardContent>
-          </Card>
+            </Box>
+          </Paper>
         </Grid>
       ))}
     </Grid>

@@ -10,6 +10,7 @@ export interface ClosureSettings {
   daily_closure_time: string;
   timezone: string;
   grace_period_minutes: number;
+  accounting_emails: string[];
 }
 
 export interface SchedulerStatus {
@@ -23,6 +24,7 @@ export interface SchedulerStatusResponse {
   scheduler: SchedulerStatus;
 }
 
+/** @deprecated Unused in Settings UI; currency is EUR app-wide and language uses i18n switcher. */
 export interface GeneralSettings {
   barName: string;
   address: string;
@@ -42,6 +44,7 @@ export interface BusinessInfo {
   taxIdentification: string;
 }
 
+/** @deprecated Legacy stub type; live printer config is PrinterSetup. */
 export interface PrinterSettings {
   enabled: boolean;
   printerName: string;
@@ -50,10 +53,8 @@ export interface PrinterSettings {
 }
 
 export interface SettingsState {
-  generalSettings: GeneralSettings;
   businessInfo: BusinessInfo;
   closureSettings: ClosureSettings;
-  printerSettings: PrinterSettings;
   schedulerStatus: SchedulerStatus;
 }
 
@@ -64,6 +65,7 @@ export interface SettingsProps {
   products?: Product[];
 }
 
+/** @deprecated General settings form removed; business identity is BusinessSettingsProps. */
 export interface GeneralSettingsProps {
   settings: GeneralSettings;
   onUpdate: (settings: GeneralSettings) => void;
@@ -94,15 +96,11 @@ export interface UseSettingsReturn {
   saving: boolean;
   infoSaving: boolean;
   infoMessage: string | null;
-  updateGeneralSettings: (settings: GeneralSettings) => void;
   updateBusinessInfo: (info: BusinessInfo) => void;
   updateClosureSettings: (settings: ClosureSettings) => void;
-  saveGeneralSettings: () => Promise<void>;
   saveBusinessInfo: () => Promise<void>;
   saveClosureSettings: () => Promise<void>;
   triggerManualCheck: () => Promise<void>;
-  testPrinter: () => Promise<void>;
-  checkPrinterStatus: () => Promise<void>;
 }
 
 /**

@@ -181,10 +181,13 @@ export function requireEstablishmentAdmin(
   next();
 }
 
-/** Gate: user must hold the named permission. */
+/** Gate: user must hold the named permission (active establishment). */
 export function requirePermission(permission: string) {
   return async (req: Request, res: Response, next: NextFunction) => {
-    const perms = await UserModel.getUserPermissions(Number(req.user?.id));
+    const perms = await UserModel.getUserPermissions(
+      Number(req.user?.id),
+      req.user?.establishment_id
+    );
     if (!perms.includes(permission)) {
       return res.status(403).json({ error: 'Permission denied' });
     }
@@ -192,10 +195,13 @@ export function requirePermission(permission: string) {
   };
 }
 
-/** User must have at least one of the given permissions. */
+/** User must have at least one of the given permissions (active establishment). */
 export function requireAnyPermission(permissions: string[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
-    const perms = await UserModel.getUserPermissions(Number(req.user?.id));
+    const perms = await UserModel.getUserPermissions(
+      Number(req.user?.id),
+      req.user?.establishment_id
+    );
     if (permissions.some((p) => perms.includes(p))) return next();
     return res.status(403).json({ error: 'Permission denied' });
   };

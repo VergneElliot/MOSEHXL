@@ -19,6 +19,7 @@ import {
 } from '@mui/material';
 import { Business } from '@mui/icons-material';
 import { BusinessInfo } from '../types';
+import { ESTABLISHMENT_BUSINESS_TYPES } from '../businessTypes';
 
 interface BusinessInfoStepProps {
   onComplete: (data: { businessInfo: BusinessInfo }) => void;
@@ -42,19 +43,6 @@ const BusinessInfoStep: React.FC<BusinessInfoStepProps> = ({
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const businessTypes = [
-    'Restaurant',
-    'Bar',
-    'Café',
-    'Bistro',
-    'Brasserie',
-    'Fast Food',
-    'Food Truck',
-    'Catering',
-    'Other'
-  ];
-
   const validateField = (field: keyof BusinessInfo, value: string): string => {
     switch (field) {
       case 'companyName':
@@ -200,9 +188,9 @@ const BusinessInfoStep: React.FC<BusinessInfoStepProps> = ({
                 onChange={(e) => handleFieldChange('businessType', e.target.value)}
                 label="Business Type *"
               >
-                {businessTypes.map((type) => (
-                  <MenuItem key={type} value={type}>
-                    {type}
+                {ESTABLISHMENT_BUSINESS_TYPES.map((type) => (
+                  <MenuItem key={type.value} value={type.value}>
+                    {type.label}
                   </MenuItem>
                 ))}
               </Select>

@@ -103,7 +103,7 @@ router.get('/:id', requireAuth, requireAdmin, validateParams([paramValidations.i
 router.delete('/:id', requireAuth, requireAdmin, validateParams([paramValidations.id]), asyncHandler(async (req, res) => {
   try {
     const id = req.params.id ?? '';
-    await establishmentService.deleteEstablishment(id);
+    // Journal before hard-delete: legal_journal rows for this establishment are removed in delete.
     await logSoftwareEventBestEffort({
       establishmentId: id,
       eventType: 'ESTABLISHMENT_DELETED',
@@ -112,6 +112,7 @@ router.delete('/:id', requireAuth, requireAdmin, validateParams([paramValidation
         establishment_id: id,
       },
     });
+    await establishmentService.deleteEstablishment(id);
     res.json({ success: true, message: 'Establishment deleted successfully' });
   } catch (error) {
     logger.error(

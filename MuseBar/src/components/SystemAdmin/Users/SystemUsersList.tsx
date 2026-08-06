@@ -10,51 +10,40 @@ import {
   Chip,
   IconButton,
   Typography,
-  Box
+  Box,
+  CircularProgress,
 } from '@mui/material';
 import {
-  Edit as EditIcon,
   Delete as DeleteIcon,
-  Security as SecurityIcon
+  Restore as RestoreIcon,
 } from '@mui/icons-material';
 import { SystemUser } from '../../../types/system';
 import { formatDateOnly } from '../../../utils/formatDate';
 
-export const SystemUsersList: React.FC = () => {
-  // TODO: Replace with actual data from hook
-  const users: SystemUser[] = [
-    {
-      id: 3,
-      email: 'elliot.vergne@gmail.com',
-      first_name: 'Elliot',
-      last_name: 'Vergne',
-      role: 'system_admin',
-      is_active: true,
-      last_login: '2025-08-01T10:00:00Z',
-      created_at: '2025-07-31T20:30:05Z'
-    }
-  ]; // Mock data
+interface SystemUsersListProps {
+  users: SystemUser[];
+  loading?: boolean;
+  onToggleActive: (user: SystemUser) => void;
+}
 
-  const getRoleColor = (role: string): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' => {
-    return role === 'system_admin' ? 'error' : 'primary';
-  };
-
-  const getStatusColor = (isActive: boolean): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' => {
-    return isActive ? 'success' : 'default';
-  };
-
-  const getRoleLabel = (role: string) => {
-    return role === 'system_admin' ? 'Administrateur' : 'Opérateur';
-  };
+export const SystemUsersList: React.FC<SystemUsersListProps> = ({
+  users,
+  loading = false,
+  onToggleActive,
+}) => {
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   if (users.length === 0) {
     return (
       <Box sx={{ textAlign: 'center', py: 4 }}>
-        <Typography variant="h6" color="textSecondary">
-          Aucun utilisateur système
-        </Typography>
-        <Typography variant="body2" color="textSecondary">
-          Cliquez sur "Ajouter un Utilisateur" pour commencer
+        <Typography variant="body1" color="text.secondary">
+          Aucun utilisateur système trouvé
         </Typography>
       </Box>
     );
@@ -65,54 +54,44 @@ export const SystemUsersList: React.FC = () => {
       <Table>
         <TableHead>
           <TableRow>
-            <TableCell>Utilisateur</TableCell>
+            <TableCell>Nom</TableCell>
             <TableCell>Email</TableCell>
             <TableCell>Rôle</TableCell>
             <TableCell>Statut</TableCell>
-            <TableCell>Dernière Connexion</TableCell>
-            <TableCell>Actions</TableCell>
+            <TableCell>Dernière connexion</TableCell>
+            <TableCell>Créé le</TableCell>
+            <TableCell align="right">Actions</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {users.map((user) => (
             <TableRow key={user.id}>
               <TableCell>
-                <Box>
-                  <Typography variant="subtitle2">
-                    {user.first_name} {user.last_name}
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary">
-                    ID: {user.id}
-                  </Typography>
-                </Box>
+                {[user.first_name, user.last_name].filter(Boolean).join(' ') || '—'}
               </TableCell>
               <TableCell>{user.email}</TableCell>
               <TableCell>
-                <Chip 
-                  label={getRoleLabel(user.role)} 
-                  color={getRoleColor(user.role)}
-                  size="small"
-                />
+                <Chip label="Administrateur" color="error" size="small" />
               </TableCell>
               <TableCell>
-                <Chip 
-                  label={user.is_active ? 'Actif' : 'Inactif'} 
-                  color={getStatusColor(user.is_active)}
+                <Chip
+                  label={user.is_active ? 'Actif' : 'Inactif'}
+                  color={user.is_active ? 'success' : 'default'}
                   size="small"
                 />
               </TableCell>
               <TableCell>
                 {user.last_login ? formatDateOnly(user.last_login) : 'Jamais'}
               </TableCell>
-              <TableCell>
-                <IconButton size="small" title="Permissions">
-                  <SecurityIcon />
-                </IconButton>
-                <IconButton size="small" title="Modifier">
-                  <EditIcon />
-                </IconButton>
-                <IconButton size="small" title="Supprimer">
-                  <DeleteIcon />
+              <TableCell>{formatDateOnly(user.created_at)}</TableCell>
+              <TableCell align="right">
+                <IconButton
+                  size="small"
+                  color={user.is_active ? 'error' : 'primary'}
+                  onClick={() => onToggleActive(user)}
+                  aria-label={user.is_active ? 'Désactiver' : 'Réactiver'}
+                >
+                  {user.is_active ? <DeleteIcon /> : <RestoreIcon />}
                 </IconButton>
               </TableCell>
             </TableRow>

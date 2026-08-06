@@ -14,6 +14,7 @@ import {
   FormHelperText
 } from '@mui/material';
 import { BusinessInfo } from '../types';
+import { ESTABLISHMENT_BUSINESS_TYPES } from '../businessTypes';
 
 interface BusinessInfoFormProps {
   businessInfo: BusinessInfo;
@@ -28,18 +29,6 @@ const BusinessInfoForm: React.FC<BusinessInfoFormProps> = ({
   onChange,
   disabled = false
 }) => {
-  const businessTypes = [
-    'Restaurant',
-    'Bar',
-    'Café',
-    'Bistro',
-    'Brasserie',
-    'Fast Food',
-    'Food Truck',
-    'Catering',
-    'Other'
-  ];
-
   const handleFieldChange = (field: keyof BusinessInfo, value: string) => {
     // Apply field-specific formatting
     let formattedValue = value;
@@ -121,9 +110,9 @@ const BusinessInfoForm: React.FC<BusinessInfoFormProps> = ({
             label="Business Type"
             required
           >
-            {businessTypes.map((type) => (
-              <MenuItem key={type} value={type}>
-                {type}
+            {ESTABLISHMENT_BUSINESS_TYPES.map((type) => (
+              <MenuItem key={type.value} value={type.value}>
+                {type.label}
               </MenuItem>
             ))}
           </Select>

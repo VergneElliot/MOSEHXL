@@ -78,7 +78,10 @@ router.post('/complete',
       });
 
       logger.info('Account creation completed, sending response');
-      res.json(response);
+      if (!response.success) {
+        return res.status(400).json(response);
+      }
+      return res.json(response);
     } catch (error) {
       logger.error('Establishment account creation error', error as Error);
       throw error;

@@ -11,6 +11,7 @@ import {
   AuthorizationError,
   ValidationError,
 } from '../../middleware/errorHandler';
+import { MembershipModel } from '../../models/membership';
 import { RefreshTokenModel } from '../../models/refreshToken';
 import { TokenBlocklistModel } from '../../models/tokenBlocklist';
 import { UserModel } from '../../models/user';
@@ -127,11 +128,41 @@ loginRoutes.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
       throw new AuthenticationError('Invalid credentials');
     }
 
-    const loginRole = deriveCanonicalRole({
-      roleFromDb: user.role,
-      isAdminFlag: user.is_admin,
-      establishmentId: user.establishment_id,
-    });
+    const d = await UserModel.getAuthLoginDetails(user.id);
+    const is_admin: boolean = d?.is_admin ?? user.is_admin;
+    const memberships = await MembershipModel.listForUser(user.id);
+    const isSystemAdmin = d?.role === 'system_admin';
+    const activeMembership = isSystemAdmin
+      ? null
+      : await MembershipModel.resolveActive(user.id, d?.establishment_id ?? user.establishment_id);
+
+    let establishment_id: string | null = null;
+    let role: CanonicalAuthRole;
+
+    if (isSystemAdmin) {
+      establishment_id = null;
+      role = deriveCanonicalRole({
+        roleFromDb: 'system_admin',
+        isAdminFlag: true,
+        establishmentId: null,
+      });
+    } else if (activeMembership) {
+      establishment_id = activeMembership.establishment_id;
+      role = deriveCanonicalRole({
+        roleFromDb: activeMembership.role,
+        isAdminFlag: false,
+        establishmentId: establishment_id,
+      });
+    } else {
+      establishment_id = d?.establishment_id || null;
+      role = deriveCanonicalRole({
+        roleFromDb: d?.role,
+        isAdminFlag: is_admin,
+        establishmentId: establishment_id,
+      });
+    }
+
+    const loginRole = role;
 
     if (isAdminTwoFactorEnforced() && requiresAdminTwoFactor(loginRole)) {
       const mfaState = await UserModel.getMfaTotpState(user.id);
@@ -181,16 +212,13 @@ loginRoutes.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
 
     await UserModel.clearLoginLockoutState(user.id);
 
-    // Fetch the full user record to build the JWT payload
-    const d = await UserModel.getAuthLoginDetails(user.id);
-
-    const is_admin: boolean = d?.is_admin ?? user.is_admin;
-    const establishment_id: string | null = d?.establishment_id || null;
-    const role: CanonicalAuthRole = deriveCanonicalRole({
-      roleFromDb: d?.role,
-      isAdminFlag: is_admin,
-      establishmentId: establishment_id,
-    });
+    if (activeMembership) {
+      await MembershipModel.setActiveEstablishment(
+        user.id,
+        activeMembership.establishment_id,
+        activeMembership.role
+      );
+    }
 
     if (kickPriorSessions) {
       const revokeBeforeIat = Math.floor(Date.now() / 1000);
@@ -200,6 +228,10 @@ loginRoutes.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
         'LOGIN_KICK_PRIOR_SESSIONS'
       );
     }
+
+    const permissions = establishment_id
+      ? await UserModel.getUserPermissions(user.id, establishment_id).catch(() => [] as string[])
+      : [];
 
     const token = generateToken(
       { id: user.id, email: user.email, role, establishment_id },
@@ -224,7 +256,7 @@ loginRoutes.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
     await logAuditOrThrow({
       user_id: String(user.id),
       action_type: 'LOGIN',
-      action_details: { email, rememberMe: !!rememberMe, kickPriorSessions },
+      action_details: { email, rememberMe: !!rememberMe, kickPriorSessions, establishment_id },
       ip_address: ip,
       user_agent: userAgent,
     }, 'LOGIN_SUCCESS');
@@ -234,12 +266,13 @@ loginRoutes.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
       user: {
         id: user.id,
         email: user.email,
-        is_admin,
+        is_admin: role === 'system_admin',
         role,
         first_name: d?.first_name || '',
         last_name: d?.last_name || '',
         establishment_id,
-        permissions: [],
+        permissions,
+        memberships: MembershipModel.toApiList(memberships),
       },
       expiresIn: ACCESS_TOKEN_EXPIRES_IN,
       refreshExpiresIn,

@@ -1,5 +1,6 @@
 import express from 'express';
 import { UserModel } from '../models/user';
+import { MembershipModel } from '../models/membership';
 import { AuditTrailModel } from '../models/auditTrail';
 import { Logger } from '../utils/logger';
 import {
@@ -43,12 +44,11 @@ async function logAuditOrThrow(
 const ESTABLISHMENT_USER_ROLES: readonly string[] = ['establishment_admin', 'staff'];
 
 // ---------------------------------------------------------------------------
-// POST /api/auth/register — create a system-level user (system_admin only).
-// Does NOT set establishment_id or role. For creating establishment users,
-// use POST /api/auth/users which is scoped by requireEstablishmentAdmin.
+// POST /api/auth/register — create a system_admin (platform) user.
+// Does NOT set establishment_id. For establishment users use POST /api/auth/users.
 // ---------------------------------------------------------------------------
 router.post('/register', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
-  const { email, password, is_admin } = req.body;
+  const { email, password, first_name, last_name } = req.body;
   const ip = req.ip;
   const userAgent = req.headers['user-agent'];
 
@@ -76,17 +76,31 @@ router.post('/register', requireAuth, requireAdmin, asyncHandler(async (req, res
   }
 
   try {
-    const user = await UserModel.createUser(email, password, !!is_admin);
+    const user = await UserModel.createSystemAdmin({
+      email,
+      password,
+      first_name,
+      last_name,
+    });
     await logAuditOrThrow({
       user_id: String(req.user!.id),
       action_type: 'CREATE_USER',
       resource_type: 'USER',
       resource_id: String(user.id),
-      action_details: { email, is_admin },
+      action_details: { email, role: 'system_admin' },
       ip_address: ip,
       user_agent: userAgent,
     }, 'REGISTER_SYSTEM_USER_SUCCESS');
-    return res.status(201).json({ id: user.id, email: user.email, is_admin: user.is_admin });
+    return res.status(201).json({
+      id: user.id,
+      email: user.email,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      role: 'system_admin',
+      is_active: user.is_active !== false,
+      last_login: user.last_login ?? null,
+      created_at: user.created_at,
+    });
   } catch (err) {
     Logger.getInstance().error(
       'Create user failed',
@@ -95,6 +109,128 @@ router.post('/register', requireAuth, requireAdmin, asyncHandler(async (req, res
     );
     throw new AppError('User already exists or invalid data', 400, 'REGISTER_SYSTEM_USER_FAILED');
   }
+}));
+
+function serializeSystemUser(user: {
+  id: number;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  is_active: boolean;
+  last_login: Date | null;
+  created_at: Date;
+}) {
+  return {
+    id: user.id,
+    email: user.email,
+    first_name: user.first_name ?? '',
+    last_name: user.last_name ?? '',
+    role: 'system_admin' as const,
+    is_active: user.is_active !== false,
+    last_login: user.last_login ?? null,
+    created_at: user.created_at,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/auth/system-users — list platform system admins
+// ---------------------------------------------------------------------------
+router.get('/system-users', requireAuth, requireAdmin, asyncHandler(async (_req, res) => {
+  const rows = await UserModel.listSystemAdmins();
+  return res.json(rows.map(serializeSystemUser));
+}));
+
+// ---------------------------------------------------------------------------
+// PATCH /api/auth/system-users/:id — activate/deactivate a system admin
+// ---------------------------------------------------------------------------
+router.patch('/system-users/:id', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const userId = parseInt(req.params.id ?? '', 10);
+  if (!Number.isFinite(userId) || userId <= 0) {
+    throw new ValidationError('Invalid user id');
+  }
+  if (typeof req.body?.is_active !== 'boolean') {
+    throw new ValidationError('is_active boolean is required');
+  }
+  if (userId === req.user!.id && req.body.is_active === false) {
+    throw new ValidationError('You cannot deactivate your own account');
+  }
+
+  const updated = await UserModel.setSystemAdminActive(userId, req.body.is_active);
+  if (!updated) {
+    throw new NotFoundError('System user');
+  }
+
+  await logAuditOrThrow({
+    user_id: String(req.user!.id),
+    action_type: req.body.is_active ? 'ACTIVATE_SYSTEM_USER' : 'DEACTIVATE_SYSTEM_USER',
+    resource_type: 'USER',
+    resource_id: String(updated.id),
+    action_details: { email: updated.email, is_active: updated.is_active },
+    ip_address: req.ip,
+    user_agent: req.headers['user-agent'],
+  }, 'SYSTEM_USER_ACTIVE_TOGGLE');
+
+  return res.json(serializeSystemUser(updated));
+}));
+
+// ---------------------------------------------------------------------------
+// GET /api/auth/system-security-logs — platform-wide audit trail (system_admin)
+// ---------------------------------------------------------------------------
+router.get('/system-security-logs', requireAuth, requireAdmin, asyncHandler(async (req, res) => {
+  const { user_id, action_type, resource_type, start, end, limit, offset } = req.query;
+  const parsedLimit = typeof limit === 'string' ? parseInt(limit, 10) : 50;
+  const parsedOffset = typeof offset === 'string' ? parseInt(offset, 10) : 0;
+
+  const actionTypes =
+    typeof action_type === 'string' && action_type
+      ? action_type.split(',').map((s) => s.trim()).filter(Boolean)
+      : Array.isArray(action_type)
+        ? action_type.flatMap((v) => String(v).split(',')).map((s) => s.trim()).filter(Boolean)
+        : [];
+
+  const { entries, total } = await AuditTrailModel.getPlatformAuditTrail({
+    user_id: typeof user_id === 'string' && user_id ? user_id : undefined,
+    action_types: actionTypes.length > 0 ? actionTypes : undefined,
+    resource_type: typeof resource_type === 'string' && resource_type ? resource_type : undefined,
+    start: typeof start === 'string' && start ? start : undefined,
+    end: typeof end === 'string' && end ? end : undefined,
+    limit: Number.isFinite(parsedLimit) ? parsedLimit : 50,
+    offset: Number.isFinite(parsedOffset) ? parsedOffset : 0,
+  });
+
+  const logs = entries.map((entry) => {
+    const action = String(entry.action_type || '');
+    let severity: 'low' | 'medium' | 'high' | 'critical' = 'low';
+    if (/FAIL|ERROR|DENIED|LOCK|BREACH/i.test(action)) severity = 'high';
+    else if (/DELETE|RESET|IMPERSONATION|DEACTIVATE/i.test(action)) severity = 'critical';
+    else if (/CREATE|UPDATE|CHANGE|GRANT|REGISTER/i.test(action)) severity = 'medium';
+
+    const details =
+      typeof entry.action_details === 'string'
+        ? entry.action_details
+        : entry.action_details
+          ? JSON.stringify(entry.action_details)
+          : '';
+
+    return {
+      id: String(entry.id),
+      user_id: entry.user_id != null ? String(entry.user_id) : '',
+      action_type: action,
+      resource_type: entry.resource_type || 'SYSTEM',
+      resource_id: entry.resource_id || undefined,
+      details,
+      ip_address: entry.ip_address || undefined,
+      user_agent: entry.user_agent || undefined,
+      timestamp:
+        entry.timestamp instanceof Date
+          ? entry.timestamp.toISOString()
+          : String(entry.timestamp),
+      severity,
+      establishment_id: entry.establishment_id ?? null,
+    };
+  });
+
+  return res.json({ logs, total });
 }));
 
 // ---------------------------------------------------------------------------
@@ -118,7 +254,7 @@ router.get('/users/:id/permissions', requireAuth, canManageUsers, asyncHandler(a
     throw new AuthorizationError('User does not belong to your establishment');
   }
 
-  const permissions = await UserModel.getUserPermissions(userId);
+  const permissions = await UserModel.getUserPermissions(userId, establishmentId);
   return res.json({ userId, permissions });
 }));
 
@@ -141,7 +277,7 @@ router.post('/users/:id/permissions', requireAuth, canManageUsers, asyncHandler(
     throw new AuthorizationError('User does not belong to your establishment');
   }
 
-  await UserModel.setUserPermissions(userId, permissions);
+  await UserModel.setUserPermissions(userId, permissions, establishmentId);
   await logAuditOrThrow({
     user_id: String(req.user!.id),
     action_type: 'SET_PERMISSIONS',
@@ -182,7 +318,7 @@ router.put('/users/:id/permissions', requireAuth, canManageUsers, asyncHandler(a
     throw new AuthorizationError('User does not belong to your establishment');
   }
 
-  await UserModel.setUserPermissions(userId, permissions);
+  await UserModel.setUserPermissions(userId, permissions, establishmentId);
   await logAuditOrThrow({
     user_id: String(req.user!.id),
     action_type: 'SET_PERMISSIONS',
@@ -207,19 +343,14 @@ router.put('/users/:id/permissions', requireAuth, canManageUsers, asyncHandler(a
 }));
 
 // ---------------------------------------------------------------------------
-// POST /api/auth/users — create user within the requester's establishment
+// POST /api/auth/users — create user or link existing email as membership
 // ---------------------------------------------------------------------------
 router.post('/users', requireAuth, canManageUsers, asyncHandler(async (req, res) => {
   const { email, password, role = 'staff' } = req.body;
   const establishmentId = req.user!.establishment_id;
 
-  if (!email || !password) {
-    throw new ValidationError('Email and password required');
-  }
-
-  const passwordValidation = await validatePasswordWithBreachCheck(password);
-  if (!passwordValidation.isValid) {
-    throw new ValidationError(passwordValidation.error ?? 'Invalid password');
+  if (!email) {
+    throw new ValidationError('Email required');
   }
 
   if (!establishmentId) {
@@ -230,14 +361,73 @@ router.post('/users', requireAuth, canManageUsers, asyncHandler(async (req, res)
     throw new ValidationError(`Role must be one of: ${ESTABLISHMENT_USER_ROLES.join(', ')}`);
   }
 
+  const normalizedEmail = String(email).toLowerCase().trim();
+  const existing = await UserModel.findByEmail(normalizedEmail);
+
+  if (existing) {
+    if (existing.role === 'system_admin') {
+      throw new ValidationError('Cannot add a system administrator as an establishment member');
+    }
+    const alreadyMember = await UserModel.userBelongsToEstablishment(existing.id, establishmentId);
+    if (alreadyMember) {
+      throw new AppError('User already belongs to this establishment', 400, 'MEMBERSHIP_EXISTS');
+    }
+    await MembershipModel.upsert({
+      user_id: existing.id,
+      establishment_id: establishmentId,
+      role,
+    });
+    await logAuditOrThrow({
+      user_id: String(req.user!.id),
+      action_type: 'LINK_USER_MEMBERSHIP',
+      resource_type: 'USER',
+      resource_id: String(existing.id),
+      action_details: { email: normalizedEmail, role, linked_existing: true },
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+    }, 'LINK_ESTABLISHMENT_MEMBERSHIP');
+    await logSoftwareEventBestEffort({
+      establishmentId,
+      eventType: 'ESTABLISHMENT_USER_CREATED',
+      userId: String(req.user!.id),
+      eventData: {
+        target_user_id: existing.id,
+        email: normalizedEmail,
+        role,
+        linked_existing: true,
+      },
+    });
+    return res.status(201).json({
+      id: existing.id,
+      email: existing.email,
+      role,
+      establishment_id: establishmentId,
+      linked_existing: true,
+    });
+  }
+
+  if (!password) {
+    throw new ValidationError('Email and password required');
+  }
+
+  const passwordValidation = await validatePasswordWithBreachCheck(password);
+  if (!passwordValidation.isValid) {
+    throw new ValidationError(passwordValidation.error ?? 'Invalid password');
+  }
+
   try {
-    const user = await UserModel.createUserForEstablishment(email, password, role, establishmentId);
+    const user = await UserModel.createUserForEstablishment(
+      normalizedEmail,
+      password,
+      role,
+      establishmentId
+    );
     await logAuditOrThrow({
       user_id: String(req.user!.id),
       action_type: 'CREATE_USER',
       resource_type: 'USER',
       resource_id: String(user.id),
-      action_details: { email, role },
+      action_details: { email: normalizedEmail, role },
       ip_address: req.ip,
       user_agent: req.headers['user-agent'],
     }, 'REGISTER_ESTABLISHMENT_USER_SUCCESS');
@@ -247,15 +437,21 @@ router.post('/users', requireAuth, canManageUsers, asyncHandler(async (req, res)
       userId: String(req.user!.id),
       eventData: {
         target_user_id: user.id,
-        email,
+        email: normalizedEmail,
         role,
       },
     });
-    return res.status(201).json({ id: user.id, email: user.email, role, establishment_id: establishmentId });
+    return res.status(201).json({
+      id: user.id,
+      email: user.email,
+      role,
+      establishment_id: establishmentId,
+      linked_existing: false,
+    });
   } catch (err) {
     Logger.getInstance().error(
       'Create establishment user failed',
-      { error: err instanceof Error ? err : new Error(String(err)), email, establishmentId },
+      { error: err instanceof Error ? err : new Error(String(err)), email: normalizedEmail, establishmentId },
       'AUTH_ROUTE'
     );
     throw new AppError('User already exists or invalid data', 400, 'REGISTER_ESTABLISHMENT_USER_FAILED');
@@ -263,7 +459,7 @@ router.post('/users', requireAuth, canManageUsers, asyncHandler(async (req, res)
 }));
 
 // ---------------------------------------------------------------------------
-// DELETE /api/auth/users/:id — remove user from the requester's establishment
+// DELETE /api/auth/users/:id — remove membership from the requester's establishment
 // ---------------------------------------------------------------------------
 router.delete('/users/:id', requireAuth, canManageUsers, asyncHandler(async (req, res) => {
   const userId = parseInt(req.params.id ?? '', 10);
@@ -278,13 +474,13 @@ router.delete('/users/:id', requireAuth, canManageUsers, asyncHandler(async (req
     throw new AuthorizationError('User does not belong to your establishment');
   }
 
-  await UserModel.deleteUserById(userId);
+  await MembershipModel.remove(userId, establishmentId);
   await logAuditOrThrow({
     user_id: String(req.user!.id),
     action_type: 'DELETE_USER',
     resource_type: 'USER',
     resource_id: String(userId),
-    action_details: {},
+    action_details: { removed_membership_establishment_id: establishmentId },
     ip_address: req.ip,
     user_agent: req.headers['user-agent'],
   }, 'DELETE_ESTABLISHMENT_USER');
@@ -321,7 +517,7 @@ router.put('/users/:id/role', requireAuth, canManageUsers, asyncHandler(async (r
     throw new AuthorizationError('Only system administrators can grant establishment_admin role');
   }
 
-  await UserModel.updateUserRoleById(userId, role);
+  await UserModel.updateUserRoleById(userId, role, establishmentId);
   await logAuditOrThrow({
     user_id: String(req.user!.id),
     action_type: 'UPDATE_USER_ROLE',

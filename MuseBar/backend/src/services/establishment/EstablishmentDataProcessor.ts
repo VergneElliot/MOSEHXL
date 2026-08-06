@@ -8,6 +8,9 @@ import { Logger } from '../../utils/logger';
 import { EnhancedCreateEstablishmentRequest } from './EstablishmentValidator';
 import { randomUUID } from 'crypto';
 import { DEFAULT_APP_TIMEZONE } from '../../config/timezone';
+import { slugifyEstablishmentName } from '../../utils/establishmentSlug';
+
+const SLUG_SUFFIX_ROOM = 48;
 
 /**
  * Establishment record interface
@@ -69,12 +72,15 @@ export class EstablishmentDataProcessor {
     data: EnhancedCreateEstablishmentRequest,
     schemaName: string
   ): Promise<EstablishmentRecord> {
+    const slug = await this.allocateUniqueSlug(client, data.name);
+
     const establishmentQuery = `
       INSERT INTO establishments (
         name, email, phone, address, schema_name,
         subscription_plan, subscription_status, status,
-        tva_number, siret_number, business_type, timezone, language
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        tva_number, siret_number, business_type, timezone, language,
+        slug, reservations_ics_token, planning_ics_token
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, gen_random_uuid(), gen_random_uuid())
       RETURNING *
     `;
 
@@ -91,11 +97,26 @@ export class EstablishmentDataProcessor {
       data.siret_number || null,
       data.business_type || 'other',
       data.timezone || DEFAULT_APP_TIMEZONE,
-      data.language || 'fr'
+      data.language || 'fr',
+      slug,
     ];
 
     const result = await client.query(establishmentQuery, establishmentValues);
     return result.rows[0];
+  }
+
+  /** Allocate a unique URL/email-safe slug from the establishment name. */
+  public async allocateUniqueSlug(client: PoolClient, name: string): Promise<string> {
+    const base = slugifyEstablishmentName(name);
+    for (let i = 0; i < 50; i += 1) {
+      const candidate = i === 0 ? base : `${base.slice(0, SLUG_SUFFIX_ROOM)}${i + 1}`;
+      const existing = await client.query(
+        'SELECT 1 FROM establishments WHERE slug = $1 LIMIT 1',
+        [candidate]
+      );
+      if (existing.rows.length === 0) return candidate;
+    }
+    return `${base.slice(0, 40)}${randomUUID().replace(/-/g, '').slice(0, 8)}`;
   }
 
   /**

@@ -4,6 +4,7 @@ import { LegalJournalModel } from '../models/legalJournal';
 import { getBusinessDayPeriod } from '../models/legalJournal/businessDayPeriod';
 import { JournalQueries } from '../models/legalJournal/journalQueries';
 import { AuditTrailModel } from '../models/auditTrail';
+import { ClosureSettingsModel } from '../models/closureSettings';
 import moment from 'moment-timezone';
 import { runWithTenantContext } from '../rls/tenantContext';
 import { Logger } from './logger';
@@ -83,31 +84,9 @@ export class ClosureScheduler {
     }
   }
 
-  // Get closure settings from database.
-  // Supports both legacy global settings and per-establishment settings.
+  // Get closure settings from database (per-establishment, with legacy fallback).
   static async getClosureSettings(establishmentId: string) {
-    let result;
-    try {
-      result = await pool.query(
-        'SELECT setting_key, setting_value FROM closure_settings WHERE establishment_id = $1',
-        [establishmentId]
-      );
-    } catch {
-      // Legacy closure_settings without establishment_id column.
-      result = await pool.query('SELECT setting_key, setting_value FROM closure_settings');
-    }
-    
-    const settings: { [key: string]: string } = {};
-    result.rows.forEach(row => {
-      settings[row.setting_key] = row.setting_value;
-    });
-
-    return {
-      auto_closure_enabled: settings.auto_closure_enabled === 'true',
-      daily_closure_time: settings.daily_closure_time || '02:00',
-      timezone: settings.timezone || DEFAULT_APP_TIMEZONE,
-      grace_period_minutes: parseInt(settings.closure_grace_period_minutes || '30')
-    };
+    return ClosureSettingsModel.getClosureSettings(establishmentId);
   }
 
   // Determine if closure should be executed.
@@ -261,6 +240,14 @@ export class ClosureScheduler {
         user_agent: 'ClosureScheduler'
       });
 
+      void import('../services/documents/closureAutoEmail').then(({ maybeAutoEmailClosureBulletin }) =>
+        maybeAutoEmailClosureBulletin({
+          establishmentId,
+          bulletinId: closureId,
+          operatorId: 'ClosureScheduler',
+        })
+      );
+
       return { establishmentId, bulletinId: closureId };
       
     } catch (error) {
@@ -333,9 +320,24 @@ export class ClosureScheduler {
     };
   }
 
-  // Manual trigger for testing
+  // Manual trigger for testing (all establishments)
   static async triggerManualCheck() {
-    // Manual closure check triggered
     await this.checkAndExecuteClosure();
+  }
+
+  // Manual trigger for a single establishment (Settings UI)
+  static async triggerManualCheckForEstablishment(establishmentId: string) {
+    await runWithTenantContext({ establishmentId }, async () => {
+      const settings = await this.getClosureSettings(establishmentId);
+      if (!settings.auto_closure_enabled) {
+        return;
+      }
+      const now = new Date();
+      await this.backfillOneMissingDailyClosure(establishmentId, settings, now);
+      const nowTz = moment.tz(now, settings.timezone);
+      const shouldClose = await this.shouldExecuteClosure(settings, nowTz);
+      if (!shouldClose) return;
+      await this.executeAutomaticClosureForEstablishment(establishmentId, now);
+    });
   }
 } 

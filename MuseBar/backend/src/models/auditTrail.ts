@@ -156,4 +156,90 @@ export class AuditTrailModel {
 
     return { entries: result.rows as AuditEntry[], total };
   }
+
+  /**
+   * Cross-tenant audit log for system_admin UI.
+   * Uses a short transaction with app.bypass_rls so FORCE RLS does not hide rows
+   * when the caller has no establishment context.
+   */
+  static async getPlatformAuditTrail(
+    opts: {
+      user_id?: string;
+      action_type?: string;
+      action_types?: string[];
+      resource_type?: string;
+      start?: string;
+      end?: string;
+      limit?: number;
+      offset?: number;
+    } = {}
+  ): Promise<{ entries: AuditEntry[]; total: number }> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SELECT set_config('app.bypass_rls', 'on', true)");
+
+      const conditions: string[] = ['TRUE'];
+      const values: unknown[] = [];
+
+      if (opts.user_id) {
+        values.push(opts.user_id);
+        conditions.push(`user_id = $${values.length}`);
+      }
+      const actionTypes =
+        opts.action_types && opts.action_types.length > 0
+          ? opts.action_types
+          : opts.action_type
+            ? [opts.action_type]
+            : [];
+      if (actionTypes.length === 1) {
+        values.push(actionTypes[0]);
+        conditions.push(`action_type = $${values.length}`);
+      } else if (actionTypes.length > 1) {
+        values.push(actionTypes);
+        conditions.push(`action_type = ANY($${values.length}::text[])`);
+      }
+      if (opts.resource_type) {
+        values.push(opts.resource_type);
+        conditions.push(`resource_type = $${values.length}`);
+      }
+      if (opts.start) {
+        values.push(opts.start);
+        conditions.push(`"timestamp" >= $${values.length}::date`);
+      }
+      if (opts.end) {
+        values.push(opts.end);
+        conditions.push(`"timestamp" < ($${values.length}::date + interval '1 day')`);
+      }
+
+      const where = conditions.join(' AND ');
+      const countResult = await client.query(
+        `SELECT COUNT(*)::int AS total FROM audit_trail WHERE ${where}`,
+        values
+      );
+      const total = countResult.rows[0]?.total ?? 0;
+
+      const limit = opts.limit != null && opts.limit > 0 ? Math.min(opts.limit, 200) : 50;
+      const offset = opts.offset != null && opts.offset >= 0 ? opts.offset : 0;
+      const pageValues = [...values, limit, offset];
+
+      const result = await client.query(
+        `SELECT id, establishment_id, user_id, action_type, resource_type, resource_id,
+                action_details, ip_address, user_agent, session_id, "timestamp"
+         FROM audit_trail
+         WHERE ${where}
+         ORDER BY "timestamp" DESC, id DESC
+         LIMIT $${pageValues.length - 1} OFFSET $${pageValues.length}`,
+        pageValues
+      );
+
+      await client.query('COMMIT');
+      return { entries: result.rows as AuditEntry[], total };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
 }

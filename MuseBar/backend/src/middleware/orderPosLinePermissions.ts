@@ -21,7 +21,7 @@ export function assertPosOrderLinePermissions() {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const perms = await UserModel.getUserPermissions(userId);
+    const perms = await UserModel.getUserPermissions(userId, req.user?.establishment_id);
     const items = (req.body as { items?: OrderItemInput[] })?.items;
     if (!Array.isArray(items)) {
       return next();

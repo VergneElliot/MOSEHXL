@@ -103,28 +103,38 @@ export class EmailSender {
     error?: string;
   }> {
     if (!this.isConfigured) {
-      // In development mode, log the email instead of throwing an error
-      this.logger.warn(
-        'Email service not configured. Logging email for development.',
+      const isProduction = process.env.NODE_ENV === 'production';
+      this.logger[isProduction ? 'error' : 'warn'](
+        isProduction
+          ? 'Email service not configured in production. Refusing to send.'
+          : 'Email service not configured. Logging email for development.',
         {
           to: options.to,
           subject: options.subject,
-          trackingId: options.trackingId
+          trackingId: options.trackingId,
         },
         'EMAIL_SENDER'
       );
-      
+
+      if (isProduction) {
+        return {
+          success: false,
+          error:
+            'Email service not configured. Set a valid SENDGRID_API_KEY (SG.…).',
+        };
+      }
+
       return {
         success: true,
         messageId: 'dev-mode-' + Date.now(),
-        error: 'Email service not configured - logged for development'
+        error: 'Email service not configured - logged for development',
       };
     }
 
     try {
       const msg = {
         to: options.to,
-        from: options.from || process.env.FROM_EMAIL || 'noreply@musebar.com',
+        from: options.from || process.env.FROM_EMAIL || 'noreply@mosehxl.com',
         replyTo: options.replyTo,
         subject: options.subject,
         text: options.text,
@@ -232,6 +242,6 @@ export class EmailSender {
    * Get default sender email
    */
   public getDefaultSenderEmail(): string {
-    return process.env.FROM_EMAIL || 'noreply@musebar.com';
+    return process.env.FROM_EMAIL || 'noreply@mosehxl.com';
   }
 }

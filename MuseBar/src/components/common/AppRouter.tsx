@@ -6,17 +6,17 @@ import {
   History as HistoryIcon,
   Settings as SettingsIcon,
   Gavel as GavelIcon,
+  BusinessCenter as AdminIcon,
 } from '@mui/icons-material';
 
 import POSContainer from '../POS/POSContainer';
 import {
-  LazyAuditTrailDashboard,
+  LazyAdministrationContainer,
   LazyClosureContainer,
   LazyHistoryContainer,
   LazyLegalComplianceDashboard,
   LazyMenuContainer,
   LazySettings,
-  LazyUserManagement,
   TabPanelFallback,
 } from './appLazyTabPanels';
 
@@ -138,23 +138,32 @@ const AppRouter: React.FC<AppRouterProps> = ({
       value: 'closures',
       permission: PERMISSIONS.access_closure,
     },
-    { label: 'Gestion utilisateurs', value: 'user_management', permission: PERMISSIONS.access_user_management },
-    { label: 'Journal de Sécurité', value: 'audit_trail', adminOnly: true },
+    {
+      label: 'Administration',
+      icon: <AdminIcon />,
+      value: 'administration',
+      establishmentAdminAlways: true,
+    },
   ];
 
   const filteredTabs = TABS.filter(tab => {
-    if (tab.adminOnly) return user?.role === 'establishment_admin';
     if (tab.establishmentWide) {
       return !!user?.establishment_id;
     }
-    if (tab.establishmentAdminAlways && user?.role === 'establishment_admin') {
-      return true;
-    }
-    if (tab.value === 'user_management') {
+    if (tab.value === 'administration') {
+      const perms = user?.permissions ?? [];
       return (
         user?.role === 'establishment_admin' ||
-        (user?.permissions?.includes(PERMISSIONS.access_user_management) ?? false)
+        Boolean(user?.establishment_id && user?.role !== 'system_admin') ||
+        perms.includes(PERMISSIONS.access_documents) ||
+        perms.includes(PERMISSIONS.access_inbox) ||
+        perms.includes(PERMISSIONS.access_reservations) ||
+        perms.includes(PERMISSIONS.access_planning) ||
+        perms.includes(PERMISSIONS.access_user_management)
       );
+    }
+    if (tab.establishmentAdminAlways && user?.role === 'establishment_admin') {
+      return true;
     }
     if (tab.permission) return user?.permissions?.includes(tab.permission) ?? false;
     return true;
@@ -278,16 +287,9 @@ const AppRouter: React.FC<AppRouterProps> = ({
                 <LazyClosureContainer />
               </Suspense>
             )}
-            {tab.value === 'user_management' &&
-              (user?.role === 'establishment_admin' ||
-                user?.permissions?.includes(PERMISSIONS.access_user_management)) && (
-                <Suspense fallback={<TabPanelFallback />}>
-                  <LazyUserManagement token={token} />
-                </Suspense>
-              )}
-            {tab.value === 'audit_trail' && user?.role === 'establishment_admin' && (
+            {tab.value === 'administration' && (
               <Suspense fallback={<TabPanelFallback />}>
-                <LazyAuditTrailDashboard token={token} />
+                <LazyAdministrationContainer user={user} token={token} />
               </Suspense>
             )}
           </TabPanel>

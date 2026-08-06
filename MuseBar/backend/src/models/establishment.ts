@@ -315,6 +315,7 @@ export class EstablishmentModel {
    *
    * Phase B1: no schema-per-tenant cleanup. Tenant data lives in shared tables and is removed
    * by deleting (or detaching) establishment-scoped rows via FK cleanup / cascades.
+   * RESTRICT FKs (legal_journal, orders, audit_trail, …) must be cleared explicitly.
    */
   public static async deleteEstablishment(id: string): Promise<void> {
     const client = await pool.connect();
@@ -333,31 +334,83 @@ export class EstablishmentModel {
         throw new Error('Establishment not found');
       }
       // Keep legacy schema_name only as metadata; no per-tenant schema is dropped.
-      assertValidSchemaName(establishment.schema_name);
+      if (establishment.schema_name) {
+        assertValidSchemaName(establishment.schema_name);
+      }
 
-      // 1) Clean dependent records to satisfy foreign keys
-      // a) Remove business_settings row linked to this establishment
-      await client.query(
-        'DELETE FROM business_settings WHERE establishment_id = $1',
-        [id]
-      );
+      // Helper: delete only when table + establishment_id column both exist.
+      const deleteIfExists = async (table: string) => {
+        const check = await client.query<{ ok: boolean }>(
+          `SELECT EXISTS (
+             SELECT 1
+             FROM information_schema.columns
+             WHERE table_schema = 'public'
+               AND table_name = $1
+               AND column_name = 'establishment_id'
+           ) AS ok`,
+          [table]
+        );
+        if (!check.rows[0]?.ok) return;
+        // Whitelisted identifiers only (never interpolate user input).
+        await client.query(`DELETE FROM ${table} WHERE establishment_id = $1`, [id]);
+      };
 
-      // b) Delete pending/accepted invitations for this establishment
-      await client.query(
-        'DELETE FROM user_invitations WHERE establishment_id = $1',
-        [id]
-      );
+      // Memberships / venue permissions
+      await deleteIfExists('user_permissions');
+      await deleteIfExists('user_establishment_memberships');
 
-      // c) Detach users from this establishment (kept for audit/history)
+      // Admin space
+      await deleteIfExists('staff_planning_ics_tokens');
+      await deleteIfExists('staff_shifts');
+      await deleteIfExists('reservations');
+      await deleteIfExists('inbox_attachments');
+      await deleteIfExists('inbox_messages');
+      await deleteIfExists('admin_document_expiry_reminders');
+      await deleteIfExists('admin_documents');
+
+      // Printing / kitchen
+      await deleteIfExists('printing_jobs');
+      await deleteIfExists('product_kitchen_printers');
+      await deleteIfExists('kitchen_printers');
+      await deleteIfExists('kitchen_ticket_day_counters');
+
+      // Menu / catalog
+      await deleteIfExists('product_option_group_products');
+      await deleteIfExists('product_option_choices');
+      await deleteIfExists('product_option_groups');
+      await deleteIfExists('order_item_options');
+
+      // Fiscal / operational RESTRICT + immutable tables — disable user triggers for teardown.
+      await client.query(`SET LOCAL session_replication_role = 'replica'`);
+      await deleteIfExists('archive_exports');
+      await deleteIfExists('closure_bulletins');
+      await deleteIfExists('legal_invoice_counters');
+      await deleteIfExists('legal_invoices');
+      await deleteIfExists('order_items');
+      await deleteIfExists('orders');
+      await deleteIfExists('legal_journal');
+      await deleteIfExists('audit_trail');
+      await client.query(`SET LOCAL session_replication_role = 'origin'`);
+
+      // Settings / invitations / catalog
+      await deleteIfExists('business_settings');
+      await deleteIfExists('establishment_settings');
+      await deleteIfExists('closure_settings');
+      await deleteIfExists('user_invitations');
+      await deleteIfExists('establishment_setup_progress');
+      await deleteIfExists('establishment_setup_steps');
+      await deleteIfExists('establishment_status_transitions');
+      await deleteIfExists('products');
+      await deleteIfExists('categories');
+
+      // Detach users last-active cache pointing at this establishment
       await client.query(
         'UPDATE users SET establishment_id = NULL WHERE establishment_id = $1',
         [id]
       );
 
-      // 2) Delete establishment record
+      // Delete establishment record (remaining CASCADE FKs clean up automatically)
       await client.query('DELETE FROM establishments WHERE id = $1', [id]);
-
-      // 3) Legacy: schema-per-tenant is not used; do not drop schemas here.
 
       await client.query('COMMIT');
 
@@ -373,6 +426,7 @@ export class EstablishmentModel {
         'Failed to delete establishment',
         { 
           error: error as Error,
+          message: error instanceof Error ? error.message : String(error),
           establishmentId: id 
         },
         'ESTABLISHMENT_MODEL'

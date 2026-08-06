@@ -95,8 +95,8 @@ export class EstablishmentOperations {
       await client.query(
         `INSERT INTO audit_trail (
           user_id, action_type, resource_type, resource_id, 
-          action_details, ip_address, user_agent, session_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          action_details, ip_address, user_agent, session_id, establishment_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [
           userId,
           'ESTABLISHMENT_BUSINESS_INFO_UPDATED',
@@ -111,7 +111,8 @@ export class EstablishmentOperations {
           }),
           ipAddress,
           userAgent,
-          null // session_id
+          null, // session_id
+          establishmentId,
         ]
       );
 
@@ -225,8 +226,26 @@ export class EstablishmentOperations {
       postalCode: businessInfo.postalCode?.trim() || '',
       city: businessInfo.city?.trim() || '',
       country: businessInfo.country?.trim() || '',
-      businessType: businessInfo.businessType?.trim() || ''
+      businessType: this.normalizeBusinessType(businessInfo.businessType)
     };
+  }
+
+  /** Map UI / legacy labels onto establishments.valid_business_type values. */
+  private normalizeBusinessType(raw: string | undefined): string {
+    const key = (raw ?? '').trim().toLowerCase();
+    const allowed = new Set(['restaurant', 'bar', 'cafe', 'retail', 'other']);
+    if (allowed.has(key)) return key;
+    const aliases: Record<string, string> = {
+      café: 'cafe',
+      bistro: 'restaurant',
+      brasserie: 'restaurant',
+      'fast food': 'other',
+      'food truck': 'other',
+      catering: 'other',
+      autre: 'other',
+      'commerce / retail': 'retail',
+    };
+    return aliases[key] ?? 'other';
   }
 
   /**

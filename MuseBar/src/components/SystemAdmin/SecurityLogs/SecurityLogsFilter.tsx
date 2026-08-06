@@ -9,54 +9,50 @@ import {
   TextField,
   Chip,
   Box,
-  Typography
+  Typography,
 } from '@mui/material';
-
-interface SecurityLogsFilters {
-  severity: string[];
-  dateRange: {
-    start: string | null;
-    end: string | null;
-  };
-  actionType: string[];
-  userId: string;
-}
+import type { SecurityLogFilters } from '../../../types/system';
 
 interface SecurityLogsFilterProps {
-  filters: SecurityLogsFilters;
-  onChange: (filters: SecurityLogsFilters) => void;
+  filters: SecurityLogFilters;
+  onChange: (filters: SecurityLogFilters) => void;
 }
 
 const severityLevels = ['low', 'medium', 'high', 'critical'];
 const actionTypes = [
   'LOGIN',
-  'LOGOUT', 
+  'LOGOUT',
+  'LOGIN_FAILED',
+  'LOGIN_BLOCKED',
+  'ACCOUNT_LOCKED',
+  'ACCOUNT_UNLOCKED',
   'CREATE_USER',
   'DELETE_USER',
+  'UPDATE_USER_ROLE',
   'CREATE_ESTABLISHMENT',
-  'DELETE_ESTABLISHMENT',
-  'SYSTEM_CONFIG_CHANGE',
-  'DATABASE_ACCESS',
-  'FAILED_LOGIN'
+  'ESTABLISHMENT_STATUS_UPDATED',
+  'ACTIVATE_SYSTEM_USER',
+  'DEACTIVATE_SYSTEM_USER',
+  'SUPPORT_IMPERSONATION_STARTED',
+  'SUPPORT_IMPERSONATION_ENDED',
+  'SET_PERMISSIONS',
+  'TOKEN_REFRESH',
 ];
 
-export const SecurityLogsFilter: React.FC<SecurityLogsFilterProps> = ({
-  filters,
-  onChange
-}) => {
+export const SecurityLogsFilter: React.FC<SecurityLogsFilterProps> = ({ filters, onChange }) => {
   const handleSeverityChange = (severity: string) => {
     const newSeverity = filters.severity.includes(severity)
-      ? filters.severity.filter(s => s !== severity)
+      ? filters.severity.filter((s) => s !== severity)
       : [...filters.severity, severity];
-    
+
     onChange({ ...filters, severity: newSeverity });
   };
 
   const handleActionTypeChange = (actionType: string) => {
     const newActionTypes = filters.actionType.includes(actionType)
-      ? filters.actionType.filter(a => a !== actionType)
+      ? filters.actionType.filter((a) => a !== actionType)
       : [...filters.actionType, actionType];
-    
+
     onChange({ ...filters, actionType: newActionTypes });
   };
 
@@ -67,8 +63,8 @@ export const SecurityLogsFilter: React.FC<SecurityLogsFilterProps> = ({
       ...filters,
       dateRange: {
         ...filters.dateRange,
-        [field]: event.target.value || null
-      }
+        [field]: event.target.value || null,
+      },
     });
   };
 
@@ -77,7 +73,7 @@ export const SecurityLogsFilter: React.FC<SecurityLogsFilterProps> = ({
       <Typography variant="h6" gutterBottom>
         Filtres
       </Typography>
-      
+
       <Grid container spacing={3}>
         <Grid item xs={12} md={3}>
           <TextField
@@ -89,7 +85,7 @@ export const SecurityLogsFilter: React.FC<SecurityLogsFilterProps> = ({
             InputLabelProps={{ shrink: true }}
           />
         </Grid>
-        
+
         <Grid item xs={12} md={3}>
           <TextField
             fullWidth
@@ -100,7 +96,7 @@ export const SecurityLogsFilter: React.FC<SecurityLogsFilterProps> = ({
             InputLabelProps={{ shrink: true }}
           />
         </Grid>
-        
+
         <Grid item xs={12} md={3}>
           <TextField
             fullWidth
@@ -109,13 +105,14 @@ export const SecurityLogsFilter: React.FC<SecurityLogsFilterProps> = ({
             onChange={(e) => onChange({ ...filters, userId: e.target.value })}
           />
         </Grid>
-        
+
         <Grid item xs={12} md={3}>
           <FormControl fullWidth>
             <InputLabel>Niveau de sévérité</InputLabel>
             <Select
               multiple
               value={filters.severity}
+              label="Niveau de sévérité"
               renderValue={(selected) => (
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                   {selected.map((value) => (
@@ -125,21 +122,17 @@ export const SecurityLogsFilter: React.FC<SecurityLogsFilterProps> = ({
               )}
             >
               {severityLevels.map((level) => (
-                <MenuItem
-                  key={level}
-                  value={level}
-                  onClick={() => handleSeverityChange(level)}
-                >
+                <MenuItem key={level} value={level} onClick={() => handleSeverityChange(level)}>
                   {level}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
         </Grid>
-        
+
         <Grid item xs={12}>
           <Typography variant="subtitle2" gutterBottom>
-            Types d'action
+            Types d&apos;action
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
             {actionTypes.map((type) => (

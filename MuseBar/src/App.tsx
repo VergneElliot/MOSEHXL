@@ -18,6 +18,18 @@ const BusinessSetupWizard = React.lazy(() =>
 const EstablishmentAccountCreation = React.lazy(
   () => import('./components/EstablishmentAccountCreation')
 );
+const PublicReservationPage = React.lazy(
+  () => import('./components/Public/PublicReservationPage')
+);
+const PublicReservationRemindPage = React.lazy(
+  () => import('./components/Public/PublicReservationRemindPage')
+);
+const PublicReservationCancelPage = React.lazy(
+  () => import('./components/Public/PublicReservationCancelPage')
+);
+const PublicShiftConfirmPage = React.lazy(
+  () => import('./components/Public/PublicShiftConfirmPage')
+);
 
 function RouteFallback() {
   return (
@@ -33,8 +45,10 @@ function App() {
     user,
     token,
     isAuthenticated,
+    authReady,
     login,
     logout,
+    switchEstablishment,
   } = useAuth();
 
   // Setup routes are handled via dedicated route below
@@ -88,8 +102,23 @@ function App() {
     logout();
   };
 
+  const handleSwitchEstablishment = async (establishmentId: string) => {
+    await switchEstablishment(establishmentId);
+    // Soft re-login for the venue: reload catalog / happy-hour tenant data.
+    await updateData();
+    updateHappyHourStatus();
+  };
+
+  if (!authReady) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   // Show loading state while data is being fetched (only for business users)
-  if (!isSystemAdmin && isLoading) {
+  if (!isSystemAdmin && isAuthenticated && isLoading) {
     return (
       <Container maxWidth="xl" sx={{ mt: 2 }}>
         <div>{t('loading')}</div>
@@ -98,7 +127,7 @@ function App() {
   }
 
   // Show error state if data loading failed (only for business users)
-  if (!isSystemAdmin && error) {
+  if (!isSystemAdmin && isAuthenticated && error) {
     return (
       <Container maxWidth="xl" sx={{ mt: 2 }}>
         <div>{t('errorPrefix')} {error}</div>
@@ -121,6 +150,28 @@ function App() {
           <EstablishmentAccountCreation />
         </Suspense>
       } />
+
+      <Route path="/reserve/:slug/relancer/:token" element={
+        <Suspense fallback={<RouteFallback />}>
+          <PublicReservationRemindPage />
+        </Suspense>
+      } />
+      <Route path="/reserve/:slug/annuler/:token" element={
+        <Suspense fallback={<RouteFallback />}>
+          <PublicReservationCancelPage />
+        </Suspense>
+      } />
+      <Route path="/reserve/:slug" element={
+        <Suspense fallback={<RouteFallback />}>
+          <PublicReservationPage />
+        </Suspense>
+      } />
+
+      <Route path="/planning/confirm/:token" element={
+        <Suspense fallback={<RouteFallback />}>
+          <PublicShiftConfirmPage />
+        </Suspense>
+      } />
       
       {/* Main application routes */}
       <Route path="/*" element={
@@ -141,6 +192,7 @@ function App() {
                 timeUntilHappyHour={timeUntilHappyHour}
                 onLogout={handleLogout}
                 user={user!}
+                onSwitchEstablishment={handleSwitchEstablishment}
               />
               <Box
                 sx={{

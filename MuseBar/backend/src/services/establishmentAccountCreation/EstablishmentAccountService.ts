@@ -80,8 +80,7 @@ export class EstablishmentAccountService {
         };
       }
 
-      // Send completion email
-      await this.sendCompletionEmail(result.establishment!, result.user!);
+      // Welcome email is sent by AccountCreationOrchestrator (non-blocking).
 
       return {
         success: true,
@@ -155,26 +154,6 @@ export class EstablishmentAccountService {
   /** Validate password (uses shared utils/passwordValidation). */
   private validatePassword(password: string): { isValid: boolean; error?: string } {
     return validatePasswordShared(password);
-  }
-
-  /**
-   * Send completion email
-   */
-  private async sendCompletionEmail(
-    establishment: { id: string },
-    user: { email: string }
-  ): Promise<void> {
-    try {
-      // TODO: Implement email service integration
-      // This will send a welcome email to the new establishment admin
-      this.logger.info('Completion email would be sent', {
-        establishmentId: establishment.id,
-        userEmail: user.email
-      });
-    } catch (error) {
-      this.logger.warn('Failed to send completion email', { error: error instanceof Error ? error.message : String(error) });
-      // Don't fail the entire process if email fails
-    }
   }
 
   /**

@@ -1,7 +1,6 @@
 import React from 'react';
 import { Box, AppBar, Toolbar, Typography, Button } from '@mui/material';
 import { useAuth } from '../../hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
 import { NavigationBreadcrumbs } from './NavigationBreadcrumbs';
 
 interface SystemAdminLayoutProps {
@@ -10,11 +9,9 @@ interface SystemAdminLayoutProps {
 
 const SystemAdminLayout: React.FC<SystemAdminLayoutProps> = ({ children }) => {
   const { logout } = useAuth();
-  const navigate = useNavigate();
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
   };
 
   return (

@@ -53,26 +53,54 @@ export class InvitationAcceptance {
 
       const establishment = await EstablishmentModel.createEstablishment(establishmentData);
 
-      // Create establishment admin user
+      // Create or link establishment admin user
       const hashedPassword = await bcrypt.hash(acceptanceData.password, 12);
-      
-      const userResult = await client.query(`
-        INSERT INTO users (
-          email, password_hash, first_name, last_name, role,
-          establishment_id, is_admin, email_verified, is_active
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        RETURNING id
-      `, [
-        invitationRecord.email,
-        hashedPassword,
-        acceptanceData.firstName || 'Admin',
-        acceptanceData.lastName || invitationRecord.establishment_name,
-        'establishment_admin',
-        establishment.id,
-        false,
-        true,
-        true
-      ]);
+      const existingUser = await client.query(
+        `SELECT id, role FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+        [invitationRecord.email]
+      );
+
+      let adminUserId: number;
+      if (existingUser.rows[0]) {
+        if (existingUser.rows[0].role === 'system_admin') {
+          throw new Error('Cannot attach a system administrator account as establishment admin');
+        }
+        adminUserId = Number(existingUser.rows[0].id);
+        await client.query(
+          `UPDATE users
+           SET establishment_id = $2, role = 'establishment_admin', email_verified = TRUE,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $1`,
+          [adminUserId, establishment.id]
+        );
+      } else {
+        const userResult = await client.query(`
+          INSERT INTO users (
+            email, password_hash, first_name, last_name, role,
+            establishment_id, is_admin, email_verified, is_active
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          RETURNING id
+        `, [
+          invitationRecord.email,
+          hashedPassword,
+          acceptanceData.firstName || 'Admin',
+          acceptanceData.lastName || invitationRecord.establishment_name,
+          'establishment_admin',
+          establishment.id,
+          false,
+          true,
+          true
+        ]);
+        adminUserId = Number(userResult.rows[0].id);
+      }
+
+      await client.query(
+        `INSERT INTO user_establishment_memberships (user_id, establishment_id, role, is_active)
+         VALUES ($1, $2, 'establishment_admin', TRUE)
+         ON CONFLICT (user_id, establishment_id) DO UPDATE
+         SET role = 'establishment_admin', is_active = TRUE, updated_at = CURRENT_TIMESTAMP`,
+        [adminUserId, establishment.id]
+      );
 
       // Update invitation status
       await client.query(`
@@ -89,7 +117,7 @@ export class InvitationAcceptance {
           invitationId: invitationRecord.id,
           establishmentId: establishment.id,
           establishmentName: establishment.name,
-          adminUserId: userResult.rows[0].id
+          adminUserId
         },
         'INVITATION_ACCEPTANCE'
       );
@@ -97,7 +125,7 @@ export class InvitationAcceptance {
       return {
         success: true,
         establishmentId: establishment.id,
-        userId: userResult.rows[0].id,
+        userId: String(adminUserId),
         message: 'Establishment created successfully',
         emailSent: false
       };

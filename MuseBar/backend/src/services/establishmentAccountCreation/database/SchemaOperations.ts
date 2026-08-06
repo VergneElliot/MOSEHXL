@@ -212,8 +212,8 @@ export class SchemaOperations {
       await client.query(
         `INSERT INTO audit_trail (
           user_id, action_type, resource_type, resource_id,
-          action_details, ip_address, user_agent, session_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          action_details, ip_address, user_agent, session_id, establishment_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [
           userId,
           'ESTABLISHMENT_SCHEMA_CLEANED_UP',
@@ -226,7 +226,8 @@ export class SchemaOperations {
           }),
           ipAddress,
           userAgent,
-          null
+          null,
+          establishmentId,
         ]
       );
 

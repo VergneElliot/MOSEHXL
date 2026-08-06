@@ -56,6 +56,13 @@ export async function exportClosureBulletinXlsx(bulletinId: number): Promise<voi
   await downloadAuthenticatedFile(`/printing/closure/${bulletinId}/export-xlsx`, `closure-recap-${bulletinId}.xlsx`);
 }
 
+export async function exportClosureBulletinFlux103(bulletinId: number): Promise<void> {
+  await downloadAuthenticatedFile(
+    `/printing/closure/${bulletinId}/export-flux103`,
+    `flux103-closure-${bulletinId}.xml`
+  );
+}
+
 export async function emailReceipt(
   orderId: number,
   to: string,
@@ -81,7 +88,7 @@ export async function emailInvoice(
 
 export async function emailClosureBulletin(
   bulletinId: number,
-  to: string
+  to: string | string[]
 ): Promise<{ trackingId: string; message: string; attachments: string[] }> {
   const { request } = await import('./core');
   return request<{ success: boolean; trackingId: string; message: string; attachments: string[] }>(

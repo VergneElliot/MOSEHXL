@@ -18,6 +18,17 @@ import { PasswordResetTemplate } from './passwordResetTemplate';
 import { EmailVerificationTemplate } from './emailVerificationTemplate';
 import { EstablishmentSetupTemplate } from './establishmentSetupTemplate';
 import { EstablishmentCreatedTemplate } from './establishmentCreatedTemplate';
+import {
+  ReservationRequestedGuestTemplate,
+  ReservationRequestedVenueTemplate,
+  ReservationReminderVenueTemplate,
+  ReservationConfirmedTemplate,
+  ReservationRefusedTemplate,
+  ReservationOnHoldTemplate,
+  ReservationCancelledGuestTemplate,
+  ReservationCancelledVenueTemplate,
+} from './reservationTemplates';
+import { ShiftConfirmationEmployeeTemplate } from './shiftTemplates';
 
 /**
  * Built-in email templates registry - delegates to specialized template modules
@@ -40,6 +51,15 @@ export class BuiltInTemplates {
     templates.set(BuiltInTemplateId.EMAIL_VERIFICATION, EmailVerificationTemplate.getTemplate());
     templates.set(BuiltInTemplateId.ESTABLISHMENT_SETUP, EstablishmentSetupTemplate.getTemplate());
     templates.set(BuiltInTemplateId.ESTABLISHMENT_CREATED, EstablishmentCreatedTemplate.getTemplate());
+    templates.set(BuiltInTemplateId.RESERVATION_REQUESTED_GUEST, ReservationRequestedGuestTemplate.getTemplate());
+    templates.set(BuiltInTemplateId.RESERVATION_REQUESTED_VENUE, ReservationRequestedVenueTemplate.getTemplate());
+    templates.set(BuiltInTemplateId.RESERVATION_REMINDER_VENUE, ReservationReminderVenueTemplate.getTemplate());
+    templates.set(BuiltInTemplateId.RESERVATION_CONFIRMED, ReservationConfirmedTemplate.getTemplate());
+    templates.set(BuiltInTemplateId.RESERVATION_REFUSED, ReservationRefusedTemplate.getTemplate());
+    templates.set(BuiltInTemplateId.RESERVATION_ON_HOLD, ReservationOnHoldTemplate.getTemplate());
+    templates.set(BuiltInTemplateId.RESERVATION_CANCELLED_GUEST, ReservationCancelledGuestTemplate.getTemplate());
+    templates.set(BuiltInTemplateId.RESERVATION_CANCELLED_VENUE, ReservationCancelledVenueTemplate.getTemplate());
+    templates.set(BuiltInTemplateId.SHIFT_CONFIRMATION_EMPLOYEE, ShiftConfirmationEmployeeTemplate.getTemplate());
 
     return templates;
   }
@@ -67,6 +87,24 @@ export class BuiltInTemplates {
         return EstablishmentSetupTemplate.getTemplate();
       case BuiltInTemplateId.ESTABLISHMENT_CREATED:
         return EstablishmentCreatedTemplate.getTemplate();
+      case BuiltInTemplateId.RESERVATION_REQUESTED_GUEST:
+        return ReservationRequestedGuestTemplate.getTemplate();
+      case BuiltInTemplateId.RESERVATION_REQUESTED_VENUE:
+        return ReservationRequestedVenueTemplate.getTemplate();
+      case BuiltInTemplateId.RESERVATION_REMINDER_VENUE:
+        return ReservationReminderVenueTemplate.getTemplate();
+      case BuiltInTemplateId.RESERVATION_CONFIRMED:
+        return ReservationConfirmedTemplate.getTemplate();
+      case BuiltInTemplateId.RESERVATION_REFUSED:
+        return ReservationRefusedTemplate.getTemplate();
+      case BuiltInTemplateId.RESERVATION_ON_HOLD:
+        return ReservationOnHoldTemplate.getTemplate();
+      case BuiltInTemplateId.RESERVATION_CANCELLED_GUEST:
+        return ReservationCancelledGuestTemplate.getTemplate();
+      case BuiltInTemplateId.RESERVATION_CANCELLED_VENUE:
+        return ReservationCancelledVenueTemplate.getTemplate();
+      case BuiltInTemplateId.SHIFT_CONFIRMATION_EMPLOYEE:
+        return ShiftConfirmationEmployeeTemplate.getTemplate();
       default:
         return null;
     }
@@ -85,7 +123,16 @@ export class BuiltInTemplates {
       BuiltInTemplateId.PASSWORD_RESET,
       BuiltInTemplateId.EMAIL_VERIFICATION,
       BuiltInTemplateId.ESTABLISHMENT_SETUP,
-      BuiltInTemplateId.ESTABLISHMENT_CREATED
+      BuiltInTemplateId.ESTABLISHMENT_CREATED,
+      BuiltInTemplateId.RESERVATION_REQUESTED_GUEST,
+      BuiltInTemplateId.RESERVATION_REQUESTED_VENUE,
+      BuiltInTemplateId.RESERVATION_REMINDER_VENUE,
+      BuiltInTemplateId.RESERVATION_CONFIRMED,
+      BuiltInTemplateId.RESERVATION_REFUSED,
+      BuiltInTemplateId.RESERVATION_ON_HOLD,
+      BuiltInTemplateId.RESERVATION_CANCELLED_GUEST,
+      BuiltInTemplateId.RESERVATION_CANCELLED_VENUE,
+      BuiltInTemplateId.SHIFT_CONFIRMATION_EMPLOYEE,
     ];
   }
 

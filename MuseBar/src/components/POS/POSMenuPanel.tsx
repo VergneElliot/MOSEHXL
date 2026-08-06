@@ -55,6 +55,7 @@ const POSMenuPanel = React.memo(function POSMenuPanel({
           display: 'flex',
           flexDirection: 'column',
           overflow: canUseVirtualization() ? 'hidden' : 'auto',
+          scrollbarGutter: 'stable',
         }}
       >
         <ProductGrid

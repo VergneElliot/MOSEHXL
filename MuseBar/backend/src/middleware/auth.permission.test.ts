@@ -38,7 +38,7 @@ describe('requirePermission', () => {
     } as unknown as Request;
     const mw = requirePermission('any_key');
     await mw(req, res, next);
-    expect(getPerms).toHaveBeenCalledWith(1);
+    expect(getPerms).toHaveBeenCalledWith(1, null);
     expect(res.status).toHaveBeenCalledWith(403);
     expect(next).not.toHaveBeenCalled();
   });
@@ -52,7 +52,7 @@ describe('requirePermission', () => {
     } as unknown as Request;
     const mw = requirePermission('any_key');
     await mw(req, res, next);
-    expect(getPerms).toHaveBeenCalledWith(1);
+    expect(getPerms).toHaveBeenCalledWith(1, null);
     expect(next).toHaveBeenCalled();
     expect(res.status).not.toHaveBeenCalled();
   });
@@ -66,7 +66,7 @@ describe('requirePermission', () => {
     } as unknown as Request;
     const mw = requirePermission(P.orders_cancel);
     await mw(req, res, next);
-    expect(getPerms).toHaveBeenCalledWith(2);
+    expect(getPerms).toHaveBeenCalledWith(2, 'e1');
     expect(res.status).toHaveBeenCalledWith(403);
     expect(next).not.toHaveBeenCalled();
   });
@@ -112,7 +112,7 @@ describe('requireAnyPermission', () => {
     } as unknown as Request;
     const mw = requireAnyPermission([P.access_settings, P.access_menu]);
     await mw(req, res, next);
-    expect(getPerms).toHaveBeenCalledWith(9);
+    expect(getPerms).toHaveBeenCalledWith(9, null);
     expect(res.status).toHaveBeenCalledWith(403);
     expect(next).not.toHaveBeenCalled();
   });
