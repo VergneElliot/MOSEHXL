@@ -122,6 +122,20 @@ These are organized chronologically. Each entry corresponds to one specific issu
 |---|------|---------|
 | 50 | [CI/CD Pipeline Issues](./patch-notes/50-CICD-PIPELINE-ISSUES-AUDIT-43-FIX.md) | Fixed deploy step, performance job paths, Lighthouse config, and GitHub Actions versions |
 
+### Feature Work — Establishment Admin Space (July–August 2026)
+
+| # | File | Summary |
+|---|------|---------|
+| 443 | [Admin Space Foundation: Documents & Inbox](./patch-notes/443-ADMIN-SPACE-FOUNDATION-DOCUMENTS-INBOX-IMPLEMENTATION.md) | New Administration tab, per-venue email address (`slug@mosehxl.com`), document library with expiry reminders, in-app inbox via SendGrid Inbound Parse, DigitalOcean Spaces object storage |
+| 444 | [Reservations: Public Booking](./patch-notes/444-RESERVATIONS-PUBLIC-BOOKING-IMPLEMENTATION.md) | Public no-account booking pages, 7-status reservation lifecycle, opening hours + closed dates, platform-wide guest no-show flags, guest/venue email flows, ICS feed |
+| 445 | [Planning: Staff Shifts](./patch-notes/445-PLANNING-STAFF-SHIFTS-IMPLEMENTATION.md) | Week-grid rota, recurring shift series, employee confirm/decline by email, week duplication, per-employee calendar feeds |
+| 446 | [Time Clock (Pointage)](./patch-notes/446-TIME-CLOCK-POINTAGE-IMPLEMENTATION.md) | IP-allowlisted clock in/out, shared-terminal password punch, admin corrections and worked-hours report |
+| 447 | [Multi-Establishment Memberships](./patch-notes/447-MULTI-ESTABLISHMENT-MEMBERSHIPS-IMPLEMENTATION.md) | One login for several venues, venue-scoped permissions, duplicate-email merge, header venue switcher, AuthProvider refactor |
+| 448 | [Closure Auto-Email & Flux 10.3](./patch-notes/448-CLOSURE-SETTINGS-AUTO-EMAIL-FLUX103-IMPLEMENTATION.md) | Persisted closure settings with accounting emails, automatic bulletin email (PDF + Excel + Flux 10.3 XML), DGFiP e-reporting XML groundwork |
+| 449 | [Admin-Wave Misc Refactors](./patch-notes/449-ADMIN-WAVE-MISC-REFACTORS-IMPLEMENTATION.md) | SystemAdmin data hooks, canonical business types, establishment delete teardown, platform audit trail, POS grid stability, `.gitignore` fix |
+
+Operational runbooks for this wave: [ADMIN-SPACE-INBOUND-AND-STORAGE.md](./runbooks/ADMIN-SPACE-INBOUND-AND-STORAGE.md), [MULTI-ESTABLISHMENT-MEMBERSHIPS.md](./runbooks/MULTI-ESTABLISHMENT-MEMBERSHIPS.md)
+
 ### Session Summaries
 
 | File | Summary |

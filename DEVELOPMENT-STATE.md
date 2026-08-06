@@ -5,6 +5,8 @@ It is the working reference for what is complete, what is broken, and what needs
 
 > **Post-audit update (April 2026):** The March 2026 remediation wave (45 fixes) was followed by additional hardening passes (P0/P1 stabilization and P2 cleanup/doc-truth sweeps). This file reflects the current post-remediation state of the `development` branch.
 
+> **Admin Space update (August 2026):** A large feature wave (July 30 – August 5, 2026) added the establishment **Administration** space: Documents (object storage + expiry reminders), in-app email Inbox (`slug@mosehxl.com` via SendGrid Inbound Parse), public Reservations with opening hours and no-show flags, staff Planning with recurring shifts and employee confirmation, IP-restricted Time Clock, multi-establishment memberships with venue switching, and automatic closure emails with Flux 10.3 e-reporting XML. See patch notes `443`–`449` and runbooks `ADMIN-SPACE-INBOUND-AND-STORAGE.md` / `MULTI-ESTABLISHMENT-MEMBERSHIPS.md`.
+
 ---
 
 ## What Is Complete
