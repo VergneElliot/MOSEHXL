@@ -13,6 +13,7 @@ export const PERMISSIONS = {
   access_inbox: 'access_inbox',
   access_reservations: 'access_reservations',
   access_planning: 'access_planning',
+  manage_floor_plan: 'manage_floor_plan',
   pos_happyhour_manual: 'pos_happyhour_manual',
   pos_apply_offert: 'pos_apply_offert',
   pos_apply_perso: 'pos_apply_perso',

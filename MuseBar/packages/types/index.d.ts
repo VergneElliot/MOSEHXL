@@ -13,6 +13,7 @@ export declare const PERMISSIONS: {
   readonly access_inbox: 'access_inbox';
   readonly access_reservations: 'access_reservations';
   readonly access_planning: 'access_planning';
+  readonly manage_floor_plan: 'manage_floor_plan';
   readonly pos_happyhour_manual: 'pos_happyhour_manual';
   readonly pos_apply_offert: 'pos_apply_offert';
   readonly pos_apply_perso: 'pos_apply_perso';
