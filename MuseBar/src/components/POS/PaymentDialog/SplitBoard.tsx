@@ -61,6 +61,7 @@ import {
   splitItemsByShareCents,
   unassignedItems,
 } from './splitAssignment';
+import { setCompactDragGhost } from '../posDragGhost';
 
 const DND_MIME = 'application/x-mosehxl-split-items';
 
@@ -238,6 +239,12 @@ export const SplitBoard: React.FC<SplitBoardProps> = ({
       selectedIds.has(itemId) && selectedIds.size > 1 ? [...selectedIds] : [itemId];
     event.dataTransfer.setData(DND_MIME, JSON.stringify(ids));
     event.dataTransfer.effectAllowed = 'move';
+    if (ids.length === 1) {
+      const item = saleOrder.find(i => i.id === ids[0]);
+      setCompactDragGhost(event, item?.productName ?? 'Article');
+    } else {
+      setCompactDragGhost(event, `${ids.length} articles`);
+    }
   };
 
   const handleDropOnBill = (event: React.DragEvent, billIndex: number) => {

@@ -24,6 +24,7 @@ import { Product, Category } from '../../types';
 import { useGridColumnCount } from '../../hooks/useGridColumnCount';
 import { canUseVirtualization } from '../../utils/canUseVirtualization';
 import { POS_PRODUCT_DND_MIME } from './posProductDnD';
+import { setCompactDragGhost } from './posDragGhost';
 
 interface ProductGridProps {
   products: Product[];
@@ -262,6 +263,7 @@ const DiversCard: React.FC<DiversCardProps> = ({ onAdd, isMobile, theme }) => {
         e.dataTransfer.setData(POS_PRODUCT_DND_MIME, payload);
         e.dataTransfer.setData('text/plain', payload);
         e.dataTransfer.effectAllowed = 'copy';
+        setCompactDragGhost(e, 'Divers');
       }}
       sx={{
         width: '100%',
@@ -343,6 +345,7 @@ const PourboireCard: React.FC<PourboireCardProps> = ({ onAdd, isMobile, theme })
         e.dataTransfer.setData(POS_PRODUCT_DND_MIME, payload);
         e.dataTransfer.setData('text/plain', payload);
         e.dataTransfer.effectAllowed = 'copy';
+        setCompactDragGhost(e, 'Pourboire');
       }}
       sx={{
         width: '100%',
@@ -474,6 +477,8 @@ const ProductCard = React.memo(function ProductCard({
           JSON.stringify({ kind: 'product', productId: product.id, quantity })
         );
         e.dataTransfer.effectAllowed = 'copy';
+        const qtyLabel = quantity > 1 ? ` ×${quantity}` : '';
+        setCompactDragGhost(e, `${product.name}${qtyLabel}`);
       }}
       sx={{
         width: '100%',
