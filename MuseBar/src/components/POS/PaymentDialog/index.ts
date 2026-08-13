@@ -3,11 +3,8 @@
  * Provides a modular payment system with focused components
  */
 
-// Core components
-export { PaymentMethodSelector } from './PaymentMethodSelector';
-export { PaymentCalculator } from './PaymentCalculator';
-export { PaymentConfirmation } from './PaymentConfirmation';
-export { SplitPayment } from './SplitPayment';
+export { SplitBoard } from './SplitBoard';
+export { ChangeMakingPanel } from './ChangeMakingPanel';
 
 // Hook
 export { usePaymentLogic } from './usePaymentLogic';

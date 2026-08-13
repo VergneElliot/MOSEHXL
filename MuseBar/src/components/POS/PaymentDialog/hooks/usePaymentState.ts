@@ -13,7 +13,7 @@ const defaultState: PaymentState = {
   simplePaymentMethod: 'card',
   cashReceived: '',
   tips: '',
-  splitType: 'equal',
+  splitType: 'custom',
   splitCount: 2,
   subBills: [],
   loading: false,
@@ -22,71 +22,46 @@ const defaultState: PaymentState = {
 export const usePaymentState = () => {
   const [state, setState] = useState<PaymentState>(defaultState);
 
-  /**
-   * Set simple payment method
-   */
   const setSimplePaymentMethod = useCallback((method: SimplePaymentMethod) => {
     setState(prev => ({
       ...prev,
       simplePaymentMethod: method,
-      // Tips are only relevant for card flows in our business rules.
-      // When switching to cash, clear tips so we don't treat them as cash tips.
       ...(method === 'cash' ? { tips: '' } : {}),
     }));
   }, []);
 
-  /**
-   * Set cash received amount
-   */
   const setCashReceived = useCallback((amount: string) => {
     setState(prev => ({ ...prev, cashReceived: amount }));
   }, []);
 
-  /**
-   * Set tips amount
-   */
   const setTips = useCallback((tips: string) => {
     setState(prev => ({ ...prev, tips }));
   }, []);
 
-  /**
-   * Set split type
-   */
   const setSplitType = useCallback((type: SplitType) => {
     setState(prev => ({ ...prev, splitType: type }));
   }, []);
 
-  /**
-   * Set split count
-   */
   const setSplitCount = useCallback((count: number) => {
     setState(prev => ({ ...prev, splitCount: count }));
   }, []);
 
-  /**
-   * Set sub-bills
-   */
   const setSubBills = useCallback((bills: LocalSubBill[]) => {
     setState(prev => ({ ...prev, subBills: bills }));
   }, []);
 
-  /**
-   * Set tab value
-   */
+  /** Tab 0 = Partage, tab 1 = Faire de la monnaie. */
   const setTabValue = useCallback((value: number) => {
-    setState(prev => ({ ...prev, tabValue: value }));
+    setState(prev => ({
+      ...prev,
+      tabValue: value,
+    }));
   }, []);
 
-  /**
-   * Set loading state
-   */
   const setLoading = useCallback((loading: boolean) => {
     setState(prev => ({ ...prev, loading }));
   }, []);
 
-  /**
-   * Reset form to defaults
-   */
   const resetForm = useCallback(() => {
     setState(defaultState);
   }, []);

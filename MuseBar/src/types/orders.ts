@@ -25,6 +25,8 @@ export interface OrderItem {
   isManualHappyHour?: boolean; // For manually applied happy hour discounts
   isOffert?: boolean; // For complimentary items (price = 0)
   isPerso?: boolean; // For employee complimentary items (price = 0)
+  /** Card tip line — not part of CA; stored as orders.tips (+card / −cash on closures). */
+  isTip?: boolean;
   originalPrice?: number; // Store original price for reverting discounts
   description?: string; // Description for special items like Divers
   options?: OrderItemOption[];
@@ -71,6 +73,13 @@ export interface LocalSubBill {
   total: number;
   payments: Payment[];
   tip?: string; // Optional tip value for this part
+  /**
+   * Manual top-up typed by the cashier (added on top of assigned items).
+   * Part total = items sum + manualAmount.
+   * `null` / undefined = no typed top-up → the last such part receives the auto residual
+   * (displayed top-up = residual total − items).
+   */
+  manualAmount?: number | null;
 }
 
 // Order status and utility types

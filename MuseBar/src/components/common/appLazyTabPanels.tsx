@@ -24,10 +24,6 @@ export const LazyHistoryContainer = React.lazy(() =>
 
 export const LazySettings = React.lazy(() => import('../Settings'));
 
-export const LazyLegalComplianceDashboard = React.lazy(() =>
-  import('../Legal').then(mod => ({ default: mod.LegalComplianceDashboard }))
-);
-
 export const LazyClosureContainer = React.lazy(() =>
   import('../Closure').then(mod => ({ default: mod.ClosureContainer }))
 );

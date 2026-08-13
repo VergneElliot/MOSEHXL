@@ -10,13 +10,16 @@ import POSLayout from './POSLayout';
 import POSMenuPanel from './POSMenuPanel';
 import POSOrderPanel from './POSOrderPanel';
 import type { DiversFormData } from './DiversDialog';
+import type { PourboireFormData } from './PourboireDialog';
 import type { ProductOptionSelection } from './ProductOptionDialog';
 import { upsertLineNoteInOptions } from '../../utils/lineItemNote';
 import { formatCurrency } from '../../utils/formatCurrency';
+import { saleLines, tipsFromOrder } from '../../hooks/usePOSOrderTotals';
 
 const LazyPaymentDialog = React.lazy(() => import('./PaymentDialog'));
 const LazyPrintAfterSaleDialog = React.lazy(() => import('./PrintAfterSaleDialog'));
 const LazyDiversDialog = React.lazy(() => import('./DiversDialog'));
+const LazyPourboireDialog = React.lazy(() => import('./PourboireDialog'));
 const LazyProductOptionDialog = React.lazy(() => import('./ProductOptionDialog'));
 
 interface POSContainerProps {
@@ -44,6 +47,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
 }) => {
   const [state, actions] = usePOSState();
   const [diversDialogOpen, setDiversDialogOpen] = useState(false);
+  const [pourboireDialogOpen, setPourboireDialogOpen] = useState(false);
   const [optionDialogOpen, setOptionDialogOpen] = useState(false);
   const [pendingProduct, setPendingProduct] = useState<{ product: Product; quantity: number } | null>(null);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
@@ -190,8 +194,8 @@ const POSContainer: React.FC<POSContainerProps> = ({
           paymentMethod: method,
           totalAmount: orderTotal,
           totalTax: orderTax,
-          items: state.currentOrder,
-          tips: 0,
+          items: saleLines(state.currentOrder),
+          tips: tipsFromOrder(state.currentOrder),
           change: 0,
         });
         actions.clearOrder();
@@ -210,6 +214,29 @@ const POSContainer: React.FC<POSContainerProps> = ({
     void handleQuickPayment('cash');
   }, [handleQuickPayment]);
 
+  const handleDropProduct = useCallback(
+    (payload: {
+      kind?: 'product' | 'divers' | 'pourboire';
+      productId?: string;
+      quantity?: number;
+    }) => {
+      if (payload.kind === 'divers') {
+        setDiversDialogOpen(true);
+        return;
+      }
+      if (payload.kind === 'pourboire') {
+        setPourboireDialogOpen(true);
+        return;
+      }
+      const productId = payload.productId;
+      if (!productId) return;
+      const product = products.find(p => String(p.id) === String(productId));
+      if (!product) return;
+      handleRequestAddProduct(product, payload.quantity ?? 1);
+    },
+    [products, handleRequestAddProduct]
+  );
+
   const handleCloseSnackbar = useCallback(() => {
     actions.closeSnackbar();
   }, [actions.closeSnackbar]);
@@ -222,8 +249,16 @@ const POSContainer: React.FC<POSContainerProps> = ({
     setDiversDialogOpen(true);
   }, []);
 
+  const handlePourboireClick = useCallback(() => {
+    setPourboireDialogOpen(true);
+  }, []);
+
   const handleCloseDiversDialog = useCallback(() => {
     setDiversDialogOpen(false);
+  }, []);
+
+  const handleClosePourboireDialog = useCallback(() => {
+    setPourboireDialogOpen(false);
   }, []);
 
   const handleClosePrintDialog = useCallback(() => {
@@ -259,6 +294,30 @@ const POSContainer: React.FC<POSContainerProps> = ({
     [handleAddToOrder]
   );
 
+  const handlePourboireSubmit = useCallback(
+    (data: PourboireFormData) => {
+      const amount = parseFloat(data.amount.replace(',', '.'));
+      if (Number.isNaN(amount) || amount <= 0) return;
+      const item: OrderItem = {
+        id: `tip-${Date.now()}`,
+        productId: null,
+        productName: 'Pourboire (carte)',
+        quantity: 1,
+        unitPrice: amount,
+        totalPrice: amount,
+        taxRate: 0,
+        taxAmount: 0,
+        isHappyHourApplied: false,
+        isOffert: false,
+        isPerso: false,
+        isTip: true,
+        description: 'Pourboire carte',
+      };
+      handleAddToOrder(item, 1);
+    },
+    [handleAddToOrder]
+  );
+
   return (
     <Box sx={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', width: '100%' }}>
@@ -274,6 +333,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
               onSearchChange={actions.setSearchQuery}
               onRequestAddProduct={handleRequestAddProduct}
               onDiversClick={handleDiversClick}
+              onPourboireClick={handlePourboireClick}
             />
           }
           orderContent={
@@ -284,11 +344,11 @@ const POSContainer: React.FC<POSContainerProps> = ({
               onCheckout={handleCheckout}
               onQuickCard={handleQuickCard}
               onQuickCash={handleQuickCash}
-              onFaireDeLaMonnaie={handleFaireDeLaMonnaie}
               onApplyHappyHour={posLinePermissions.happyHourManual ? handleApplyHappyHour : undefined}
               onApplyOffert={posLinePermissions.offert ? handleApplyOffert : undefined}
               onApplyPerso={posLinePermissions.perso ? handleApplyPerso : undefined}
               onUpdateLineNote={handleUpdateLineNote}
+              onDropProduct={handleDropProduct}
             />
           }
           orderBadge={state.currentOrder.length}
@@ -330,6 +390,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
             onOrderError={handlePaymentError}
             onDataUpdate={onDataUpdate}
             onClearOrder={actions.clearOrder}
+            onFaireDeLaMonnaie={handleFaireDeLaMonnaie}
           />
         </Suspense>
       )}
@@ -350,6 +411,17 @@ const POSContainer: React.FC<POSContainerProps> = ({
             open={diversDialogOpen}
             onClose={handleCloseDiversDialog}
             onSubmit={handleDiversSubmit}
+            formatCurrency={formatCurrency}
+          />
+        </Suspense>
+      )}
+
+      {pourboireDialogOpen && (
+        <Suspense fallback={null}>
+          <LazyPourboireDialog
+            open={pourboireDialogOpen}
+            onClose={handleClosePourboireDialog}
+            onSubmit={handlePourboireSubmit}
             formatCurrency={formatCurrency}
           />
         </Suspense>

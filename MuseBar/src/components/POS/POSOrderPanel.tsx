@@ -3,6 +3,7 @@ import type { OrderItem } from '../../types';
 import { usePOSOrderTotals } from '../../hooks/usePOSOrderTotals';
 import { formatCurrency } from '../../utils/formatCurrency';
 import OrderSummary from './OrderSummary';
+import type { PosProductDragPayload } from './posProductDnD';
 
 export interface POSOrderPanelProps {
   currentOrder: OrderItem[];
@@ -11,11 +12,11 @@ export interface POSOrderPanelProps {
   onCheckout: () => void;
   onQuickCard: () => void;
   onQuickCash: () => void;
-  onFaireDeLaMonnaie: (amount: number) => Promise<void>;
   onApplyHappyHour?: (index: number) => void;
   onApplyOffert?: (index: number) => void;
   onApplyPerso?: (index: number) => void;
   onUpdateLineNote?: (index: number, note: string) => void;
+  onDropProduct?: (payload: PosProductDragPayload) => void;
 }
 
 const POSOrderPanel = React.memo(function POSOrderPanel({
@@ -25,13 +26,14 @@ const POSOrderPanel = React.memo(function POSOrderPanel({
   onCheckout,
   onQuickCard,
   onQuickCash,
-  onFaireDeLaMonnaie,
   onApplyHappyHour,
   onApplyOffert,
   onApplyPerso,
   onUpdateLineNote,
+  onDropProduct,
 }: POSOrderPanelProps) {
-  const { orderTotal, orderTax, orderSubtotal, canProcessPayment } = usePOSOrderTotals(currentOrder);
+  const { orderTotal, orderTax, orderSubtotal, tipsTotal, canProcessPayment } =
+    usePOSOrderTotals(currentOrder);
 
   return (
     <OrderSummary
@@ -39,17 +41,18 @@ const POSOrderPanel = React.memo(function POSOrderPanel({
       orderTotal={orderTotal}
       orderTax={orderTax}
       orderSubtotal={orderSubtotal}
+      tipsTotal={tipsTotal}
       canProcessPayment={canProcessPayment}
       onRemoveItem={onRemoveItem}
       onClearOrder={onClearOrder}
       onCheckout={onCheckout}
       onQuickCard={onQuickCard}
       onQuickCash={onQuickCash}
-      onFaireDeLaMonnaie={onFaireDeLaMonnaie}
       onApplyHappyHour={onApplyHappyHour}
       onApplyOffert={onApplyOffert}
       onApplyPerso={onApplyPerso}
       onUpdateLineNote={onUpdateLineNote}
+      onDropProduct={onDropProduct}
       formatCurrency={formatCurrency}
     />
   );

@@ -128,6 +128,11 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
             InputLabelProps={{ shrink: true }}
             size="small"
             fullWidth
+            helperText={
+              selectedClosureType === 'ANNUAL'
+                ? 'Bulletin annuel : année glissante se terminant à cette date (ex. 01/08/2025 → 01/08/2026)'
+                : undefined
+            }
           />
 
           <TextField

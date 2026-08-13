@@ -1,11 +1,13 @@
 /**
  * Payment Calculations
- * Handles split bill calculations and payment amount logic
+ * Split bill math. Tips come from Pourboire cart lines (isTip), not dialog state.
+ * Split amounts cover sale CA only; tips are sent separately as orders.tips.
  */
 
 import { useCallback, useMemo } from 'react';
 import { OrderItem, LocalSubBill } from '../../../../types';
 import { PaymentState } from '../types';
+import { saleLines, tipsFromOrder } from '../../../../hooks/usePOSOrderTotals';
 
 interface UsePaymentCalculationsProps {
   state: PaymentState;
@@ -18,32 +20,17 @@ export const usePaymentCalculations = ({
   orderItems,
   onSubBillsUpdate,
 }: UsePaymentCalculationsProps) => {
+  const saleOrderItems = useMemo(() => saleLines(orderItems), [orderItems]);
 
-  /**
-   * Calculate total amount for order
-   */
   const totalAmount = useMemo(() => {
-    return orderItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
-  }, [orderItems]);
+    return saleOrderItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+  }, [saleOrderItems]);
 
-  /**
-   * Calculate tips amount
-   */
-  const tipsAmount = useMemo(() => {
-    const tips = parseFloat(state.tips) || 0;
-    return Math.max(0, tips);
-  }, [state.tips]);
+  const tipsAmount = useMemo(() => tipsFromOrder(orderItems), [orderItems]);
 
-  /**
-   * Calculate total with tips
-   */
-  const totalWithTips = useMemo(() => {
-    return totalAmount + tipsAmount;
-  }, [totalAmount, tipsAmount]);
+  /** Charge shown to card terminal = CA + tip (tip still stored separately). */
+  const totalWithTips = useMemo(() => totalAmount + tipsAmount, [totalAmount, tipsAmount]);
 
-  /**
-   * Calculate cash change (only when Montant reçu is filled)
-   */
   const cashChange = useMemo(() => {
     if (state.simplePaymentMethod !== 'cash') return 0;
     if (!state.cashReceived || state.cashReceived.trim() === '') return 0;
@@ -52,13 +39,13 @@ export const usePaymentCalculations = ({
   }, [state.simplePaymentMethod, state.cashReceived, totalWithTips]);
 
   /**
-   * Initialize split bills based on type
-   * Equal split: distribute total in whole cents so the sum matches exactly (no rounding drift in closures).
+   * Initialize split bills.
+   * Equal: distribute sale CA in whole cents. Tip is order-level, not per-bill.
    */
   const initializeSplitBills = useCallback(() => {
     if (state.splitType === 'equal') {
-      const total = totalWithTips;
-      const n = state.splitCount;
+      const total = totalAmount;
+      const n = Math.max(1, state.splitCount);
       const totalCents = Math.round(total * 100);
       const baseCents = Math.floor(totalCents / n);
       const remainder = totalCents - baseCents * n;
@@ -69,63 +56,59 @@ export const usePaymentCalculations = ({
           id: `split-${index + 1}`,
           total: partAmount,
           payments: [{ amount: partAmount, method: 'card' as const }],
-          items: orderItems.map(item => ({
+          items: saleOrderItems.map(item => ({
             ...item,
             quantity: item.quantity / n,
           })),
-          tip: (tipsAmount / n).toFixed(2),
+          tip: '0',
         };
       });
       onSubBillsUpdate(bills);
     } else {
-      // Custom split - create empty bills for manual assignment
-      const bills: LocalSubBill[] = Array.from({ length: state.splitCount }, (_, index) => ({
+      const n = Math.max(2, state.splitCount);
+      const bills: LocalSubBill[] = Array.from({ length: n }, (_, index) => ({
         id: `custom-${index + 1}`,
         total: 0,
-        payments: [],
+        payments: [{ amount: 0, method: 'card' as const }],
         items: [],
         tip: '0',
       }));
       onSubBillsUpdate(bills);
     }
-  }, [state.splitType, state.splitCount, totalWithTips, orderItems, tipsAmount, onSubBillsUpdate]);
+  }, [state.splitType, state.splitCount, totalAmount, saleOrderItems, onSubBillsUpdate]);
 
-  /**
-   * Update sub-bill amount
-   */
-  const updateSubBillAmount = useCallback((billId: string, amount: number) => {
-    const updatedBills = state.subBills.map(bill =>
-      bill.id === billId ? { ...bill, total: amount } : bill
-    );
-    onSubBillsUpdate(updatedBills);
-  }, [state.subBills, onSubBillsUpdate]);
+  const updateSubBillAmount = useCallback(
+    (billId: string, amount: number) => {
+      const updatedBills = state.subBills.map(bill =>
+        bill.id === billId ? { ...bill, total: amount } : bill
+      );
+      onSubBillsUpdate(updatedBills);
+    },
+    [state.subBills, onSubBillsUpdate]
+  );
 
-  /**
-   * Update sub-bill payment method (card or cash) for closure attribution
-   */
-  const updateSubBillPaymentMethod = useCallback((billId: string, paymentMethod: 'cash' | 'card') => {
-    const updatedBills = state.subBills.map(bill =>
-      bill.id === billId ? { ...bill, payments: [{ amount: bill.total, method: paymentMethod }] } : bill
-    );
-    onSubBillsUpdate(updatedBills);
-  }, [state.subBills, onSubBillsUpdate]);
+  const updateSubBillPaymentMethod = useCallback(
+    (billId: string, paymentMethod: 'cash' | 'card') => {
+      const updatedBills = state.subBills.map(bill =>
+        bill.id === billId
+          ? { ...bill, payments: [{ amount: bill.total, method: paymentMethod }] }
+          : bill
+      );
+      onSubBillsUpdate(updatedBills);
+    },
+    [state.subBills, onSubBillsUpdate]
+  );
 
-  /**
-   * Calculate total of all sub-bills
-   */
   const subBillsTotal = useMemo(() => {
     return state.subBills.reduce((sum, bill) => sum + (bill.total || 0), 0);
   }, [state.subBills]);
 
-  /**
-   * Check if split amounts are valid (sum equals order total; use cents to avoid float drift)
-   */
   const isSplitAmountValid = useMemo(() => {
     if (state.subBills.length === 0) return false;
     const sumCents = Math.round(subBillsTotal * 100);
-    const totalCents = Math.round(totalWithTips * 100);
+    const totalCents = Math.round(totalAmount * 100);
     return sumCents === totalCents;
-  }, [subBillsTotal, totalWithTips, state.subBills.length]);
+  }, [subBillsTotal, totalAmount, state.subBills.length]);
 
   return {
     totalAmount,
@@ -134,6 +117,7 @@ export const usePaymentCalculations = ({
     cashChange,
     subBillsTotal,
     isSplitAmountValid,
+    saleOrderItems,
     initializeSplitBills,
     updateSubBillAmount,
     updateSubBillPaymentMethod,

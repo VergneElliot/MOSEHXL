@@ -1,9 +1,10 @@
 /**
- * Payment Dialog Container Component
- * Main orchestrator for the modular payment system
+ * Payment options dialog:
+ * - Tab Partage: two-column split board
+ * - Tab Faire de la monnaie: card→cash change
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -13,29 +14,31 @@ import {
   Box,
   Tabs,
   Tab,
+  Alert,
+  Typography,
   useTheme,
   useMediaQuery,
 } from '@mui/material';
 import {
   Payment as PaymentIcon,
-  CreditCard as SimplePaymentIcon,
-  Group as SplitPaymentIcon,
+  CallSplit as SplitTabIcon,
+  SwapHoriz as ChangeTabIcon,
   Cancel as CancelIcon,
 } from '@mui/icons-material';
 import { PaymentDialogProps, PaymentTabPanelProps } from './types';
-import { PaymentMethodSelector } from './PaymentMethodSelector';
-import { PaymentCalculator } from './PaymentCalculator';
-import { PaymentConfirmation } from './PaymentConfirmation';
-import { SplitPayment } from './SplitPayment';
+import { SplitBoard } from './SplitBoard';
+import { ChangeMakingPanel } from './ChangeMakingPanel';
 import { usePaymentLogic } from './usePaymentLogic';
 import OrderSummaryCard from '../OrderSummaryCard';
+import { formatCurrency } from '../../../utils/formatCurrency';
+import { tipsFromOrder } from '../../../hooks/usePOSOrderTotals';
+import {
+  paymentMethodBreakdown,
+  taxBreakdownByRate,
+} from './splitAssignment';
 
-/**
- * Tab Panel Component
- */
 function TabPanel(props: PaymentTabPanelProps) {
   const { children, value, index, ...other } = props;
-
   return (
     <div
       role="tabpanel"
@@ -44,18 +47,11 @@ function TabPanel(props: PaymentTabPanelProps) {
       aria-labelledby={`payment-tab-${index}`}
       {...other}
     >
-      {value === index && (
-        <Box sx={{ pt: 2 }}>
-          {children}
-        </Box>
-      )}
+      {value === index && <Box sx={{ pt: 2 }}>{children}</Box>}
     </div>
   );
 }
 
-/**
- * Payment Dialog Container Component
- */
 export const PaymentDialogContainer: React.FC<PaymentDialogProps> = ({
   open,
   onClose,
@@ -67,10 +63,12 @@ export const PaymentDialogContainer: React.FC<PaymentDialogProps> = ({
   onOrderError,
   onDataUpdate,
   onClearOrder,
+  onFaireDeLaMonnaie,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  
+  const tipsTotal = tipsFromOrder(currentOrder);
+
   const paymentLogic = usePaymentLogic(
     currentOrder,
     orderTotal,
@@ -82,7 +80,18 @@ export const PaymentDialogContainer: React.FC<PaymentDialogProps> = ({
     onClose
   );
 
-  // Handle dialog close
+  const taxParts = useMemo(() => taxBreakdownByRate(currentOrder), [currentOrder]);
+  const splitValid = useMemo(() => {
+    const bills = paymentLogic.state.subBills;
+    if (bills.length === 0) return false;
+    const sum = bills.reduce((s, b) => s + b.total, 0);
+    return Math.round(sum * 100) === Math.round(orderTotal * 100);
+  }, [paymentLogic.state.subBills, orderTotal]);
+  const methods = useMemo(
+    () => paymentMethodBreakdown(paymentLogic.state.subBills),
+    [paymentLogic.state.subBills]
+  );
+
   const handleClose = () => {
     if (!paymentLogic.state.loading) {
       onClose();
@@ -90,128 +99,84 @@ export const PaymentDialogContainer: React.FC<PaymentDialogProps> = ({
     }
   };
 
-  // Handle tab change
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    paymentLogic.setTabValue(newValue);
-    
-    // Initialize split bills when switching to split tab
-    if (newValue === 1 && paymentLogic.state.subBills.length === 0) {
-      paymentLogic.initializeSplitBills();
-    }
-  };
-
   return (
-    <Dialog 
-      open={open} 
-      onClose={handleClose} 
-      maxWidth="md" 
-      fullWidth
-      fullScreen={isMobile}
-    >
+    <Dialog open={open} onClose={handleClose} maxWidth="lg" fullWidth fullScreen={isMobile}>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <PaymentIcon />
-        Paiement - {paymentLogic.formatCurrency(orderTotal)}
+        Options de paiement — {formatCurrency(orderTotal)}
       </DialogTitle>
 
       <DialogContent>
-        {/* Order Summary */}
-        <Box sx={{ mb: 3 }}>
-          <OrderSummaryCard
-            orderTotal={orderTotal}
-            orderTax={orderTax}
-            orderSubtotal={orderSubtotal}
-            formatCurrency={paymentLogic.formatCurrency}
-          />
-        </Box>
+        {tipsTotal > 0 && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              Pourboire carte (hors CA) : <strong>{formatCurrency(tipsTotal)}</strong>
+              {' — '}enregistré séparément (+carte / −espèces)
+            </Typography>
+          </Alert>
+        )}
 
-        {/* Payment Tabs */}
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tabs
             value={paymentLogic.state.tabValue}
-            onChange={handleTabChange}
+            onChange={(_e, v) => paymentLogic.setTabValue(v)}
             variant="fullWidth"
-            aria-label="payment tabs"
           >
             <Tab
-              icon={<SimplePaymentIcon />}
-              label="Paiement simple"
+              icon={<SplitTabIcon />}
+              iconPosition="start"
+              label="Partage"
               id="payment-tab-0"
               aria-controls="payment-tabpanel-0"
-              iconPosition="start"
             />
             <Tab
-              icon={<SplitPaymentIcon />}
-              label="Paiement partagé"
+              icon={<ChangeTabIcon />}
+              iconPosition="start"
+              label="Faire de la monnaie"
               id="payment-tab-1"
               aria-controls="payment-tabpanel-1"
-              iconPosition="start"
+              disabled={!onFaireDeLaMonnaie}
             />
           </Tabs>
         </Box>
 
-        {/* Simple Payment Tab */}
         <TabPanel value={paymentLogic.state.tabValue} index={0}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {/* Payment Method Selection */}
-            <PaymentMethodSelector
-              paymentMethod={paymentLogic.state.simplePaymentMethod}
-              onMethodChange={paymentLogic.setSimplePaymentMethod}
-              disabled={paymentLogic.state.loading}
-            />
-
-            {/* Payment Calculator */}
-            <PaymentCalculator
-              paymentMethod={paymentLogic.state.simplePaymentMethod}
-              orderTotal={orderTotal}
-              tips={paymentLogic.state.tips}
-              onTipsChange={paymentLogic.setTips}
-              cashReceived={paymentLogic.state.cashReceived}
-              onCashReceivedChange={paymentLogic.setCashReceived}
-              changeAmount={paymentLogic.changeAmount}
-              isValid={paymentLogic.isSimplePaymentValid}
-              disabled={paymentLogic.state.loading}
-            />
-
-            {/* Payment Confirmation */}
-            <PaymentConfirmation
-              orderTotal={orderTotal}
-              tips={paymentLogic.state.tips}
-              paymentMethod={paymentLogic.state.simplePaymentMethod}
-              cashReceived={paymentLogic.state.cashReceived}
-              changeAmount={paymentLogic.changeAmount}
-              isValid={paymentLogic.isSimplePaymentValid}
-              loading={paymentLogic.state.loading}
-              onConfirm={paymentLogic.handleSimplePayment}
-              onCancel={handleClose}
-            />
-          </Box>
-        </TabPanel>
-
-        {/* Split Payment Tab */}
-        <TabPanel value={paymentLogic.state.tabValue} index={1}>
-          <SplitPayment
+          <SplitBoard
             orderTotal={orderTotal}
             currentOrder={currentOrder}
-            splitType={paymentLogic.state.splitType}
             splitCount={paymentLogic.state.splitCount}
             subBills={paymentLogic.state.subBills}
-            onSplitTypeChange={paymentLogic.setSplitType}
             onSplitCountChange={paymentLogic.setSplitCount}
             onSubBillsChange={paymentLogic.setSubBills}
             onSubBillPaymentMethodChange={paymentLogic.updateSubBillPaymentMethod}
-            onInitialize={paymentLogic.initializeSplitBills}
             loading={paymentLogic.state.loading}
             onConfirm={paymentLogic.handleSplitPayment}
           />
         </TabPanel>
+
+        <TabPanel value={paymentLogic.state.tabValue} index={1}>
+          {onFaireDeLaMonnaie ? (
+            <ChangeMakingPanel onSubmit={onFaireDeLaMonnaie} onClose={handleClose} />
+          ) : (
+            <Alert severity="warning">Fonction indisponible.</Alert>
+          )}
+        </TabPanel>
+
+        <OrderSummaryCard
+          orderTotal={orderTotal}
+          orderTax={orderTax}
+          orderSubtotal={orderSubtotal}
+          formatCurrency={formatCurrency}
+          tax10={taxParts.rate10}
+          tax20={taxParts.rate20}
+          showPaymentBreakdown={splitValid && paymentLogic.state.tabValue === 0}
+          cashTotal={methods.cash}
+          cardTotal={methods.card}
+        />
       </DialogContent>
 
       <DialogActions>
-        <Button
-          startIcon={<CancelIcon />}
-          onClick={handleClose}
-          disabled={paymentLogic.state.loading}
-        >
+        <Button startIcon={<CancelIcon />} onClick={handleClose} disabled={paymentLogic.state.loading}>
           Fermer
         </Button>
       </DialogActions>
@@ -220,4 +185,3 @@ export const PaymentDialogContainer: React.FC<PaymentDialogProps> = ({
 };
 
 export default PaymentDialogContainer;
-

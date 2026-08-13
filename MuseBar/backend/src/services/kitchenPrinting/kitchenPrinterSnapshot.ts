@@ -28,3 +28,16 @@ export async function loadKitchenPrinterSnapshotsByProduct(
   }
   return map;
 }
+
+/**
+ * Establishment "default" kitchen printer: first active by display_order / name / id.
+ * Used when a line has an ad-hoc note but no product kitchen-printer assignment.
+ */
+export async function loadDefaultKitchenPrinterSnapshot(
+  establishmentId: string
+): Promise<KitchenPrinterLineSnapshot | null> {
+  const printers = await KitchenPrinterModel.getAllActive(establishmentId);
+  const first = printers[0];
+  if (!first) return null;
+  return { id: first.id, name: first.name, slug: first.slug };
+}

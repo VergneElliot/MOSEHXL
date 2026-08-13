@@ -10,11 +10,21 @@ import {
   validateOrderItemOptionsForProduct,
   type CreateOrderItemOptionInput,
 } from '../productOptions/productOptionValidationService';
+import { AD_HOC_LINE_NOTE_GROUP_NAME } from '../productOptions/lineItemNote';
 import {
+  loadDefaultKitchenPrinterSnapshot,
   loadKitchenPrinterSnapshotsByProduct,
   type KitchenPrinterLineSnapshot,
 } from '../kitchenPrinting/kitchenPrinterSnapshot';
 import { dispatchKitchenTicketsForCompletedOrder } from '../kitchenPrinting/kitchenTicketDispatchService';
+
+function snapshotsHaveAdHocLineNote(snapshots: OrderItemOptionSnapshotInput[]): boolean {
+  return snapshots.some(
+    (snapshot) =>
+      snapshot.group_name_snapshot === AD_HOC_LINE_NOTE_GROUP_NAME &&
+      (snapshot.free_text?.trim() ?? '') !== ''
+  );
+}
 
 export interface CreateOrderItemInput {
   product_id?: number;
@@ -88,6 +98,7 @@ export async function createOrderWithCompliance(
   const assignedGroupsByProduct = await loadAssignedGroupsByProduct(establishmentId, productIds);
   const kitchenPrintersByProduct = await loadKitchenPrinterSnapshotsByProduct(establishmentId, productIds);
   const printPickupSlipByProduct = await ProductModel.getPrintPickupSlipFlags(establishmentId, productIds);
+  const defaultKitchenPrinter = await loadDefaultKitchenPrinterSnapshot(establishmentId);
 
   const validatedSnapshots: OrderItemOptionSnapshotInput[][] = [];
   for (const item of items) {
@@ -125,8 +136,16 @@ export async function createOrderWithCompliance(
 
   const createdItems = [];
   for (const [index, item] of items.entries()) {
-    const kitchenPrinterSnapshot: KitchenPrinterLineSnapshot[] =
+    let kitchenPrinterSnapshot: KitchenPrinterLineSnapshot[] =
       item.product_id != null ? kitchenPrintersByProduct.get(item.product_id) ?? [] : [];
+    // Ad-hoc line note on a product with no kitchen printers → route to default printer
+    if (
+      kitchenPrinterSnapshot.length === 0 &&
+      defaultKitchenPrinter &&
+      snapshotsHaveAdHocLineNote(validatedSnapshots[index] ?? [])
+    ) {
+      kitchenPrinterSnapshot = [defaultKitchenPrinter];
+    }
     const printPickupSlipSnapshot =
       item.product_id != null ? printPickupSlipByProduct.get(item.product_id) === true : false;
     const createdItem = await OrderItemModel.create(

@@ -8,6 +8,7 @@ import {
   People as UsersIcon,
   Security as AuditIcon,
   AccessTime as ClockIcon,
+  Gavel as ComplianceIcon,
 } from '@mui/icons-material';
 import { PERMISSIONS } from '@mosehxl/types';
 import type { User } from '../../types/auth';
@@ -19,6 +20,9 @@ import TimeClockPanel from './TimeClockPanel';
 
 const LazyUserManagement = React.lazy(() => import('../Admin/UserManagement'));
 const LazyAuditTrailDashboard = React.lazy(() => import('../Admin/AuditTrailDashboard'));
+const LazyLegalComplianceDashboard = React.lazy(() =>
+  import('../Legal').then(mod => ({ default: mod.LegalComplianceDashboard }))
+);
 
 function PanelFallback() {
   return (
@@ -40,6 +44,7 @@ type AdminSection =
   | 'planning'
   | 'time_clock'
   | 'users'
+  | 'compliance'
   | 'audit';
 
 const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user, token }) => {
@@ -67,6 +72,10 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
     if (isEstAdmin || perms.includes(PERMISSIONS.access_user_management)) {
       items.push({ key: 'users', label: 'Utilisateurs', icon: <UsersIcon /> });
     }
+    // Legal compliance dashboard: establishment admin only (moved from its own top-level tab).
+    if (isEstAdmin) {
+      items.push({ key: 'compliance', label: 'Conformité Légale', icon: <ComplianceIcon /> });
+    }
     if (isEstAdmin) {
       items.push({ key: 'audit', label: 'Journal de sécurité', icon: <AuditIcon /> });
     }
@@ -89,8 +98,8 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, height: '100%', minHeight: 0 }}>
       <Typography variant="h4">Administration</Typography>
       <Typography variant="body2" color="text.secondary">
-        Documents, boîte mail, réservations, planning, pointage, utilisateurs et journal de
-        sécurité.
+        Documents, boîte mail, réservations, planning, pointage, utilisateurs, conformité
+        légale et journal de sécurité.
       </Typography>
 
       <Tabs
@@ -113,6 +122,11 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
         {active === 'users' && (
           <Suspense fallback={<PanelFallback />}>
             <LazyUserManagement token={token} />
+          </Suspense>
+        )}
+        {active === 'compliance' && (
+          <Suspense fallback={<PanelFallback />}>
+            <LazyLegalComplianceDashboard />
           </Suspense>
         )}
         {active === 'audit' && (

@@ -9,9 +9,6 @@ import {
   Typography,
   TextField,
   Button,
-  RadioGroup,
-  FormControlLabel,
-  Radio,
   List,
   ListItem,
   ListItemText,
@@ -51,7 +48,6 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
   splitType,
   splitCount,
   subBills,
-  onSplitTypeChange,
   onSplitCountChange,
   onSubBillsChange,
   onSubBillPaymentMethodChange,
@@ -64,11 +60,10 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
   const totalSplit = subBills.reduce((sum, bill) => sum + bill.total, 0);
   const isValidSplit = Math.round(totalSplit * 100) === Math.round(orderTotal * 100);
 
-  const assignedItemIds = new Set(
-    subBills.flatMap(b => b.items.map(i => i.id))
-  );
-  const unassignedItems = currentOrder.filter(item => !assignedItemIds.has(item.id));
-  const allItemsAssigned = currentOrder.length > 0 && unassignedItems.length === 0;
+  const saleItems = currentOrder.filter(item => !item.isTip);
+  const assignedItemIds = new Set(subBills.flatMap(b => b.items.map(i => i.id)));
+  const unassignedItems = saleItems.filter(item => !assignedItemIds.has(item.id));
+  const allItemsAssigned = saleItems.length > 0 && unassignedItems.length === 0;
   const isValidByItems = allItemsAssigned && isValidSplit;
 
   const assignItemToBill = useCallback(
@@ -182,45 +177,8 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
     <Box sx={{ mt: 2 }}>
       <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <GroupIcon />
-        Paiement partagé
+        {splitType === 'equal' ? 'Partage égal' : 'Partage personnalisé'}
       </Typography>
-
-      {/* Split Configuration */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="subtitle1" gutterBottom>
-          Type de partage
-        </Typography>
-        
-        <RadioGroup
-          value={splitType}
-          onChange={(e) => onSplitTypeChange(e.target.value as 'equal' | 'custom')}
-        >
-          <FormControlLabel
-            value="equal"
-            control={<Radio />}
-            label={
-              <Box>
-                <Typography variant="body1">Partage égal</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Divise la commande en parts égales
-                </Typography>
-              </Box>
-            }
-          />
-          <FormControlLabel
-            value="custom"
-            control={<Radio />}
-            label={
-              <Box>
-                <Typography variant="body1">Partage personnalisé</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Configure manuellement chaque paiement
-                </Typography>
-              </Box>
-            }
-          />
-        </RadioGroup>
-      </Box>
 
       {/* Number of Splits */}
       <Box sx={{ mb: 3 }}>
@@ -228,12 +186,20 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
           label="Nombre de paiements"
           type="number"
           value={splitCount}
-          onChange={(e) => onSplitCountChange(parseInt(e.target.value) || 2)}
-          inputProps={{ min: 2, max: 10, onFocus: (e: React.FocusEvent<HTMLInputElement>) => e.target.select() }}
+          onChange={e => onSplitCountChange(parseInt(e.target.value) || (splitType === 'equal' ? 1 : 2))}
+          inputProps={{
+            min: splitType === 'equal' ? 1 : 2,
+            max: 10,
+            onFocus: (e: React.FocusEvent<HTMLInputElement>) => e.target.select(),
+          }}
           sx={{ maxWidth: 200 }}
-          helperText="Entre 2 et 10 paiements"
+          helperText={
+            splitType === 'equal'
+              ? '1 = paiement unique (carte ou espèces) · 2–10 = parts égales'
+              : 'Entre 2 et 10 paiements'
+          }
         />
-        
+
         <Button
           variant="outlined"
           startIcon={<RefreshIcon />}
@@ -266,7 +232,7 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
       )}
 
       {/* Item assignment list for custom split by items (unassigned only) */}
-      {splitType === 'custom' && customSubMode === 'items' && currentOrder.length > 0 && subBills.length > 0 && (
+      {splitType === 'custom' && customSubMode === 'items' && saleItems.length > 0 && subBills.length > 0 && (
         <Box sx={{ mb: 3 }}>
           <Typography variant="subtitle1" gutterBottom>
             Articles à assigner
@@ -389,7 +355,11 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
             disabled={(splitType === 'custom' && customSubMode === 'items' ? !isValidByItems : !isValidSplit) || loading}
             size="large"
           >
-            {loading ? 'Traitement...' : 'Confirmer le paiement partagé'}
+            {loading
+              ? 'Traitement...'
+              : subBills.length === 1
+                ? 'Confirmer le paiement'
+                : 'Confirmer le paiement partagé'}
           </Button>
         </Box>
       )}
@@ -397,13 +367,26 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
       {/* Information */}
       <Alert severity="info" sx={{ mt: 2 }}>
         <Typography variant="subtitle2" gutterBottom>
-          Paiement partagé:
+          {splitType === 'equal' ? 'Partage égal' : 'Partage personnalisé'}:
         </Typography>
         <Typography variant="body2">
-          • Divise la commande entre plusieurs payeurs<br />
-          • Chaque paiement peut utiliser une méthode différente<br />
-          • Le total de tous les paiements doit égaler le montant de la commande<br />
-          • Utile pour les groupes et les repas d'affaires
+          {splitType === 'equal' ? (
+            <>
+              • 1 paiement = règlement unique (choisir carte ou espèces sur la ligne)
+              <br />
+              • Plusieurs paiements = parts égales du montant TTC
+              <br />
+              • Les pourboires carte ajoutés au panier restent hors CA
+            </>
+          ) : (
+            <>
+              • Répartissez par montant ou par articles
+              <br />
+              • Chaque paiement peut utiliser carte ou espèces
+              <br />
+              • Le total des parts doit égaler le montant de la commande (hors pourboire)
+            </>
+          )}
         </Typography>
       </Alert>
     </Box>

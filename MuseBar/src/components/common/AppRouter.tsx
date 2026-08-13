@@ -14,7 +14,6 @@ import {
   LazyAdministrationContainer,
   LazyClosureContainer,
   LazyHistoryContainer,
-  LazyLegalComplianceDashboard,
   LazyMenuContainer,
   LazySettings,
   TabPanelFallback,
@@ -124,13 +123,6 @@ const AppRouter: React.FC<AppRouterProps> = ({
       icon: <SettingsIcon />,
       value: 'settings',
       permission: PERMISSIONS.access_settings,
-    },
-    {
-      label: 'Conformité Légale',
-      icon: <GavelIcon />,
-      value: 'compliance',
-      permission: PERMISSIONS.access_compliance,
-      establishmentAdminAlways: true,
     },
     {
       label: 'Bulletins de Clôture',
@@ -275,11 +267,6 @@ const AppRouter: React.FC<AppRouterProps> = ({
                   onHappyHourStatusUpdate={onHappyHourStatusUpdate}
                   products={products}
                 />
-              </Suspense>
-            )}
-            {tab.value === 'compliance' && (
-              <Suspense fallback={<TabPanelFallback />}>
-                <LazyLegalComplianceDashboard />
               </Suspense>
             )}
             {tab.value === 'closures' && (

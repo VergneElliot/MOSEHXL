@@ -16,6 +16,7 @@ export interface POSMenuPanelProps {
   onSearchChange: (query: string) => void;
   onRequestAddProduct: (product: Product, quantity: number) => void;
   onDiversClick: () => void;
+  onPourboireClick: () => void;
 }
 
 const POSMenuPanel = React.memo(function POSMenuPanel({
@@ -28,6 +29,7 @@ const POSMenuPanel = React.memo(function POSMenuPanel({
   onSearchChange,
   onRequestAddProduct,
   onDiversClick,
+  onPourboireClick,
 }: POSMenuPanelProps) {
   const { filteredProducts, calculateProductPrice, formatCurrency } = usePOSCatalogLogic(
     products,
@@ -66,6 +68,7 @@ const POSMenuPanel = React.memo(function POSMenuPanel({
           calculateProductPrice={calculateProductPrice}
           formatCurrency={formatCurrency}
           onDiversClick={onDiversClick}
+          onPourboireClick={onPourboireClick}
         />
       </Box>
     </>

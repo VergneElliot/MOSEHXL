@@ -134,6 +134,15 @@ These are organized chronologically. Each entry corresponds to one specific issu
 | 448 | [Closure Auto-Email & Flux 10.3](./patch-notes/448-CLOSURE-SETTINGS-AUTO-EMAIL-FLUX103-IMPLEMENTATION.md) | Persisted closure settings with accounting emails, automatic bulletin email (PDF + Excel + Flux 10.3 XML), DGFiP e-reporting XML groundwork |
 | 449 | [Admin-Wave Misc Refactors](./patch-notes/449-ADMIN-WAVE-MISC-REFACTORS-IMPLEMENTATION.md) | SystemAdmin data hooks, canonical business types, establishment delete teardown, platform audit trail, POS grid stability, `.gitignore` fix |
 
+### Feature Work — POS payment & cart (August 2026)
+
+| # | File | Summary |
+|---|------|---------|
+| 450 | [Annual Closure Rolling Year + Conformité Tab Move](./patch-notes/450-ANNUAL-CLOSURE-ROLLING-YEAR-AND-COMPLIANCE-TAB-MOVE-IMPLEMENTATION.md) | Rolling-year annual closure; Conformité Légale under Administration |
+| 451 | [Pourboire Card + Payment Tabs](./patch-notes/451-POURBOIRE-CARD-AND-PAYMENT-TABS-IMPLEMENTATION.md) | Tip as product card; payment dialog tabs cleanup |
+| 452 | [Unified Payment Options Split Board](./patch-notes/452-UNIFIED-PAYMENT-OPTIONS-SPLIT-BOARD-IMPLEMENTATION.md) | Partage board + Faire de la monnaie tab; cart payment buttons simplified |
+| 453 | [POS Cart Actions Panel](./patch-notes/453-POS-CART-ACTIONS-PANEL-SELECTION-DND-IMPLEMENTATION.md) | Two-column cart, line selection, product→cart DnD, actions column (table / À suivre stubs) |
+
 Operational runbooks for this wave: [ADMIN-SPACE-INBOUND-AND-STORAGE.md](./runbooks/ADMIN-SPACE-INBOUND-AND-STORAGE.md), [MULTI-ESTABLISHMENT-MEMBERSHIPS.md](./runbooks/MULTI-ESTABLISHMENT-MEMBERSHIPS.md)
 
 ### Session Summaries

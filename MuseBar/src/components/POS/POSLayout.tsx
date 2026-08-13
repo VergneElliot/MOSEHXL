@@ -1,6 +1,7 @@
 /**
  * Responsive layout for the cashier (Caisse): menu + order.
- * - Wide (≥ md): two-column flex layout (menu ~2/3, order ~1/3) so height/overflow chain works for scroll and payment buttons.
+ * - Wide (≥ md): two-column flex layout (menu ~60%, order ~40%) so the cart
+ *   actions column fits beside selectable lines.
  * - Narrow (< md): tabbed view (Menu | Commande) so only one panel is visible at a time.
  * Single responsibility: layout only; no POS state or business logic.
  */
@@ -85,8 +86,8 @@ const POSLayout: React.FC<POSLayoutProps> = ({
         </Box>
         <Box
           sx={{
-            flex: '0 0 33.333%',
-            minWidth: 0,
+            flex: '0 0 40%',
+            minWidth: 320,
             minHeight: 0,
             display: 'flex',
             flexDirection: 'column',

@@ -255,14 +255,22 @@ export class ClosureOperations {
     fondDeCaisse?: number,
     closeImmediately = true
   ): Promise<ClosureBulletin> {
-    // Get the start and end of the year
-    const startOfYear = new Date(date.getFullYear(), 0, 1);
-    const endOfYear = new Date(date.getFullYear(), 11, 31, 23, 59, 59, 999);
+    // Rolling year: from one year before the selected date (00:00) through the
+    // selected date (23:59:59.999). Annual bulletins are intentionally NOT tied to
+    // the calendar year: fiscal years can end on any date, and venues may go live
+    // mid-year, so the operator picks the closing date and gets the year leading
+    // up to it (e.g. selected 2026-08-01 → period 2025-08-01 → 2026-08-01).
+    const startOfPeriod = new Date(date);
+    startOfPeriod.setFullYear(startOfPeriod.getFullYear() - 1);
+    startOfPeriod.setHours(0, 0, 0, 0);
+
+    const endOfPeriod = new Date(date);
+    endOfPeriod.setHours(23, 59, 59, 999);
 
     return await this.createPeriodClosure(
       'ANNUAL',
-      startOfYear,
-      endOfYear,
+      startOfPeriod,
+      endOfPeriod,
       date,
       establishmentId,
       force,

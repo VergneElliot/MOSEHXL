@@ -28,10 +28,9 @@ It is the working reference for what is complete, what is broken, and what needs
 - Frontend API calls routed through `ApiService` with auto-detected backend URL
 
 ### POS
-- Product grid with category filter and accent-normalized search
-- Cart management: add, remove, update quantity
-- Payment dialog: simple cash/card with change calculation and tips
-- Payment dialog: split payment (equal split or by item) with mixed cash/card sub-bills
+- Product grid with category filter and accent-normalized search; product cards drag-and-drop onto the cart
+- Cart: two-column panel (selectable lines + totals | actions); empty selection applies discounts/notes to all non-tip lines
+- Payment: quick CB / espèces + Options de paiement (split board + faire de la monnaie) from the cart actions column
 - Order creation via `POST /api/orders` with legal journal + audit trail write on completion
 - Cash register change operation via `POST /api/orders/payment/change` (dedicated endpoint)
 

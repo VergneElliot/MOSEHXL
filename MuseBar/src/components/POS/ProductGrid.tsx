@@ -11,13 +11,19 @@ import {
   IconButton,
   TextField,
 } from '@mui/material';
-import { Add as AddIcon, Remove as RemoveIcon, Category as DiversIcon } from '@mui/icons-material';
+import {
+  Add as AddIcon,
+  Remove as RemoveIcon,
+  Category as DiversIcon,
+  VolunteerActivism as TipIcon,
+} from '@mui/icons-material';
 import { alpha } from '@mui/material/styles';
 import type { Theme } from '@mui/material/styles';
 import { VirtuosoGrid } from 'react-virtuoso';
 import { Product, Category } from '../../types';
 import { useGridColumnCount } from '../../hooks/useGridColumnCount';
 import { canUseVirtualization } from '../../utils/canUseVirtualization';
+import { POS_PRODUCT_DND_MIME } from './posProductDnD';
 
 interface ProductGridProps {
   products: Product[];
@@ -27,6 +33,7 @@ interface ProductGridProps {
   calculateProductPrice: (product: Product, isHappyHour: boolean) => number;
   formatCurrency: (amount: number) => string;
   onDiversClick?: () => void;
+  onPourboireClick?: () => void;
 }
 
 /**
@@ -44,6 +51,7 @@ const ProductGrid = React.memo(function ProductGrid({
   calculateProductPrice,
   formatCurrency,
   onDiversClick,
+  onPourboireClick,
 }: ProductGridProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -61,7 +69,9 @@ const ProductGrid = React.memo(function ProductGrid({
   }, [categories]);
 
   const hasDiversSlot = Boolean(onDiversClick);
-  const totalCount = products.length + (hasDiversSlot ? 1 : 0);
+  const hasPourboireSlot = Boolean(onPourboireClick);
+  const specialSlotCount = (hasDiversSlot ? 1 : 0) + (hasPourboireSlot ? 1 : 0);
+  const totalCount = products.length + specialSlotCount;
   const cardMinHeight = isMobile ? CARD_MIN_HEIGHT_MOBILE : CARD_MIN_HEIGHT_DESKTOP;
 
   // Stable Virtuoso components: column count via CSS var (avoids remount flicker).
@@ -106,22 +116,38 @@ const ProductGrid = React.memo(function ProductGrid({
 
   const computeItemKey = useCallback(
     (index: number) => {
-      if (hasDiversSlot && index === 0) return 'divers';
-      const productIndex = hasDiversSlot ? index - 1 : index;
-      const product = products[productIndex];
+      let offset = 0;
+      if (hasDiversSlot) {
+        if (index === offset) return 'divers';
+        offset += 1;
+      }
+      if (hasPourboireSlot) {
+        if (index === offset) return 'pourboire';
+        offset += 1;
+      }
+      const product = products[index - offset];
       return product?.id ?? `idx-${index}`;
     },
-    [hasDiversSlot, products]
+    [hasDiversSlot, hasPourboireSlot, products]
   );
 
   const renderGridItem = useCallback(
     (index: number) => {
-      if (hasDiversSlot && index === 0) {
-        return <DiversCard onAdd={onDiversClick!} isMobile={isMobile} theme={theme} />;
+      let offset = 0;
+      if (hasDiversSlot) {
+        if (index === offset) {
+          return <DiversCard onAdd={onDiversClick!} isMobile={isMobile} theme={theme} />;
+        }
+        offset += 1;
+      }
+      if (hasPourboireSlot) {
+        if (index === offset) {
+          return <PourboireCard onAdd={onPourboireClick!} isMobile={isMobile} theme={theme} />;
+        }
+        offset += 1;
       }
 
-      const productIndex = hasDiversSlot ? index - 1 : index;
-      const product = products[productIndex];
+      const product = products[index - offset];
       if (!product) return null;
 
       return (
@@ -138,7 +164,9 @@ const ProductGrid = React.memo(function ProductGrid({
     },
     [
       hasDiversSlot,
+      hasPourboireSlot,
       onDiversClick,
+      onPourboireClick,
       isMobile,
       theme,
       products,
@@ -174,6 +202,9 @@ const ProductGrid = React.memo(function ProductGrid({
         }}
       >
         {onDiversClick && <DiversCard onAdd={onDiversClick} isMobile={isMobile} theme={theme} />}
+        {onPourboireClick && (
+          <PourboireCard onAdd={onPourboireClick} isMobile={isMobile} theme={theme} />
+        )}
         {products.map(product => (
           <ProductCard
             key={product.id}
@@ -225,6 +256,13 @@ const DiversCard: React.FC<DiversCardProps> = ({ onAdd, isMobile, theme }) => {
 
   return (
     <Card
+      draggable
+      onDragStart={e => {
+        const payload = JSON.stringify({ kind: 'divers' });
+        e.dataTransfer.setData(POS_PRODUCT_DND_MIME, payload);
+        e.dataTransfer.setData('text/plain', payload);
+        e.dataTransfer.effectAllowed = 'copy';
+      }}
       sx={{
         width: '100%',
         height: '100%',
@@ -234,6 +272,8 @@ const DiversCard: React.FC<DiversCardProps> = ({ onAdd, isMobile, theme }) => {
         border: `1px solid ${border}`,
         backgroundColor: bg,
         transition: 'box-shadow 0.15s ease',
+        cursor: 'grab',
+        '&:active': { cursor: 'grabbing' },
         '&:hover': {
           boxShadow: 3,
         },
@@ -265,6 +305,88 @@ const DiversCard: React.FC<DiversCardProps> = ({ onAdd, isMobile, theme }) => {
         </Box>
         <Button
           variant="contained"
+          size="small"
+          fullWidth
+          onClick={e => {
+            e.stopPropagation();
+            onAdd();
+          }}
+          sx={{
+            mt: 1,
+            minHeight: isMobile ? 34 : 42,
+            py: isMobile ? 0.5 : 0.75,
+            fontSize: isMobile ? '1rem' : '1.9rem',
+          }}
+        >
+          Ajouter
+        </Button>
+      </CardContent>
+    </Card>
+  );
+};
+
+interface PourboireCardProps {
+  onAdd: () => void;
+  isMobile: boolean;
+  theme: Theme;
+}
+
+const PourboireCard: React.FC<PourboireCardProps> = ({ onAdd, isMobile, theme }) => {
+  const border = theme.palette.divider;
+  const bg = alpha(theme.palette.secondary.main, 0.08);
+
+  return (
+    <Card
+      draggable
+      onDragStart={e => {
+        const payload = JSON.stringify({ kind: 'pourboire' });
+        e.dataTransfer.setData(POS_PRODUCT_DND_MIME, payload);
+        e.dataTransfer.setData('text/plain', payload);
+        e.dataTransfer.effectAllowed = 'copy';
+      }}
+      sx={{
+        width: '100%',
+        height: '100%',
+        minHeight: isMobile ? CARD_MIN_HEIGHT_MOBILE : CARD_MIN_HEIGHT_DESKTOP,
+        display: 'flex',
+        flexDirection: 'column',
+        border: `1px solid ${border}`,
+        backgroundColor: bg,
+        transition: 'box-shadow 0.15s ease',
+        cursor: 'grab',
+        '&:active': { cursor: 'grabbing' },
+        '&:hover': {
+          boxShadow: 3,
+        },
+      }}
+    >
+      <CardContent
+        sx={{
+          p: isMobile ? 1 : 2,
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          justifyContent: 'space-between',
+        }}
+      >
+        <Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+            <TipIcon sx={{ fontSize: isMobile ? 20 : 24 }} color="secondary" />
+            <Typography
+              variant={isMobile ? 'body2' : 'h6'}
+              component="h3"
+              sx={{ fontWeight: 'bold', fontSize: isMobile ? '1.3rem' : '2.3rem' }}
+            >
+              Pourboire
+            </Typography>
+          </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+            Pourboire carte (hors CA — +carte / −espèces)
+          </Typography>
+        </Box>
+        <Button
+          variant="contained"
+          color="secondary"
           size="small"
           fullWidth
           onClick={e => {
@@ -341,6 +463,18 @@ const ProductCard = React.memo(function ProductCard({
 
   return (
     <Card
+      draggable
+      onDragStart={e => {
+        e.dataTransfer.setData(
+          POS_PRODUCT_DND_MIME,
+          JSON.stringify({ kind: 'product', productId: product.id, quantity })
+        );
+        e.dataTransfer.setData(
+          'text/plain',
+          JSON.stringify({ kind: 'product', productId: product.id, quantity })
+        );
+        e.dataTransfer.effectAllowed = 'copy';
+      }}
       sx={{
         width: '100%',
         height: '100%',
@@ -351,6 +485,8 @@ const ProductCard = React.memo(function ProductCard({
         border: `1px solid ${resolvedBorder}`,
         backgroundColor: resolvedBackground,
         transition: 'box-shadow 0.15s ease',
+        cursor: 'grab',
+        '&:active': { cursor: 'grabbing' },
         '&:hover': {
           boxShadow: 3,
         },

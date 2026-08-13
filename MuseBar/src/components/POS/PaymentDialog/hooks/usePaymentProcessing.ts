@@ -1,12 +1,14 @@
 /**
  * Payment Processing
- * Handles API calls and payment execution logic
+ * Tips: sum of Pourboire cart lines → orders.tips (not sale items).
+ * Split: sale lines only in items / sub_bills amounts.
  */
 
 import { useCallback } from 'react';
 import { OrderItem, Order } from '../../../../types';
 import { usePOSAPI } from '../../../../hooks/usePOSAPI';
 import { PaymentState } from '../types';
+import { saleLines, tipsFromOrder } from '../../../../hooks/usePOSOrderTotals';
 
 interface UsePaymentProcessingProps {
   state: PaymentState;
@@ -29,32 +31,27 @@ export const usePaymentProcessing = ({
   onError,
   onReset,
 }: UsePaymentProcessingProps) => {
-  
   const { createOrder } = usePOSAPI(
-    (message, createdOrder) => onSuccess(createdOrder),
-    (message) => onError(message),
-    () => {} // onDataUpdate placeholder
+    (_message, createdOrder) => onSuccess(createdOrder),
+    message => onError(message),
+    () => {}
   );
 
-  /**
-   * Handle simple payment processing.
-   * For cash: when "Montant reçu" is empty we send totalAmount = order total and change = 0,
-   * so the backend records one cash transaction for the full order amount (daily cash total is correct).
-   */
   const handleSimplePayment = useCallback(async () => {
     onLoading(true);
-    
     try {
+      const saleItems = saleLines(orderItems);
+      const tips = tipsFromOrder(orderItems);
       const orderData = {
-        totalAmount: totalWithTips,
-        totalTax: orderItems.reduce((sum, item) => sum + item.taxAmount, 0),
+        totalAmount: saleItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0),
+        totalTax: saleItems.reduce((sum, item) => sum + item.taxAmount, 0),
         paymentMethod: state.simplePaymentMethod,
-        items: orderItems,
-        tips: parseFloat(state.tips) || 0,
-        // API stores order total and payment_method; when cash + empty montant reçu we send total so cash = order total
-        cashReceived: state.simplePaymentMethod === 'cash'
-          ? (parseFloat(state.cashReceived) || totalWithTips)
-          : undefined,
+        items: saleItems,
+        tips,
+        cashReceived:
+          state.simplePaymentMethod === 'cash'
+            ? parseFloat(state.cashReceived) || totalWithTips
+            : undefined,
         change: state.simplePaymentMethod === 'cash' ? cashChange : 0,
       };
 
@@ -69,7 +66,6 @@ export const usePaymentProcessing = ({
     }
   }, [
     state.simplePaymentMethod,
-    state.tips,
     state.cashReceived,
     totalWithTips,
     cashChange,
@@ -81,9 +77,6 @@ export const usePaymentProcessing = ({
     onReset,
   ]);
 
-  /**
-   * Handle split payment processing
-   */
   const handleSplitPayment = useCallback(async () => {
     if (state.subBills.length === 0) {
       onError('No sub-bills configured for split payment');
@@ -91,19 +84,36 @@ export const usePaymentProcessing = ({
     }
 
     onLoading(true);
-    
     try {
-      // Create a single order with split payment
-      const orderData = {
-        totalAmount: totalWithTips,
-        totalTax: orderItems.reduce((sum, item) => sum + item.taxAmount, 0),
-        paymentMethod: 'split' as const,
-        items: orderItems,
-        subBills: state.subBills,
-        tips: state.subBills.reduce((sum, bill) => sum + parseFloat(bill.tip || '0'), 0),
-      };
+      const saleItems = saleLines(orderItems);
+      const tips = tipsFromOrder(orderItems);
+      const saleTotal = saleItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
 
-      const created = await createOrder(orderData);
+      // Single payer (equal count=1): store as card/cash, not split — cleaner for closures.
+      if (state.subBills.length === 1) {
+        const bill = state.subBills[0]!;
+        const method = bill.payments[0]?.method === 'cash' ? 'cash' : 'card';
+        const created = await createOrder({
+          totalAmount: saleTotal,
+          totalTax: saleItems.reduce((sum, item) => sum + item.taxAmount, 0),
+          paymentMethod: method,
+          items: saleItems,
+          tips,
+          change: 0,
+        });
+        onSuccess(created);
+        onReset();
+        return;
+      }
+
+      const created = await createOrder({
+        totalAmount: saleTotal,
+        totalTax: saleItems.reduce((sum, item) => sum + item.taxAmount, 0),
+        paymentMethod: 'split',
+        items: saleItems,
+        subBills: state.subBills,
+        tips,
+      });
       onSuccess(created);
       onReset();
     } catch (error) {
@@ -112,66 +122,23 @@ export const usePaymentProcessing = ({
     } finally {
       onLoading(false);
     }
-  }, [
-    state.subBills,
-    totalWithTips,
-    orderItems,
-    createOrder,
-    onLoading,
-    onSuccess,
-    onError,
-    onReset,
-  ]);
+  }, [state.subBills, orderItems, createOrder, onLoading, onSuccess, onError, onReset]);
 
-  /**
-   * Process payment based on current tab
-   */
   const processCurrentPayment = useCallback(async () => {
-    if (state.tabValue === 0) {
-      await handleSimplePayment();
-    } else {
-      await handleSplitPayment();
-    }
-  }, [state.tabValue, handleSimplePayment, handleSplitPayment]);
+    await handleSplitPayment();
+  }, [handleSplitPayment]);
 
-  /**
-   * Validate and process payment
-   */
   const executePayment = useCallback(async () => {
-    // Basic validation before processing
-    // Allow 0€ totals (e.g. fully discounted or complimentary orders), but prevent negative amounts
     if (totalWithTips < 0) {
       onError('Invalid payment amount');
       return;
     }
-
-    if (state.tabValue === 0) {
-      // Simple payment validation (cash: Montant reçu is optional)
-      if (state.simplePaymentMethod === 'cash' && state.cashReceived && state.cashReceived.trim() !== '') {
-        const received = parseFloat(state.cashReceived) || 0;
-        if (received < totalWithTips) {
-          onError('Insufficient cash amount');
-          return;
-        }
-      }
-    } else {
-      // Split payment validation
-      if (state.subBills.length === 0) {
-        onError('No sub-bills configured');
-        return;
-      }
+    if (state.subBills.length === 0) {
+      onError('No sub-bills configured');
+      return;
     }
-
     await processCurrentPayment();
-  }, [
-    totalWithTips,
-    state.tabValue,
-    state.simplePaymentMethod,
-    state.cashReceived,
-    state.subBills,
-    processCurrentPayment,
-    onError,
-  ]);
+  }, [totalWithTips, state.subBills, processCurrentPayment, onError]);
 
   return {
     handleSimplePayment,

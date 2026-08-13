@@ -16,6 +16,8 @@ export interface PaymentDialogProps {
   onOrderError: (message: string) => void;
   onDataUpdate: () => void;
   onClearOrder: () => void;
+  /** Card→cash change operation (Faire de la monnaie tab). */
+  onFaireDeLaMonnaie?: (amount: number) => Promise<void>;
 }
 
 export type SimplePaymentMethod = 'card' | 'cash';
@@ -58,7 +60,6 @@ export interface SplitPaymentProps {
   splitType: SplitType;
   splitCount: number;
   subBills: LocalSubBill[];
-  onSplitTypeChange: (type: SplitType) => void;
   onSplitCountChange: (count: number) => void;
   onSubBillsChange: (bills: LocalSubBill[]) => void;
   onSubBillPaymentMethodChange?: (billId: string, method: 'cash' | 'card') => void;
