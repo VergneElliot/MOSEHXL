@@ -65,7 +65,8 @@ router.get(
   requireAuth,
   requirePermission(P.access_pos),
   asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req);
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
     const plans = await FloorPlanModel.list(establishmentId);
     return res.json({ plans });
   })
@@ -76,7 +77,8 @@ router.post(
   requireAuth,
   manageFloor,
   asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req);
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
     const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
     if (!name) throw new ValidationError('name is required');
     const plan = await FloorPlanModel.create(establishmentId, {
@@ -93,7 +95,8 @@ router.patch(
   requireAuth,
   manageFloor,
   asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req);
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) throw new ValidationError('Invalid plan id');
     const patch: { name?: string; display_order?: number; is_active?: boolean } = {};
@@ -115,7 +118,8 @@ router.delete(
   requireAuth,
   manageFloor,
   asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req);
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) throw new ValidationError('Invalid plan id');
     const deleted = await FloorPlanModel.delete(id, establishmentId);
@@ -132,7 +136,8 @@ router.get(
   requireAuth,
   requirePermission(P.access_pos),
   asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req);
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
     const planId = req.query.plan_id != null ? Number(req.query.plan_id) : undefined;
     if (planId != null && !Number.isInteger(planId)) {
       throw new ValidationError('plan_id must be an integer');
@@ -147,7 +152,8 @@ router.get(
   requireAuth,
   requirePermission(P.access_pos),
   asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req);
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
     const tables = await DiningTableModel.listStatus(establishmentId);
     return res.json({ tables });
   })
@@ -158,7 +164,8 @@ router.post(
   requireAuth,
   manageFloor,
   asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req);
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
     const floor_plan_id = Number(req.body?.floor_plan_id);
     const label = typeof req.body?.label === 'string' ? req.body.label.trim() : '';
     if (!Number.isInteger(floor_plan_id)) throw new ValidationError('floor_plan_id is required');
@@ -194,7 +201,8 @@ router.patch(
   requireAuth,
   manageFloor,
   asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req);
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) throw new ValidationError('Invalid table id');
     const patch: Parameters<typeof DiningTableModel.update>[2] = {};
@@ -228,7 +236,8 @@ router.delete(
   requireAuth,
   manageFloor,
   asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req);
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) throw new ValidationError('Invalid table id');
     try {
@@ -254,7 +263,8 @@ router.post(
   requireAuth,
   requirePosPinActor,
   asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req);
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
     const actor = req.pinActor!;
     const dining_table_id = Number(req.body?.dining_table_id);
     if (!Number.isInteger(dining_table_id)) {
@@ -289,7 +299,8 @@ router.get(
   requireAuth,
   requirePermission(P.access_pos),
   asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req);
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) throw new ValidationError('Invalid ticket id');
     const ticket = await OpenTicketModel.get(id, establishmentId);
@@ -304,7 +315,8 @@ router.put(
   requireAuth,
   requirePosPinActor,
   asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req);
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
     const actor = req.pinActor!;
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) throw new ValidationError('Invalid ticket id');
@@ -328,7 +340,8 @@ router.post(
   requireAuth,
   requirePosPinActor,
   asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req);
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
     const actor = req.pinActor!;
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) throw new ValidationError('Invalid ticket id');
@@ -343,7 +356,8 @@ router.post(
   requireAuth,
   requirePosPinActor,
   asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req);
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
     const actor = req.pinActor!;
     const id = Number(req.params.id);
     const orderId = Number(req.body?.order_id);

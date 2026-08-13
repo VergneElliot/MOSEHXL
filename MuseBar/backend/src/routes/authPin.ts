@@ -39,7 +39,8 @@ router.post(
   '/verify',
   requireAuth,
   asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req);
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
     const pin = parsePinBody(req.body?.pin);
 
     const candidates = await MembershipPinModel.listPinMemberships(establishmentId);
@@ -94,7 +95,8 @@ router.post(
   requireAuth,
   requirePermission(P.access_user_management),
   asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req);
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
     const pin = parsePinBody(req.body?.pin);
     const targetUserId =
       req.body?.user_id != null ? Number(req.body.user_id) : req.user!.id;
@@ -140,7 +142,8 @@ router.delete(
   requireAuth,
   requirePermission(P.access_user_management),
   asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req);
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
     const targetUserId = Number(req.params.userId);
     if (!Number.isInteger(targetUserId) || targetUserId <= 0) {
       throw new ValidationError('userId must be a positive integer');
@@ -170,7 +173,8 @@ router.get(
   requireAuth,
   requirePermission(P.access_user_management),
   asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req);
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
     const targetUserId = Number(req.params.userId);
     if (!Number.isInteger(targetUserId) || targetUserId <= 0) {
       throw new ValidationError('userId must be a positive integer');
