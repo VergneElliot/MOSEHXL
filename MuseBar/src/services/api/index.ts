@@ -6,6 +6,7 @@ export * as kitchenPrintersApi from './kitchenPrinters';
 export * as ordersApi from './orders';
 export * as legalApi from './legal';
 export * as printingApi from './printing';
+export * as floorApi from './floor';
 
 
 

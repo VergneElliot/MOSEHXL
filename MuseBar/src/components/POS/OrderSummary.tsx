@@ -67,6 +67,10 @@ interface OrderSummaryProps {
   onUpdateLineNote?: (index: number, note: string) => void;
   /** Drop a product card onto the cart */
   onDropProduct?: (payload: PosProductDragPayload) => void;
+  /** Open floor map / select table */
+  onSelectTable?: () => void;
+  /** Label of bound table, if any */
+  activeTableLabel?: string | null;
   formatCurrency: (amount: number) => string;
 }
 
@@ -93,6 +97,8 @@ const OrderSummary = React.memo(function OrderSummary({
   onApplyPerso,
   onUpdateLineNote,
   onDropProduct,
+  onSelectTable,
+  activeTableLabel = null,
   formatCurrency,
 }: OrderSummaryProps) {
   const theme = useTheme();
@@ -398,16 +404,17 @@ const OrderSummary = React.memo(function OrderSummary({
 
       <Divider sx={{ my: 0.5 }} />
 
-      <Tooltip title="Bientôt — plan de salle">
+      <Tooltip title={activeTableLabel ? `Table ${activeTableLabel}` : 'Plan de salle'}>
         <span>
           <Button
             variant="outlined"
             fullWidth
-            disabled
+            disabled={!onSelectTable}
             startIcon={<TableIcon />}
+            onClick={onSelectTable}
             sx={actionBtnSx}
           >
-            Sélectionner une table
+            {activeTableLabel ? `Table ${activeTableLabel}` : 'Sélectionner une table'}
           </Button>
         </span>
       </Tooltip>

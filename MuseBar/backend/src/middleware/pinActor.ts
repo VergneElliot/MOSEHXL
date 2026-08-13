@@ -18,7 +18,7 @@ export function requirePinActor(requiredPermission?: string) {
     const header = req.headers['x-pin-actor-token'];
     const raw = Array.isArray(header) ? header[0] : header;
     if (!raw || typeof raw !== 'string') {
-      return res.status(401).json({
+      return res.status(403).json({
         error: 'PIN identification required',
         code: 'PIN_ACTOR_REQUIRED',
       });
@@ -42,7 +42,7 @@ export function requirePinActor(requiredPermission?: string) {
       if (error instanceof AuthorizationError) {
         return res.status(403).json({ error: error.message, code: error.errorCode });
       }
-      return res.status(401).json({
+      return res.status(403).json({
         error: 'Invalid or expired PIN session',
         code: 'PIN_ACTOR_INVALID',
       });

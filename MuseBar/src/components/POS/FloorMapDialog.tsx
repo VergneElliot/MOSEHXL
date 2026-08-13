@@ -1,0 +1,203 @@
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Box,
+  Typography,
+  CircularProgress,
+  Chip,
+  Stack,
+} from '@mui/material';
+import { TableRestaurant as TableIcon } from '@mui/icons-material';
+import * as floorApi from '../../services/api/floor';
+
+interface FloorMapDialogProps {
+  open: boolean;
+  onClose: () => void;
+  activeTicketId: number | null;
+  onSelectFree: (table: floorApi.DiningTableStatusDto) => void;
+  onSelectOccupied: (table: floorApi.DiningTableStatusDto) => void;
+  onAbandon: (ticketId: number) => void;
+  onDetach: () => void;
+  canManageFloor: boolean;
+}
+
+export const FloorMapDialog: React.FC<FloorMapDialogProps> = ({
+  open,
+  onClose,
+  activeTicketId,
+  onSelectFree,
+  onSelectOccupied,
+  onAbandon,
+  onDetach,
+  canManageFloor,
+}) => {
+  const [loading, setLoading] = useState(false);
+  const [tables, setTables] = useState<floorApi.DiningTableStatusDto[]>([]);
+  const [plans, setPlans] = useState<floorApi.FloorPlanDto[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [status, planList] = await Promise.all([
+        floorApi.getFloorStatus(),
+        floorApi.listFloorPlans(),
+      ]);
+      setTables(status);
+      setPlans(planList);
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      setError(e.message || 'Impossible de charger le plan de salle');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (open) void reload();
+  }, [open, reload]);
+
+  const byPlan = useMemo(() => {
+    const map = new Map<number, floorApi.DiningTableStatusDto[]>();
+    for (const t of tables) {
+      const list = map.get(t.floor_plan_id) ?? [];
+      list.push(t);
+      map.set(t.floor_plan_id, list);
+    }
+    return map;
+  }, [tables]);
+
+  const createQuickPlan = useCallback(async () => {
+    setCreating(true);
+    setError(null);
+    try {
+      const plan = await floorApi.createFloorPlan('Salle');
+      const cols = 4;
+      for (let i = 1; i <= 12; i += 1) {
+        const col = (i - 1) % cols;
+        const row = Math.floor((i - 1) / cols);
+        await floorApi.createDiningTable({
+          floor_plan_id: plan.id,
+          label: String(i),
+          pos_x: col * 100,
+          pos_y: row * 100,
+          sort_order: i,
+        });
+      }
+      await reload();
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      setError(e.message || 'Création du plan impossible (permission manage_floor_plan ?)');
+    } finally {
+      setCreating(false);
+    }
+  }, [reload]);
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <TableIcon />
+        Plan de salle
+      </DialogTitle>
+      <DialogContent dividers>
+        {loading && (
+          <Box display="flex" justifyContent="center" p={4}>
+            <CircularProgress />
+          </Box>
+        )}
+        {error && (
+          <Typography color="error" sx={{ mb: 2 }}>
+            {error}
+          </Typography>
+        )}
+        {!loading && tables.length === 0 && (
+          <Box sx={{ textAlign: 'center', py: 3 }}>
+            <Typography sx={{ mb: 2 }}>Aucune table configurée.</Typography>
+            {canManageFloor ? (
+              <Button variant="contained" onClick={() => void createQuickPlan()} disabled={creating}>
+                {creating ? 'Création…' : 'Créer un plan « Salle » (tables 1–12)'}
+              </Button>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                Demandez à un administrateur de créer le plan de salle.
+              </Typography>
+            )}
+          </Box>
+        )}
+        {!loading &&
+          plans
+            .filter((p) => p.is_active)
+            .map((plan) => {
+              const planTables = byPlan.get(plan.id) ?? [];
+              if (planTables.length === 0 && plans.length > 1) return null;
+              return (
+                <Box key={plan.id} sx={{ mb: 3 }}>
+                  <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
+                    {plan.name}
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))',
+                      gap: 1,
+                    }}
+                  >
+                    {planTables.map((table) => {
+                      const occupied = table.open_ticket_id != null;
+                      const isActive = activeTicketId != null && table.open_ticket_id === activeTicketId;
+                      return (
+                        <Button
+                          key={table.id}
+                          variant={isActive ? 'contained' : 'outlined'}
+                          color={occupied ? 'warning' : 'success'}
+                          onClick={() =>
+                            occupied ? onSelectOccupied(table) : onSelectFree(table)
+                          }
+                          sx={{
+                            minHeight: 72,
+                            flexDirection: 'column',
+                            textTransform: 'none',
+                          }}
+                        >
+                          <Typography fontWeight={700}>{table.label}</Typography>
+                          <Typography variant="caption">
+                            {occupied ? 'Occupée' : 'Libre'}
+                          </Typography>
+                        </Button>
+                      );
+                    })}
+                  </Box>
+                </Box>
+              );
+            })}
+        <Stack direction="row" spacing={1} sx={{ mt: 1 }} flexWrap="wrap" useFlexGap>
+          <Chip size="small" color="success" variant="outlined" label="Libre" />
+          <Chip size="small" color="warning" variant="outlined" label="Occupée" />
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ justifyContent: 'space-between', px: 2 }}>
+        <Box>
+          {activeTicketId != null && (
+            <>
+              <Button color="inherit" onClick={onDetach}>
+                Laisser ouverte
+              </Button>
+              <Button color="error" onClick={() => onAbandon(activeTicketId)}>
+                Abandonner
+              </Button>
+            </>
+          )}
+        </Box>
+        <Button onClick={onClose}>Fermer</Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
+export default FloorMapDialog;

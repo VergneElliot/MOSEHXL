@@ -6,9 +6,12 @@ import { usePOSOrderTotals } from '../../hooks/usePOSOrderTotals';
 import { usePOSAPI } from '../../hooks/usePOSAPI';
 import { usePOSOrderAdjustments } from '../../hooks/usePOSOrderAdjustments';
 import { usePOSCatalogLogic } from '../../hooks/usePOSCatalogLogic';
+import { useFloorService } from '../../hooks/useFloorService';
+import { useAuth } from '../../hooks/useAuth';
 import POSLayout from './POSLayout';
 import POSMenuPanel from './POSMenuPanel';
 import POSOrderPanel from './POSOrderPanel';
+import FloorBadgeStrip from './FloorBadgeStrip';
 import type { DiversFormData } from './DiversDialog';
 import type { PourboireFormData } from './PourboireDialog';
 import type { ProductOptionSelection } from './ProductOptionDialog';
@@ -21,6 +24,8 @@ const LazyPrintAfterSaleDialog = React.lazy(() => import('./PrintAfterSaleDialog
 const LazyDiversDialog = React.lazy(() => import('./DiversDialog'));
 const LazyPourboireDialog = React.lazy(() => import('./PourboireDialog'));
 const LazyProductOptionDialog = React.lazy(() => import('./ProductOptionDialog'));
+const LazyPinPadDialog = React.lazy(() => import('./PinPadDialog'));
+const LazyFloorMapDialog = React.lazy(() => import('./FloorMapDialog'));
 
 interface POSContainerProps {
   categories: Category[];
@@ -53,6 +58,32 @@ const POSContainer: React.FC<POSContainerProps> = ({
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [lastOrderId, setLastOrderId] = useState<number | null>(null);
 
+  const floorOnError = useCallback(
+    (message: string) => {
+      actions.setSnackbar({ open: true, message, severity: 'error' });
+    },
+    [actions.setSnackbar]
+  );
+  const floorOnInfo = useCallback(
+    (message: string) => {
+      actions.setSnackbar({ open: true, message, severity: 'success' });
+    },
+    [actions.setSnackbar]
+  );
+
+  const floor = useFloorService({
+    currentOrder: state.currentOrder,
+    setCurrentOrder: actions.setCurrentOrder,
+    onError: floorOnError,
+    onInfo: floorOnInfo,
+  });
+
+  const { user, permissions } = useAuth();
+
+  const canManageFloor =
+    user?.role === 'establishment_admin' ||
+    permissions.includes('manage_floor_plan');
+
   const { orderTotal, orderTax, orderSubtotal } = usePOSOrderTotals(state.currentOrder);
   const { calculateProductPrice } = usePOSCatalogLogic(
     products,
@@ -75,9 +106,10 @@ const POSContainer: React.FC<POSContainerProps> = ({
       if (Number.isFinite(parsedId) && parsedId > 0) {
         setLastOrderId(parsedId);
         setPrintDialogOpen(true);
+        void floor.closeActiveTicketAfterOrder(parsedId);
       }
     },
-    [actions.setSnackbar]
+    [actions.setSnackbar, floor.closeActiveTicketAfterOrder]
   );
 
   const handlePaymentError = useCallback(
@@ -190,7 +222,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
     async (method: 'cash' | 'card') => {
       if (state.currentOrder.length === 0) return;
       try {
-        await createOrder({
+        const created = await createOrder({
           paymentMethod: method,
           totalAmount: orderTotal,
           totalTax: orderTax,
@@ -198,6 +230,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
           tips: tipsFromOrder(state.currentOrder),
           change: 0,
         });
+        void created;
         actions.clearOrder();
       } catch {
         // Error already reported by usePOSAPI
@@ -205,6 +238,10 @@ const POSContainer: React.FC<POSContainerProps> = ({
     },
     [state.currentOrder, orderTotal, orderTax, createOrder, actions.clearOrder]
   );
+
+  const handleClearOrder = useCallback(() => {
+    actions.clearOrder();
+  }, [actions.clearOrder]);
 
   const handleQuickCard = useCallback(() => {
     void handleQuickPayment('card');
@@ -320,6 +357,13 @@ const POSContainer: React.FC<POSContainerProps> = ({
 
   return (
     <Box sx={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <FloorBadgeStrip
+        displayName={floor.pinActor?.displayName ?? null}
+        tableLabel={floor.activeTable?.label ?? null}
+        onBadgeClick={() => floor.openPinDialog('verify')}
+        onBadgeOut={floor.clearPin}
+        onTableClick={floor.requestMap}
+      />
       <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', width: '100%' }}>
         <POSLayout
           menuContent={
@@ -340,7 +384,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
             <POSOrderPanel
               currentOrder={state.currentOrder}
               onRemoveItem={actions.removeFromOrder}
-              onClearOrder={actions.clearOrder}
+              onClearOrder={handleClearOrder}
               onCheckout={handleCheckout}
               onQuickCard={handleQuickCard}
               onQuickCash={handleQuickCash}
@@ -349,6 +393,8 @@ const POSContainer: React.FC<POSContainerProps> = ({
               onApplyPerso={posLinePermissions.perso ? handleApplyPerso : undefined}
               onUpdateLineNote={handleUpdateLineNote}
               onDropProduct={handleDropProduct}
+              onSelectTable={floor.requestMap}
+              activeTableLabel={floor.activeTable?.label ?? null}
             />
           }
           orderBadge={state.currentOrder.length}
@@ -435,6 +481,37 @@ const POSContainer: React.FC<POSContainerProps> = ({
             quantity={pendingProduct?.quantity ?? 1}
             onClose={handleCloseOptionDialog}
             onConfirm={handleConfirmProductOptions}
+          />
+        </Suspense>
+      )}
+
+      {floor.pinDialogOpen && (
+        <Suspense fallback={null}>
+          <LazyPinPadDialog
+            open={floor.pinDialogOpen}
+            mode={floor.pinDialogMode}
+            onClose={() => {
+              floor.setPinDialogOpen(false);
+            }}
+            onVerify={floor.badgeIn}
+            onSetPin={floor.setMyPin}
+            onSwitchToSet={() => floor.setPinDialogMode('set')}
+            onSwitchToVerify={() => floor.setPinDialogMode('verify')}
+          />
+        </Suspense>
+      )}
+
+      {floor.mapDialogOpen && (
+        <Suspense fallback={null}>
+          <LazyFloorMapDialog
+            open={floor.mapDialogOpen}
+            onClose={() => floor.setMapDialogOpen(false)}
+            activeTicketId={floor.activeTable?.ticketId ?? null}
+            onSelectFree={(t) => void floor.selectFreeTable(t)}
+            onSelectOccupied={(t) => void floor.selectOccupiedTable(t)}
+            onAbandon={(id) => void floor.abandonActiveOrTable(id)}
+            onDetach={floor.detachTableKeepTicket}
+            canManageFloor={canManageFloor}
           />
         </Suspense>
       )}

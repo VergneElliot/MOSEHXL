@@ -17,6 +17,8 @@ export interface POSOrderPanelProps {
   onApplyPerso?: (index: number) => void;
   onUpdateLineNote?: (index: number, note: string) => void;
   onDropProduct?: (payload: PosProductDragPayload) => void;
+  onSelectTable?: () => void;
+  activeTableLabel?: string | null;
 }
 
 const POSOrderPanel = React.memo(function POSOrderPanel({
@@ -31,6 +33,8 @@ const POSOrderPanel = React.memo(function POSOrderPanel({
   onApplyPerso,
   onUpdateLineNote,
   onDropProduct,
+  onSelectTable,
+  activeTableLabel,
 }: POSOrderPanelProps) {
   const { orderTotal, orderTax, orderSubtotal, tipsTotal, canProcessPayment } =
     usePOSOrderTotals(currentOrder);
@@ -53,6 +57,8 @@ const POSOrderPanel = React.memo(function POSOrderPanel({
       onApplyPerso={onApplyPerso}
       onUpdateLineNote={onUpdateLineNote}
       onDropProduct={onDropProduct}
+      onSelectTable={onSelectTable}
+      activeTableLabel={activeTableLabel}
       formatCurrency={formatCurrency}
     />
   );

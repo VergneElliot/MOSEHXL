@@ -58,7 +58,7 @@ router.post(
     if (!matched) {
       // Constant-ish work when no match
       await bcrypt.compare(pin, await getDummyHash());
-      throw new AppError('Invalid PIN', 401, 'PIN_INVALID');
+      throw new AppError('Invalid PIN', 400, 'PIN_INVALID');
     }
 
     if (MembershipPinModel.isLocked(matched)) {
