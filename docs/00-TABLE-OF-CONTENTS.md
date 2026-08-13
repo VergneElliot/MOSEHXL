@@ -142,6 +142,7 @@ These are organized chronologically. Each entry corresponds to one specific issu
 | 451 | [Pourboire Card + Payment Tabs](./patch-notes/451-POURBOIRE-CARD-AND-PAYMENT-TABS-IMPLEMENTATION.md) | Tip as product card; payment dialog tabs cleanup |
 | 452 | [Unified Payment Options Split Board](./patch-notes/452-UNIFIED-PAYMENT-OPTIONS-SPLIT-BOARD-IMPLEMENTATION.md) | Partage board + Faire de la monnaie tab; cart payment buttons simplified |
 | 453 | [POS Cart Actions Panel](./patch-notes/453-POS-CART-ACTIONS-PANEL-SELECTION-DND-IMPLEMENTATION.md) | Two-column cart, line selection, product→cart DnD, actions column (table / À suivre stubs) |
+| 454 | [Daily Closure Cut Time + Close-Now](./patch-notes/454-DAILY-CLOSURE-SETTINGS-CUT-AND-CLOSE-NOW-IMPLEMENTATION.md) | Bulletin periods use settings cut time; manual close-now vs business-day modes |
 
 Operational runbooks for this wave: [ADMIN-SPACE-INBOUND-AND-STORAGE.md](./runbooks/ADMIN-SPACE-INBOUND-AND-STORAGE.md), [MULTI-ESTABLISHMENT-MEMBERSHIPS.md](./runbooks/MULTI-ESTABLISHMENT-MEMBERSHIPS.md)
 

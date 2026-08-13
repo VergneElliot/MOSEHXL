@@ -144,6 +144,10 @@ export class JournalQueries {
     return await journalRead.getLastFondDeCaisse(establishmentId);
   }
 
+  static async getLastClosedDailyPeriodEnd(establishmentId: string): Promise<Date | null> {
+    return await journalRead.getLastClosedDailyPeriodEnd(establishmentId);
+  }
+
   static async insertClosureBulletin(
     closureType: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL',
     startDate: Date,

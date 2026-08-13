@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   getTopProductsForOrders: vi.fn(),
   getCurrentBusinessDayPeriod: vi.fn(),
   computePaymentBreakdownFromOrders: vi.fn(),
+  getClosureSettings: vi.fn(),
 }));
 
 vi.mock('../../db/pool', () => ({
@@ -41,6 +42,12 @@ vi.mock('../../models/legalJournal/businessDayPeriod', () => ({
 
 vi.mock('../../models/legalJournal/paymentBreakdown', () => ({
   computePaymentBreakdownFromOrders: mocks.computePaymentBreakdownFromOrders,
+}));
+
+vi.mock('../../models/closureSettings', () => ({
+  ClosureSettingsModel: {
+    getClosureSettings: mocks.getClosureSettings,
+  },
 }));
 
 vi.mock('../../permissions/registry', () => ({
@@ -77,6 +84,7 @@ describe('legal business-day-stats permission gate', () => {
     mocks.getTopProductsForOrders.mockReset();
     mocks.getCurrentBusinessDayPeriod.mockReset();
     mocks.computePaymentBreakdownFromOrders.mockReset();
+    mocks.getClosureSettings.mockReset();
 
     mocks.poolQuery.mockImplementation(async (query: unknown) => {
       const sql = String(query ?? '');
@@ -84,6 +92,14 @@ describe('legal business-day-stats permission gate', () => {
         return { rows: [] };
       }
       return { rows: [] };
+    });
+
+    mocks.getClosureSettings.mockResolvedValue({
+      auto_closure_enabled: true,
+      daily_closure_time: '02:00',
+      timezone: 'Europe/Paris',
+      grace_period_minutes: 30,
+      accounting_emails: [],
     });
 
     const start = new Date('2026-04-30T00:00:00.000Z');

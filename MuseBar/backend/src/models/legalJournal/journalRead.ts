@@ -246,6 +246,26 @@ export async function getLastFondDeCaisse(establishmentId: string): Promise<numb
   return Number.isFinite(n) ? n : null;
 }
 
+/** Latest closed DAILY bulletin period_end for continuity / close-now windows. */
+export async function getLastClosedDailyPeriodEnd(establishmentId: string): Promise<Date | null> {
+  const result = await pool.query(
+    `
+      SELECT period_end
+      FROM closure_bulletins
+      WHERE closure_type = 'DAILY'
+        AND is_closed = TRUE
+        AND (establishment_id IS NOT DISTINCT FROM $1)
+      ORDER BY period_end DESC, id DESC
+      LIMIT 1
+    `,
+    [establishmentId]
+  );
+  const row = result.rows[0] as { period_end?: Date | string } | undefined;
+  if (!row?.period_end) return null;
+  const d = row.period_end instanceof Date ? row.period_end : new Date(row.period_end);
+  return Number.isFinite(d.getTime()) ? d : null;
+}
+
 export async function closureBulletinExists(
   type: ClosureType,
   startDate: Date,

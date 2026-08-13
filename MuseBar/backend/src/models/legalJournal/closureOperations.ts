@@ -8,8 +8,12 @@ import { JournalQueries } from './journalQueries';
 import { JournalSigning } from './journalSigning';
 import { pool } from '../../db/pool';
 import { DEFAULT_APP_TIMEZONE } from '../../config/timezone';
-import { getBusinessDayPeriod } from './businessDayPeriod';
+import {
+  resolveDailyClosurePeriod,
+  type DailyClosureMode,
+} from './businessDayPeriod';
 import { computePaymentBreakdownFromOrders } from './paymentBreakdown';
+import { ClosureSettingsModel } from '../closureSettings';
 
 function roundTo4(amount: number): number {
   return Math.round(amount * 10000) / 10000;
@@ -66,21 +70,31 @@ export const __testComputeReconciliation = computeReconciliation;
 export class ClosureOperations {
   /**
    * Create daily closure bulletin for one establishment (multi-tenant: only that establishment's orders).
-   * @param date - The date to create closure for
-   * @param establishmentId - UUID of the establishment (required for data isolation)
-   * @param timezone - IANA timezone (e.g. Europe/Paris). Defaults to DEFAULT_APP_TIMEZONE.
-   * @returns The created closure bulletin
+   * Period uses establishment closure settings (daily_closure_time + timezone):
+   * - business_day (default): cut→next cut for `date`, clamped after last closed DAILY
+   * - close_now: last closed DAILY end → now
    */
   static async createDailyClosure(
     date: Date,
     establishmentId: string,
-    timezone: string = DEFAULT_APP_TIMEZONE,
+    timezone?: string,
     force = false,
     fondDeCaisse?: number,
-    closeImmediately = true
+    closeImmediately = true,
+    mode: DailyClosureMode = 'business_day'
   ): Promise<ClosureBulletin> {
-    // Business day period uses configurable timezone (Paris for France)
-    const { start, end } = getBusinessDayPeriod(date, '02:00', timezone);
+    const settings = await ClosureSettingsModel.getClosureSettings(establishmentId);
+    const tz = timezone || settings.timezone || DEFAULT_APP_TIMEZONE;
+    const cutTime = settings.daily_closure_time || '02:00';
+    const lastClosedPeriodEnd = await JournalQueries.getLastClosedDailyPeriodEnd(establishmentId);
+
+    const { start, end } = resolveDailyClosurePeriod({
+      mode,
+      date,
+      closureTime: cutTime,
+      timezone: tz,
+      lastClosedPeriodEnd,
+    });
 
     // Check if closure already exists for this establishment
     const exists = await JournalQueries.closureBulletinExists('DAILY', start.toDate(), end.toDate(), establishmentId);
@@ -143,7 +157,7 @@ export class ClosureOperations {
       const sameDay = await JournalQueries.findClosedDailyBulletinsForBusinessDay(
         establishmentId,
         start.toDate(),
-        timezone
+        tz
       );
       for (const existing of sameDay) {
         if (existing.closure_hash === closureHash) {

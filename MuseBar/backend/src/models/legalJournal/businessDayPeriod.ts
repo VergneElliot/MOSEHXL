@@ -6,6 +6,8 @@
 
 import moment from 'moment-timezone';
 
+export type DailyClosureMode = 'business_day' | 'close_now';
+
 /**
  * Returns the business day period that contains the given date.
  * E.g. closure 02:00 → for date 2025-07-11, period is 11th 02:00 until 12th 01:59:59.999.
@@ -48,5 +50,63 @@ export function getCurrentBusinessDayPeriod(
   }
   const start = todayClosure;
   const end = todayClosure.clone().add(1, 'day').subtract(1, 'ms');
+  return { start, end };
+}
+
+export interface ResolveDailyClosurePeriodInput {
+  mode: DailyClosureMode;
+  /** Calendar date used for business_day mode (ignored for close_now). */
+  date: Date;
+  closureTime: string;
+  timezone: string;
+  /** period_end of the last closed DAILY bulletin, if any. */
+  lastClosedPeriodEnd: Date | null;
+  now?: Date;
+}
+
+/**
+ * Resolve the inclusive [start, end] window for a daily closure.
+ * - business_day: canonical cut→cut+1d for `date`, clamped after last closed period_end
+ * - close_now: last closed period_end (+1ms) → now (or current business-day start if none)
+ */
+export function resolveDailyClosurePeriod(
+  input: ResolveDailyClosurePeriodInput
+): { start: moment.Moment; end: moment.Moment } {
+  const {
+    mode,
+    date,
+    closureTime,
+    timezone,
+    lastClosedPeriodEnd,
+    now = new Date(),
+  } = input;
+
+  if (mode === 'close_now') {
+    const end = moment.tz(now, timezone);
+    let start: moment.Moment;
+    if (lastClosedPeriodEnd) {
+      start = moment.tz(lastClosedPeriodEnd, timezone).add(1, 'millisecond');
+    } else {
+      start = getCurrentBusinessDayPeriod(closureTime, timezone).start;
+    }
+    if (start.isAfter(end)) {
+      throw new Error('Aucune période ouverte à clôturer (déjà à jour)');
+    }
+    return { start, end };
+  }
+
+  let { start, end } = getBusinessDayPeriod(date, closureTime, timezone);
+  if (lastClosedPeriodEnd) {
+    const last = moment.tz(lastClosedPeriodEnd, timezone);
+    if (last.isSameOrAfter(end)) {
+      throw new Error('Cette journée commerciale est déjà couverte par une clôture précédente');
+    }
+    if (last.isSameOrAfter(start)) {
+      start = last.clone().add(1, 'millisecond');
+    }
+  }
+  if (start.isAfter(end)) {
+    throw new Error('Fenêtre de clôture vide pour cette journée');
+  }
   return { start, end };
 }

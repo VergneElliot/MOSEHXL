@@ -6,6 +6,7 @@
 import express from 'express';
 import LegalJournalModel from '../../models/legalJournal';
 import type { ClosureType } from '../../models/legalJournal/types';
+import type { DailyClosureMode } from '../../models/legalJournal/businessDayPeriod';
 import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
 import { P } from '../../permissions/registry';
 import { Logger } from '../../utils/logger';
@@ -13,6 +14,12 @@ import { AppError, asyncHandler, ConflictError, NotFoundError, ValidationError }
 
 const router = express.Router();
 const logger = Logger.getInstance();
+
+function parseDailyClosureMode(value: unknown): DailyClosureMode {
+  if (value == null || value === '') return 'business_day';
+  if (value === 'close_now' || value === 'business_day') return value;
+  throw new ValidationError('mode must be business_day or close_now');
+}
 
 type ClosureJournalPayload = {
   id?: number;
@@ -179,15 +186,16 @@ router.post('/daily', asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const { date, force, fond_de_caisse } = req.body;
-    if (!date) {
+    const { date, force, fond_de_caisse, mode } = req.body;
+    if (!date && mode !== 'close_now') {
       throw new ValidationError('Date is required (YYYY-MM-DD format)');
     }
     const fondDeCaisse = parseFondDeCaisse(fond_de_caisse);
     if (fondDeCaisse === null) {
       throw new ValidationError('fond_de_caisse is required and must be a number >= 0');
     }
-    const closureDate = new Date(date);
+    const dailyMode = parseDailyClosureMode(mode);
+    const closureDate = date ? new Date(date) : new Date();
     if (isNaN(closureDate.getTime())) {
       throw new ValidationError('Invalid date format');
     }
@@ -205,7 +213,8 @@ router.post('/daily', asyncHandler(async (req, res) => {
           establishmentId,
           undefined,
           forceCreate,
-          fondDeCaisse
+          fondDeCaisse,
+          dailyMode
         ) as Promise<ClosureJournalPayload>
     );
 
@@ -393,15 +402,16 @@ router.post('/create', asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
-    const { date, type, force, fond_de_caisse, email_recipients } = req.body;
+    const { date, type, force, fond_de_caisse, email_recipients, mode } = req.body;
 
-    if (!date) {
+    const dailyMode = type === 'DAILY' ? parseDailyClosureMode(mode) : 'business_day';
+    if (!date && !(type === 'DAILY' && dailyMode === 'close_now')) {
       throw new ValidationError('Date is required (YYYY-MM-DD format)');
     }
     if (!type || !['DAILY', 'WEEKLY', 'MONTHLY', 'ANNUAL'].includes(type)) {
       throw new ValidationError('Valid closure type is required (DAILY, WEEKLY, MONTHLY, ANNUAL)');
     }
-    const closureDate = new Date(date);
+    const closureDate = date ? new Date(date) : new Date();
     if (isNaN(closureDate.getTime())) {
       throw new ValidationError('Invalid date format');
     }
@@ -422,7 +432,8 @@ router.post('/create', asyncHandler(async (req, res) => {
             establishmentId,
             undefined,
             forceCreate,
-            fondDeCaisse
+            fondDeCaisse,
+            dailyMode
           ) as Promise<ClosureJournalPayload>;
         break;
       case 'WEEKLY':

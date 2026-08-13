@@ -19,6 +19,8 @@ export interface CreateClosureData {
   force?: boolean;
   fond_de_caisse: number;
   email_recipients?: string[];
+  /** DAILY only: close_now = last closure → now; business_day = cut-time window for date */
+  mode?: 'business_day' | 'close_now';
 }
 
 export const useClosureAPI = (
@@ -135,6 +137,9 @@ export const useClosureAPI = (
           fond_de_caisse: closureData.fond_de_caisse,
           ...(closureData.email_recipients && closureData.email_recipients.length > 0
             ? { email_recipients: closureData.email_recipients }
+            : {}),
+          ...(closureData.type === 'DAILY' && closureData.mode
+            ? { mode: closureData.mode }
             : {}),
         }
         );

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   Box,
   Button,
   Checkbox,
@@ -10,6 +11,8 @@ import {
   FormControl,
   FormControlLabel,
   MenuItem,
+  Radio,
+  RadioGroup,
   TextField,
   Tooltip,
   Typography,
@@ -17,6 +20,7 @@ import {
 import { apiCore } from '../../services/api';
 
 export type ClosureType = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL';
+export type DailyClosureMode = 'business_day' | 'close_now';
 
 interface CreateClosureDialogProps {
   open: boolean;
@@ -27,6 +31,7 @@ interface CreateClosureDialogProps {
     force?: boolean;
     fond_de_caisse: number;
     email_recipients?: string[];
+    mode?: DailyClosureMode;
   }) => Promise<void>;
   creating: boolean;
   selectedDate: string;
@@ -53,24 +58,35 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
   const [forceCreation, setForceCreation] = useState(false);
   const [fondDeCaisse, setFondDeCaisse] = useState<string>('');
   const [emailRecipients, setEmailRecipients] = useState('');
+  const [dailyMode, setDailyMode] = useState<DailyClosureMode>('close_now');
+  const [cutTime, setCutTime] = useState('02:00');
 
   useEffect(() => {
     if (!open) return;
     const initial = defaultFondDeCaisse ?? 0;
     setFondDeCaisse(String(initial));
+    setDailyMode('close_now');
 
     let cancelled = false;
     (async () => {
       try {
-        const settingsRes = await apiCore.request<{ settings?: { accounting_emails?: string[] } }>(
-          '/legal/closure-settings',
-          { method: 'GET' }
-        );
+        const settingsRes = await apiCore.request<{
+          settings?: { accounting_emails?: string[]; daily_closure_time?: string };
+          daily_closure_time?: string;
+        }>('/legal/closure-settings', { method: 'GET' });
         if (cancelled) return;
         const defaults = settingsRes?.settings?.accounting_emails;
         setEmailRecipients(Array.isArray(defaults) && defaults.length > 0 ? defaults.join(', ') : '');
+        const time =
+          settingsRes?.settings?.daily_closure_time ||
+          settingsRes?.daily_closure_time ||
+          '02:00';
+        setCutTime(time);
       } catch {
-        if (!cancelled) setEmailRecipients('');
+        if (!cancelled) {
+          setEmailRecipients('');
+          setCutTime('02:00');
+        }
       }
     })();
 
@@ -94,9 +110,12 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
     [emailRecipients]
   );
 
+  const isDaily = selectedClosureType === 'DAILY';
+  const needsDate = !isDaily || dailyMode === 'business_day';
+
   const canCreate =
     !creating &&
-    selectedDate.trim().length > 0 &&
+    (!needsDate || selectedDate.trim().length > 0) &&
     !!selectedClosureType &&
     fondDeCaisseNumber !== null;
 
@@ -120,20 +139,61 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
             </TextField>
           </FormControl>
 
-          <TextField
-            label="Date de clôture"
-            type="date"
-            value={selectedDate}
-            onChange={e => onDateChange(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            size="small"
-            fullWidth
-            helperText={
-              selectedClosureType === 'ANNUAL'
-                ? 'Bulletin annuel : année glissante se terminant à cette date (ex. 01/08/2025 → 01/08/2026)'
-                : undefined
-            }
-          />
+          {isDaily && (
+            <FormControl component="fieldset">
+              <Typography variant="subtitle2" gutterBottom>
+                Mode journalier
+              </Typography>
+              <RadioGroup
+                value={dailyMode}
+                onChange={e => setDailyMode(e.target.value as DailyClosureMode)}
+              >
+                <FormControlLabel
+                  value="close_now"
+                  control={<Radio size="small" />}
+                  label="Clôturer maintenant (depuis la dernière clôture → maintenant)"
+                />
+                <FormControlLabel
+                  value="business_day"
+                  control={<Radio size="small" />}
+                  label="Clôturer une journée commerciale (date + heure de coupure)"
+                />
+              </RadioGroup>
+              <Alert severity="info" sx={{ mt: 1 }}>
+                {dailyMode === 'close_now' ? (
+                  <>
+                    Inclut toutes les ventes depuis la fin de la dernière clôture journalière
+                    jusqu’à l’instant présent. Idéal en fin de service.
+                  </>
+                ) : (
+                  <>
+                    Journée commerciale : de <strong>{cutTime}</strong> le jour choisi jusqu’à{' '}
+                    <strong>{cutTime}</strong> le lendemain (paramètre « heure de clôture »). Les
+                    ventes déjà couvertes par une clôture précédente sont exclues.
+                  </>
+                )}
+              </Alert>
+            </FormControl>
+          )}
+
+          {needsDate && (
+            <TextField
+              label="Date de clôture"
+              type="date"
+              value={selectedDate}
+              onChange={e => onDateChange(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              size="small"
+              fullWidth
+              helperText={
+                selectedClosureType === 'ANNUAL'
+                  ? 'Bulletin annuel : année glissante se terminant à cette date (ex. 01/08/2025 → 01/08/2026)'
+                  : isDaily
+                    ? `Journée du calendrier sélectionné, coupée à ${cutTime}`
+                    : undefined
+              }
+            />
+          )}
 
           <TextField
             label="Fond de caisse (€)"
@@ -187,7 +247,8 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
           </Tooltip>
 
           <Typography variant="caption" color="textSecondary">
-            La clôture crée un bulletin immuable pour la période sélectionnée.
+            Chaque vente doit figurer dans une clôture journalière : les périodes sont continues,
+            sans chevauchement.
           </Typography>
         </Box>
       </DialogContent>
@@ -204,6 +265,7 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
               force: forceCreation,
               fond_de_caisse: fondDeCaisseNumber ?? 0,
               email_recipients: parsedEmails.length > 0 ? parsedEmails : undefined,
+              ...(isDaily ? { mode: dailyMode } : {}),
             })
           }
           variant="contained"

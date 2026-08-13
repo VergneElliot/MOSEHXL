@@ -126,17 +126,8 @@ export class LegalJournalModel {
     establishmentId: string,
     timezone?: string,
     force?: boolean,
-    fondDeCaisse?: number
-  ) {
-    return await ClosureOperations.createDailyClosure(date, establishmentId, timezone, force, fondDeCaisse);
-  }
-
-  static async createDailyClosureOpen(
-    date: Date,
-    establishmentId: string,
-    timezone?: string,
-    force?: boolean,
-    fondDeCaisse?: number
+    fondDeCaisse?: number,
+    mode?: import('./businessDayPeriod').DailyClosureMode
   ) {
     return await ClosureOperations.createDailyClosure(
       date,
@@ -144,7 +135,27 @@ export class LegalJournalModel {
       timezone,
       force,
       fondDeCaisse,
-      false
+      true,
+      mode ?? 'business_day'
+    );
+  }
+
+  static async createDailyClosureOpen(
+    date: Date,
+    establishmentId: string,
+    timezone?: string,
+    force?: boolean,
+    fondDeCaisse?: number,
+    mode?: import('./businessDayPeriod').DailyClosureMode
+  ) {
+    return await ClosureOperations.createDailyClosure(
+      date,
+      establishmentId,
+      timezone,
+      force,
+      fondDeCaisse,
+      false,
+      mode ?? 'business_day'
     );
   }
 

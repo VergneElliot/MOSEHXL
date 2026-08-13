@@ -5,7 +5,7 @@
 
 import express from 'express';
 import { requireAuth, getEstablishmentId, requireAnyPermission } from '../auth';
-import { DEFAULT_APP_TIMEZONE } from '../../config/timezone';
+import { ClosureSettingsModel } from '../../models/closureSettings';
 import { getCurrentBusinessDayPeriod } from '../../models/legalJournal/businessDayPeriod';
 import { computePaymentBreakdownFromOrders } from '../../models/legalJournal/paymentBreakdown';
 import { BusinessDayStatsRepository } from '../../models/legalJournal/businessDayStatsRepository';
@@ -14,7 +14,6 @@ import { logError } from '../../utils/logger';
 import { AppError, asyncHandler } from '../../middleware/errorHandler';
 
 const router = express.Router();
-const DEFAULT_CLOSURE_TIME = '02:00';
 
 router.use(requireAuth);
 
@@ -30,10 +29,11 @@ router.get(
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
 
-  const timezone = DEFAULT_APP_TIMEZONE;
-  const closureTime = DEFAULT_CLOSURE_TIME;
-
   try {
+    const settings = await ClosureSettingsModel.getClosureSettings(establishmentId);
+    const timezone = settings.timezone;
+    const closureTime = settings.daily_closure_time;
+
     const { start, end } = getCurrentBusinessDayPeriod(closureTime, timezone);
     const startDate = start.toDate();
     const endDate = end.toDate();
