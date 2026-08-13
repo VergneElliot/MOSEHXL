@@ -228,6 +228,130 @@ export function useFloorService(options: {
     [activeTable, pinActor, onError]
   );
 
+  const transferActiveToTable = useCallback(
+    async (diningTableId: number, label: string, floorPlanId: number) => {
+      if (!activeTable || !pinActor) {
+        onError('Badge et table active requis');
+        return;
+      }
+      try {
+        const { ticket } = await floorApi.transferTicket(
+          activeTable.ticketId,
+          diningTableId,
+          pinActor.token
+        );
+        setActiveTable({
+          id: diningTableId,
+          label,
+          floorPlanId,
+          ticketId: ticket.id,
+        });
+        onInfo(`Transféré vers table ${label}`);
+        setMapDialogOpen(false);
+      } catch (error: unknown) {
+        const err = error as { message?: string };
+        onError(err.message || 'Transfert impossible');
+      }
+    },
+    [activeTable, pinActor, onError, onInfo]
+  );
+
+  const mergeActiveIntoTable = useCallback(
+    async (target: floorApi.DiningTableStatusDto) => {
+      if (!activeTable || !pinActor || !target.open_ticket_id) {
+        onError('Fusion impossible');
+        return;
+      }
+      if (target.open_ticket_id === activeTable.ticketId) {
+        onError('Choisissez une autre table');
+        return;
+      }
+      try {
+        const { target: merged } = await floorApi.mergeTickets(
+          activeTable.ticketId,
+          target.open_ticket_id,
+          pinActor.token
+        );
+        const { items } = await floorApi.getTicket(merged.id);
+        bindTable(
+          {
+            id: target.id,
+            label: target.label,
+            floorPlanId: target.floor_plan_id,
+            ticketId: merged.id,
+          },
+          floorApi.mapTicketItemsToOrderItems(items)
+        );
+        onInfo(`Fusionné sur table ${target.label}`);
+      } catch (error: unknown) {
+        const err = error as { message?: string };
+        onError(err.message || 'Fusion impossible');
+      }
+    },
+    [activeTable, pinActor, bindTable, onError, onInfo]
+  );
+
+  const takeoverActive = useCallback(async () => {
+    if (!activeTable || !pinActor) {
+      onError('Badge et table active requis');
+      return;
+    }
+    try {
+      await floorApi.takeoverTicket(activeTable.ticketId, pinActor.token);
+      onInfo(`Prise en charge : ${pinActor.displayName}`);
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      onError(err.message || 'Prise en charge impossible');
+    }
+  }, [activeTable, pinActor, onError, onInfo]);
+
+  const printSuivre = useCallback(
+    async (order: OrderItem[]) => {
+      if (!pinActor) {
+        pendingAfterPin.current = null;
+        openPinDialog('verify');
+        onError('Badge requis pour À suivre');
+        return;
+      }
+      try {
+        if (activeTable) {
+          // Sync cart first so kitchen sees latest lines
+          await floorApi.replaceTicketItems(activeTable.ticketId, order, pinActor.token);
+          const result = await floorApi.printSuivreForTicket(activeTable.ticketId, pinActor.token);
+          onInfo(
+            result.enqueued > 0
+              ? `À suivre envoyé (${result.enqueued})`
+              : 'Aucun ticket cuisine (imprimantes ?)'
+          );
+          return;
+        }
+        const sale = order.filter((line) => !line.isTip);
+        if (sale.length === 0) {
+          onError('Aucun article à envoyer');
+          return;
+        }
+        const result = await floorApi.printSuivreFromCart(
+          sale.map((line) => ({
+            product_id: line.productId ? parseInt(String(line.productId), 10) || null : null,
+            product_name: line.productName,
+            quantity: line.quantity,
+          })),
+          pinActor.token,
+          null
+        );
+        onInfo(
+          result.enqueued > 0
+            ? `À suivre envoyé (${result.enqueued})`
+            : 'Aucun ticket cuisine (imprimantes ?)'
+        );
+      } catch (error: unknown) {
+        const err = error as { message?: string };
+        onError(err.message || 'Impression À suivre échouée');
+      }
+    },
+    [pinActor, activeTable, openPinDialog, onError, onInfo]
+  );
+
   // Debounced cart → ticket sync
   useEffect(() => {
     if (!activeTable || !pinActor) return;
@@ -269,5 +393,9 @@ export function useFloorService(options: {
     closeActiveTicketAfterOrder,
     detachTableKeepTicket,
     clearTableBinding,
+    transferActiveToTable,
+    mergeActiveIntoTable,
+    takeoverActive,
+    printSuivre,
   };
 }

@@ -27,6 +27,10 @@ const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn =
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [totalOrders, setTotalOrders] = useState(0);
+  const [waiterUserId, setWaiterUserId] = useState<number | ''>('');
+  const [waiters, setWaiters] = useState<
+    Array<{ waiter_user_id: number; waiter_display_name: string }>
+  >([]);
 
   // Custom hook for business logic
   const logic = useHistoryLogic(state.orders, state.search);
@@ -34,6 +38,10 @@ const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn =
   const getPagination = useCallback(() => {
     return { limit: rowsPerPage, offset: page * rowsPerPage };
   }, [page, rowsPerPage]);
+
+  const getWaiterUserId = useCallback(() => {
+    return waiterUserId === '' ? undefined : waiterUserId;
+  }, [waiterUserId]);
 
   // Custom hook for API calls
   const api = useHistoryAPI(
@@ -45,7 +53,8 @@ const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn =
     actions.setReturnSuccess,
     actions.setReturnError,
     actions.closeReturnDialog,
-    getPagination
+    getPagination,
+    getWaiterUserId
   );
 
   // Avoid including `api` in effect deps (useHistoryState recreates some callbacks).
@@ -55,13 +64,17 @@ const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn =
   // Load stats once on mount
   useEffect(() => {
     apiRef.current.loadStats();
+    void import('../../services/api/floor')
+      .then((mod) => mod.listOrderWaiters())
+      .then(setWaiters)
+      .catch(() => setWaiters([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load orders whenever pagination changes
+  // Load orders whenever pagination or waiter filter changes
   useEffect(() => {
     apiRef.current.loadOrders({ limit: rowsPerPage, offset: page * rowsPerPage });
-  }, [page, rowsPerPage]);
+  }, [page, rowsPerPage, waiterUserId]);
 
   // Event handlers
   const handleViewOrder = (order: Order) => {
@@ -116,6 +129,12 @@ const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn =
         onSearchChange={(newSearch) => {
           actions.setSearch(newSearch);
           setPage(0);
+        }}
+        waiterUserId={waiterUserId}
+        waiters={waiters}
+        onWaiterChange={(id) => {
+          setPage(0);
+          setWaiterUserId(id);
         }}
       />
 

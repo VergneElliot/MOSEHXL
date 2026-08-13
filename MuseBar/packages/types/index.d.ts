@@ -35,6 +35,9 @@ export interface Order {
   change_amount?: number | null;
   created_at: Date;
   updated_at: Date;
+  waiter_user_id?: number | null;
+  waiter_display_name?: string | null;
+  table_label?: string | null;
 }
 
 export interface OrderItem {

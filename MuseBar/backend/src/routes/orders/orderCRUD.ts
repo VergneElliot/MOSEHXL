@@ -28,14 +28,26 @@ router.get('/', asyncHandler(async (req, res) => {
   try {
     const limitRaw = req.query.limit;
     const offsetRaw = req.query.offset;
+    const waiterRaw = req.query.waiter_user_id;
     const limit = typeof limitRaw === 'string' ? parseInt(limitRaw, 10) : undefined;
     const offset = typeof offsetRaw === 'string' ? parseInt(offsetRaw, 10) : undefined;
+    const waiterUserId =
+      typeof waiterRaw === 'string' && waiterRaw.trim() !== ''
+        ? parseInt(waiterRaw, 10)
+        : undefined;
 
     const shouldPaginate =
       (limit != null && Number.isFinite(limit) && limit > 0) ||
       (offset != null && Number.isFinite(offset) && offset >= 0);
 
-    const orders = await OrderModel.getAll(establishmentId, shouldPaginate ? { limit, offset } : undefined);
+    const listOpts = {
+      ...(shouldPaginate ? { limit, offset } : {}),
+      ...(waiterUserId != null && Number.isFinite(waiterUserId) && waiterUserId > 0
+        ? { waiterUserId }
+        : {}),
+    };
+
+    const orders = await OrderModel.getAll(establishmentId, listOpts);
     const ordersWithDetails = await Promise.all(
       orders.map(async (order) => {
         const items = await attachOptionsToOrderItems(
@@ -52,12 +64,14 @@ router.get('/', asyncHandler(async (req, res) => {
       return;
     }
 
-    const totalResult = await pool.query(
-      'SELECT COUNT(*)::int AS total FROM orders WHERE establishment_id = $1',
-      [establishmentId]
+    const total = await OrderModel.countAll(
+      establishmentId,
+      waiterUserId != null && Number.isFinite(waiterUserId) && waiterUserId > 0
+        ? { waiterUserId }
+        : undefined
     );
 
-    res.json({ orders: ordersWithDetails, total: totalResult.rows[0]?.total ?? 0 });
+    res.json({ orders: ordersWithDetails, total });
   } catch (error) {
     logger.error(
       'Failed to fetch orders',
@@ -66,6 +80,16 @@ router.get('/', asyncHandler(async (req, res) => {
     );
     throw new AppError('Failed to fetch orders', 500, 'ORDERS_FETCH_FAILED');
   }
+}));
+
+/**
+ * GET /api/orders/waiters — distinct waiters who have paid orders (for History filter)
+ */
+router.get('/waiters', asyncHandler(async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
+  const waiters = await OrderModel.listWaitersWithSales(establishmentId);
+  res.json({ waiters });
 }));
 
 /**

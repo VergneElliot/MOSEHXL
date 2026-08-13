@@ -1,4 +1,4 @@
-import React, { Suspense, useCallback, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import { Box, Snackbar, Alert, CircularProgress } from '@mui/material';
 import { Category, Product, OrderItem, Order } from '../../types';
 import { usePOSState } from '../../hooks/usePOSState';
@@ -8,6 +8,7 @@ import { usePOSOrderAdjustments } from '../../hooks/usePOSOrderAdjustments';
 import { usePOSCatalogLogic } from '../../hooks/usePOSCatalogLogic';
 import { useFloorService } from '../../hooks/useFloorService';
 import { useAuth } from '../../hooks/useAuth';
+import { setFloorOrderAttribution } from '../../services/floorOrderAttribution';
 import POSLayout from './POSLayout';
 import POSMenuPanel from './POSMenuPanel';
 import POSOrderPanel from './POSOrderPanel';
@@ -83,6 +84,18 @@ const POSContainer: React.FC<POSContainerProps> = ({
   const canManageFloor =
     user?.role === 'establishment_admin' ||
     permissions.includes('manage_floor_plan');
+
+  useEffect(() => {
+    if (floor.pinActor) {
+      setFloorOrderAttribution({
+        waiterUserId: floor.pinActor.userId,
+        waiterDisplayName: floor.pinActor.displayName,
+        tableLabel: floor.activeTable?.label ?? null,
+      });
+    } else {
+      setFloorOrderAttribution(null);
+    }
+  }, [floor.pinActor, floor.activeTable]);
 
   const { orderTotal, orderTax, orderSubtotal } = usePOSOrderTotals(state.currentOrder);
   const { calculateProductPrice } = usePOSCatalogLogic(
@@ -395,6 +408,11 @@ const POSContainer: React.FC<POSContainerProps> = ({
               onDropProduct={handleDropProduct}
               onSelectTable={floor.requestMap}
               activeTableLabel={floor.activeTable?.label ?? null}
+              onSuivre={
+                floor.pinActor
+                  ? () => void floor.printSuivre(state.currentOrder)
+                  : () => floor.openPinDialog('verify')
+              }
             />
           }
           orderBadge={state.currentOrder.length}
@@ -509,8 +527,13 @@ const POSContainer: React.FC<POSContainerProps> = ({
             activeTicketId={floor.activeTable?.ticketId ?? null}
             onSelectFree={(t) => void floor.selectFreeTable(t)}
             onSelectOccupied={(t) => void floor.selectOccupiedTable(t)}
+            onTransferTo={(t) =>
+              void floor.transferActiveToTable(t.id, t.label, t.floor_plan_id)
+            }
+            onMergeInto={(t) => void floor.mergeActiveIntoTable(t)}
             onAbandon={(id) => void floor.abandonActiveOrTable(id)}
             onDetach={floor.detachTableKeepTicket}
+            onTakeover={() => void floor.takeoverActive()}
             canManageFloor={canManageFloor}
           />
         </Suspense>

@@ -10,9 +10,13 @@ import {
   CircularProgress,
   Chip,
   Stack,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import { TableRestaurant as TableIcon } from '@mui/icons-material';
 import * as floorApi from '../../services/api/floor';
+
+type MapMode = 'select' | 'transfer' | 'merge';
 
 interface FloorMapDialogProps {
   open: boolean;
@@ -20,8 +24,11 @@ interface FloorMapDialogProps {
   activeTicketId: number | null;
   onSelectFree: (table: floorApi.DiningTableStatusDto) => void;
   onSelectOccupied: (table: floorApi.DiningTableStatusDto) => void;
+  onTransferTo: (table: floorApi.DiningTableStatusDto) => void;
+  onMergeInto: (table: floorApi.DiningTableStatusDto) => void;
   onAbandon: (ticketId: number) => void;
   onDetach: () => void;
+  onTakeover: () => void;
   canManageFloor: boolean;
 }
 
@@ -31,8 +38,11 @@ export const FloorMapDialog: React.FC<FloorMapDialogProps> = ({
   activeTicketId,
   onSelectFree,
   onSelectOccupied,
+  onTransferTo,
+  onMergeInto,
   onAbandon,
   onDetach,
+  onTakeover,
   canManageFloor,
 }) => {
   const [loading, setLoading] = useState(false);
@@ -40,6 +50,7 @@ export const FloorMapDialog: React.FC<FloorMapDialogProps> = ({
   const [plans, setPlans] = useState<floorApi.FloorPlanDto[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [mode, setMode] = useState<MapMode>('select');
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -60,7 +71,10 @@ export const FloorMapDialog: React.FC<FloorMapDialogProps> = ({
   }, []);
 
   useEffect(() => {
-    if (open) void reload();
+    if (open) {
+      setMode('select');
+      void reload();
+    }
   }, [open, reload]);
 
   const byPlan = useMemo(() => {
@@ -99,6 +113,22 @@ export const FloorMapDialog: React.FC<FloorMapDialogProps> = ({
     }
   }, [reload]);
 
+  const handleTableClick = (table: floorApi.DiningTableStatusDto) => {
+    const occupied = table.open_ticket_id != null;
+    if (mode === 'transfer') {
+      if (occupied) return;
+      onTransferTo(table);
+      return;
+    }
+    if (mode === 'merge') {
+      if (!occupied || table.open_ticket_id === activeTicketId) return;
+      onMergeInto(table);
+      return;
+    }
+    if (occupied) onSelectOccupied(table);
+    else onSelectFree(table);
+  };
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -106,6 +136,27 @@ export const FloorMapDialog: React.FC<FloorMapDialogProps> = ({
         Plan de salle
       </DialogTitle>
       <DialogContent dividers>
+        {activeTicketId != null && (
+          <Box sx={{ mb: 2 }}>
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              value={mode}
+              onChange={(_e, next: MapMode | null) => {
+                if (next) setMode(next);
+              }}
+            >
+              <ToggleButton value="select">Ouvrir / charger</ToggleButton>
+              <ToggleButton value="transfer">Transférer</ToggleButton>
+              <ToggleButton value="merge">Fusionner</ToggleButton>
+            </ToggleButtonGroup>
+            <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
+              {mode === 'transfer' && 'Choisissez une table libre.'}
+              {mode === 'merge' && 'Choisissez une autre table occupée (cible).'}
+              {mode === 'select' && 'Touchez une table libre ou occupée.'}
+            </Typography>
+          </Box>
+        )}
         {loading && (
           <Box display="flex" justifyContent="center" p={4}>
             <CircularProgress />
@@ -150,15 +201,18 @@ export const FloorMapDialog: React.FC<FloorMapDialogProps> = ({
                   >
                     {planTables.map((table) => {
                       const occupied = table.open_ticket_id != null;
-                      const isActive = activeTicketId != null && table.open_ticket_id === activeTicketId;
+                      const isActive =
+                        activeTicketId != null && table.open_ticket_id === activeTicketId;
+                      const disabled =
+                        (mode === 'transfer' && occupied) ||
+                        (mode === 'merge' && (!occupied || isActive));
                       return (
                         <Button
                           key={table.id}
                           variant={isActive ? 'contained' : 'outlined'}
                           color={occupied ? 'warning' : 'success'}
-                          onClick={() =>
-                            occupied ? onSelectOccupied(table) : onSelectFree(table)
-                          }
+                          disabled={disabled}
+                          onClick={() => handleTableClick(table)}
                           sx={{
                             minHeight: 72,
                             flexDirection: 'column',
@@ -181,10 +235,13 @@ export const FloorMapDialog: React.FC<FloorMapDialogProps> = ({
           <Chip size="small" color="warning" variant="outlined" label="Occupée" />
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ justifyContent: 'space-between', px: 2 }}>
+      <DialogActions sx={{ justifyContent: 'space-between', px: 2, flexWrap: 'wrap', gap: 1 }}>
         <Box>
           {activeTicketId != null && (
             <>
+              <Button color="inherit" onClick={onTakeover}>
+                Prendre en charge
+              </Button>
               <Button color="inherit" onClick={onDetach}>
                 Laisser ouverte
               </Button>

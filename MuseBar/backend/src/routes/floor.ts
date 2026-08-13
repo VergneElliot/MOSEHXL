@@ -10,6 +10,7 @@ import {
 import { DiningTableModel, FloorPlanModel } from '../models/database/floorModel';
 import { OpenTicketModel, type OpenTicketItemInput } from '../models/database/openTicketModel';
 import { requirePosPinActor } from '../middleware/pinActor';
+import { pool } from '../db/pool';
 
 const router = express.Router();
 
@@ -368,6 +369,166 @@ router.post(
     const ticket = await OpenTicketModel.closeWithOrder(id, establishmentId, orderId, actor.id);
     if (!ticket) throw new NotFoundError('Open ticket not found or already closed');
     return res.json({ ticket });
+  })
+);
+
+router.post(
+  '/tickets/:id/transfer',
+  requireAuth,
+  requirePosPinActor,
+  asyncHandler(async (req, res) => {
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
+    const actor = req.pinActor!;
+    const id = Number(req.params.id);
+    const diningTableId = Number(req.body?.dining_table_id);
+    if (!Number.isInteger(id)) throw new ValidationError('Invalid ticket id');
+    if (!Number.isInteger(diningTableId)) throw new ValidationError('dining_table_id is required');
+    try {
+      const ticket = await OpenTicketModel.transferTable(id, establishmentId, diningTableId, actor.id);
+      return res.json({ ticket });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (message === 'OPEN_TICKET_NOT_FOUND_OR_CLOSED') {
+        throw new NotFoundError('Open ticket not found or already closed');
+      }
+      if (message === 'DINING_TABLE_NOT_FOUND') throw new NotFoundError('Dining table not found');
+      if (message === 'TARGET_TABLE_OCCUPIED') {
+        throw new ConflictError('La table de destination est déjà occupée');
+      }
+      throw error;
+    }
+  })
+);
+
+router.post(
+  '/tickets/:id/takeover',
+  requireAuth,
+  requirePosPinActor,
+  asyncHandler(async (req, res) => {
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
+    const actor = req.pinActor!;
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) throw new ValidationError('Invalid ticket id');
+    const ticket = await OpenTicketModel.takeover(id, establishmentId, actor.id);
+    if (!ticket) throw new NotFoundError('Open ticket not found or already closed');
+    return res.json({ ticket });
+  })
+);
+
+router.post(
+  '/tickets/:id/merge',
+  requireAuth,
+  requirePosPinActor,
+  asyncHandler(async (req, res) => {
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
+    const actor = req.pinActor!;
+    const id = Number(req.params.id);
+    const targetTicketId = Number(req.body?.target_ticket_id);
+    if (!Number.isInteger(id)) throw new ValidationError('Invalid ticket id');
+    if (!Number.isInteger(targetTicketId)) throw new ValidationError('target_ticket_id is required');
+    try {
+      const result = await OpenTicketModel.mergeInto(id, targetTicketId, establishmentId, actor.id);
+      return res.json(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (message === 'OPEN_TICKET_NOT_FOUND_OR_CLOSED') {
+        throw new NotFoundError('Open ticket not found or already closed');
+      }
+      if (message === 'MERGE_SAME_TICKET') {
+        throw new ValidationError('Cannot merge a ticket into itself');
+      }
+      throw error;
+    }
+  })
+);
+
+router.post(
+  '/tickets/:id/print-suivre',
+  requireAuth,
+  requirePosPinActor,
+  asyncHandler(async (req, res) => {
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
+    const actor = req.pinActor!;
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) throw new ValidationError('Invalid ticket id');
+    const ticket = await OpenTicketModel.get(id, establishmentId);
+    if (!ticket || ticket.status !== 'open') {
+      throw new NotFoundError('Open ticket not found or already closed');
+    }
+    const table = await DiningTableModel.get(ticket.dining_table_id, establishmentId);
+    let items = await OpenTicketModel.listItems(id, establishmentId);
+    const itemIdsRaw = req.body?.item_ids;
+    if (Array.isArray(itemIdsRaw) && itemIdsRaw.length > 0) {
+      const allowed = new Set(itemIdsRaw.map((v: unknown) => Number(v)).filter((n: number) => Number.isInteger(n)));
+      items = items.filter((item) => allowed.has(item.id));
+    }
+    if (items.length === 0) throw new ValidationError('No items to print');
+
+    const { dispatchKitchenFollowUpTickets } = await import(
+      '../services/kitchenPrinting/kitchenFollowUpDispatchService'
+    );
+    const { Logger } = await import('../utils/logger');
+    const result = await dispatchKitchenFollowUpTickets(pool, {
+      establishmentId,
+      tableLabel: table?.label ?? null,
+      createdByUserId: actor.id,
+      logger: Logger.getInstance(),
+      items: items.map((item) => ({
+        product_id: item.product_id ?? undefined,
+        product_name: item.product_name,
+        quantity: Number(item.quantity),
+        kitchen_printer_ids_snapshot: item.kitchen_printer_ids_snapshot,
+        print_pickup_slip_snapshot: item.print_pickup_slip_snapshot,
+      })),
+    });
+
+    await OpenTicketModel.touchServer(id, establishmentId, actor.id);
+    return res.json(result);
+  })
+);
+
+/** À suivre from cart without an open ticket (comptoir). */
+router.post(
+  '/print-suivre',
+  requireAuth,
+  requirePosPinActor,
+  asyncHandler(async (req, res) => {
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
+    const actor = req.pinActor!;
+    const rawItems = req.body?.items;
+    if (!Array.isArray(rawItems) || rawItems.length === 0) {
+      throw new ValidationError('items are required');
+    }
+    const tableLabel =
+      typeof req.body?.table_label === 'string' ? req.body.table_label.trim() : null;
+
+    const { dispatchKitchenFollowUpTickets } = await import(
+      '../services/kitchenPrinting/kitchenFollowUpDispatchService'
+    );
+    const { Logger } = await import('../utils/logger');
+    const result = await dispatchKitchenFollowUpTickets(pool, {
+      establishmentId,
+      tableLabel: tableLabel || null,
+      createdByUserId: actor.id,
+      logger: Logger.getInstance(),
+      items: rawItems.map((entry: Record<string, unknown>) => ({
+        product_id:
+          entry.product_id != null && Number.isFinite(Number(entry.product_id))
+            ? Number(entry.product_id)
+            : undefined,
+        product_name: String(entry.product_name ?? 'Article'),
+        quantity: Number(entry.quantity) || 1,
+        kitchen_printer_ids_snapshot: entry.kitchen_printer_ids_snapshot,
+        print_pickup_slip_snapshot: entry.print_pickup_slip_snapshot === true,
+        options: [],
+      })),
+    });
+    return res.json(result);
   })
 );
 

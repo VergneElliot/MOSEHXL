@@ -33,6 +33,9 @@ export interface Order {
   change?: number;
   operation_type?: OperationType;
   change_amount?: number | null;
+  waiter_user_id?: number | null;
+  waiter_display_name?: string | null;
+  table_label?: string | null;
   created_at: Date;
   updated_at: Date;
 }

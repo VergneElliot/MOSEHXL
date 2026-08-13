@@ -90,23 +90,36 @@ export function renderKitchenOrderTicket(input: {
   createdAt: Date | string;
   printerName: string;
   lines: KitchenTicketLine[];
+  /** When set, prints as follow-up (À SUIVRE) instead of COMMANDE */
+  followUp?: boolean;
+  tableLabel?: string | null;
 }): string {
+  const title = input.followUp ? 'A SUIVRE' : `COMMANDE #${input.ticketDayNumber}`;
   const parts = [
     ESC_POS.INIT,
     kitchenTicketAlertSequence(),
     ESC_POS.CENTER,
     ESC_POS.BOLD_ON,
     ESC_POS.DOUBLE_SIZE,
-    `COMMANDE #${input.ticketDayNumber}`,
+    title,
     ESC_POS.NORMAL_SIZE,
     ESC_POS.BOLD_OFF,
     ESC_POS.LEFT,
     '',
+  ];
+
+  if (input.followUp && input.tableLabel) {
+    parts.push(ESC_POS.BOLD_ON, normalizeThermalText(`Table ${input.tableLabel}`), ESC_POS.BOLD_OFF, '');
+  } else if (input.followUp) {
+    parts.push(ESC_POS.BOLD_ON, 'COMPTOIR', ESC_POS.BOLD_OFF, '');
+  }
+
+  parts.push(
     normalizeThermalText(input.printerName),
     normalizeThermalText(formatTimestamp(input.createdAt)),
     '================================',
-    '',
-  ];
+    ''
+  );
 
   appendKitchenLineItems(parts, input.lines);
 

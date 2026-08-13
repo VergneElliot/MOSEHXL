@@ -50,6 +50,9 @@ export interface Order {
   operationType?: 'sale' | 'change';
   /** Amount in € for change operations */
   changeAmount?: number | null;
+  waiterUserId?: number | null;
+  waiterDisplayName?: string | null;
+  tableLabel?: string | null;
 }
 
 export interface Payment {

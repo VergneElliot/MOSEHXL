@@ -28,7 +28,8 @@ export const useHistoryAPI = (
   setReturnSuccess: (message: string) => void,
   setReturnError: (error: string) => void,
   closeReturnDialog: () => void,
-  getPagination?: () => { limit: number; offset: number }
+  getPagination?: () => { limit: number; offset: number },
+  getWaiterUserId?: () => number | undefined
 ): HistoryAPIActions => {
   const apiService = useMemo(() => ApiService.getInstance(), []);
 
@@ -36,9 +37,16 @@ export const useHistoryAPI = (
     try {
       setLoading(true);
       const effectivePagination = pagination ?? (getPagination ? getPagination() : undefined);
+      const waiterUserId = getWaiterUserId?.();
       const ordersResult = effectivePagination
-        ? await apiService.getOrders({ limit: effectivePagination.limit, offset: effectivePagination.offset })
-        : await apiService.getOrders();
+        ? await apiService.getOrders({
+            limit: effectivePagination.limit,
+            offset: effectivePagination.offset,
+            ...(waiterUserId != null ? { waiterUserId } : {}),
+          })
+        : await apiService.getOrders(
+            waiterUserId != null ? { waiterUserId } : undefined
+          );
 
       // Map sub_bills to subBills for frontend compatibility
       const mappedOrders = ordersResult.orders.map(order => ({
@@ -55,7 +63,7 @@ export const useHistoryAPI = (
     } finally {
       setLoading(false);
     }
-  }, [apiService, setOrders, setTotalOrders, setLoading, setReturnError, getPagination]);
+  }, [apiService, setOrders, setTotalOrders, setLoading, setReturnError, getPagination, getWaiterUserId]);
 
   const loadStats = useCallback(async () => {
     try {

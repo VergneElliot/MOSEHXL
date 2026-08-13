@@ -200,6 +200,74 @@ export async function closeTicket(
   });
 }
 
+export async function transferTicket(
+  ticketId: number,
+  diningTableId: number,
+  pinActorToken: string
+): Promise<{ ticket: OpenTicketDto }> {
+  return request(`/floor/tickets/${ticketId}/transfer`, {
+    method: 'POST',
+    headers: pinHeaders(pinActorToken),
+    body: JSON.stringify({ dining_table_id: diningTableId }),
+  });
+}
+
+export async function takeoverTicket(
+  ticketId: number,
+  pinActorToken: string
+): Promise<{ ticket: OpenTicketDto }> {
+  return request(`/floor/tickets/${ticketId}/takeover`, {
+    method: 'POST',
+    headers: pinHeaders(pinActorToken),
+    body: JSON.stringify({}),
+  });
+}
+
+export async function mergeTickets(
+  sourceTicketId: number,
+  targetTicketId: number,
+  pinActorToken: string
+): Promise<{ source: OpenTicketDto; target: OpenTicketDto }> {
+  return request(`/floor/tickets/${sourceTicketId}/merge`, {
+    method: 'POST',
+    headers: pinHeaders(pinActorToken),
+    body: JSON.stringify({ target_ticket_id: targetTicketId }),
+  });
+}
+
+export async function printSuivreForTicket(
+  ticketId: number,
+  pinActorToken: string,
+  itemIds?: number[]
+): Promise<{ enqueued: number; failures: number }> {
+  return request(`/floor/tickets/${ticketId}/print-suivre`, {
+    method: 'POST',
+    headers: pinHeaders(pinActorToken),
+    body: JSON.stringify(itemIds?.length ? { item_ids: itemIds } : {}),
+  });
+}
+
+export async function printSuivreFromCart(
+  items: Array<{ product_id: number | null; product_name: string; quantity: number }>,
+  pinActorToken: string,
+  tableLabel?: string | null
+): Promise<{ enqueued: number; failures: number }> {
+  return request('/floor/print-suivre', {
+    method: 'POST',
+    headers: pinHeaders(pinActorToken),
+    body: JSON.stringify({ items, table_label: tableLabel ?? null }),
+  });
+}
+
+export async function listOrderWaiters(): Promise<
+  Array<{ waiter_user_id: number; waiter_display_name: string }>
+> {
+  const res = await request<{ waiters: Array<{ waiter_user_id: number; waiter_display_name: string }> }>(
+    '/orders/waiters'
+  );
+  return res.waiters;
+}
+
 export function mapTicketItemsToOrderItems(items: OpenTicketItemDto[]): OrderItem[] {
   return items.map((item, index) => {
     const optionsRaw = Array.isArray(item.options_json) ? item.options_json : [];

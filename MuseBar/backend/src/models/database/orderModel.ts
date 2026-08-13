@@ -16,10 +16,17 @@ const ALLOWED_ORDER_UPDATE_FIELDS = [
 export const OrderModel = {
   async getAll(
     establishmentId: string,
-    opts?: { limit?: number; offset?: number }
+    opts?: { limit?: number; offset?: number; waiterUserId?: number }
   ): Promise<Order[]> {
     const values: Array<string | number> = [establishmentId];
-    let query = 'SELECT * FROM orders WHERE establishment_id = $1 ORDER BY created_at DESC';
+    let query = 'SELECT * FROM orders WHERE establishment_id = $1';
+
+    if (opts?.waiterUserId != null && Number.isFinite(opts.waiterUserId) && opts.waiterUserId > 0) {
+      values.push(opts.waiterUserId);
+      query += ` AND waiter_user_id = $${values.length}`;
+    }
+
+    query += ' ORDER BY created_at DESC';
 
     if (opts?.limit != null && Number.isFinite(opts.limit) && opts.limit > 0) {
       values.push(opts.limit);
@@ -35,6 +42,34 @@ export const OrderModel = {
     return result.rows;
   },
 
+  async countAll(
+    establishmentId: string,
+    opts?: { waiterUserId?: number }
+  ): Promise<number> {
+    const values: Array<string | number> = [establishmentId];
+    let query = 'SELECT COUNT(*)::int AS total FROM orders WHERE establishment_id = $1';
+    if (opts?.waiterUserId != null && Number.isFinite(opts.waiterUserId) && opts.waiterUserId > 0) {
+      values.push(opts.waiterUserId);
+      query += ` AND waiter_user_id = $${values.length}`;
+    }
+    const totalResult = await pool.query(query, values);
+    return totalResult.rows[0]?.total ?? 0;
+  },
+
+  async listWaitersWithSales(establishmentId: string): Promise<
+    Array<{ waiter_user_id: number; waiter_display_name: string }>
+  > {
+    const result = await pool.query(
+      `SELECT waiter_user_id, MAX(waiter_display_name) AS waiter_display_name
+       FROM orders
+       WHERE establishment_id = $1 AND waiter_user_id IS NOT NULL
+       GROUP BY waiter_user_id
+       ORDER BY MAX(waiter_display_name) ASC NULLS LAST`,
+      [establishmentId]
+    );
+    return result.rows;
+  },
+
   async getById(id: number, establishmentId: string): Promise<Order | null> {
     const result = await pool.query(
       'SELECT * FROM orders WHERE id = $1 AND establishment_id = $2',
@@ -46,8 +81,9 @@ export const OrderModel = {
   async create(order: Omit<Order, 'id' | 'created_at' | 'updated_at'>, establishmentId: string): Promise<Order> {
     const result = await pool.query(
       `INSERT INTO orders (
-         total_amount, total_tax, payment_method, status, notes, tips, change, establishment_id, operation_type, change_amount
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         total_amount, total_tax, payment_method, status, notes, tips, change, establishment_id,
+         operation_type, change_amount, waiter_user_id, waiter_display_name, table_label
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
       [
         order.total_amount,
@@ -60,6 +96,9 @@ export const OrderModel = {
         establishmentId,
         order.operation_type ?? 'sale',
         order.change_amount ?? null,
+        order.waiter_user_id ?? null,
+        order.waiter_display_name ?? null,
+        order.table_label ?? null,
       ]
     );
     return result.rows[0];

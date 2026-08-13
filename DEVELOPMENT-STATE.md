@@ -34,7 +34,7 @@ It is the working reference for what is complete, what is broken, and what needs
 - Daily closures: business day cut from settings; manual « close now » (last closure → now) or dated business day
 - Order creation via `POST /api/orders` with legal journal + audit trail write on completion
 - Cash register change operation via `POST /api/orders/payment/change` (dedicated endpoint)
-- **Floor service (in progress on `development`):** Phase A APIs + Phase B POS badge/map/open tickets (patch notes `455`–`458`). Bar/comptoir mode unchanged when no table is selected.
+- **Floor service (in progress on `development`):** Phases A–C — PIN badge, map, open tickets, transfer/merge/à suivre, waiter snapshot + History filter (patch notes `455`–`460`).
 
 ### Menu Management
 - Full CRUD for categories and products

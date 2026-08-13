@@ -229,4 +229,132 @@ export const OpenTicketModel = {
       client.release();
     }
   },
+
+  async transferTable(
+    ticketId: number,
+    establishmentId: string,
+    newDiningTableId: number,
+    actorUserId: number
+  ): Promise<OpenTicket> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const ticketRes = await client.query(
+        `SELECT * FROM open_tickets
+         WHERE id = $1 AND establishment_id = $2 AND status = 'open'
+         FOR UPDATE`,
+        [ticketId, establishmentId]
+      );
+      if (ticketRes.rowCount === 0) throw new Error('OPEN_TICKET_NOT_FOUND_OR_CLOSED');
+      const tableRes = await client.query(
+        `SELECT id FROM dining_tables WHERE id = $1 AND establishment_id = $2 AND is_active = TRUE`,
+        [newDiningTableId, establishmentId]
+      );
+      if (tableRes.rowCount === 0) throw new Error('DINING_TABLE_NOT_FOUND');
+      const occupied = await client.query(
+        `SELECT id FROM open_tickets
+         WHERE dining_table_id = $1 AND establishment_id = $2 AND status = 'open' AND id <> $3`,
+        [newDiningTableId, establishmentId, ticketId]
+      );
+      if ((occupied.rowCount || 0) > 0) throw new Error('TARGET_TABLE_OCCUPIED');
+      const updated = await client.query(
+        `UPDATE open_tickets
+         SET dining_table_id = $3,
+             last_served_by_user_id = $4,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1 AND establishment_id = $2
+         RETURNING *`,
+        [ticketId, establishmentId, newDiningTableId, actorUserId]
+      );
+      await client.query('COMMIT');
+      return updated.rows[0] as OpenTicket;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
+
+  async takeover(
+    ticketId: number,
+    establishmentId: string,
+    actorUserId: number
+  ): Promise<OpenTicket | null> {
+    const result = await pool.query(
+      `UPDATE open_tickets
+       SET last_served_by_user_id = $3, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND establishment_id = $2 AND status = 'open'
+       RETURNING *`,
+      [ticketId, establishmentId, actorUserId]
+    );
+    return (result.rows[0] as OpenTicket | undefined) ?? null;
+  },
+
+  async mergeInto(
+    sourceTicketId: number,
+    targetTicketId: number,
+    establishmentId: string,
+    actorUserId: number
+  ): Promise<{ source: OpenTicket; target: OpenTicket }> {
+    if (sourceTicketId === targetTicketId) {
+      throw new Error('MERGE_SAME_TICKET');
+    }
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const sourceRes = await client.query(
+        `SELECT * FROM open_tickets
+         WHERE id = $1 AND establishment_id = $2 AND status = 'open'
+         FOR UPDATE`,
+        [sourceTicketId, establishmentId]
+      );
+      const targetRes = await client.query(
+        `SELECT * FROM open_tickets
+         WHERE id = $1 AND establishment_id = $2 AND status = 'open'
+         FOR UPDATE`,
+        [targetTicketId, establishmentId]
+      );
+      if (sourceRes.rowCount === 0 || targetRes.rowCount === 0) {
+        throw new Error('OPEN_TICKET_NOT_FOUND_OR_CLOSED');
+      }
+
+      await client.query(
+        `UPDATE open_ticket_items
+         SET open_ticket_id = $2
+         WHERE open_ticket_id = $1 AND establishment_id = $3`,
+        [sourceTicketId, targetTicketId, establishmentId]
+      );
+
+      const source = await client.query(
+        `UPDATE open_tickets
+         SET status = 'cancelled',
+             last_served_by_user_id = $3,
+             closed_at = CURRENT_TIMESTAMP,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1 AND establishment_id = $2
+         RETURNING *`,
+        [sourceTicketId, establishmentId, actorUserId]
+      );
+
+      const target = await client.query(
+        `UPDATE open_tickets
+         SET last_served_by_user_id = $3, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1 AND establishment_id = $2
+         RETURNING *`,
+        [targetTicketId, establishmentId, actorUserId]
+      );
+
+      await client.query('COMMIT');
+      return {
+        source: source.rows[0] as OpenTicket,
+        target: target.rows[0] as OpenTicket,
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
 };

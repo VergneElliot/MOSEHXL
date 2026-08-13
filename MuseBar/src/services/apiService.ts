@@ -95,7 +95,11 @@ export class ApiService {
   }
 
   // Orders
-  async getOrders(params?: { limit?: number; offset?: number }): Promise<{ orders: Order[]; total: number }> {
+  async getOrders(params?: {
+    limit?: number;
+    offset?: number;
+    waiterUserId?: number;
+  }): Promise<{ orders: Order[]; total: number }> {
     if (params) {
       return ordersApi.getOrdersPaginated(params);
     }
@@ -103,7 +107,22 @@ export class ApiService {
     return { orders, total: orders.length };
   }
 
-  async createOrder(order: { items: OrderItem[]; totalAmount: number; taxAmount: number; paymentMethod: 'cash' | 'card' | 'split'; status?: string; notes?: string; tips?: number; change?: number; sub_bills?: Array<{ payment_method: 'cash' | 'card'; amount: number }>; }): Promise<Order> { return ordersApi.createOrder(order); }
+  async createOrder(order: {
+    items: OrderItem[];
+    totalAmount: number;
+    taxAmount: number;
+    paymentMethod: 'cash' | 'card' | 'split';
+    status?: string;
+    notes?: string;
+    tips?: number;
+    change?: number;
+    sub_bills?: Array<{ payment_method: 'cash' | 'card'; amount: number }>;
+    waiter_user_id?: number;
+    waiter_display_name?: string;
+    table_label?: string;
+  }): Promise<Order> {
+    return ordersApi.createOrder(order);
+  }
 
   // Generic HTTP methods for other components
   async get<T>(endpoint: string): Promise<{ data: T }> { const data = await this.request<T>(endpoint); return { data }; }

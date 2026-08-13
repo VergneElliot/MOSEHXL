@@ -71,6 +71,8 @@ interface OrderSummaryProps {
   onSelectTable?: () => void;
   /** Label of bound table, if any */
   activeTableLabel?: string | null;
+  /** Send kitchen follow-up (À suivre) */
+  onSuivre?: () => void;
   formatCurrency: (amount: number) => string;
 }
 
@@ -99,6 +101,7 @@ const OrderSummary = React.memo(function OrderSummary({
   onDropProduct,
   onSelectTable,
   activeTableLabel = null,
+  onSuivre,
   formatCurrency,
 }: OrderSummaryProps) {
   const theme = useTheme();
@@ -418,13 +421,14 @@ const OrderSummary = React.memo(function OrderSummary({
           </Button>
         </span>
       </Tooltip>
-      <Tooltip title="Bientôt — mention cuisine">
+      <Tooltip title={onSuivre ? 'Envoyer en cuisine (sans encaisser)' : 'Badge requis'}>
         <span>
           <Button
             variant="outlined"
             fullWidth
-            disabled
+            disabled={!onSuivre || currentOrder.filter((i) => !i.isTip).length === 0}
             startIcon={<SuivreIcon />}
+            onClick={onSuivre}
             sx={actionBtnSx}
           >
             À suivre

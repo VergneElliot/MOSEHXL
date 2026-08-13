@@ -15,6 +15,9 @@ type RawOrder = Partial<ApiOrder> &
     total_amount: number | string;
     total_tax: number | string;
     created_at: string | Date;
+    waiter_user_id?: number | null;
+    waiter_display_name?: string | null;
+    table_label?: string | null;
     items?: Array<Partial<ApiOrderItem> & {
       id?: string | number;
       product_id?: string | number | null;
@@ -102,6 +105,9 @@ function mapRawOrder(order: RawOrder): Order {
     change: order.change || 0,
     operationType: order.operation_type as 'sale' | 'change' | undefined,
     changeAmount: order.change_amount != null ? toNumber(order.change_amount) : null,
+    waiterUserId: order.waiter_user_id != null ? Number(order.waiter_user_id) : null,
+    waiterDisplayName: order.waiter_display_name != null ? String(order.waiter_display_name) : null,
+    tableLabel: order.table_label != null ? String(order.table_label) : null,
   };
 }
 
@@ -113,10 +119,12 @@ export async function getOrders(): Promise<Order[]> {
 export async function getOrdersPaginated(params: {
   limit?: number;
   offset?: number;
+  waiterUserId?: number;
 }): Promise<{ orders: Order[]; total: number }> {
   const query = new URLSearchParams();
   if (params.limit != null) query.set('limit', String(params.limit));
   if (params.offset != null) query.set('offset', String(params.offset));
+  if (params.waiterUserId != null) query.set('waiter_user_id', String(params.waiterUserId));
 
   const response = await request<RawOrder[] | { orders?: RawOrder[]; total?: number }>(
     '/orders' + (query.toString() ? `?${query.toString()}` : '')
@@ -140,6 +148,9 @@ export async function createOrder(order: {
   tips?: number;
   change?: number;
   sub_bills?: Array<{ payment_method: 'cash' | 'card'; amount: number }>;
+  waiter_user_id?: number;
+  waiter_display_name?: string;
+  table_label?: string;
 }): Promise<Order> {
   // Accounting: send exact amounts for storage (no rounding). Taxes are derived from
   // prices (taxAmount = totalPrice * taxRate / (1+taxRate)) and may be non-terminating;
@@ -154,6 +165,11 @@ export async function createOrder(order: {
       notes: order.notes,
       tips: order.tips || 0,
       change: order.change || 0,
+      ...(order.waiter_user_id != null ? { waiter_user_id: order.waiter_user_id } : {}),
+      ...(order.waiter_display_name != null
+        ? { waiter_display_name: order.waiter_display_name }
+        : {}),
+      ...(order.table_label != null ? { table_label: order.table_label } : {}),
       items: order.items.map(item => ({
         product_id: item.productId ? (isNaN(parseInt(String(item.productId))) ? null : parseInt(String(item.productId))) : null,
         product_name: item.productName,

@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { ApiService } from '../services/apiService';
 import { OrderItem, LocalSubBill, Order } from '../types';
+import { getFloorOrderAttribution } from '../services/floorOrderAttribution';
 
 interface ChangeResponse {
   message?: string;
@@ -22,6 +23,9 @@ export interface CreateOrderData {
   cashReceived?: number;
   change?: number;
   notes?: string;
+  waiterUserId?: number;
+  waiterDisplayName?: string;
+  tableLabel?: string;
 }
 
 export interface ChangeData {
@@ -40,6 +44,7 @@ export const usePOSAPI = (
   const createOrder = useCallback(
     async (orderData: CreateOrderData) => {
       try {
+        const attribution = getFloorOrderAttribution();
         const created = await apiService.createOrder({
           totalAmount: orderData.totalAmount,
           taxAmount: orderData.totalTax,
@@ -55,6 +60,9 @@ export const usePOSAPI = (
           tips: orderData.tips ?? 0,
           change: orderData.change ?? 0,
           notes: orderData.notes,
+          waiter_user_id: orderData.waiterUserId ?? attribution?.waiterUserId,
+          waiter_display_name: orderData.waiterDisplayName ?? attribution?.waiterDisplayName,
+          table_label: orderData.tableLabel ?? attribution?.tableLabel ?? undefined,
         });
         onSuccess('Commande créée avec succès', created);
         onDataUpdate();

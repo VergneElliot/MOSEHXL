@@ -54,6 +54,9 @@ export interface CreateOrderBodyInput {
   sub_bills?: CreateOrderSubBillInput[];
   tips?: number;
   change?: number;
+  waiter_user_id?: number | null;
+  waiter_display_name?: string | null;
+  table_label?: string | null;
 }
 
 export interface OrderCreationRequestContext {
@@ -130,6 +133,9 @@ export async function createOrderWithCompliance(
       tips: tips || 0,
       change: change || 0,
       establishment_id: establishmentId,
+      waiter_user_id: body.waiter_user_id ?? null,
+      waiter_display_name: body.waiter_display_name ?? null,
+      table_label: body.table_label ?? null,
     },
     establishmentId
   );
