@@ -141,16 +141,18 @@ export const ClosureSettings: React.FC<ClosureSettingsProps> = ({
             />
           </Grid>
 
-          {/* Daily Closure Time */}
+          {/* Daily Closure Time — the business day boundary, not just a scheduler setting:
+              manual "journée commerciale" closures and live day stats use it too, so it
+              must stay editable when the scheduler is off. */}
           <Grid item xs={12} md={6}>
             <TextField
-              label="Heure de clôture quotidienne"
+              label="Heure de coupure de la journée commerciale"
               type="time"
               fullWidth
               value={closureSettings.daily_closure_time}
               onChange={handleFieldChange('daily_closure_time')}
-              disabled={loading || !closureSettings.auto_closure_enabled}
-              helperText="Heure à laquelle la clôture automatique s'exécute"
+              disabled={loading}
+              helperText="Fin de journée commerciale (ex. 04:00 = la nuit compte pour la veille). Sert aussi aux clôtures manuelles."
               InputLabelProps={{
                 shrink: true,
               }}
@@ -165,8 +167,8 @@ export const ClosureSettings: React.FC<ClosureSettingsProps> = ({
               fullWidth
               value={closureSettings.timezone}
               onChange={handleFieldChange('timezone')}
-              disabled={loading || !closureSettings.auto_closure_enabled}
-              helperText="Fuseau horaire pour la clôture automatique"
+              disabled={loading}
+              helperText="Fuseau horaire des journées commerciales"
             >
               {TIMEZONE_OPTIONS.map((option) => (
                 <MenuItem key={option.value} value={option.value}>

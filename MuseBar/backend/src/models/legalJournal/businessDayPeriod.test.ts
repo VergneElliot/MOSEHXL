@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import moment from 'moment-timezone';
 
-import { resolveDailyClosurePeriod } from './businessDayPeriod';
+import { getBusinessPeriodBounds, resolveDailyClosurePeriod } from './businessDayPeriod';
 
 const TZ = 'Europe/Paris';
 
@@ -91,6 +91,47 @@ describe('resolveDailyClosurePeriod', () => {
         now,
       })
     ).toThrow(/pas encore commencé/i);
+  });
+
+  it('getBusinessPeriodBounds spans exactly one year, cut to cut', () => {
+    // Selected date is the first day outside the period: no extra day, no split night.
+    const endExclusive = moment.tz('2026-08-01 00:00', TZ);
+    const { start, end } = getBusinessPeriodBounds(
+      endExclusive.clone().subtract(1, 'year'),
+      endExclusive,
+      '04:00',
+      TZ
+    );
+
+    expect(start.format('YYYY-MM-DD HH:mm')).toBe('2025-08-01 04:00');
+    expect(end.format('YYYY-MM-DD HH:mm:ss.SSS')).toBe('2026-08-01 03:59:59.999');
+  });
+
+  it('getBusinessPeriodBounds covers a whole month at the cut time', () => {
+    const monthStart = moment.tz('2026-08-01 00:00', TZ);
+    const { start, end } = getBusinessPeriodBounds(
+      monthStart,
+      monthStart.clone().add(1, 'month'),
+      '04:00',
+      TZ
+    );
+
+    expect(start.format('YYYY-MM-DD HH:mm')).toBe('2026-08-01 04:00');
+    expect(end.format('YYYY-MM-DD HH:mm:ss.SSS')).toBe('2026-09-01 03:59:59.999');
+  });
+
+  it('getBusinessPeriodBounds keeps the cut time across a DST change', () => {
+    // Europe/Paris leaves DST on 2026-10-25; both bounds must still read 04:00 local.
+    const start2 = moment.tz('2026-10-01 00:00', TZ);
+    const { start, end } = getBusinessPeriodBounds(
+      start2,
+      start2.clone().add(1, 'month'),
+      '04:00',
+      TZ
+    );
+
+    expect(start.format('YYYY-MM-DD HH:mm')).toBe('2026-10-01 04:00');
+    expect(end.format('YYYY-MM-DD HH:mm:ss.SSS')).toBe('2026-11-01 03:59:59.999');
   });
 
   it('business_day with force keeps the canonical window instead of clamping', () => {

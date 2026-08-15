@@ -149,6 +149,37 @@ Moving the cut from 02:00 to 04:00 leaves 14/08 02:00 → 04:00 outside any bull
 That window contains **zero sales**, so no revenue is unreported; the discontinuity is
 purely an artefact of the settings change and is documented here.
 
+## Follow-up found while validating the annual bulletin
+
+Preparing the first annual bulletin surfaced two further defects in the weekly,
+monthly and annual periods. They share a cause: those periods were built with
+`new Date(...)` and `setHours`, which resolve in the **server's** timezone (UTC in
+production), and they ignored the business-day cut entirely.
+
+1. **Two-hour shift.** `setHours(0,0,0,0)` produced midnight UTC = 02:00 Paris, so
+   every weekly/monthly/annual period was offset by two hours and could split a
+   night in half.
+2. **Annual covered 366 days.** The rolling year ran from `date − 1 year` at 00:00
+   through `date` at 23:59:59.999 — inclusive at both ends, so the selected day was
+   counted as an extra day. Selecting 01/08/2026 returned 21 308 sales / €531 967,50
+   instead of the 21 253 / €530 744,50 that one actual year contains.
+
+Both are fixed by a shared `getBusinessPeriodBounds(startDay, endExclusiveDay, cut,
+tz)` helper: bounds are computed in the establishment timezone and land on the cut
+time, and the selected date is treated as the first day *outside* the period.
+
+| Closure | Selected | Period now |
+| --- | --- | --- |
+| Annual | 01/08/2026 | 01/08/2025 04:00 → 01/08/2026 03:59:59.999 |
+| Monthly | any day of 08/2026 | 01/08/2026 04:00 → 01/09/2026 03:59:59.999 |
+| Weekly | any day of the week | Monday 04:00 → next Monday 03:59:59.999 |
+
+Covered by tests, including one asserting the cut time holds across the October DST
+change.
+
+Note that annual bulletin **#215** (calendar 2025, created 08/01/2026) predates this
+fix and used the old boundaries. It is left untouched.
+
 ## Follow-ups
 
 - Auto-closure is left **disabled**. It should only be re-enabled after the scheduler

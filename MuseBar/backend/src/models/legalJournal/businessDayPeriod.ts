@@ -53,6 +53,35 @@ export function getCurrentBusinessDayPeriod(
   return { start, end };
 }
 
+/**
+ * Inclusive [start, end] for a multi-day closure, expressed in business days.
+ *
+ * Both bounds land on the cut time in the establishment timezone, so a period
+ * never splits a night: with a 04:00 cut, a period "ending 01/08" runs to
+ * 01/08 03:59:59.999 rather than to midnight.
+ *
+ * `endExclusive` is the first calendar day *after* the period.
+ */
+export function getBusinessPeriodBounds(
+  startDay: moment.Moment,
+  endExclusiveDay: moment.Moment,
+  closureTime: string,
+  timezone: string
+): { start: moment.Moment; end: moment.Moment } {
+  const [hours, minutes] = closureTime.split(':').map(Number);
+  const applyCut = (m: moment.Moment) =>
+    m
+      .clone()
+      .tz(timezone)
+      .startOf('day')
+      .set({ hour: hours, minute: minutes ?? 0, second: 0, millisecond: 0 });
+
+  return {
+    start: applyCut(startDay),
+    end: applyCut(endExclusiveDay).subtract(1, 'millisecond'),
+  };
+}
+
 export interface ResolveDailyClosurePeriodInput {
   mode: DailyClosureMode;
   /** Calendar date used for business_day mode (ignored for close_now). */

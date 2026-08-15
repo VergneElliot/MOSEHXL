@@ -8,7 +8,9 @@ import { JournalQueries } from './journalQueries';
 import { JournalSigning } from './journalSigning';
 import { pool } from '../../db/pool';
 import { DEFAULT_APP_TIMEZONE } from '../../config/timezone';
+import moment from 'moment-timezone';
 import {
+  getBusinessPeriodBounds,
   resolveDailyClosurePeriod,
   type DailyClosureMode,
 } from './businessDayPeriod';
@@ -68,6 +70,17 @@ function computeReconciliation(
 export const __testComputeReconciliation = computeReconciliation;
 
 export class ClosureOperations {
+  /** Business-day cut time and timezone used by every closure period. */
+  private static async getPeriodSettings(
+    establishmentId: string
+  ): Promise<{ cutTime: string; tz: string }> {
+    const settings = await ClosureSettingsModel.getClosureSettings(establishmentId);
+    return {
+      cutTime: settings.daily_closure_time || '02:00',
+      tz: settings.timezone || DEFAULT_APP_TIMEZONE,
+    };
+  }
+
   /**
    * Create daily closure bulletin for one establishment (multi-tenant: only that establishment's orders).
    * Period uses establishment closure settings (daily_closure_time + timezone):
@@ -307,21 +320,19 @@ export class ClosureOperations {
     fondDeCaisse?: number,
     closeImmediately = true
   ): Promise<ClosureBulletin> {
-    // Get the start of the week (Monday) and end of the week (Sunday)
-    const startOfWeek = new Date(date);
-    const dayOfWeek = startOfWeek.getDay();
-    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Sunday = 0, Monday = 1
-    startOfWeek.setDate(startOfWeek.getDate() - daysToMonday);
-    startOfWeek.setHours(0, 0, 0, 0);
-
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(endOfWeek.getDate() + 6);
-    endOfWeek.setHours(23, 59, 59, 999);
+    const { cutTime, tz } = await this.getPeriodSettings(establishmentId);
+    const monday = moment.tz(date, tz).startOf('isoWeek');
+    const { start, end } = getBusinessPeriodBounds(
+      monday,
+      monday.clone().add(7, 'days'),
+      cutTime,
+      tz
+    );
 
     return await this.createPeriodClosure(
       'WEEKLY',
-      startOfWeek,
-      endOfWeek,
+      start.toDate(),
+      end.toDate(),
       date,
       establishmentId,
       force,
@@ -340,14 +351,19 @@ export class ClosureOperations {
     fondDeCaisse?: number,
     closeImmediately = true
   ): Promise<ClosureBulletin> {
-    // Get the start and end of the month
-    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-    const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+    const { cutTime, tz } = await this.getPeriodSettings(establishmentId);
+    const monthStart = moment.tz(date, tz).startOf('month');
+    const { start, end } = getBusinessPeriodBounds(
+      monthStart,
+      monthStart.clone().add(1, 'month'),
+      cutTime,
+      tz
+    );
 
     return await this.createPeriodClosure(
       'MONTHLY',
-      startOfMonth,
-      endOfMonth,
+      start.toDate(),
+      end.toDate(),
       date,
       establishmentId,
       force,
@@ -366,22 +382,24 @@ export class ClosureOperations {
     fondDeCaisse?: number,
     closeImmediately = true
   ): Promise<ClosureBulletin> {
-    // Rolling year: from one year before the selected date (00:00) through the
-    // selected date (23:59:59.999). Annual bulletins are intentionally NOT tied to
-    // the calendar year: fiscal years can end on any date, and venues may go live
-    // mid-year, so the operator picks the closing date and gets the year leading
-    // up to it (e.g. selected 2026-08-01 → period 2025-08-01 → 2026-08-01).
-    const startOfPeriod = new Date(date);
-    startOfPeriod.setFullYear(startOfPeriod.getFullYear() - 1);
-    startOfPeriod.setHours(0, 0, 0, 0);
-
-    const endOfPeriod = new Date(date);
-    endOfPeriod.setHours(23, 59, 59, 999);
+    // Rolling year ending at the selected date, which is treated as the first day
+    // *outside* the period: selecting 01/08/2026 yields 01/08/2025 → 01/08/2026 at
+    // the cut time, i.e. exactly one year with no split night and no extra day.
+    // Annual bulletins are intentionally not tied to the calendar year: fiscal
+    // years can end on any date and venues may go live mid-year.
+    const { cutTime, tz } = await this.getPeriodSettings(establishmentId);
+    const endExclusive = moment.tz(date, tz).startOf('day');
+    const { start, end } = getBusinessPeriodBounds(
+      endExclusive.clone().subtract(1, 'year'),
+      endExclusive,
+      cutTime,
+      tz
+    );
 
     return await this.createPeriodClosure(
       'ANNUAL',
-      startOfPeriod,
-      endOfPeriod,
+      start.toDate(),
+      end.toDate(),
       date,
       establishmentId,
       force,
