@@ -254,6 +254,7 @@ export async function getLastClosedDailyPeriodEnd(establishmentId: string): Prom
       FROM closure_bulletins
       WHERE closure_type = 'DAILY'
         AND is_closed = TRUE
+        AND voided_at IS NULL
         AND (establishment_id IS NOT DISTINCT FROM $1)
       ORDER BY period_end DESC, id DESC
       LIMIT 1
@@ -275,6 +276,7 @@ export async function closureBulletinExists(
   const query = `
     SELECT id FROM closure_bulletins
     WHERE closure_type = $1 AND period_start = $2 AND period_end = $3
+      AND voided_at IS NULL
       AND (establishment_id IS NOT DISTINCT FROM $4)
   `;
   const result = await pool.query(query, [type, startDate, endDate, establishmentId]);
@@ -296,6 +298,7 @@ export async function findClosedDailyBulletinsForBusinessDay(
     FROM closure_bulletins
     WHERE closure_type = 'DAILY'
       AND is_closed = TRUE
+      AND voided_at IS NULL
       AND (establishment_id IS NOT DISTINCT FROM $1)
       AND (timezone($2, period_start))::date = (timezone($2, $3::timestamptz))::date
     ORDER BY total_amount DESC, closed_at DESC NULLS LAST, id DESC

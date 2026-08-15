@@ -139,6 +139,11 @@ export interface ClosureBulletin {
   created_at: string;
   tips_total?: number;
   change_total?: number;
+  /** Set when the bulletin was issued in error; it is kept in the archive unchanged. */
+  voided_at?: string | null;
+  voided_by?: string | null;
+  void_reason?: string | null;
+  superseded_by_bulletin_id?: number | null;
 }
 
 export type ClosureTodayBulletin = Omit<ClosureBulletin, 'total_transactions'>;

@@ -308,6 +308,17 @@ async function handleShutdownSignal(signal: NodeJS.Signals) {
   }
 }
 
+// A rejected promise in a background job (schedulers, monitors, fire-and-forget
+// emails) must never take the POS down mid-service. Log it and keep serving;
+// request-scoped failures are still handled by the error middleware.
+process.on('unhandledRejection', (reason) => {
+  logger.error(
+    'Unhandled promise rejection (process kept alive)',
+    reason instanceof Error ? reason : new Error(String(reason)),
+    'PROCESS'
+  );
+});
+
 process.on('SIGINT', () => {
   void handleShutdownSignal('SIGINT');
 });

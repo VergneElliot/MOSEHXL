@@ -35,10 +35,9 @@ export class ClosureScheduler {
         await this.checkAndExecuteClosure();
       } catch (error) {
         // Error in closure scheduler
-        await AuditTrailModel.logAction({
+        await AuditTrailModel.logActionBestEffort({
           action_type: 'AUTO_CLOSURE_ERROR',
           action_details: { error: error instanceof Error ? error.message : 'Unknown error' },
-          ip_address: 'system',
           user_agent: 'ClosureScheduler'
         });
       }
@@ -190,7 +189,7 @@ export class ClosureScheduler {
           journalError instanceof Error ? journalError : new Error(String(journalError)),
           'LEGAL_JOURNAL'
         );
-        await AuditTrailModel.logAction({
+        await AuditTrailModel.logActionBestEffort({
           action_type: 'AUTO_CLOSURE_JOURNAL_APPEND_FAILED',
           resource_type: 'CLOSURE_BULLETIN',
           resource_id: closureBulletin.id?.toString(),
@@ -201,7 +200,6 @@ export class ClosureScheduler {
             closure_time: now.toISOString(),
             error: journalError instanceof Error ? journalError.message : 'Unknown error',
           },
-          ip_address: 'system',
           user_agent: 'ClosureScheduler'
         });
 
@@ -222,7 +220,7 @@ export class ClosureScheduler {
         throw new Error(`Failed to finalize auto-closure bulletin ${closureId}`);
       }
 
-      await AuditTrailModel.logAction({
+      await AuditTrailModel.logActionBestEffort({
         action_type: 'AUTO_CLOSURE_EXECUTED',
         resource_type: 'CLOSURE_BULLETIN',
         resource_id: closureId.toString(),
@@ -236,7 +234,6 @@ export class ClosureScheduler {
           trigger: 'AUTOMATIC',
           journal_sequence_number: journalSequenceNumber,
         },
-        ip_address: 'system',
         user_agent: 'ClosureScheduler'
       });
 
@@ -253,14 +250,13 @@ export class ClosureScheduler {
     } catch (error) {
       // Failed to execute automatic closure
       
-      await AuditTrailModel.logAction({
+      await AuditTrailModel.logActionBestEffort({
         action_type: 'AUTO_CLOSURE_FAILED',
         action_details: { 
           error: error instanceof Error ? error.message : 'Unknown error',
           establishment_id: establishmentId,
           closure_time: now.toISOString()
         },
-        ip_address: 'system',
         user_agent: 'ClosureScheduler'
       });
       

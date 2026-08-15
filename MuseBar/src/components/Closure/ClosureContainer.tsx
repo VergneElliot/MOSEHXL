@@ -14,6 +14,7 @@ import {
   MenuItem,
 } from '@mui/material';
 import { Add } from '@mui/icons-material';
+import { ApiService } from '../../services/apiService';
 import { useClosureState } from '../../hooks/useClosureState';
 import { useClosureAPI } from '../../hooks/useClosureAPI';
 import type { ClosureBulletin } from '../../hooks/useClosureState';
@@ -91,6 +92,38 @@ const ClosureContainer: React.FC = () => {
 
   const handleOpenBulletinDialog = (bulletin: ClosureBulletin) => {
     actions.openPrintDialog(bulletin);
+  };
+
+  const handleVoidBulletin = async (bulletin: ClosureBulletin) => {
+    const reason = window.prompt(
+      `Annuler le bulletin #${bulletin.id} (${formatDate(bulletin.period_start)} — ` +
+        `${formatCurrency(bulletin.total_amount)}) ?\n\n` +
+        'Le bulletin est conservé tel quel dans l’archive légale et marqué comme annulé. ' +
+        'Émettez ensuite un bulletin correctif pour la période.\n\n' +
+        'Motif de l’annulation (10 caractères minimum) :'
+    );
+    if (reason === null) return;
+    if (reason.trim().length < 10) {
+      actions.showError('Un motif d’au moins 10 caractères est requis.');
+      return;
+    }
+
+    try {
+      await ApiService.getInstance().post(`/legal/closure/bulletins/${bulletin.id}/void`, {
+        reason: reason.trim(),
+      });
+      actions.showSuccess(`Bulletin #${bulletin.id} annulé.`);
+      await api.loadBulletins({
+        limit: bulletinsRowsPerPage,
+        offset: bulletinsPage * bulletinsRowsPerPage,
+        type: closureTypeFilter === 'ALL' ? undefined : closureTypeFilter,
+      });
+      await api.loadTodayStatus();
+    } catch (err) {
+      actions.showError(
+        err instanceof Error ? err.message : 'Erreur lors de l’annulation du bulletin'
+      );
+    }
   };
 
   const getClosureTypeLabel = (type: string): string => {
@@ -194,6 +227,7 @@ const ClosureContainer: React.FC = () => {
           setBulletinsPage(0);
         }}
         onOpenBulletinDialog={handleOpenBulletinDialog}
+        onVoidBulletin={handleVoidBulletin}
         formatCurrency={formatCurrency}
         formatDate={formatDate}
         getClosureTypeLabel={getClosureTypeLabel}
@@ -219,9 +253,7 @@ const ClosureContainer: React.FC = () => {
       <CreateClosureDialog
         open={state.showCreateDialog}
         onClose={() => actions.setShowCreateDialog(false)}
-        onCreate={async ({ date, type, force, fond_de_caisse, email_recipients }) =>
-          api.createClosure({ date, type, force, fond_de_caisse, email_recipients })
-        }
+        onCreate={async (payload) => api.createClosure(payload)}
         creating={state.creating}
         selectedDate={state.selectedDate}
         selectedClosureType={state.selectedClosureType}

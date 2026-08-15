@@ -94,6 +94,7 @@ export class ClosureOperations {
       closureTime: cutTime,
       timezone: tz,
       lastClosedPeriodEnd,
+      force,
     });
 
     // Check if closure already exists for this establishment
@@ -126,6 +127,18 @@ export class ClosureOperations {
 
     const { paymentBreakdown } = computePaymentBreakdownFromOrders(orders, subBills);
     const totalTransactions = orders.length;
+
+    // An empty daily bulletin is almost always the wrong day rather than a real
+    // day off, and once closed it blankets that period. Make the operator confirm.
+    if (totalTransactions === 0 && !force) {
+      throw new Error(
+        `Aucune vente entre le ${start.format('DD/MM/YYYY HH:mm')} et le ` +
+          `${end.format('DD/MM/YYYY HH:mm')}. Vérifiez la date : après l’heure de coupure ` +
+          `(${cutTime}), la nuit qui vient de s’achever porte la date de la veille. ` +
+          'Cochez « Forcer la création » s’il s’agit réellement d’une journée sans vente.'
+      );
+    }
+
     const vatBreakdown = await getExactVatBreakdownFromOrderItems(pool, orderIds);
     const computedTotalAmount = vatBreakdown.vat_10.ttc + vatBreakdown.vat_20.ttc;
     const computedTotalVat = vatBreakdown.vat_10.vat + vatBreakdown.vat_20.vat;
@@ -197,6 +210,90 @@ export class ClosureOperations {
       closureHash,
       establishmentId,
       closeImmediately
+    );
+  }
+
+  /**
+   * Resolve what a daily closure would cover, without writing anything.
+   * Lets the POS show the exact period and totals before the operator commits,
+   * which is what makes a wrong-day closure impossible to miss.
+   */
+  static async previewDailyClosure(
+    date: Date,
+    establishmentId: string,
+    mode: DailyClosureMode = 'business_day',
+    force = false
+  ): Promise<{
+    period_start: string;
+    period_end: string;
+    total_transactions: number;
+    total_amount: number;
+    closure_time: string;
+    timezone: string;
+  }> {
+    const settings = await ClosureSettingsModel.getClosureSettings(establishmentId);
+    const tz = settings.timezone || DEFAULT_APP_TIMEZONE;
+    const cutTime = settings.daily_closure_time || '02:00';
+    const lastClosedPeriodEnd = await JournalQueries.getLastClosedDailyPeriodEnd(establishmentId);
+
+    const { start, end } = resolveDailyClosurePeriod({
+      mode,
+      date,
+      closureTime: cutTime,
+      timezone: tz,
+      lastClosedPeriodEnd,
+      force,
+    });
+
+    const result = await pool.query(
+      `
+        SELECT COUNT(*)::int AS n, COALESCE(SUM(total_amount), 0) AS total
+        FROM orders
+        WHERE created_at >= $1 AND created_at <= $2
+          AND status IN ('completed', 'paid')
+          AND establishment_id = $3
+      `,
+      [start.toDate(), end.toDate(), establishmentId]
+    );
+    const row = result.rows[0] as { n?: number; total?: string | number } | undefined;
+
+    return {
+      period_start: start.toISOString(),
+      period_end: end.toISOString(),
+      total_transactions: Number(row?.n ?? 0),
+      total_amount: parseFloat(String(row?.total ?? 0)) || 0,
+      closure_time: cutTime,
+      timezone: tz,
+    };
+  }
+
+  /**
+   * Annul a closed bulletin issued in error and optionally record which
+   * corrective bulletin replaces it. The original is retained in full.
+   */
+  static async voidClosureBulletin(
+    closureBulletinId: number,
+    establishmentId: string,
+    reason: string,
+    voidedBy: string
+  ): Promise<ClosureBulletin | null> {
+    return await JournalQueries.voidClosureBulletin(
+      closureBulletinId,
+      establishmentId,
+      reason,
+      voidedBy
+    );
+  }
+
+  static async setSupersededBy(
+    voidedBulletinId: number,
+    supersedingBulletinId: number,
+    establishmentId: string
+  ): Promise<void> {
+    return await JournalQueries.setSupersededBy(
+      voidedBulletinId,
+      supersedingBulletinId,
+      establishmentId
     );
   }
 

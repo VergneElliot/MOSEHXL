@@ -74,6 +74,39 @@ describe('resolveDailyClosurePeriod', () => {
         lastClosedPeriodEnd: lastEnd,
         now,
       })
-    ).toThrow(/déjà à jour/i);
+    ).toThrow(/Aucune période ouverte à clôturer/i);
+  });
+
+  it('business_day rejects a window that has not started yet', () => {
+    // 02:11 on the 15th with a 02:00 cut: the night that just ended is the 14th's
+    // business day, so closing "the 15th" would blanket a night still to come.
+    const now = moment.tz('2026-08-15 02:11', TZ).toDate();
+    expect(() =>
+      resolveDailyClosurePeriod({
+        mode: 'business_day',
+        date: moment.tz('2026-08-16 00:00', TZ).toDate(),
+        closureTime: '02:00',
+        timezone: TZ,
+        lastClosedPeriodEnd: null,
+        now,
+      })
+    ).toThrow(/pas encore commencé/i);
+  });
+
+  it('business_day with force keeps the canonical window instead of clamping', () => {
+    const now = moment.tz('2026-08-16 12:00', TZ).toDate();
+    const { start, end } = resolveDailyClosurePeriod({
+      mode: 'business_day',
+      date: moment.tz('2026-08-15 00:00', TZ).toDate(),
+      closureTime: '02:00',
+      timezone: TZ,
+      // An erroneous bulletin already covers well past this day.
+      lastClosedPeriodEnd: moment.tz('2026-08-17 02:00', TZ).toDate(),
+      now,
+      force: true,
+    });
+
+    expect(start.format('YYYY-MM-DD HH:mm')).toBe('2026-08-15 02:00');
+    expect(end.format('YYYY-MM-DD HH:mm:ss.SSS')).toBe('2026-08-16 01:59:59.999');
   });
 });

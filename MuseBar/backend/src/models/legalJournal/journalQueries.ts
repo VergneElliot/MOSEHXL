@@ -210,6 +210,32 @@ export class JournalQueries {
     return await journalAppend.deleteOpenClosureBulletin(closureBulletinId, establishmentId);
   }
 
+  static async voidClosureBulletin(
+    closureBulletinId: number,
+    establishmentId: string,
+    reason: string,
+    voidedBy: string
+  ): Promise<ClosureBulletin | null> {
+    return await journalAppend.voidClosureBulletin(
+      closureBulletinId,
+      establishmentId,
+      reason,
+      voidedBy
+    );
+  }
+
+  static async setSupersededBy(
+    voidedBulletinId: number,
+    supersedingBulletinId: number,
+    establishmentId: string
+  ): Promise<void> {
+    return await journalAppend.setSupersededBy(
+      voidedBulletinId,
+      supersedingBulletinId,
+      establishmentId
+    );
+  }
+
   static async closureBulletinExists(
     type: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL',
     startDate: Date,

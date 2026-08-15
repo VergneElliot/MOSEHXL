@@ -14,7 +14,7 @@ import {
   Typography,
   TablePagination,
 } from '@mui/material';
-import { Visibility } from '@mui/icons-material';
+import { Visibility, Block } from '@mui/icons-material';
 import { ClosureBulletin } from '../../hooks/useClosureState';
 
 interface BulletinsTableProps {
@@ -26,6 +26,7 @@ interface BulletinsTableProps {
   onPageChange: (newPage: number) => void;
   onRowsPerPageChange: (newRowsPerPage: number) => void;
   onOpenBulletinDialog: (bulletin: ClosureBulletin) => void;
+  onVoidBulletin?: (bulletin: ClosureBulletin) => void;
   formatCurrency: (amount: number) => string;
   formatDate: (dateString: string) => string;
   getClosureTypeLabel: (type: string) => string;
@@ -40,6 +41,7 @@ const BulletinsTable: React.FC<BulletinsTableProps> = ({
   onPageChange,
   onRowsPerPageChange,
   onOpenBulletinDialog,
+  onVoidBulletin,
   formatCurrency,
   formatDate,
   getClosureTypeLabel,
@@ -74,8 +76,14 @@ const BulletinsTable: React.FC<BulletinsTableProps> = ({
           </TableRow>
         </TableHead>
         <TableBody>
-          {bulletins.map(bulletin => (
-            <TableRow key={bulletin.id} hover>
+          {bulletins.map(bulletin => {
+            const isVoided = Boolean(bulletin.voided_at);
+            return (
+            <TableRow
+              key={bulletin.id}
+              hover
+              sx={isVoided ? { opacity: 0.6, '& td': { textDecoration: 'line-through' } } : undefined}
+            >
               <TableCell>
                 <Chip
                   label={getClosureTypeLabel(bulletin.closure_type)}
@@ -96,24 +104,42 @@ const BulletinsTable: React.FC<BulletinsTableProps> = ({
                   {formatCurrency(bulletin.total_amount)}
                 </Typography>
               </TableCell>
-              <TableCell align="center">
-                <Chip
-                  label={bulletin.is_closed ? 'Clôturé' : 'En cours'}
-                  size="small"
-                  color={bulletin.is_closed ? 'success' : 'warning'}
-                />
+              <TableCell align="center" sx={{ textDecoration: 'none !important' }}>
+                {isVoided ? (
+                  <Tooltip title={bulletin.void_reason ?? 'Bulletin annulé'}>
+                    <Chip label="Annulé" size="small" color="error" />
+                  </Tooltip>
+                ) : (
+                  <Chip
+                    label={bulletin.is_closed ? 'Clôturé' : 'En cours'}
+                    size="small"
+                    color={bulletin.is_closed ? 'success' : 'warning'}
+                  />
+                )}
               </TableCell>
-              <TableCell align="center">
+              <TableCell align="center" sx={{ textDecoration: 'none !important' }}>
                 <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
                   <Tooltip title="Ouvrir (aperçu, impression, export)">
                     <IconButton size="small" onClick={() => onOpenBulletinDialog(bulletin)}>
                       <Visibility />
                     </IconButton>
                   </Tooltip>
+                  {onVoidBulletin && !isVoided && (
+                    <Tooltip title="Annuler ce bulletin (émis par erreur)">
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => onVoidBulletin(bulletin)}
+                      >
+                        <Block />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                 </Box>
               </TableCell>
             </TableRow>
-          ))}
+            );
+          })}
         </TableBody>
       </Table>
 

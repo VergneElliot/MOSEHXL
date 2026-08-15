@@ -15,6 +15,29 @@ export interface AuditEntry {
   timestamp: Date;
 }
 
+const IPV4_REGEX = /^(\d{1,3}\.){3}\d{1,3}$/;
+
+/**
+ * audit_trail.ip_address is an `inet` column: any non-IP value makes the INSERT
+ * fail. Background jobs legitimately have no client IP, so coerce those to NULL
+ * instead of letting Postgres reject the whole row.
+ */
+function toInetOrNull(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const raw = value.trim();
+  if (!raw) return null;
+  const candidate = raw.startsWith('::ffff:') ? raw.slice(7) : raw;
+  if (IPV4_REGEX.test(candidate)) {
+    const octetsValid = candidate
+      .split('.')
+      .every((octet) => Number(octet) >= 0 && Number(octet) <= 255);
+    return octetsValid ? candidate : null;
+  }
+  // IPv6: hex groups and colons only (also accepts the ::ffff:v4 form above).
+  if (/^[0-9a-fA-F:]+$/.test(raw) && raw.includes(':')) return raw;
+  return null;
+}
+
 export class AuditTrailModel {
   private static async resolveFallbackEstablishmentId(): Promise<string | null> {
     const result = await pool.query(
@@ -66,7 +89,7 @@ export class AuditTrailModel {
       resource_type || null,
       resource_id || null,
       action_details ? JSON.stringify(action_details) : null,
-      ip_address || null,
+      toInetOrNull(ip_address),
       user_agent || null,
       session_id || null,
       est
@@ -79,6 +102,19 @@ export class AuditTrailModel {
     } catch (err) {
       logError('[AUDIT LOG] Error logging action', err instanceof Error ? err : new Error(String(err)));
       throw err;
+    }
+  }
+
+  /**
+   * Audit write for background jobs (schedulers, monitors). Never rejects:
+   * a failed audit row must not become an unhandled rejection that kills the
+   * process while the POS is in service.
+   */
+  static async logActionBestEffort(entry: Partial<AuditEntry>): Promise<void> {
+    try {
+      await this.logAction(entry);
+    } catch {
+      // Already reported by logAction.
     }
   }
 

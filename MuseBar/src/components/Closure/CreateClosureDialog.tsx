@@ -22,6 +22,26 @@ import { apiCore } from '../../services/api';
 export type ClosureType = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL';
 export type DailyClosureMode = 'business_day' | 'close_now';
 
+type ClosurePreview =
+  | {
+      ok: true;
+      period_start: string;
+      period_end: string;
+      total_transactions: number;
+      total_amount: number;
+    }
+  | { ok: false; reason: string };
+
+const PARIS_DATETIME = new Intl.DateTimeFormat('fr-FR', {
+  dateStyle: 'short',
+  timeStyle: 'short',
+});
+
+function formatPeriodBound(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : PARIS_DATETIME.format(d);
+}
+
 interface CreateClosureDialogProps {
   open: boolean;
   onClose: () => void;
@@ -60,6 +80,8 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
   const [emailRecipients, setEmailRecipients] = useState('');
   const [dailyMode, setDailyMode] = useState<DailyClosureMode>('close_now');
   const [cutTime, setCutTime] = useState('02:00');
+  const [preview, setPreview] = useState<ClosurePreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -95,6 +117,44 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
     };
   }, [open, defaultFondDeCaisse]);
 
+  // Daily bulletins are the ones that can silently land on the wrong night, so
+  // resolve the exact window server-side and show it before anything is written.
+  useEffect(() => {
+    if (!open || selectedClosureType !== 'DAILY') {
+      setPreview(null);
+      return;
+    }
+    if (dailyMode === 'business_day' && !selectedDate) {
+      setPreview(null);
+      return;
+    }
+
+    let cancelled = false;
+    setPreviewLoading(true);
+
+    const params = new URLSearchParams({ mode: dailyMode });
+    if (dailyMode === 'business_day') params.set('date', selectedDate);
+    if (forceCreation) params.set('force', 'true');
+
+    (async () => {
+      try {
+        const res = await apiCore.request<ClosurePreview>(
+          `/legal/closure/daily-preview?${params.toString()}`,
+          { method: 'GET' }
+        );
+        if (!cancelled) setPreview(res ?? null);
+      } catch {
+        if (!cancelled) setPreview(null);
+      } finally {
+        if (!cancelled) setPreviewLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, selectedClosureType, dailyMode, selectedDate, forceCreation]);
+
   const fondDeCaisseNumber = useMemo(() => {
     const n = parseFloat(fondDeCaisse.replace(',', '.'));
     if (!Number.isFinite(n) || n < 0) return null;
@@ -113,8 +173,14 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
   const isDaily = selectedClosureType === 'DAILY';
   const needsDate = !isDaily || dailyMode === 'business_day';
 
+  const previewBlocks = isDaily && preview !== null && preview.ok === false;
+  const previewIsEmpty = isDaily && preview?.ok === true && preview.total_transactions === 0;
+
   const canCreate =
     !creating &&
+    !previewLoading &&
+    !previewBlocks &&
+    (!previewIsEmpty || forceCreation) &&
     (!needsDate || selectedDate.trim().length > 0) &&
     !!selectedClosureType &&
     fondDeCaisseNumber !== null;
@@ -193,6 +259,51 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
                     : undefined
               }
             />
+          )}
+
+          {isDaily && (
+            <Box>
+              {previewLoading && (
+                <Alert severity="info" icon={false}>
+                  Calcul de la période…
+                </Alert>
+              )}
+              {!previewLoading && preview?.ok === false && (
+                <Alert severity="error">
+                  <Typography variant="subtitle2">Clôture impossible</Typography>
+                  {preview.reason}
+                </Alert>
+              )}
+              {!previewLoading && preview?.ok === true && (
+                <Alert severity={preview.total_transactions === 0 ? 'warning' : 'success'}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Cette clôture couvrira
+                  </Typography>
+                  <Typography variant="body2">
+                    Du <strong>{formatPeriodBound(preview.period_start)}</strong> au{' '}
+                    <strong>{formatPeriodBound(preview.period_end)}</strong>
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>{preview.total_transactions}</strong> vente
+                    {preview.total_transactions > 1 ? 's' : ''} —{' '}
+                    <strong>
+                      {preview.total_amount.toLocaleString('fr-FR', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}{' '}
+                      €
+                    </strong>
+                  </Typography>
+                  {preview.total_transactions === 0 && (
+                    <Typography variant="body2" sx={{ mt: 1 }}>
+                      Aucune vente sur cette période. Après l’heure de coupure ({cutTime}), la nuit
+                      qui vient de s’achever porte la date de la veille. Cochez « Forcer la
+                      création » s’il s’agit réellement d’une journée sans vente.
+                    </Typography>
+                  )}
+                </Alert>
+              )}
+            </Box>
           )}
 
           <TextField

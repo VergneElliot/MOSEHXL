@@ -221,6 +221,46 @@ export class LegalJournalModel {
   static async getLastFondDeCaisse(establishmentId: string): Promise<number | null> {
     return await JournalQueries.getLastFondDeCaisse(establishmentId);
   }
+
+  static async previewDailyClosure(
+    date: Date,
+    establishmentId: string,
+    mode?: import('./businessDayPeriod').DailyClosureMode,
+    force?: boolean
+  ) {
+    return await ClosureOperations.previewDailyClosure(
+      date,
+      establishmentId,
+      mode ?? 'business_day',
+      force ?? false
+    );
+  }
+
+  static async voidClosureBulletin(
+    closureBulletinId: number,
+    establishmentId: string,
+    reason: string,
+    voidedBy: string
+  ) {
+    return await ClosureOperations.voidClosureBulletin(
+      closureBulletinId,
+      establishmentId,
+      reason,
+      voidedBy
+    );
+  }
+
+  static async setSupersededBy(
+    voidedBulletinId: number,
+    supersedingBulletinId: number,
+    establishmentId: string
+  ) {
+    return await ClosureOperations.setSupersededBy(
+      voidedBulletinId,
+      supersedingBulletinId,
+      establishmentId
+    );
+  }
 }
 
 export default LegalJournalModel;

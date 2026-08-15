@@ -59,15 +59,29 @@ export interface ResolveDailyClosurePeriodInput {
   date: Date;
   closureTime: string;
   timezone: string;
-  /** period_end of the last closed DAILY bulletin, if any. */
+  /** period_end of the last closed, non-annulled DAILY bulletin, if any. */
   lastClosedPeriodEnd: Date | null;
   now?: Date;
+  /**
+   * Corrective run. Skips the continuity clamp and the "already covered" guard
+   * so a replacement bulletin can span a period an erroneous bulletin already
+   * touched. Never skips the future-window guard.
+   */
+  force?: boolean;
 }
+
+const FUTURE_WINDOW_ERROR =
+  'Cette journée commerciale n’a pas encore commencé : il n’y a rien à clôturer. ' +
+  'Après l’heure de coupure, la nuit qui vient de se terminer correspond à la date de la veille.';
 
 /**
  * Resolve the inclusive [start, end] window for a daily closure.
  * - business_day: canonical cut→cut+1d for `date`, clamped after last closed period_end
  * - close_now: last closed period_end (+1ms) → now (or current business-day start if none)
+ *
+ * A window that starts in the future is always rejected: that is the shape of the
+ * "closed the wrong day just after the cut time" mistake, which otherwise produces
+ * an empty bulletin that blankets a night that has not happened yet.
  */
 export function resolveDailyClosurePeriod(
   input: ResolveDailyClosurePeriodInput
@@ -79,10 +93,13 @@ export function resolveDailyClosurePeriod(
     timezone,
     lastClosedPeriodEnd,
     now = new Date(),
+    force = false,
   } = input;
 
+  const nowTz = moment.tz(now, timezone);
+
   if (mode === 'close_now') {
-    const end = moment.tz(now, timezone);
+    const end = nowTz.clone();
     let start: moment.Moment;
     if (lastClosedPeriodEnd) {
       start = moment.tz(lastClosedPeriodEnd, timezone).add(1, 'millisecond');
@@ -90,21 +107,35 @@ export function resolveDailyClosurePeriod(
       start = getCurrentBusinessDayPeriod(closureTime, timezone).start;
     }
     if (start.isAfter(end)) {
-      throw new Error('Aucune période ouverte à clôturer (déjà à jour)');
+      throw new Error(
+        'Aucune période ouverte à clôturer : la dernière clôture couvre déjà une période ' +
+          `qui se termine le ${start.format('DD/MM/YYYY à HH:mm')}. ` +
+          'Si cette clôture est erronée, annulez-la avant d’en créer une nouvelle.'
+      );
     }
     return { start, end };
   }
 
   let { start, end } = getBusinessDayPeriod(date, closureTime, timezone);
-  if (lastClosedPeriodEnd) {
+
+  if (start.isAfter(nowTz)) {
+    throw new Error(FUTURE_WINDOW_ERROR);
+  }
+
+  if (lastClosedPeriodEnd && !force) {
     const last = moment.tz(lastClosedPeriodEnd, timezone);
     if (last.isSameOrAfter(end)) {
-      throw new Error('Cette journée commerciale est déjà couverte par une clôture précédente');
+      throw new Error(
+        'Cette journée commerciale est déjà couverte par une clôture précédente. ' +
+          'Utilisez « Forcer la création » pour émettre un bulletin correctif, ' +
+          'ou annulez d’abord le bulletin erroné.'
+      );
     }
     if (last.isSameOrAfter(start)) {
       start = last.clone().add(1, 'millisecond');
     }
   }
+
   if (start.isAfter(end)) {
     throw new Error('Fenêtre de clôture vide pour cette journée');
   }

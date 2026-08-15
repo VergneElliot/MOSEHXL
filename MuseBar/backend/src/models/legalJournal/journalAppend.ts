@@ -258,6 +258,49 @@ export async function closeOpenClosureBulletin(
   return result.rows[0] ?? null;
 }
 
+/**
+ * Annul a closed bulletin issued in error. Fiscal content is never touched:
+ * only the annulment stamp is written, and only once (enforced by the
+ * prevent_closed_bulletin_modification trigger).
+ */
+export async function voidClosureBulletin(
+  closureBulletinId: number,
+  establishmentId: string,
+  reason: string,
+  voidedBy: string
+): Promise<ClosureBulletin | null> {
+  const result = await pool.query(
+    `
+      UPDATE closure_bulletins
+      SET voided_at = NOW(), voided_by = $3, void_reason = $4
+      WHERE id = $1
+        AND establishment_id = $2
+        AND voided_at IS NULL
+      RETURNING *
+    `,
+    [closureBulletinId, establishmentId, voidedBy, reason]
+  );
+  return result.rows[0] ?? null;
+}
+
+/** Link an annulled bulletin to the corrective bulletin that replaces it. */
+export async function setSupersededBy(
+  voidedBulletinId: number,
+  supersedingBulletinId: number,
+  establishmentId: string
+): Promise<void> {
+  await pool.query(
+    `
+      UPDATE closure_bulletins
+      SET superseded_by_bulletin_id = $2
+      WHERE id = $1
+        AND establishment_id = $3
+        AND voided_at IS NOT NULL
+    `,
+    [voidedBulletinId, supersedingBulletinId, establishmentId]
+  );
+}
+
 export async function deleteOpenClosureBulletin(
   closureBulletinId: number,
   establishmentId: string

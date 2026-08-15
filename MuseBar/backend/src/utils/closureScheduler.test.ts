@@ -28,6 +28,7 @@ vi.mock('../models/legalJournal', () => ({
 vi.mock('../models/auditTrail', () => ({
   AuditTrailModel: {
     logAction: mocks.auditLogAction,
+    logActionBestEffort: mocks.auditLogAction,
   },
 }));
 
