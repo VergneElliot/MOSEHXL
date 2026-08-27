@@ -38,9 +38,16 @@ interface MenuContainerProps {
   categories: Category[];
   products: Product[];
   onDataUpdate: () => void;
+  /** Nested under Settings — softer page chrome. */
+  embedded?: boolean;
 }
 
-const MenuContainer: React.FC<MenuContainerProps> = ({ categories, products, onDataUpdate }) => {
+const MenuContainer: React.FC<MenuContainerProps> = ({
+  categories,
+  products,
+  onDataUpdate,
+  embedded = false,
+}) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -240,11 +247,15 @@ const MenuContainer: React.FC<MenuContainerProps> = ({ categories, products, onD
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant={isMobile ? 'h5' : 'h4'} component="h1" gutterBottom>
-          🍽️ Gestion du Menu
+      <Box sx={{ mb: embedded ? 2 : 3 }}>
+        <Typography
+          variant={embedded ? 'h5' : isMobile ? 'h5' : 'h4'}
+          component={embedded ? 'h2' : 'h1'}
+          gutterBottom
+        >
+          {embedded ? 'Gestion du menu' : '🍽️ Gestion du Menu'}
         </Typography>
-        <Box display="flex" justifyContent="space-between" alignItems="center">
+        <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
           <Typography variant="body2" color="textSecondary">
             Gérez vos catégories et produits pour organiser votre menu
           </Typography>

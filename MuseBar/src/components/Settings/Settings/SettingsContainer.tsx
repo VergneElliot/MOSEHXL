@@ -17,6 +17,9 @@ export const SettingsContainer: React.FC<SettingsProps> = ({
   timeUntilHappyHour = '',
   onHappyHourStatusUpdate = () => {},
   products = [],
+  categories = [],
+  onDataUpdate = () => {},
+  canManageMenu = false,
 }) => {
   const settingsHook = useSettings();
 
@@ -40,13 +43,16 @@ export const SettingsContainer: React.FC<SettingsProps> = ({
   }
 
   return (
-    <Box sx={{ width: '100%', maxWidth: 1200, mx: 'auto', p: 3 }}>
+    <Box sx={{ width: '100%', maxWidth: canManageMenu ? 1400 : 1200, mx: 'auto', p: 3 }}>
       <SettingsTabs
         settingsHook={settingsHook}
         isHappyHourActive={isHappyHourActive}
         timeUntilHappyHour={timeUntilHappyHour}
         onHappyHourStatusUpdate={onHappyHourStatusUpdate}
         products={products}
+        categories={categories}
+        onDataUpdate={onDataUpdate}
+        canManageMenu={canManageMenu}
       />
     </Box>
   );

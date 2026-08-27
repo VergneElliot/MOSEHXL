@@ -1,7 +1,6 @@
 import React, { Suspense, useCallback, useMemo, useState } from 'react';
 import { Box, Tabs, Tab, Paper, useTheme, useMediaQuery } from '@mui/material';
 import {
-  RestaurantMenu as MenuIcon,
   PointOfSale as POSIcon,
   History as HistoryIcon,
   Settings as SettingsIcon,
@@ -16,7 +15,6 @@ import {
   LazyClosureContainer,
   LazyFloorPlanConsultPanel,
   LazyHistoryContainer,
-  LazyMenuContainer,
   LazySettings,
   TabPanelFallback,
 } from './appLazyTabPanels';
@@ -129,7 +127,6 @@ const AppRouter: React.FC<AppRouterProps> = ({
       value: 'floor_plan',
       permission: PERMISSIONS.access_pos,
     },
-    { label: 'Menu', icon: <MenuIcon />, value: 'menu', permission: PERMISSIONS.access_menu },
     { label: 'Historique', icon: <HistoryIcon />, value: 'history', establishmentWide: true },
     {
       label: 'Paramètres',
@@ -167,6 +164,13 @@ const AppRouter: React.FC<AppRouterProps> = ({
         perms.includes(PERMISSIONS.access_user_management)
       );
     }
+    if (tab.value === 'settings') {
+      const perms = user?.permissions ?? [];
+      return (
+        perms.includes(PERMISSIONS.access_settings) ||
+        perms.includes(PERMISSIONS.access_menu)
+      );
+    }
     if (tab.establishmentAdminAlways && user?.role === 'establishment_admin') {
       return true;
     }
@@ -176,10 +180,12 @@ const AppRouter: React.FC<AppRouterProps> = ({
 
   const stepUpPermissionForTab = useCallback((tabValueKey: string): PermissionName | null => {
     switch (tabValueKey) {
-      case 'menu':
-        return PERMISSIONS.access_menu;
-      case 'settings':
+      case 'settings': {
+        const perms = user?.permissions ?? [];
+        if (perms.includes(PERMISSIONS.access_settings)) return PERMISSIONS.access_settings;
+        if (perms.includes(PERMISSIONS.access_menu)) return PERMISSIONS.access_menu;
         return PERMISSIONS.access_settings;
+      }
       case 'closures':
         return PERMISSIONS.access_closure;
       case 'administration':
@@ -187,7 +193,7 @@ const AppRouter: React.FC<AppRouterProps> = ({
       default:
         return null;
     }
-  }, []);
+  }, [user?.permissions]);
 
   const handleTabChange = useCallback(
     (_event: React.SyntheticEvent, newValue: number) => {
@@ -202,6 +208,11 @@ const AppRouter: React.FC<AppRouterProps> = ({
       if (
         pinActorHasPermission(actor, required) ||
         hasGrant(required) ||
+        (tab.value === 'settings' &&
+          (pinActorHasPermission(actor, PERMISSIONS.access_menu) ||
+            hasGrant(PERMISSIONS.access_menu) ||
+            pinActorHasPermission(actor, PERMISSIONS.access_settings) ||
+            hasGrant(PERMISSIONS.access_settings))) ||
         (tab.value === 'administration' &&
           actor &&
           (actor.role === 'establishment_admin' ||
@@ -315,15 +326,6 @@ const AppRouter: React.FC<AppRouterProps> = ({
                 <LazyFloorPlanConsultPanel />
               </Suspense>
             )}
-            {tab.value === 'menu' && (
-              <Suspense fallback={<TabPanelFallback />}>
-                <LazyMenuContainer
-                  categories={categories}
-                  products={products}
-                  onDataUpdate={onDataUpdate}
-                />
-              </Suspense>
-            )}
             {tab.value === 'history' && (
               <Suspense fallback={<TabPanelFallback />}>
                 <LazyHistoryContainer
@@ -338,6 +340,9 @@ const AppRouter: React.FC<AppRouterProps> = ({
                   timeUntilHappyHour={timeUntilHappyHour}
                   onHappyHourStatusUpdate={onHappyHourStatusUpdate}
                   products={products}
+                  categories={categories}
+                  onDataUpdate={onDataUpdate}
+                  canManageMenu={user?.permissions?.includes(PERMISSIONS.access_menu) ?? false}
                 />
               </Suspense>
             )}

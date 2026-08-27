@@ -3,8 +3,8 @@
  * Navigation and tab management for settings sections
  */
 
-import React, { useState } from 'react';
-import { Box, Tabs, Tab, Typography } from '@mui/material';
+import React, { Suspense, useCallback, useMemo, useState } from 'react';
+import { Box, Tabs, Tab, Typography, CircularProgress } from '@mui/material';
 import {
   Business as BusinessIcon,
   Schedule as ScheduleIcon,
@@ -12,6 +12,7 @@ import {
   LocalBar as HappyHourIcon,
   AccessTime as HoursIcon,
   Wifi as WifiIcon,
+  RestaurantMenu as MenuIcon,
 } from '@mui/icons-material';
 import { SettingsTab } from './types';
 import { EstablishmentSettings } from './EstablishmentSettings';
@@ -20,9 +21,14 @@ import { TimeClockNetworkSettings } from './TimeClockNetworkSettings';
 import { ClosureSettings } from './ClosureSettings';
 import { PrinterSetup } from '../../PrinterSetup';
 import { HappyHourControl } from '../../HappyHour';
-
-import { Product } from '../../../types';
+import { Product, Category } from '../../../types';
 import { UseSettingsReturn } from './types';
+import { useStepUpAuth } from '../../../contexts/StepUpAuthContext';
+import { PERMISSIONS } from '@mosehxl/types';
+
+const LazyMenuContainer = React.lazy(() =>
+  import('../../Menu').then((mod) => ({ default: mod.MenuContainer }))
+);
 
 interface SettingsTabsProps {
   settingsHook: UseSettingsReturn;
@@ -30,6 +36,9 @@ interface SettingsTabsProps {
   timeUntilHappyHour?: string;
   onHappyHourStatusUpdate?: () => void;
   products?: Product[];
+  categories?: Category[];
+  onDataUpdate?: () => void;
+  canManageMenu?: boolean;
 }
 
 /**
@@ -61,6 +70,14 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
+function MenuPanelFallback() {
+  return (
+    <Box display="flex" justifyContent="center" p={4}>
+      <CircularProgress />
+    </Box>
+  );
+}
+
 /**
  * Settings Tabs Component
  */
@@ -70,79 +87,130 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
   timeUntilHappyHour = '',
   onHappyHourStatusUpdate = () => {},
   products = [],
+  categories = [],
+  onDataUpdate = () => {},
+  canManageMenu = false,
 }) => {
   const [currentTab, setCurrentTab] = useState(0);
+  const { ensurePermission } = useStepUpAuth();
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    setCurrentTab(newValue);
-  };
+  const tabs: SettingsTab[] = useMemo(() => {
+    const base: SettingsTab[] = [
+      {
+        id: 'establishment',
+        label: "Établissement",
+        icon: <BusinessIcon />,
+        component: (
+          <EstablishmentSettings
+            businessInfoProps={{
+              businessInfo: settingsHook.state.businessInfo,
+              onUpdate: settingsHook.updateBusinessInfo,
+              onSave: settingsHook.saveBusinessInfo,
+              loading: settingsHook.infoSaving,
+              message: settingsHook.infoMessage,
+            }}
+          />
+        ),
+      },
+      {
+        id: 'opening_hours',
+        label: 'Plages de réservations',
+        icon: <HoursIcon />,
+        component: <OpeningHoursSettingsPanel />,
+      },
+      {
+        id: 'time_clock_network',
+        label: 'Pointage',
+        icon: <WifiIcon />,
+        component: <TimeClockNetworkSettings />,
+      },
+      {
+        id: 'happy_hour',
+        label: 'Happy Hour',
+        icon: <HappyHourIcon />,
+        component: (
+          <HappyHourControl
+            isActive={isHappyHourActive}
+            timeUntil={timeUntilHappyHour}
+            onStatusUpdate={onHappyHourStatusUpdate}
+            products={products}
+          />
+        ),
+      },
+      {
+        id: 'closure',
+        label: 'Clôture Automatique',
+        icon: <ScheduleIcon />,
+        component: (
+          <ClosureSettings
+            closureSettings={settingsHook.state.closureSettings}
+            schedulerStatus={settingsHook.state.schedulerStatus}
+            onUpdate={settingsHook.updateClosureSettings}
+            onSave={settingsHook.saveClosureSettings}
+            onTriggerManualCheck={settingsHook.triggerManualCheck}
+            loading={settingsHook.saving}
+          />
+        ),
+      },
+      {
+        id: 'printer',
+        label: 'Imprimante',
+        icon: <PrintIcon />,
+        component: (
+          <PrinterSetup embedded />
+        ),
+      },
+    ];
 
-  const tabs: SettingsTab[] = [
-    {
-      id: 'establishment',
-      label: "Établissement",
-      icon: <BusinessIcon />,
-      component: (
-        <EstablishmentSettings
-          businessInfoProps={{
-            businessInfo: settingsHook.state.businessInfo,
-            onUpdate: settingsHook.updateBusinessInfo,
-            onSave: settingsHook.saveBusinessInfo,
-            loading: settingsHook.infoSaving,
-            message: settingsHook.infoMessage,
-          }}
-        />
-      ),
+    if (canManageMenu) {
+      base.splice(1, 0, {
+        id: 'menu',
+        label: 'Menu',
+        icon: <MenuIcon />,
+        component: (
+          <Suspense fallback={<MenuPanelFallback />}>
+            <LazyMenuContainer
+              categories={categories}
+              products={products}
+              onDataUpdate={onDataUpdate}
+              embedded
+            />
+          </Suspense>
+        ),
+      });
+    }
+
+    return base;
+  }, [
+    settingsHook,
+    isHappyHourActive,
+    timeUntilHappyHour,
+    onHappyHourStatusUpdate,
+    products,
+    categories,
+    onDataUpdate,
+    canManageMenu,
+  ]);
+
+  const handleTabChange = useCallback(
+    (_event: React.SyntheticEvent, newValue: number) => {
+      const tab = tabs[newValue];
+      if (!tab) return;
+      if (tab.id !== 'menu') {
+        setCurrentTab(newValue);
+        return;
+      }
+      void ensurePermission(PERMISSIONS.access_menu, {
+        title: 'Gestion du menu',
+        description: 'PIN d’un profil autorisé à modifier le catalogue (menu).',
+      })
+        .then(() => setCurrentTab(newValue))
+        .catch(() => {
+          /* stay on current sub-tab */
+        });
     },
-    {
-      id: 'opening_hours',
-      label: 'Plages de réservations',
-      icon: <HoursIcon />,
-      component: <OpeningHoursSettingsPanel />,
-    },
-    {
-      id: 'time_clock_network',
-      label: 'Pointage',
-      icon: <WifiIcon />,
-      component: <TimeClockNetworkSettings />,
-    },
-    {
-      id: 'happy_hour',
-      label: 'Happy Hour',
-      icon: <HappyHourIcon />,
-      component: (
-        <HappyHourControl
-          isActive={isHappyHourActive}
-          timeUntil={timeUntilHappyHour}
-          onStatusUpdate={onHappyHourStatusUpdate}
-          products={products}
-        />
-      ),
-    },
-    {
-      id: 'closure',
-      label: 'Clôture Automatique',
-      icon: <ScheduleIcon />,
-      component: (
-        <ClosureSettings
-          closureSettings={settingsHook.state.closureSettings}
-          schedulerStatus={settingsHook.state.schedulerStatus}
-          onUpdate={settingsHook.updateClosureSettings}
-          onSave={settingsHook.saveClosureSettings}
-          onTriggerManualCheck={settingsHook.triggerManualCheck}
-          loading={settingsHook.saving}
-        />
-      ),
-    },
-    {
-      id: 'printer',
-      label: 'Imprimante',
-      icon: <PrintIcon />,
-      component: (
-        <PrinterSetup embedded />
-      ),
-    },
-  ];
+    [tabs, ensurePermission]
+  );
 
   return (
     <Box sx={{ width: '100%' }}>
@@ -189,4 +257,3 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
 };
 
 export default SettingsTabs;
-

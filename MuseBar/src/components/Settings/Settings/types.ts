@@ -3,7 +3,7 @@
  * Centralized type definitions for the settings system
  */
 
-import { Product } from '../../../types';
+import { Product, Category } from '../../../types';
 
 export interface ClosureSettings {
   auto_closure_enabled: boolean;
@@ -63,6 +63,10 @@ export interface SettingsProps {
   timeUntilHappyHour?: string;
   onHappyHourStatusUpdate?: () => void;
   products?: Product[];
+  categories?: Category[];
+  onDataUpdate?: () => void;
+  /** Login user may edit catalog (access_menu). */
+  canManageMenu?: boolean;
 }
 
 /** @deprecated General settings form removed; business identity is BusinessSettingsProps. */
