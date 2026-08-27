@@ -8,6 +8,7 @@ import { usePOSOrderAdjustments } from '../../hooks/usePOSOrderAdjustments';
 import { usePOSCatalogLogic } from '../../hooks/usePOSCatalogLogic';
 import { useFloorService } from '../../hooks/useFloorService';
 import { useAuth } from '../../hooks/useAuth';
+import { usePinSessions } from '../../contexts/PinSessionsContext';
 import { setFloorOrderAttribution } from '../../services/floorOrderAttribution';
 import POSLayout from './POSLayout';
 import POSMenuPanel from './POSMenuPanel';
@@ -52,6 +53,8 @@ const POSContainer: React.FC<POSContainerProps> = ({
   },
 }) => {
   const [state, actions] = usePOSState();
+  const { activeSessionId, sessions, updateActiveSession } = usePinSessions();
+  const sessionSyncRef = React.useRef<string | null>(null);
   const [diversDialogOpen, setDiversDialogOpen] = useState(false);
   const [pourboireDialogOpen, setPourboireDialogOpen] = useState(false);
   const [optionDialogOpen, setOptionDialogOpen] = useState(false);
@@ -84,6 +87,20 @@ const POSContainer: React.FC<POSContainerProps> = ({
   const canManageFloor =
     user?.role === 'establishment_admin' ||
     permissions.includes('manage_floor_plan');
+
+  // Load cart when switching PIN session tabs
+  useEffect(() => {
+    if (activeSessionId === sessionSyncRef.current) return;
+    sessionSyncRef.current = activeSessionId;
+    const session = sessions.find((s) => s.id === activeSessionId);
+    actions.setCurrentOrder(session?.cart ?? []);
+  }, [activeSessionId, sessions, actions]);
+
+  // Persist cart into active session
+  useEffect(() => {
+    if (!activeSessionId || sessionSyncRef.current !== activeSessionId) return;
+    updateActiveSession({ cart: state.currentOrder });
+  }, [state.currentOrder, activeSessionId, updateActiveSession]);
 
   useEffect(() => {
     if (floor.pinActor) {
@@ -371,10 +388,9 @@ const POSContainer: React.FC<POSContainerProps> = ({
   return (
     <Box sx={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <FloorBadgeStrip
-        displayName={floor.pinActor?.displayName ?? null}
+        sessionName={floor.pinActor?.displayName ?? null}
         tableLabel={floor.activeTable?.label ?? null}
-        onBadgeClick={() => floor.openPinDialog('verify')}
-        onBadgeOut={floor.clearPin}
+        onOpenSession={() => floor.openPinDialog('verify')}
         onTableClick={floor.requestMap}
       />
       <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', width: '100%' }}>

@@ -1,20 +1,19 @@
 import React from 'react';
 import { Box, Button, Chip, Typography } from '@mui/material';
-import { Badge as BadgeIcon, TableRestaurant as TableIcon } from '@mui/icons-material';
+import { TableRestaurant as TableIcon } from '@mui/icons-material';
 
 interface FloorBadgeStripProps {
-  displayName: string | null;
+  sessionName: string | null;
   tableLabel: string | null;
-  onBadgeClick: () => void;
-  onBadgeOut: () => void;
+  onOpenSession: () => void;
   onTableClick: () => void;
 }
 
+/** POS strip under header sessions: table binding only (PIN sessions live in AppHeader). */
 export const FloorBadgeStrip: React.FC<FloorBadgeStripProps> = ({
-  displayName,
+  sessionName,
   tableLabel,
-  onBadgeClick,
-  onBadgeOut,
+  onOpenSession,
   onTableClick,
 }) => {
   return (
@@ -32,26 +31,14 @@ export const FloorBadgeStrip: React.FC<FloorBadgeStripProps> = ({
         flexWrap: 'wrap',
       }}
     >
-      {displayName ? (
-        <>
-          <Chip
-            icon={<BadgeIcon />}
-            label={displayName}
-            color="primary"
-            onClick={onBadgeClick}
-            onDelete={onBadgeOut}
-            sx={{ fontWeight: 600 }}
-          />
-        </>
-      ) : (
-        <Button
-          size="small"
-          variant="contained"
-          startIcon={<BadgeIcon />}
-          onClick={onBadgeClick}
-        >
-          Badge
+      {!sessionName ? (
+        <Button size="small" variant="contained" onClick={onOpenSession}>
+          Ouvrir une session PIN
         </Button>
+      ) : (
+        <Typography variant="body2" color="text.secondary">
+          Session active : <strong>{sessionName}</strong>
+        </Typography>
       )}
       {tableLabel ? (
         <Chip

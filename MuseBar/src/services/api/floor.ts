@@ -143,10 +143,27 @@ export interface DiningTableDto {
   is_active: boolean;
 }
 
+function coerceGeomNumber(value: unknown, fallback: number): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normalizeDiningTable<T extends DiningTableDto>(table: T): T {
+  return {
+    ...table,
+    pos_x: coerceGeomNumber(table.pos_x, 0),
+    pos_y: coerceGeomNumber(table.pos_y, 0),
+    width: coerceGeomNumber(table.width, 80),
+    height: coerceGeomNumber(table.height, 80),
+    capacity: table.capacity == null ? null : coerceGeomNumber(table.capacity, 0),
+    sort_order: coerceGeomNumber(table.sort_order, 0),
+  };
+}
+
 export async function listDiningTables(floorPlanId?: number): Promise<DiningTableDto[]> {
   const q = floorPlanId != null ? `?plan_id=${floorPlanId}` : '';
   const res = await request<{ tables: DiningTableDto[] }>(`/floor/tables${q}`);
-  return res.tables;
+  return res.tables.map((t) => normalizeDiningTable(t));
 }
 
 export async function createDiningTable(input: {
@@ -164,7 +181,7 @@ export async function createDiningTable(input: {
     method: 'POST',
     body: JSON.stringify(input),
   });
-  return res.table;
+  return normalizeDiningTable(res.table);
 }
 
 export async function updateDiningTable(
@@ -185,7 +202,7 @@ export async function updateDiningTable(
     method: 'PATCH',
     body: JSON.stringify(patch),
   });
-  return res.table;
+  return normalizeDiningTable(res.table);
 }
 
 export async function deleteDiningTable(id: number): Promise<void> {
@@ -194,7 +211,7 @@ export async function deleteDiningTable(id: number): Promise<void> {
 
 export async function getFloorStatus(): Promise<DiningTableStatusDto[]> {
   const res = await request<{ tables: DiningTableStatusDto[] }>('/floor/status');
-  return res.tables;
+  return res.tables.map((t) => normalizeDiningTable(t) as DiningTableStatusDto);
 }
 
 export async function openTicket(

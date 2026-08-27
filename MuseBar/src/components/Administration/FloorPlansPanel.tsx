@@ -18,15 +18,18 @@ import {
   TextField,
   ToggleButton,
   ToggleButtonGroup,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import * as floorApi from '../../services/api/floor';
 import FloorCanvasView, { type FloorCanvasTable } from '../floor/FloorCanvasView';
 import {
   SIZE_PRESETS,
+  clampTableRect,
   detectSizePreset,
   gridPlacement,
   nextTableLabel,
+  normalizeTableGeometry,
   type SizePreset,
   type TableShape,
 } from '../floor/floorGeometry';
@@ -35,12 +38,9 @@ function toCanvasTables(tables: floorApi.DiningTableDto[]): FloorCanvasTable[] {
   return tables.map((t) => ({
     id: t.id,
     label: t.label,
-    pos_x: t.pos_x ?? 40,
-    pos_y: t.pos_y ?? 40,
-    width: t.width || SIZE_PRESETS.M.width,
-    height: t.height || SIZE_PRESETS.M.height,
+    ...normalizeTableGeometry(t),
     shape: t.shape || 'rectangle',
-    capacity: t.capacity,
+    capacity: t.capacity != null ? Number(t.capacity) : null,
   }));
 }
 
@@ -168,11 +168,17 @@ const FloorPlansPanel: React.FC = () => {
     if (keepId != null) setSelectedTableId(keepId);
   };
 
+  /** Labels are unique across the whole establishment, not only this plan. */
+  const loadEstablishmentLabels = async (): Promise<string[]> => {
+    const all = await floorApi.listDiningTables();
+    return all.map((t) => t.label);
+  };
+
   const handleAddTable = async () => {
     if (!selectedPlanId) return;
     setSaving(true);
     try {
-      const label = nextTableLabel(tables.map((t) => t.label));
+      const label = nextTableLabel(await loadEstablishmentLabels());
       const place = gridPlacement(tables.length);
       const size = SIZE_PRESETS.M;
       const created = await floorApi.createDiningTable({
@@ -199,7 +205,7 @@ const FloorPlansPanel: React.FC = () => {
     const n = Math.min(40, Math.max(1, parseInt(bulkCount, 10) || 1));
     setSaving(true);
     try {
-      let labels = tables.map((t) => t.label);
+      let labels = await loadEstablishmentLabels();
       let count = tables.length;
       let lastId: number | undefined;
       for (let i = 0; i < n; i += 1) {
@@ -229,6 +235,33 @@ const FloorPlansPanel: React.FC = () => {
     }
   };
 
+  const handleDuplicateSelected = async () => {
+    if (!selectedTable || !selectedLocal || !selectedPlanId) return;
+    setSaving(true);
+    try {
+      const label = nextTableLabel(await loadEstablishmentLabels());
+      const geo = normalizeTableGeometry(selectedLocal);
+      const offset = clampTableRect(geo.pos_x + 24, geo.pos_y + 24, geo.width, geo.height);
+      const created = await floorApi.createDiningTable({
+        floor_plan_id: selectedPlanId,
+        label,
+        pos_x: offset.pos_x,
+        pos_y: offset.pos_y,
+        width: geo.width,
+        height: geo.height,
+        capacity: selectedTable.capacity,
+        shape: selectedTable.shape || 'rectangle',
+        sort_order: tables.length + 1,
+      });
+      await syncAfterTableChange(selectedPlanId, created.id);
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      setError(e.message || 'Duplication impossible');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleGeometryCommit = async (
     id: number,
     geometry: { pos_x: number; pos_y: number; width: number; height: number }
@@ -241,10 +274,7 @@ const FloorPlansPanel: React.FC = () => {
           t.id === id
             ? {
                 ...t,
-                pos_x: updated.pos_x,
-                pos_y: updated.pos_y,
-                width: updated.width,
-                height: updated.height,
+                ...normalizeTableGeometry(updated),
               }
             : t
         )
@@ -277,10 +307,9 @@ const FloorPlansPanel: React.FC = () => {
             ? {
                 ...t,
                 label: updated.label,
-                capacity: updated.capacity,
+                capacity: updated.capacity != null ? Number(updated.capacity) : null,
                 shape: updated.shape,
-                width: updated.width,
-                height: updated.height,
+                ...normalizeTableGeometry(updated),
               }
             : t
         )
@@ -474,16 +503,18 @@ const FloorPlansPanel: React.FC = () => {
             >
               + N tables
             </Button>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  size="small"
-                  checked={snapEnabled}
-                  onChange={(e) => setSnapEnabled(e.target.checked)}
-                />
-              }
-              label="Magnétisme"
-            />
+            <Tooltip title="Aligne automatiquement position et taille sur une grille de 20 px pour des tables bien alignées. Désactivez pour un placement libre au pixel près.">
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={snapEnabled}
+                    onChange={(e) => setSnapEnabled(e.target.checked)}
+                  />
+                }
+                label="Aligner sur la grille"
+              />
+            </Tooltip>
             {selectedPlan && (
               <Typography variant="body2" color="text.secondary" sx={{ ml: 'auto' }}>
                 {selectedPlan.name} · {tables.length} table{tables.length === 1 ? '' : 's'}
@@ -591,9 +622,20 @@ const FloorPlansPanel: React.FC = () => {
                 }
                 label="Table active"
               />
+              <Button
+                variant="outlined"
+                size="small"
+                disabled={saving}
+                onClick={() => void handleDuplicateSelected()}
+              >
+                Dupliquer la table
+              </Button>
               <Button color="error" size="small" onClick={() => void handleDeleteSelected()}>
                 Supprimer la table
               </Button>
+              <Typography variant="caption" color="text.secondary">
+                Les libellés sont uniques dans tout l’établissement (tous plans confondus).
+              </Typography>
             </Stack>
           )}
         </Paper>

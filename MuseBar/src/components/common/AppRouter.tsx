@@ -7,12 +7,14 @@ import {
   Settings as SettingsIcon,
   Gavel as GavelIcon,
   BusinessCenter as AdminIcon,
+  TableRestaurant as FloorIcon,
 } from '@mui/icons-material';
 
 import POSContainer from '../POS/POSContainer';
 import {
   LazyAdministrationContainer,
   LazyClosureContainer,
+  LazyFloorPlanConsultPanel,
   LazyHistoryContainer,
   LazyMenuContainer,
   LazySettings,
@@ -116,6 +118,12 @@ const AppRouter: React.FC<AppRouterProps> = ({
 
   const TABS: TabConfig[] = [
     { label: 'Caisse', icon: <POSIcon />, value: 'pos', permission: PERMISSIONS.access_pos },
+    {
+      label: 'Plan de salle',
+      icon: <FloorIcon />,
+      value: 'floor_plan',
+      permission: PERMISSIONS.access_pos,
+    },
     { label: 'Menu', icon: <MenuIcon />, value: 'menu', permission: PERMISSIONS.access_menu },
     { label: 'Historique', icon: <HistoryIcon />, value: 'history', establishmentWide: true },
     {
@@ -232,7 +240,7 @@ const AppRouter: React.FC<AppRouterProps> = ({
             value={tabValue}
             index={i}
             key={tab.value}
-            scrollMode={tab.value === 'pos' ? 'hidden' : 'auto'}
+            scrollMode={tab.value === 'pos' || tab.value === 'floor_plan' ? 'hidden' : 'auto'}
           >
             {tab.value === 'pos' && (
               <POSContainer
@@ -242,6 +250,11 @@ const AppRouter: React.FC<AppRouterProps> = ({
                 onDataUpdate={onDataUpdate}
                 posLinePermissions={posLinePermissions}
               />
+            )}
+            {tab.value === 'floor_plan' && (
+              <Suspense fallback={<TabPanelFallback />}>
+                <LazyFloorPlanConsultPanel />
+              </Suspense>
             )}
             {tab.value === 'menu' && (
               <Suspense fallback={<TabPanelFallback />}>

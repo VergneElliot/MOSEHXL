@@ -19,6 +19,26 @@ export function snap(value: number, enabled: boolean, grid = FLOOR_GRID): number
   return Math.round(value / grid) * grid;
 }
 
+/** pg NUMERIC and JSON often arrive as strings — CSS needs real numbers (px). */
+export function asGeomNumber(value: unknown, fallback: number): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+export function normalizeTableGeometry(input: {
+  pos_x?: unknown;
+  pos_y?: unknown;
+  width?: unknown;
+  height?: unknown;
+}): { pos_x: number; pos_y: number; width: number; height: number } {
+  return {
+    pos_x: asGeomNumber(input.pos_x, 40),
+    pos_y: asGeomNumber(input.pos_y, 40),
+    width: asGeomNumber(input.width, SIZE_PRESETS.M.width),
+    height: asGeomNumber(input.height, SIZE_PRESETS.M.height),
+  };
+}
+
 export function clampTableRect(
   x: number,
   y: number,

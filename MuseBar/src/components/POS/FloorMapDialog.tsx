@@ -18,7 +18,7 @@ import {
 import { TableRestaurant as TableIcon } from '@mui/icons-material';
 import * as floorApi from '../../services/api/floor';
 import FloorCanvasView, { type FloorCanvasTable } from '../floor/FloorCanvasView';
-import { SIZE_PRESETS, gridPlacement } from '../floor/floorGeometry';
+import { SIZE_PRESETS, gridPlacement, normalizeTableGeometry } from '../floor/floorGeometry';
 
 type MapMode = 'select' | 'transfer' | 'merge';
 
@@ -111,12 +111,9 @@ export const FloorMapDialog: React.FC<FloorMapDialogProps> = ({
         return {
           id: t.id,
           label: t.label,
-          pos_x: t.pos_x ?? 40,
-          pos_y: t.pos_y ?? 40,
-          width: t.width || SIZE_PRESETS.M.width,
-          height: t.height || SIZE_PRESETS.M.height,
+          ...normalizeTableGeometry(t),
           shape: t.shape || 'rectangle',
-          capacity: t.capacity,
+          capacity: t.capacity != null ? Number(t.capacity) : null,
           occupied,
           isActive,
           disabled,

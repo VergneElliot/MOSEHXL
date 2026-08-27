@@ -1,45 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { OrderItem } from '../types';
 import * as floorApi from '../services/api/floor';
+import {
+  usePinSessions,
+  type ActiveTableState,
+  type PinActorState,
+} from '../contexts/PinSessionsContext';
 
-const PIN_STORAGE_KEY = 'mosehxl.pinActor';
-
-export interface PinActorState {
-  token: string;
-  userId: number;
-  displayName: string;
-  email: string;
-  role: string;
-  permissions: string[];
-}
-
-export interface ActiveTableState {
-  id: number;
-  label: string;
-  floorPlanId: number;
-  ticketId: number;
-}
-
-function readStoredPin(): PinActorState | null {
-  try {
-    const raw = sessionStorage.getItem(PIN_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as PinActorState;
-    if (!parsed?.token || !parsed.userId) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredPin(actor: PinActorState | null): void {
-  try {
-    if (!actor) sessionStorage.removeItem(PIN_STORAGE_KEY);
-    else sessionStorage.setItem(PIN_STORAGE_KEY, JSON.stringify(actor));
-  } catch {
-    // ignore quota / private mode
-  }
-}
+export type { ActiveTableState, PinActorState };
 
 export function useFloorService(options: {
   currentOrder: OrderItem[];
@@ -48,9 +16,16 @@ export function useFloorService(options: {
   onInfo: (message: string) => void;
 }) {
   const { currentOrder, setCurrentOrder, onError, onInfo } = options;
+  const {
+    activeSession,
+    addOrFocusSession,
+    dismissActiveSession,
+    updateActiveSession,
+  } = usePinSessions();
 
-  const [pinActor, setPinActor] = useState<PinActorState | null>(() => readStoredPin());
-  const [activeTable, setActiveTable] = useState<ActiveTableState | null>(null);
+  const pinActor = activeSession?.actor ?? null;
+  const activeTable = activeSession?.activeTable ?? null;
+
   const [pinDialogOpen, setPinDialogOpen] = useState(false);
   const [mapDialogOpen, setMapDialogOpen] = useState(false);
   const [pinDialogMode, setPinDialogMode] = useState<'verify' | 'set'>('verify');
@@ -59,9 +34,8 @@ export function useFloorService(options: {
   const skipNextSync = useRef(false);
 
   const clearPin = useCallback(() => {
-    setPinActor(null);
-    writeStoredPin(null);
-  }, []);
+    dismissActiveSession();
+  }, [dismissActiveSession]);
 
   const badgeIn = useCallback(
     async (pin: string) => {
@@ -74,22 +48,21 @@ export function useFloorService(options: {
         role: result.role,
         permissions: result.permissions,
       };
-      setPinActor(actor);
-      writeStoredPin(actor);
+      addOrFocusSession(actor);
       setPinDialogOpen(false);
-      onInfo(`Badge : ${actor.displayName}`);
+      onInfo(`Session : ${actor.displayName}`);
       if (pendingAfterPin.current === 'map') {
         pendingAfterPin.current = null;
         setMapDialogOpen(true);
       }
     },
-    [onInfo]
+    [addOrFocusSession, onInfo]
   );
 
   const setMyPin = useCallback(
     async (pin: string) => {
       await floorApi.setPin(pin);
-      onInfo('PIN enregistré — vous pouvez vous badger');
+      onInfo('PIN enregistré — vous pouvez ouvrir une session');
       setPinDialogMode('verify');
     },
     [onInfo]
@@ -112,24 +85,24 @@ export function useFloorService(options: {
   const bindTable = useCallback(
     (table: ActiveTableState, items: OrderItem[]) => {
       skipNextSync.current = true;
-      setActiveTable(table);
+      updateActiveSession({ activeTable: table, cart: items });
       setCurrentOrder(items);
       setMapDialogOpen(false);
       onInfo(`Table ${table.label}`);
     },
-    [setCurrentOrder, onInfo]
+    [setCurrentOrder, onInfo, updateActiveSession]
   );
 
   const clearTableBinding = useCallback(() => {
-    setActiveTable(null);
-  }, []);
+    updateActiveSession({ activeTable: null });
+  }, [updateActiveSession]);
 
   const detachTableKeepTicket = useCallback(() => {
     skipNextSync.current = true;
-    setActiveTable(null);
+    updateActiveSession({ activeTable: null, cart: [] });
     setCurrentOrder([]);
     onInfo('Table laissée ouverte');
-  }, [setCurrentOrder, onInfo]);
+  }, [setCurrentOrder, onInfo, updateActiveSession]);
 
   const selectFreeTable = useCallback(
     async (table: floorApi.DiningTableStatusDto) => {
@@ -194,7 +167,7 @@ export function useFloorService(options: {
         await floorApi.abandonTicket(ticketId, pinActor.token);
         if (activeTable?.ticketId === ticketId) {
           skipNextSync.current = true;
-          setActiveTable(null);
+          updateActiveSession({ activeTable: null, cart: [] });
           setCurrentOrder([]);
         }
         onInfo('Addition abandonnée');
@@ -203,7 +176,7 @@ export function useFloorService(options: {
         onError(err.message || 'Abandon impossible');
       }
     },
-    [pinActor, activeTable, setCurrentOrder, onError, onInfo]
+    [pinActor, activeTable, setCurrentOrder, onError, onInfo, updateActiveSession]
   );
 
   const closeActiveTicketAfterOrder = useCallback(
@@ -222,10 +195,10 @@ export function useFloorService(options: {
         const err = error as { message?: string };
         onError(err.message || 'Table non clôturée côté serveur');
       } finally {
-        setActiveTable(null);
+        updateActiveSession({ activeTable: null });
       }
     },
-    [activeTable, pinActor, onError]
+    [activeTable, pinActor, onError, updateActiveSession]
   );
 
   const transferActiveToTable = useCallback(
@@ -240,11 +213,13 @@ export function useFloorService(options: {
           diningTableId,
           pinActor.token
         );
-        setActiveTable({
-          id: diningTableId,
-          label,
-          floorPlanId,
-          ticketId: ticket.id,
+        updateActiveSession({
+          activeTable: {
+            id: diningTableId,
+            label,
+            floorPlanId,
+            ticketId: ticket.id,
+          },
         });
         onInfo(`Transféré vers table ${label}`);
         setMapDialogOpen(false);
@@ -253,7 +228,7 @@ export function useFloorService(options: {
         onError(err.message || 'Transfert impossible');
       }
     },
-    [activeTable, pinActor, onError, onInfo]
+    [activeTable, pinActor, onError, onInfo, updateActiveSession]
   );
 
   const mergeActiveIntoTable = useCallback(

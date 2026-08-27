@@ -209,8 +209,11 @@ router.post(
       return res.status(201).json({ table });
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
-      if (message.includes('dining_tables_label_unique_per_plan')) {
-        throw new ConflictError('A table with this label already exists on this plan');
+      if (
+        message.includes('dining_tables_label_unique_per_establishment') ||
+        message.includes('dining_tables_label_unique_per_plan')
+      ) {
+        throw new ConflictError('A table with this label already exists in this establishment');
       }
       throw error;
     }
@@ -244,8 +247,11 @@ router.patch(
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
       const message = error instanceof Error ? error.message : '';
-      if (message.includes('dining_tables_label_unique_per_plan')) {
-        throw new ConflictError('A table with this label already exists on this plan');
+      if (
+        message.includes('dining_tables_label_unique_per_establishment') ||
+        message.includes('dining_tables_label_unique_per_plan')
+      ) {
+        throw new ConflictError('A table with this label already exists in this establishment');
       }
       throw error;
     }

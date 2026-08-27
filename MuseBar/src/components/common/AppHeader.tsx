@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   AppBar,
   Toolbar,
@@ -18,8 +18,8 @@ import {
 } from '@mui/icons-material';
 import { User } from '../../types/auth';
 import { useTranslation } from 'react-i18next';
-import { LanguageSwitcher } from './LanguageSwitcher';
 import { TimeClockHeaderControl } from './TimeClockHeaderControl';
+import { PinSessionHeaderTabs } from './PinSessionHeaderTabs';
 
 interface AppHeaderProps {
   isHappyHourActive: boolean;
@@ -27,6 +27,8 @@ interface AppHeaderProps {
   onLogout: () => void;
   user: User | null;
   onSwitchEstablishment?: (establishmentId: string) => Promise<void> | void;
+  /** Show PIN session tabs (establishment POS shell). */
+  showPinSessions?: boolean;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
@@ -35,10 +37,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onLogout,
   user,
   onSwitchEstablishment,
+  showPinSessions = false,
 }) => {
   const { t } = useTranslation('common');
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [switching, setSwitching] = useState(false);
+  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [switching, setSwitching] = React.useState(false);
 
   const memberships = user?.memberships ?? [];
   const showSwitcher =
@@ -69,14 +72,17 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   return (
     <AppBar position="static" sx={{ backgroundColor: '#1a1a1a' }}>
-      <Toolbar>
-        <RestaurantIcon sx={{ mr: 2 }} />
-        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+      <Toolbar sx={{ gap: 1, minHeight: { xs: 56, sm: 64 } }}>
+        <RestaurantIcon sx={{ mr: 1, flexShrink: 0 }} />
+        <Typography variant="h6" component="div" sx={{ flexShrink: 0, mr: 1 }}>
           {t('appTitle')}
         </Typography>
-        
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <LanguageSwitcher />
+
+        {showPinSessions && <PinSessionHeaderTabs />}
+
+        {!showPinSessions && <Box sx={{ flexGrow: 1 }} />}
+
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, ml: 'auto', flexShrink: 0 }}>
           {user && user.role !== 'system_admin' && user.establishment_id && (
             <TimeClockHeaderControl />
           )}
@@ -85,16 +91,17 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               label={t('happyHour.active')}
               color="success"
               variant="filled"
-              sx={{ fontWeight: 'bold' }}
+              sx={{ fontWeight: 'bold', display: { xs: 'none', sm: 'flex' } }}
             />
           ) : (
             <Chip
               label={t('happyHour.in', { time: timeUntilHappyHour })}
               color="warning"
               variant="outlined"
+              sx={{ display: { xs: 'none', md: 'flex' } }}
             />
           )}
-          
+
           {user && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Button
@@ -145,11 +152,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                   })}
                 </Menu>
               )}
-              <Button
-                color="inherit"
-                onClick={onLogout}
-                sx={{ textTransform: 'none' }}
-              >
+              <Button color="inherit" onClick={onLogout} sx={{ textTransform: 'none' }}>
                 {t('auth.logout')}
               </Button>
             </Box>

@@ -9,6 +9,7 @@ import AppRouter from './components/common/AppRouter';
 import { Login } from './components/auth';
 import type { User } from './types';
 import { AppHeader } from './components/common/AppHeader';
+import { PinSessionsProvider } from './contexts/PinSessionsContext';
 import { useTranslation } from 'react-i18next';
 
 const SystemAdminRouter = React.lazy(() => import('./components/common/SystemAdminRouter'));
@@ -187,35 +188,38 @@ function App() {
           ) : (
             // Business Interface - viewport-height chain so tab content can use flex/scroll
             <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-              <AppHeader
-                isHappyHourActive={isHappyHourActive}
-                timeUntilHappyHour={timeUntilHappyHour}
-                onLogout={handleLogout}
-                user={user!}
-                onSwitchEstablishment={handleSwitchEstablishment}
-              />
-              <Box
-                sx={{
-                  flex: 1,
-                  minHeight: 0,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  overflow: 'hidden',
-                  mt: 0,
-                  px: 0,
-                }}
-              >
-                <AppRouter
-                  user={user!}
-                  token={token!}
-                  categories={categories}
-                  products={products}
+              <PinSessionsProvider>
+                <AppHeader
                   isHappyHourActive={isHappyHourActive}
                   timeUntilHappyHour={timeUntilHappyHour}
-                  onDataUpdate={updateData}
-                  onHappyHourStatusUpdate={updateHappyHourStatus}
+                  onLogout={handleLogout}
+                  user={user!}
+                  onSwitchEstablishment={handleSwitchEstablishment}
+                  showPinSessions
                 />
-              </Box>
+                <Box
+                  sx={{
+                    flex: 1,
+                    minHeight: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden',
+                    mt: 0,
+                    px: 0,
+                  }}
+                >
+                  <AppRouter
+                    user={user!}
+                    token={token!}
+                    categories={categories}
+                    products={products}
+                    isHappyHourActive={isHappyHourActive}
+                    timeUntilHappyHour={timeUntilHappyHour}
+                    onDataUpdate={updateData}
+                    onHappyHourStatusUpdate={updateHappyHourStatus}
+                  />
+                </Box>
+              </PinSessionsProvider>
             </Box>
           )}
         </>
