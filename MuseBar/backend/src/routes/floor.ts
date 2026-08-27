@@ -1,5 +1,11 @@
 import express from 'express';
-import { getEstablishmentId, requireAuth, requirePermission } from './auth';
+import {
+  getEstablishmentId,
+  requireAuth,
+  requirePermission,
+  requireEstablishmentAdminOrPermission,
+  requireAnyPermission,
+} from './auth';
 import { P } from '../permissions/registry';
 import {
   asyncHandler,
@@ -14,7 +20,21 @@ import { pool } from '../db/pool';
 
 const router = express.Router();
 
-const manageFloor = requirePermission(P.manage_floor_plan);
+/** Establishment admins always; otherwise explicit manage_floor_plan (staff). */
+const manageFloor = requireEstablishmentAdminOrPermission(P.manage_floor_plan);
+
+/**
+ * Plan/table catalog reads: POS (`access_pos`) or floor editors.
+ * Establishment admins always pass (Admin canvas without relying on POS perm).
+ */
+const readFloorCatalog = (
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) => {
+  if (req.user?.role === 'establishment_admin') return next();
+  return requireAnyPermission([P.access_pos, P.manage_floor_plan])(req, res, next);
+};
 
 function parseShape(value: unknown): 'rectangle' | 'circle' | 'square' {
   if (value === 'rectangle' || value === 'circle' || value === 'square') return value;
@@ -64,7 +84,7 @@ function parseTicketItems(raw: unknown): OpenTicketItemInput[] {
 router.get(
   '/plans',
   requireAuth,
-  requirePermission(P.access_pos),
+  readFloorCatalog,
   asyncHandler(async (req, res) => {
     const establishmentId = getEstablishmentId(req, res);
     if (!establishmentId) return;
@@ -135,7 +155,7 @@ router.delete(
 router.get(
   '/tables',
   requireAuth,
-  requirePermission(P.access_pos),
+  readFloorCatalog,
   asyncHandler(async (req, res) => {
     const establishmentId = getEstablishmentId(req, res);
     if (!establishmentId) return;
