@@ -17,6 +17,8 @@ import {
 } from '@mui/material';
 import { TableRestaurant as TableIcon } from '@mui/icons-material';
 import * as floorApi from '../../services/api/floor';
+import FloorCanvasView, { type FloorCanvasTable } from '../floor/FloorCanvasView';
+import { SIZE_PRESETS, gridPlacement } from '../floor/floorGeometry';
 
 type MapMode = 'select' | 'transfer' | 'merge';
 
@@ -98,20 +100,47 @@ export const FloorMapDialog: React.FC<FloorMapDialogProps> = ({
   const activePlans = useMemo(() => plans.filter((p) => p.is_active), [plans]);
   const planTables = selectedPlanId != null ? byPlan.get(selectedPlanId) ?? [] : [];
 
+  const canvasTables: FloorCanvasTable[] = useMemo(
+    () =>
+      planTables.map((t) => {
+        const occupied = t.open_ticket_id != null;
+        const isActive = activeTicketId != null && t.open_ticket_id === activeTicketId;
+        const disabled =
+          (mode === 'transfer' && occupied) ||
+          (mode === 'merge' && (!occupied || isActive));
+        return {
+          id: t.id,
+          label: t.label,
+          pos_x: t.pos_x ?? 40,
+          pos_y: t.pos_y ?? 40,
+          width: t.width || SIZE_PRESETS.M.width,
+          height: t.height || SIZE_PRESETS.M.height,
+          shape: t.shape || 'rectangle',
+          capacity: t.capacity,
+          occupied,
+          isActive,
+          disabled,
+        };
+      }),
+    [planTables, activeTicketId, mode]
+  );
+
   const createQuickPlan = useCallback(async () => {
     setCreating(true);
     setError(null);
     try {
       const plan = await floorApi.createFloorPlan('Salle');
-      const cols = 4;
+      const size = SIZE_PRESETS.M;
       for (let i = 1; i <= 12; i += 1) {
-        const col = (i - 1) % cols;
-        const row = Math.floor((i - 1) / cols);
+        const place = gridPlacement(i - 1);
         await floorApi.createDiningTable({
           floor_plan_id: plan.id,
           label: String(i),
-          pos_x: col * 100,
-          pos_y: row * 100,
+          pos_x: place.pos_x,
+          pos_y: place.pos_y,
+          width: size.width,
+          height: size.height,
+          shape: 'rectangle',
           sort_order: i,
         });
       }
@@ -124,7 +153,10 @@ export const FloorMapDialog: React.FC<FloorMapDialogProps> = ({
     }
   }, [reload]);
 
-  const handleTableClick = (table: floorApi.DiningTableStatusDto) => {
+  const handleTableSelect = (id: number | null) => {
+    if (id == null) return;
+    const table = planTables.find((t) => t.id === id);
+    if (!table) return;
     const occupied = table.open_ticket_id != null;
     if (mode === 'transfer') {
       if (occupied) return;
@@ -141,7 +173,7 @@ export const FloorMapDialog: React.FC<FloorMapDialogProps> = ({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <TableIcon />
         Plan de salle
@@ -217,43 +249,16 @@ export const FloorMapDialog: React.FC<FloorMapDialogProps> = ({
                 {activePlans[0]?.name}
               </Typography>
             )}
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))',
-                gap: 1,
-              }}
-            >
-              {planTables.map((table) => {
-                const occupied = table.open_ticket_id != null;
-                const isActive =
-                  activeTicketId != null && table.open_ticket_id === activeTicketId;
-                const disabled =
-                  (mode === 'transfer' && occupied) ||
-                  (mode === 'merge' && (!occupied || isActive));
-                return (
-                  <Button
-                    key={table.id}
-                    variant={isActive ? 'contained' : 'outlined'}
-                    color={occupied ? 'warning' : 'success'}
-                    disabled={disabled}
-                    onClick={() => handleTableClick(table)}
-                    sx={{
-                      minHeight: 72,
-                      flexDirection: 'column',
-                      textTransform: 'none',
-                    }}
-                  >
-                    <Typography fontWeight={700}>{table.label}</Typography>
-                    <Typography variant="caption">
-                      {occupied ? 'Occupée' : 'Libre'}
-                    </Typography>
-                  </Button>
-                );
-              })}
+            <Box sx={{ height: 480 }}>
+              <FloorCanvasView
+                tables={canvasTables}
+                mode="select"
+                snapEnabled={false}
+                onSelect={handleTableSelect}
+              />
             </Box>
             {planTables.length === 0 && (
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                 Aucune table active sur ce plan.
               </Typography>
             )}

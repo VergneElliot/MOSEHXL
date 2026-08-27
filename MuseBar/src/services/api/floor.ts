@@ -154,7 +154,10 @@ export async function createDiningTable(input: {
   label: string;
   pos_x?: number;
   pos_y?: number;
+  width?: number;
+  height?: number;
   capacity?: number | null;
+  shape?: string;
   sort_order?: number;
 }): Promise<DiningTableDto> {
   const res = await request<{ table: DiningTableDto }>('/floor/tables', {
@@ -171,6 +174,11 @@ export async function updateDiningTable(
     capacity: number | null;
     sort_order: number;
     is_active: boolean;
+    pos_x: number;
+    pos_y: number;
+    width: number;
+    height: number;
+    shape: string;
   }>
 ): Promise<DiningTableDto> {
   const res = await request<{ table: DiningTableDto }>(`/floor/tables/${id}`, {

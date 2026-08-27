@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
@@ -8,39 +8,58 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControl,
   FormControlLabel,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material';
 import * as floorApi from '../../services/api/floor';
+import FloorCanvasView, { type FloorCanvasTable } from '../floor/FloorCanvasView';
+import {
+  SIZE_PRESETS,
+  detectSizePreset,
+  gridPlacement,
+  nextTableLabel,
+  type SizePreset,
+  type TableShape,
+} from '../floor/floorGeometry';
+
+function toCanvasTables(tables: floorApi.DiningTableDto[]): FloorCanvasTable[] {
+  return tables.map((t) => ({
+    id: t.id,
+    label: t.label,
+    pos_x: t.pos_x ?? 40,
+    pos_y: t.pos_y ?? 40,
+    width: t.width || SIZE_PRESETS.M.width,
+    height: t.height || SIZE_PRESETS.M.height,
+    shape: t.shape || 'rectangle',
+    capacity: t.capacity,
+  }));
+}
 
 /**
- * Light Admin CRUD for floor plans + dining tables (forms only, no drag canvas).
+ * Admin visual floor editor: plan list + canvas + table properties.
  */
 const FloorPlansPanel: React.FC = () => {
   const [plans, setPlans] = useState<floorApi.FloorPlanDto[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
   const [tables, setTables] = useState<floorApi.DiningTableDto[]>([]);
+  const [localTables, setLocalTables] = useState<FloorCanvasTable[]>([]);
+  const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [snapEnabled, setSnapEnabled] = useState(true);
   const [newPlanName, setNewPlanName] = useState('');
-  const [tableDialog, setTableDialog] = useState<{
-    mode: 'create' | 'edit';
-    table?: floorApi.DiningTableDto;
-  } | null>(null);
-  const [tableLabel, setTableLabel] = useState('');
-  const [tableCapacity, setTableCapacity] = useState('');
-  const [tableSort, setTableSort] = useState('0');
-  const [tableActive, setTableActive] = useState(true);
   const [renamePlan, setRenamePlan] = useState<{ id: number; name: string } | null>(null);
+  const [bulkCount, setBulkCount] = useState('4');
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -64,6 +83,10 @@ const FloorPlansPanel: React.FC = () => {
     try {
       const list = await floorApi.listDiningTables(planId);
       setTables(list);
+      setLocalTables(toCanvasTables(list));
+      setSelectedTableId((prev) =>
+        prev != null && list.some((t) => t.id === prev) ? prev : null
+      );
     } catch (err: unknown) {
       const e = err as { message?: string };
       setError(e.message || 'Impossible de charger les tables');
@@ -76,8 +99,22 @@ const FloorPlansPanel: React.FC = () => {
 
   useEffect(() => {
     if (selectedPlanId != null) void reloadTables(selectedPlanId);
-    else setTables([]);
+    else {
+      setTables([]);
+      setLocalTables([]);
+      setSelectedTableId(null);
+    }
   }, [selectedPlanId, reloadTables]);
+
+  const selectedPlan = plans.find((p) => p.id === selectedPlanId) ?? null;
+  const selectedTable = useMemo(
+    () => tables.find((t) => t.id === selectedTableId) ?? null,
+    [tables, selectedTableId]
+  );
+  const selectedLocal = useMemo(
+    () => localTables.find((t) => t.id === selectedTableId) ?? null,
+    [localTables, selectedTableId]
+  );
 
   const handleCreatePlan = async () => {
     const name = newPlanName.trim();
@@ -126,69 +163,183 @@ const FloorPlansPanel: React.FC = () => {
     }
   };
 
-  const openCreateTable = () => {
-    setTableLabel('');
-    setTableCapacity('');
-    setTableSort(String((tables.length + 1) * 10));
-    setTableActive(true);
-    setTableDialog({ mode: 'create' });
+  const syncAfterTableChange = async (planId: number, keepId?: number) => {
+    await reloadTables(planId);
+    if (keepId != null) setSelectedTableId(keepId);
   };
 
-  const openEditTable = (table: floorApi.DiningTableDto) => {
-    setTableLabel(table.label);
-    setTableCapacity(table.capacity != null ? String(table.capacity) : '');
-    setTableSort(String(table.sort_order));
-    setTableActive(table.is_active);
-    setTableDialog({ mode: 'edit', table });
-  };
-
-  const handleSaveTable = async () => {
-    if (!selectedPlanId || !tableLabel.trim()) return;
-    const capacity = tableCapacity.trim() === '' ? null : Number(tableCapacity);
-    const sort_order = Number(tableSort) || 0;
+  const handleAddTable = async () => {
+    if (!selectedPlanId) return;
+    setSaving(true);
     try {
-      if (tableDialog?.mode === 'edit' && tableDialog.table) {
-        await floorApi.updateDiningTable(tableDialog.table.id, {
-          label: tableLabel.trim(),
-          capacity: Number.isFinite(capacity as number) ? capacity : null,
-          sort_order,
-          is_active: tableActive,
-        });
-      } else {
-        await floorApi.createDiningTable({
-          floor_plan_id: selectedPlanId,
-          label: tableLabel.trim(),
-          capacity: Number.isFinite(capacity as number) ? capacity : null,
-          sort_order,
-        });
-      }
-      setTableDialog(null);
-      await reloadTables(selectedPlanId);
+      const label = nextTableLabel(tables.map((t) => t.label));
+      const place = gridPlacement(tables.length);
+      const size = SIZE_PRESETS.M;
+      const created = await floorApi.createDiningTable({
+        floor_plan_id: selectedPlanId,
+        label,
+        pos_x: place.pos_x,
+        pos_y: place.pos_y,
+        width: size.width,
+        height: size.height,
+        shape: 'rectangle',
+        sort_order: tables.length + 1,
+      });
+      await syncAfterTableChange(selectedPlanId, created.id);
     } catch (err: unknown) {
       const e = err as { message?: string };
-      setError(e.message || 'Enregistrement de la table impossible');
+      setError(e.message || 'Ajout de table impossible');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDeleteTable = async (table: floorApi.DiningTableDto) => {
-    if (!window.confirm(`Supprimer la table « ${table.label} » ?`)) return;
+  const handleAddBulk = async () => {
+    if (!selectedPlanId) return;
+    const n = Math.min(40, Math.max(1, parseInt(bulkCount, 10) || 1));
+    setSaving(true);
     try {
-      await floorApi.deleteDiningTable(table.id);
-      if (selectedPlanId != null) await reloadTables(selectedPlanId);
+      let labels = tables.map((t) => t.label);
+      let count = tables.length;
+      let lastId: number | undefined;
+      for (let i = 0; i < n; i += 1) {
+        const label = nextTableLabel(labels);
+        labels = [...labels, label];
+        const place = gridPlacement(count);
+        const size = SIZE_PRESETS.M;
+        const created = await floorApi.createDiningTable({
+          floor_plan_id: selectedPlanId,
+          label,
+          pos_x: place.pos_x,
+          pos_y: place.pos_y,
+          width: size.width,
+          height: size.height,
+          shape: 'rectangle',
+          sort_order: count + 1,
+        });
+        lastId = created.id;
+        count += 1;
+      }
+      await syncAfterTableChange(selectedPlanId, lastId);
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      setError(e.message || 'Ajout en masse impossible');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleGeometryCommit = async (
+    id: number,
+    geometry: { pos_x: number; pos_y: number; width: number; height: number }
+  ) => {
+    try {
+      const updated = await floorApi.updateDiningTable(id, geometry);
+      setTables((prev) => prev.map((t) => (t.id === id ? { ...t, ...updated } : t)));
+      setLocalTables((prev) =>
+        prev.map((t) =>
+          t.id === id
+            ? {
+                ...t,
+                pos_x: updated.pos_x,
+                pos_y: updated.pos_y,
+                width: updated.width,
+                height: updated.height,
+              }
+            : t
+        )
+      );
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      setError(e.message || 'Enregistrement de la position impossible');
+      if (selectedPlanId != null) void reloadTables(selectedPlanId);
+    }
+  };
+
+  const patchSelected = async (
+    patch: Partial<{
+      label: string;
+      capacity: number | null;
+      shape: string;
+      width: number;
+      height: number;
+      is_active: boolean;
+    }>
+  ) => {
+    if (!selectedTableId || !selectedPlanId) return;
+    setSaving(true);
+    try {
+      const updated = await floorApi.updateDiningTable(selectedTableId, patch);
+      setTables((prev) => prev.map((t) => (t.id === selectedTableId ? { ...t, ...updated } : t)));
+      setLocalTables((prev) =>
+        prev.map((t) =>
+          t.id === selectedTableId
+            ? {
+                ...t,
+                label: updated.label,
+                capacity: updated.capacity,
+                shape: updated.shape,
+                width: updated.width,
+                height: updated.height,
+              }
+            : t
+        )
+      );
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      setError(e.message || 'Mise à jour impossible');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!selectedTable || !selectedPlanId) return;
+    if (!window.confirm(`Supprimer la table « ${selectedTable.label} » ?`)) return;
+    try {
+      await floorApi.deleteDiningTable(selectedTable.id);
+      setSelectedTableId(null);
+      await reloadTables(selectedPlanId);
     } catch (err: unknown) {
       const e = err as { message?: string };
       setError(e.message || 'Suppression impossible (table occupée ?)');
     }
   };
 
-  const selectedPlan = plans.find((p) => p.id === selectedPlanId) ?? null;
+  const applyPreset = (preset: SizePreset) => {
+    const size = SIZE_PRESETS[preset];
+    void patchSelected({ width: size.width, height: size.height });
+  };
+
+  const applyShape = (shape: TableShape) => {
+    if (!selectedLocal) return;
+    if (shape === 'square' || shape === 'circle') {
+      const s = Math.max(selectedLocal.width, selectedLocal.height);
+      void patchSelected({ shape, width: s, height: s });
+    } else {
+      void patchSelected({ shape });
+    }
+  };
+
+  const sizePreset = selectedLocal
+    ? detectSizePreset(selectedLocal.width, selectedLocal.height)
+    : 'custom';
 
   return (
-    <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+    <Box
+      sx={{
+        p: 2,
+        height: '100%',
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 1.5,
+      }}
+    >
       <Typography variant="h5">Plans de tables</Typography>
       <Typography variant="body2" color="text.secondary">
-        Créez des salles et des tables (libellé, capacité, ordre). L’éditeur graphique
-        glisser-déposer arrive plus tard — le POS affiche déjà ces tables.
+        Glissez les tables sur le plan. La géométrie s’enregistre automatiquement. Le POS utilise
+        le même positionnement.
       </Typography>
 
       {error && (
@@ -197,111 +348,256 @@ const FloorPlansPanel: React.FC = () => {
         </Alert>
       )}
 
-      <Paper sx={{ p: 2 }}>
-        <Typography variant="subtitle1" gutterBottom>
-          Plans
-        </Typography>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mb: 2 }}>
-          <TextField
-            size="small"
-            label="Nouveau plan"
-            value={newPlanName}
-            onChange={(e) => setNewPlanName(e.target.value)}
-          />
-          <Button variant="contained" onClick={() => void handleCreatePlan()} disabled={!newPlanName.trim()}>
-            Créer
-          </Button>
-        </Stack>
-
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Nom</TableCell>
-                <TableCell>Actif</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {plans.map((plan) => (
-                <TableRow
-                  key={plan.id}
-                  hover
-                  selected={plan.id === selectedPlanId}
-                  onClick={() => setSelectedPlanId(plan.id)}
-                  sx={{ cursor: 'pointer' }}
-                >
-                  <TableCell>{plan.name}</TableCell>
-                  <TableCell>{plan.is_active ? 'Oui' : 'Non'}</TableCell>
-                  <TableCell align="right" onClick={(e) => e.stopPropagation()}>
-                    <Button size="small" onClick={() => setRenamePlan({ id: plan.id, name: plan.name })}>
-                      Renommer
-                    </Button>
-                    <Button size="small" onClick={() => void handleTogglePlanActive(plan)}>
-                      {plan.is_active ? 'Désactiver' : 'Activer'}
-                    </Button>
-                    <Button size="small" color="error" onClick={() => void handleDeletePlan(plan)}>
-                      Supprimer
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {!loading && plans.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={3}>Aucun plan — créez-en un ci-dessus.</TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
-
-      {selectedPlan && (
-        <Paper sx={{ p: 2 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-            <Typography variant="subtitle1">Tables — {selectedPlan.name}</Typography>
-            <Button variant="contained" size="small" onClick={openCreateTable}>
-              Ajouter une table
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 480,
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', md: '220px 1fr 260px' },
+          gap: 1.5,
+        }}
+      >
+        {/* Left: plans */}
+        <Paper sx={{ p: 1.5, overflow: 'auto' }}>
+          <Typography variant="subtitle2" gutterBottom>
+            Plans
+          </Typography>
+          <Stack direction="row" spacing={1} sx={{ mb: 1.5 }}>
+            <TextField
+              size="small"
+              label="Nouveau"
+              value={newPlanName}
+              onChange={(e) => setNewPlanName(e.target.value)}
+              fullWidth
+            />
+            <Button
+              variant="contained"
+              size="small"
+              onClick={() => void handleCreatePlan()}
+              disabled={!newPlanName.trim()}
+            >
+              +
             </Button>
           </Stack>
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Libellé</TableCell>
-                  <TableCell>Capacité</TableCell>
-                  <TableCell>Ordre</TableCell>
-                  <TableCell>Active</TableCell>
-                  <TableCell align="right">Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {tables.map((table) => (
-                  <TableRow key={table.id}>
-                    <TableCell>{table.label}</TableCell>
-                    <TableCell>{table.capacity ?? '—'}</TableCell>
-                    <TableCell>{table.sort_order}</TableCell>
-                    <TableCell>{table.is_active ? 'Oui' : 'Non'}</TableCell>
-                    <TableCell align="right">
-                      <Button size="small" onClick={() => openEditTable(table)}>
-                        Modifier
-                      </Button>
-                      <Button size="small" color="error" onClick={() => void handleDeleteTable(table)}>
-                        Supprimer
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {tables.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={5}>Aucune table sur ce plan.</TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+          <Stack spacing={0.5}>
+            {plans.map((plan) => (
+              <Box
+                key={plan.id}
+                onClick={() => setSelectedPlanId(plan.id)}
+                sx={{
+                  p: 1,
+                  borderRadius: 1,
+                  cursor: 'pointer',
+                  bgcolor: plan.id === selectedPlanId ? 'action.selected' : 'transparent',
+                  border: '1px solid',
+                  borderColor: plan.id === selectedPlanId ? 'primary.main' : 'divider',
+                }}
+              >
+                <Typography variant="body2" fontWeight={600}>
+                  {plan.name}
+                  {!plan.is_active && (
+                    <Typography component="span" variant="caption" color="text.secondary">
+                      {' '}
+                      (inactif)
+                    </Typography>
+                  )}
+                </Typography>
+                <Stack direction="row" spacing={0.5} sx={{ mt: 0.5 }} flexWrap="wrap" useFlexGap>
+                  <Button
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRenamePlan({ id: plan.id, name: plan.name });
+                    }}
+                  >
+                    Renommer
+                  </Button>
+                  <Button
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleTogglePlanActive(plan);
+                    }}
+                  >
+                    {plan.is_active ? 'Off' : 'On'}
+                  </Button>
+                  <Button
+                    size="small"
+                    color="error"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleDeletePlan(plan);
+                    }}
+                  >
+                    Suppr.
+                  </Button>
+                </Stack>
+              </Box>
+            ))}
+            {!loading && plans.length === 0 && (
+              <Typography variant="body2" color="text.secondary">
+                Aucun plan — créez-en un.
+              </Typography>
+            )}
+          </Stack>
         </Paper>
-      )}
+
+        {/* Center: canvas */}
+        <Paper sx={{ p: 1, display: 'flex', flexDirection: 'column', minHeight: 420 }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            sx={{ mb: 1, flexWrap: 'wrap' }}
+            useFlexGap
+          >
+            <Button
+              variant="contained"
+              size="small"
+              disabled={!selectedPlanId || saving}
+              onClick={() => void handleAddTable()}
+            >
+              + Table
+            </Button>
+            <TextField
+              size="small"
+              label="N"
+              value={bulkCount}
+              onChange={(e) => setBulkCount(e.target.value.replace(/\D/g, ''))}
+              sx={{ width: 64 }}
+            />
+            <Button
+              size="small"
+              variant="outlined"
+              disabled={!selectedPlanId || saving}
+              onClick={() => void handleAddBulk()}
+            >
+              + N tables
+            </Button>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  size="small"
+                  checked={snapEnabled}
+                  onChange={(e) => setSnapEnabled(e.target.checked)}
+                />
+              }
+              label="Magnétisme"
+            />
+            {selectedPlan && (
+              <Typography variant="body2" color="text.secondary" sx={{ ml: 'auto' }}>
+                {selectedPlan.name} · {tables.length} table{tables.length === 1 ? '' : 's'}
+              </Typography>
+            )}
+          </Stack>
+          {selectedPlan ? (
+            <Box sx={{ flex: 1, minHeight: 400 }}>
+              <FloorCanvasView
+                tables={localTables}
+                localTables={localTables}
+                onLocalTablesChange={setLocalTables}
+                mode="edit"
+                selectedId={selectedTableId}
+                onSelect={setSelectedTableId}
+                onGeometryCommit={(id, geo) => void handleGeometryCommit(id, geo)}
+                snapEnabled={snapEnabled}
+              />
+            </Box>
+          ) : (
+            <Box sx={{ p: 4, textAlign: 'center' }}>
+              <Typography color="text.secondary">Sélectionnez ou créez un plan.</Typography>
+            </Box>
+          )}
+        </Paper>
+
+        {/* Right: properties */}
+        <Paper sx={{ p: 1.5, overflow: 'auto' }}>
+          <Typography variant="subtitle2" gutterBottom>
+            Propriétés
+          </Typography>
+          {!selectedTable || !selectedLocal ? (
+            <Typography variant="body2" color="text.secondary">
+              Sélectionnez une table sur le plan.
+            </Typography>
+          ) : (
+            <Stack spacing={1.5}>
+              <TextField
+                size="small"
+                label="Libellé"
+                defaultValue={selectedTable.label}
+                key={`label-${selectedTable.id}-${selectedTable.label}`}
+                onBlur={(e) => {
+                  const v = e.target.value.trim();
+                  if (v && v !== selectedTable.label) void patchSelected({ label: v });
+                }}
+              />
+              <TextField
+                size="small"
+                label="Couverts"
+                defaultValue={selectedTable.capacity ?? ''}
+                key={`cap-${selectedTable.id}-${selectedTable.capacity}`}
+                onBlur={(e) => {
+                  const raw = e.target.value.trim();
+                  const capacity = raw === '' ? null : Number(raw);
+                  if (capacity !== selectedTable.capacity) {
+                    void patchSelected({
+                      capacity: Number.isFinite(capacity as number) ? capacity : null,
+                    });
+                  }
+                }}
+              />
+              <FormControl size="small" fullWidth>
+                <InputLabel>Forme</InputLabel>
+                <Select
+                  label="Forme"
+                  value={(selectedLocal.shape as TableShape) || 'rectangle'}
+                  onChange={(e) => applyShape(e.target.value as TableShape)}
+                >
+                  <MenuItem value="rectangle">Rectangle</MenuItem>
+                  <MenuItem value="square">Carré</MenuItem>
+                  <MenuItem value="circle">Rond</MenuItem>
+                </Select>
+              </FormControl>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Taille
+                </Typography>
+                <ToggleButtonGroup
+                  exclusive
+                  size="small"
+                  fullWidth
+                  value={sizePreset === 'custom' ? null : sizePreset}
+                  onChange={(_e, v: SizePreset | null) => {
+                    if (v) applyPreset(v);
+                  }}
+                  sx={{ mt: 0.5 }}
+                >
+                  <ToggleButton value="S">S</ToggleButton>
+                  <ToggleButton value="M">M</ToggleButton>
+                  <ToggleButton value="L">L</ToggleButton>
+                </ToggleButtonGroup>
+                {sizePreset === 'custom' && (
+                  <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
+                    {Math.round(selectedLocal.width)}×{Math.round(selectedLocal.height)} (perso.)
+                  </Typography>
+                )}
+              </Box>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={selectedTable.is_active}
+                    onChange={(e) => void patchSelected({ is_active: e.target.checked })}
+                  />
+                }
+                label="Table active"
+              />
+              <Button color="error" size="small" onClick={() => void handleDeleteSelected()}>
+                Supprimer la table
+              </Button>
+            </Stack>
+          )}
+        </Paper>
+      </Box>
 
       <Dialog open={renamePlan != null} onClose={() => setRenamePlan(null)}>
         <DialogTitle>Renommer le plan</DialogTitle>
@@ -320,54 +616,6 @@ const FloorPlansPanel: React.FC = () => {
         <DialogActions>
           <Button onClick={() => setRenamePlan(null)}>Annuler</Button>
           <Button variant="contained" onClick={() => void handleSaveRename()}>
-            Enregistrer
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog open={tableDialog != null} onClose={() => setTableDialog(null)}>
-        <DialogTitle>
-          {tableDialog?.mode === 'edit' ? 'Modifier la table' : 'Nouvelle table'}
-        </DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            fullWidth
-            margin="dense"
-            label="Libellé"
-            value={tableLabel}
-            onChange={(e) => setTableLabel(e.target.value)}
-          />
-          <TextField
-            fullWidth
-            margin="dense"
-            label="Capacité"
-            value={tableCapacity}
-            onChange={(e) => setTableCapacity(e.target.value.replace(/\D/g, ''))}
-          />
-          <TextField
-            fullWidth
-            margin="dense"
-            label="Ordre d’affichage"
-            value={tableSort}
-            onChange={(e) => setTableSort(e.target.value.replace(/\D/g, ''))}
-          />
-          {tableDialog?.mode === 'edit' && (
-            <FormControlLabel
-              control={
-                <Checkbox checked={tableActive} onChange={(e) => setTableActive(e.target.checked)} />
-              }
-              label="Table active"
-            />
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setTableDialog(null)}>Annuler</Button>
-          <Button
-            variant="contained"
-            disabled={!tableLabel.trim()}
-            onClick={() => void handleSaveTable()}
-          >
             Enregistrer
           </Button>
         </DialogActions>
