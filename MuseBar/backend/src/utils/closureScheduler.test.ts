@@ -222,4 +222,38 @@ describe('ClosureScheduler.executeAutomaticClosureForEstablishment', () => {
       establishment_id: ESTABLISHMENT_ID,
     });
   });
+
+  it('skips empty-day refusals without treating them as hard failures', async () => {
+    mocks.createDailyClosureOpen.mockRejectedValue(
+      new Error('Aucune vente entre le 20/05/2026 02:00 et le 21/05/2026 01:59')
+    );
+
+    const result = await ClosureScheduler.executeAutomaticClosureForEstablishment(
+      ESTABLISHMENT_ID,
+      NOW
+    );
+
+    expect(result).toBeNull();
+    expect(mocks.logClosure).not.toHaveBeenCalled();
+    expect(
+      mocks.auditLogAction.mock.calls.find(([e]) => e?.action_type === 'AUTO_CLOSURE_FAILED')
+    ).toBeUndefined();
+  });
+});
+
+describe('ClosureScheduler.shouldExecuteClosure', () => {
+  it('runs only inside the grace window after cut time', async () => {
+    const settings = { daily_closure_time: '02:00', grace_period_minutes: 30 };
+    const moment = (await import('moment-timezone')).default;
+    const TZ = 'Europe/Paris';
+
+    const justAfterCut = moment.tz('2026-05-20 02:05', TZ);
+    expect(await ClosureScheduler.shouldExecuteClosure(settings, justAfterCut)).toBe(true);
+
+    const afterGrace = moment.tz('2026-05-20 02:45', TZ);
+    expect(await ClosureScheduler.shouldExecuteClosure(settings, afterGrace)).toBe(false);
+
+    const beforeCut = moment.tz('2026-05-20 01:50', TZ);
+    expect(await ClosureScheduler.shouldExecuteClosure(settings, beforeCut)).toBe(false);
+  });
 });

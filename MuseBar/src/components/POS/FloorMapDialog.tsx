@@ -12,6 +12,8 @@ import {
   Stack,
   ToggleButton,
   ToggleButtonGroup,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import { TableRestaurant as TableIcon } from '@mui/icons-material';
 import * as floorApi from '../../services/api/floor';
@@ -51,6 +53,7 @@ export const FloorMapDialog: React.FC<FloorMapDialogProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [mode, setMode] = useState<MapMode>('select');
+  const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -62,6 +65,11 @@ export const FloorMapDialog: React.FC<FloorMapDialogProps> = ({
       ]);
       setTables(status);
       setPlans(planList);
+      setSelectedPlanId((prev) => {
+        const active = planList.filter((p) => p.is_active);
+        if (prev != null && active.some((p) => p.id === prev)) return prev;
+        return active[0]?.id ?? planList[0]?.id ?? null;
+      });
     } catch (err: unknown) {
       const e = err as { message?: string };
       setError(e.message || 'Impossible de charger le plan de salle');
@@ -86,6 +94,9 @@ export const FloorMapDialog: React.FC<FloorMapDialogProps> = ({
     }
     return map;
   }, [tables]);
+
+  const activePlans = useMemo(() => plans.filter((p) => p.is_active), [plans]);
+  const planTables = selectedPlanId != null ? byPlan.get(selectedPlanId) ?? [] : [];
 
   const createQuickPlan = useCallback(async () => {
     setCreating(true);
@@ -181,55 +192,73 @@ export const FloorMapDialog: React.FC<FloorMapDialogProps> = ({
             )}
           </Box>
         )}
-        {!loading &&
-          plans
-            .filter((p) => p.is_active)
-            .map((plan) => {
-              const planTables = byPlan.get(plan.id) ?? [];
-              if (planTables.length === 0 && plans.length > 1) return null;
-              return (
-                <Box key={plan.id} sx={{ mb: 3 }}>
-                  <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
-                    {plan.name}
-                  </Typography>
-                  <Box
+        {!loading && tables.length > 0 && activePlans.length > 1 && (
+          <Tabs
+            value={selectedPlanId ?? false}
+            onChange={(_e, value: number) => setSelectedPlanId(value)}
+            variant="scrollable"
+            allowScrollButtonsMobile
+            sx={{ mb: 2, minHeight: 40 }}
+          >
+            {activePlans.map((plan) => (
+              <Tab
+                key={plan.id}
+                value={plan.id}
+                label={plan.name}
+                sx={{ textTransform: 'none', minHeight: 40 }}
+              />
+            ))}
+          </Tabs>
+        )}
+        {!loading && tables.length > 0 && (
+          <Box sx={{ mb: 2 }}>
+            {activePlans.length === 1 && (
+              <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
+                {activePlans[0]?.name}
+              </Typography>
+            )}
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))',
+                gap: 1,
+              }}
+            >
+              {planTables.map((table) => {
+                const occupied = table.open_ticket_id != null;
+                const isActive =
+                  activeTicketId != null && table.open_ticket_id === activeTicketId;
+                const disabled =
+                  (mode === 'transfer' && occupied) ||
+                  (mode === 'merge' && (!occupied || isActive));
+                return (
+                  <Button
+                    key={table.id}
+                    variant={isActive ? 'contained' : 'outlined'}
+                    color={occupied ? 'warning' : 'success'}
+                    disabled={disabled}
+                    onClick={() => handleTableClick(table)}
                     sx={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))',
-                      gap: 1,
+                      minHeight: 72,
+                      flexDirection: 'column',
+                      textTransform: 'none',
                     }}
                   >
-                    {planTables.map((table) => {
-                      const occupied = table.open_ticket_id != null;
-                      const isActive =
-                        activeTicketId != null && table.open_ticket_id === activeTicketId;
-                      const disabled =
-                        (mode === 'transfer' && occupied) ||
-                        (mode === 'merge' && (!occupied || isActive));
-                      return (
-                        <Button
-                          key={table.id}
-                          variant={isActive ? 'contained' : 'outlined'}
-                          color={occupied ? 'warning' : 'success'}
-                          disabled={disabled}
-                          onClick={() => handleTableClick(table)}
-                          sx={{
-                            minHeight: 72,
-                            flexDirection: 'column',
-                            textTransform: 'none',
-                          }}
-                        >
-                          <Typography fontWeight={700}>{table.label}</Typography>
-                          <Typography variant="caption">
-                            {occupied ? 'Occupée' : 'Libre'}
-                          </Typography>
-                        </Button>
-                      );
-                    })}
-                  </Box>
-                </Box>
-              );
-            })}
+                    <Typography fontWeight={700}>{table.label}</Typography>
+                    <Typography variant="caption">
+                      {occupied ? 'Occupée' : 'Libre'}
+                    </Typography>
+                  </Button>
+                );
+              })}
+            </Box>
+            {planTables.length === 0 && (
+              <Typography variant="body2" color="text.secondary">
+                Aucune table active sur ce plan.
+              </Typography>
+            )}
+          </Box>
+        )}
         <Stack direction="row" spacing={1} sx={{ mt: 1 }} flexWrap="wrap" useFlexGap>
           <Chip size="small" color="success" variant="outlined" label="Libre" />
           <Chip size="small" color="warning" variant="outlined" label="Occupée" />

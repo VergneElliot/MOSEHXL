@@ -147,7 +147,12 @@ export class ClosureScheduler {
       } catch (err) {
         if (
           err instanceof Error &&
-          (err.message.includes('already exists') || err.message.includes('equal or higher amount'))
+          (err.message.includes('already exists') ||
+            err.message.includes('equal or higher amount') ||
+            err.message.includes('Aucune vente') ||
+            err.message.includes('pas encore commencé') ||
+            err.message.includes('déjà couverte') ||
+            err.message.includes('Fenêtre de clôture vide'))
         ) {
           return null;
         }

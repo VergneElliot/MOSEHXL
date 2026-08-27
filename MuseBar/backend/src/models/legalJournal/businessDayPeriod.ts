@@ -36,14 +36,25 @@ export function getCurrentBusinessDayPeriod(
   closureTime: string,
   timezone: string
 ): { start: moment.Moment; end: moment.Moment } {
+  return getBusinessDayPeriodForInstant(new Date(), closureTime, timezone);
+}
+
+/**
+ * Business day that contains `instant` (cut→next cut), same rules as getCurrentBusinessDayPeriod.
+ */
+export function getBusinessDayPeriodForInstant(
+  instant: Date,
+  closureTime: string,
+  timezone: string
+): { start: moment.Moment; end: moment.Moment } {
   const [hours, minutes] = closureTime.split(':').map(Number);
-  const now = moment.tz(moment(), timezone);
-  const todayClosure = now
+  const at = moment.tz(instant, timezone);
+  const todayClosure = at
     .clone()
     .startOf('day')
     .set({ hour: hours, minute: minutes ?? 0, second: 0, millisecond: 0 });
 
-  if (now.isBefore(todayClosure)) {
+  if (at.isBefore(todayClosure)) {
     const start = todayClosure.clone().subtract(1, 'day');
     const end = todayClosure.clone().subtract(1, 'ms');
     return { start, end };
@@ -51,6 +62,15 @@ export function getCurrentBusinessDayPeriod(
   const start = todayClosure;
   const end = todayClosure.clone().add(1, 'day').subtract(1, 'ms');
   return { start, end };
+}
+
+/** Calendar date key (YYYY-MM-DD) for business_day mode for a given instant. */
+export function getBusinessDayDateKey(
+  instant: Date,
+  closureTime: string,
+  timezone: string
+): string {
+  return getBusinessDayPeriodForInstant(instant, closureTime, timezone).start.format('YYYY-MM-DD');
 }
 
 /**

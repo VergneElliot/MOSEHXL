@@ -1,9 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import moment from 'moment-timezone';
 
-import { getBusinessPeriodBounds, resolveDailyClosurePeriod } from './businessDayPeriod';
+import {
+  getBusinessDayDateKey,
+  getBusinessPeriodBounds,
+  resolveDailyClosurePeriod,
+} from './businessDayPeriod';
 
 const TZ = 'Europe/Paris';
+
+describe('getBusinessDayDateKey', () => {
+  it('maps pre-cut early morning to the previous calendar day key', () => {
+    const instant = moment.tz('2026-08-15 01:30', TZ).toDate();
+    expect(getBusinessDayDateKey(instant, '02:00', TZ)).toBe('2026-08-14');
+  });
+
+  it('maps post-cut to the same calendar day key', () => {
+    const instant = moment.tz('2026-08-15 03:00', TZ).toDate();
+    expect(getBusinessDayDateKey(instant, '02:00', TZ)).toBe('2026-08-15');
+  });
+});
 
 describe('resolveDailyClosurePeriod', () => {
   it('business_day uses cut time from settings (not hardcoded 02:00)', () => {

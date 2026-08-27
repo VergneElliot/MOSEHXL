@@ -10,7 +10,9 @@ import { pool } from '../../db/pool';
 import { DEFAULT_APP_TIMEZONE } from '../../config/timezone';
 import moment from 'moment-timezone';
 import {
+  getBusinessDayDateKey,
   getBusinessPeriodBounds,
+  getCurrentBusinessDayPeriod,
   resolveDailyClosurePeriod,
   type DailyClosureMode,
 } from './businessDayPeriod';
@@ -224,6 +226,56 @@ export class ClosureOperations {
       establishmentId,
       closeImmediately
     );
+  }
+
+  /**
+   * Suggest the YYYY-MM-DD to prefill for business_day mode:
+   * the business day of the first uncovered paid sale after the last closed DAILY,
+   * else the previous completed business day (not the in-progress one).
+   */
+  static async suggestBusinessDayDate(establishmentId: string): Promise<{
+    date: string;
+    closure_time: string;
+    timezone: string;
+    reason: 'unclosed_sales' | 'previous_business_day';
+  }> {
+    const { cutTime, tz } = await this.getPeriodSettings(establishmentId);
+    const lastClosedPeriodEnd = await JournalQueries.getLastClosedDailyPeriodEnd(establishmentId);
+    const now = new Date();
+    const searchStart = lastClosedPeriodEnd
+      ? new Date(lastClosedPeriodEnd.getTime() + 1)
+      : moment.tz(now, tz).subtract(90, 'days').toDate();
+
+    const firstSale = await pool.query(
+      `
+        SELECT MIN(created_at) AS first_at
+        FROM orders
+        WHERE establishment_id = $1
+          AND status IN ('completed', 'paid')
+          AND created_at >= $2
+          AND created_at <= $3
+      `,
+      [establishmentId, searchStart, now]
+    );
+    const firstAt = firstSale.rows[0]?.first_at as Date | string | undefined;
+    if (firstAt) {
+      const instant = firstAt instanceof Date ? firstAt : new Date(firstAt);
+      return {
+        date: getBusinessDayDateKey(instant, cutTime, tz),
+        closure_time: cutTime,
+        timezone: tz,
+        reason: 'unclosed_sales',
+      };
+    }
+
+    const current = getCurrentBusinessDayPeriod(cutTime, tz);
+    const previousStart = current.start.clone().subtract(1, 'day');
+    return {
+      date: previousStart.format('YYYY-MM-DD'),
+      closure_time: cutTime,
+      timezone: tz,
+      reason: 'previous_business_day',
+    };
   }
 
   /**

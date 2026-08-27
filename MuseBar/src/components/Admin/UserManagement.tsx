@@ -1,11 +1,11 @@
 /**
  * User Management Component
  * Administrative interface for managing users and permissions
- * 
+ *
  * Refactored to use modular hooks for better maintainability
  */
 
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Box,
   Typography,
@@ -29,6 +29,7 @@ import {
   DialogContent,
   DialogActions,
   Alert,
+  Chip,
 } from '@mui/material';
 
 import { EstablishmentAssignableRole } from '../../types/auth';
@@ -38,6 +39,7 @@ import {
   usePermissions,
   useUserForm,
 } from './UserManagement/hooks';
+import * as floorApi from '../../services/api/floor';
 
 function formatEstablishmentRoleLabel(role: string): string {
   switch (role) {
@@ -51,11 +53,10 @@ function formatEstablishmentRoleLabel(role: string): string {
 }
 
 const UserManagement: React.FC<{ token: string }> = ({ token }) => {
-  // Initialize hooks
   const userState = useUserState();
   const userForm = useUserForm();
   const permissions = usePermissions();
-  
+
   const userActions = useUserActions({
     onUsersUpdate: userState.updateUsers,
     onUserAdd: userState.addUser,
@@ -64,18 +65,38 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
   });
 
   const { fetchUsers } = userActions;
+  const [pinStatusByUser, setPinStatusByUser] = useState<Record<number, boolean>>({});
+  const [pinDialog, setPinDialog] = useState<{ userId: number; email: string } | null>(null);
+  const [pinValue, setPinValue] = useState('');
+  const [pinBusy, setPinBusy] = useState(false);
+  const [pinError, setPinError] = useState<string | null>(null);
 
-  // Load users only when this tab is active and we have a token (avoids 401 race
-  // where /auth/users was called before the token was set after login).
+  const refreshPinStatuses = useCallback(async (users: Array<{ id: number }>) => {
+    const entries = await Promise.all(
+      users.map(async (u) => {
+        try {
+          const status = await floorApi.getPinStatus(u.id);
+          return [u.id, status.has_pin] as const;
+        } catch {
+          return [u.id, false] as const;
+        }
+      })
+    );
+    setPinStatusByUser(Object.fromEntries(entries));
+  }, []);
+
   useEffect(() => {
     if (token) {
       fetchUsers();
     }
   }, [token, fetchUsers]);
 
-  /**
-   * Handle adding a new user
-   */
+  useEffect(() => {
+    if (userState.users.length > 0) {
+      void refreshPinStatuses(userState.users);
+    }
+  }, [userState.users, refreshPinStatuses]);
+
   const handleAddUser = async () => {
     const validationError = userForm.validateForm();
     if (validationError) {
@@ -92,23 +113,18 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
 
     if (success) {
       userForm.closeAddDialog();
-      // Refresh users list
       userActions.fetchUsers();
     }
   };
 
-  /**
-   * Handle saving permissions
-   */
   const handleSavePermissions = async () => {
     const success = await permissions.savePermissions();
     if (success) {
-      // Refresh users list to update any changes
       userActions.fetchUsers();
     }
   };
 
-  const handleDeleteUser = async (user: typeof userState.users[number]) => {
+  const handleDeleteUser = async (user: (typeof userState.users)[number]) => {
     const confirmed = window.confirm(
       `Supprimer définitivement le compte ${user.email} ?`
     );
@@ -117,6 +133,34 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
     const success = await userActions.deleteUser(user.id);
     if (success) {
       userActions.fetchUsers();
+    }
+  };
+
+  const handleSavePin = async () => {
+    if (!pinDialog) return;
+    setPinBusy(true);
+    setPinError(null);
+    try {
+      await floorApi.setPin(pinValue, pinDialog.userId);
+      setPinDialog(null);
+      setPinValue('');
+      await refreshPinStatuses(userState.users);
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      setPinError(e.message || 'Impossible d’enregistrer le PIN');
+    } finally {
+      setPinBusy(false);
+    }
+  };
+
+  const handleClearPin = async (user: (typeof userState.users)[number]) => {
+    if (!window.confirm(`Effacer le PIN badge de ${user.email} ?`)) return;
+    try {
+      await floorApi.clearPin(user.id);
+      await refreshPinStatuses(userState.users);
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      userState.setErrorState(e.message || 'Impossible d’effacer le PIN');
     }
   };
 
@@ -133,11 +177,7 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
       )}
 
       <Box sx={{ mb: 2 }}>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={userForm.openAddDialog}
-        >
+        <Button variant="contained" color="primary" onClick={userForm.openAddDialog}>
           Ajouter un utilisateur
         </Button>
       </Box>
@@ -148,6 +188,7 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
             <TableRow>
               <TableCell>Email</TableCell>
               <TableCell>Rôle</TableCell>
+              <TableCell>PIN badge</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -157,6 +198,14 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
                 <TableCell>{user.email}</TableCell>
                 <TableCell>{formatEstablishmentRoleLabel(user.role)}</TableCell>
                 <TableCell>
+                  <Chip
+                    size="small"
+                    label={pinStatusByUser[user.id] ? 'PIN défini' : 'Pas de PIN'}
+                    color={pinStatusByUser[user.id] ? 'success' : 'default'}
+                    variant="outlined"
+                  />
+                </TableCell>
+                <TableCell>
                   <Button
                     onClick={() => permissions.openPermDialog(user)}
                     variant="outlined"
@@ -165,6 +214,29 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
                   >
                     Permissions
                   </Button>
+                  <Button
+                    onClick={() => {
+                      setPinError(null);
+                      setPinValue('');
+                      setPinDialog({ userId: user.id, email: user.email });
+                    }}
+                    variant="outlined"
+                    size="small"
+                    sx={{ mr: 1 }}
+                  >
+                    {pinStatusByUser[user.id] ? 'Changer PIN' : 'Définir PIN'}
+                  </Button>
+                  {pinStatusByUser[user.id] && (
+                    <Button
+                      onClick={() => void handleClearPin(user)}
+                      variant="outlined"
+                      color="warning"
+                      size="small"
+                      sx={{ mr: 1 }}
+                    >
+                      Effacer PIN
+                    </Button>
+                  )}
                   <Button
                     onClick={() => handleDeleteUser(user)}
                     variant="outlined"
@@ -180,7 +252,6 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
         </Table>
       </TableContainer>
 
-      {/* Add User Dialog */}
       <Dialog open={userForm.showAdd} onClose={userForm.closeAddDialog}>
         <DialogTitle>Ajouter un nouvel utilisateur</DialogTitle>
         <DialogContent>
@@ -215,7 +286,7 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
             >
               <MenuItem value="staff">Staff</MenuItem>
               <MenuItem value="establishment_admin">
-                Administrateur d'établissement
+                Administrateur d&apos;établissement
               </MenuItem>
             </Select>
           </FormControl>
@@ -232,23 +303,52 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
         </DialogActions>
       </Dialog>
 
-      {/* Permissions Dialog */}
-      <Dialog 
-        open={permissions.permDialog.open} 
+      <Dialog open={pinDialog != null} onClose={() => setPinDialog(null)}>
+        <DialogTitle>PIN badge — {pinDialog?.email}</DialogTitle>
+        <DialogContent>
+          {pinError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {pinError}
+            </Alert>
+          )}
+          <TextField
+            autoFocus
+            margin="dense"
+            label="PIN (6 chiffres)"
+            type="password"
+            inputMode="numeric"
+            fullWidth
+            value={pinValue}
+            onChange={(e) => setPinValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            helperText="Le serveur refuse un PIN déjà utilisé par un autre membre."
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPinDialog(null)}>Annuler</Button>
+          <Button
+            variant="contained"
+            disabled={pinBusy || pinValue.length !== 6}
+            onClick={() => void handleSavePin()}
+          >
+            {pinBusy ? 'Enregistrement…' : 'Enregistrer'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={permissions.permDialog.open}
         onClose={permissions.closePermDialog}
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>
-          Permissions pour {permissions.permDialog.user?.email}
-        </DialogTitle>
+        <DialogTitle>Permissions pour {permissions.permDialog.user?.email}</DialogTitle>
         <DialogContent>
           {permissions.permError && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {permissions.permError}
             </Alert>
           )}
-          
+
           <Box sx={{ mb: 2 }}>
             <Button
               onClick={() => permissions.toggleAllPermissions(true)}
@@ -257,10 +357,7 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
             >
               Tout sélectionner
             </Button>
-            <Button
-              onClick={() => permissions.toggleAllPermissions(false)}
-              size="small"
-            >
+            <Button onClick={() => permissions.toggleAllPermissions(false)} size="small">
               Tout désélectionner
             </Button>
           </Box>
@@ -278,15 +375,13 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
               sx={{ display: 'block' }}
             />
           ))}
-          
+
           <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
             {permissions.getEnabledCount()} permission(s) sélectionnée(s)
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={permissions.closePermDialog}>
-            Annuler
-          </Button>
+          <Button onClick={permissions.closePermDialog}>Annuler</Button>
           <Button
             onClick={handleSavePermissions}
             disabled={permissions.permSaving}

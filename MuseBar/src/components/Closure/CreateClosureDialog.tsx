@@ -110,12 +110,46 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
           setCutTime('02:00');
         }
       }
+
+      try {
+        const suggestion = await apiCore.request<{ date?: string }>(
+          '/legal/closure/suggest-business-day-date',
+          { method: 'GET' }
+        );
+        if (!cancelled && suggestion?.date) {
+          onDateChange(suggestion.date);
+        }
+      } catch {
+        // Keep whatever date the parent already has.
+      }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [open, defaultFondDeCaisse]);
+  }, [open, defaultFondDeCaisse, onDateChange]);
+
+  // When switching to business_day, refresh the suggested date once.
+  useEffect(() => {
+    if (!open || selectedClosureType !== 'DAILY' || dailyMode !== 'business_day') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const suggestion = await apiCore.request<{ date?: string }>(
+          '/legal/closure/suggest-business-day-date',
+          { method: 'GET' }
+        );
+        if (!cancelled && suggestion?.date) {
+          onDateChange(suggestion.date);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, selectedClosureType, dailyMode, onDateChange]);
 
   // Daily bulletins are the ones that can silently land on the wrong night, so
   // resolve the exact window server-side and show it before anything is written.

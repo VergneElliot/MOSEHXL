@@ -9,6 +9,7 @@ import OrdersTable from './OrdersTable';
 import OrderDetailsDialog from './OrderDetailsDialog';
 import ReturnDialog from './ReturnDialog';
 import PrintAfterSaleDialog from '../POS/PrintAfterSaleDialog';
+import WaiterDayReportPanel from './WaiterDayReportPanel';
 import { Order } from '../../types';
 
 interface HistoryContainerProps {
@@ -122,6 +123,8 @@ const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn =
         loading={state.loading}
         formatCurrency={logic.formatCurrency}
       />
+
+      <WaiterDayReportPanel />
 
       {/* Search Bar */}
       <SearchBar

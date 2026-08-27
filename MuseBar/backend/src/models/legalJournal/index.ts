@@ -236,6 +236,10 @@ export class LegalJournalModel {
     );
   }
 
+  static async suggestBusinessDayDate(establishmentId: string) {
+    return await ClosureOperations.suggestBusinessDayDate(establishmentId);
+  }
+
   static async voidClosureBulletin(
     closureBulletinId: number,
     establishmentId: string,

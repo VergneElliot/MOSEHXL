@@ -78,6 +78,7 @@ export const ALL_PERMISSIONS: Permission[] = [
   { key: 'access_inbox', label: 'Administration — Boîte mail' },
   { key: 'access_reservations', label: 'Administration — Réservations' },
   { key: 'access_planning', label: 'Administration — Planning' },
+  { key: 'manage_floor_plan', label: 'Plans de tables' },
   { key: 'pos_happyhour_manual', label: 'POS — Happy Hour (bouton manuel)' },
   { key: 'pos_apply_offert', label: 'POS — Offert' },
   { key: 'pos_apply_perso', label: 'POS — Perso' },

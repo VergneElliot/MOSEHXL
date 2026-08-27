@@ -9,6 +9,7 @@ import {
   Security as AuditIcon,
   AccessTime as ClockIcon,
   Gavel as ComplianceIcon,
+  TableRestaurant as FloorIcon,
 } from '@mui/icons-material';
 import { PERMISSIONS } from '@mosehxl/types';
 import type { User } from '../../types/auth';
@@ -17,6 +18,7 @@ import InboxPanel from './InboxPanel';
 import ReservationsPanel from './ReservationsPanel';
 import PlanningPanel from './PlanningPanel';
 import TimeClockPanel from './TimeClockPanel';
+import FloorPlansPanel from './FloorPlansPanel';
 
 const LazyUserManagement = React.lazy(() => import('../Admin/UserManagement'));
 const LazyAuditTrailDashboard = React.lazy(() => import('../Admin/AuditTrailDashboard'));
@@ -43,6 +45,7 @@ type AdminSection =
   | 'reservations'
   | 'planning'
   | 'time_clock'
+  | 'floor'
   | 'users'
   | 'compliance'
   | 'audit';
@@ -68,6 +71,9 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
     // report edit requires planning/admin (enforced in the panel / API).
     if (user.role !== 'system_admin' && user.establishment_id) {
       items.push({ key: 'time_clock', label: 'Pointage', icon: <ClockIcon /> });
+    }
+    if (isEstAdmin || perms.includes(PERMISSIONS.manage_floor_plan)) {
+      items.push({ key: 'floor', label: 'Plans de tables', icon: <FloorIcon /> });
     }
     if (isEstAdmin || perms.includes(PERMISSIONS.access_user_management)) {
       items.push({ key: 'users', label: 'Utilisateurs', icon: <UsersIcon /> });
@@ -98,8 +104,8 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, height: '100%', minHeight: 0 }}>
       <Typography variant="h4">Administration</Typography>
       <Typography variant="body2" color="text.secondary">
-        Documents, boîte mail, réservations, planning, pointage, utilisateurs, conformité
-        légale et journal de sécurité.
+        Documents, boîte mail, réservations, planning, pointage, plans de tables, utilisateurs,
+        conformité légale et journal de sécurité.
       </Typography>
 
       <Tabs
@@ -119,6 +125,7 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
         {active === 'reservations' && <ReservationsPanel />}
         {active === 'planning' && <PlanningPanel />}
         {active === 'time_clock' && <TimeClockPanel user={user} />}
+        {active === 'floor' && <FloorPlansPanel />}
         {active === 'users' && (
           <Suspense fallback={<PanelFallback />}>
             <LazyUserManagement token={token} />

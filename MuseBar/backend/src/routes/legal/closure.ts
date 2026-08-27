@@ -497,6 +497,17 @@ router.post('/create', asyncHandler(async (req, res) => {
 }));
 
 /**
+ * GET suggested YYYY-MM-DD for business_day mode (unclosed sales or previous day).
+ * GET /api/legal/closure/suggest-business-day-date
+ */
+router.get('/suggest-business-day-date', asyncHandler(async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
+  const suggestion = await LegalJournalModel.suggestBusinessDayDate(establishmentId);
+  res.json(suggestion);
+}));
+
+/**
  * GET what a daily closure would cover, without creating anything.
  * GET /api/legal/closure/daily-preview?mode=close_now|business_day&date=YYYY-MM-DD&force=
  */

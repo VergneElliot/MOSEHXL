@@ -139,6 +139,13 @@ export const ClosureSettings: React.FC<ClosureSettingsProps> = ({
               }
               label="Activer la clôture automatique"
             />
+            {closureSettings.auto_closure_enabled && (
+              <Alert severity="warning" sx={{ mt: 1 }}>
+                Après activation, sauvegardez puis lancez « Déclencher vérification manuelle »
+                une fois hors service pour confirmer que le planificateur tourne sans erreur.
+                Ne laissez pas l&apos;auto-clôture activée si cette vérification échoue.
+              </Alert>
+            )}
           </Grid>
 
           {/* Daily Closure Time — the business day boundary, not just a scheduler setting:

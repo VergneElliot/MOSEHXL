@@ -92,6 +92,14 @@ export async function setPin(pin: string, userId?: number): Promise<{ success: b
   });
 }
 
+export async function clearPin(userId: number): Promise<{ success: boolean; user_id: number }> {
+  return request(`/auth/pin/${userId}`, { method: 'DELETE' });
+}
+
+export async function getPinStatus(userId: number): Promise<{ user_id: number; has_pin: boolean }> {
+  return request(`/auth/pin/status/${userId}`);
+}
+
 export async function listFloorPlans(): Promise<FloorPlanDto[]> {
   const res = await request<{ plans: FloorPlanDto[] }>('/floor/plans');
   return res.plans;
@@ -105,18 +113,75 @@ export async function createFloorPlan(name: string): Promise<FloorPlanDto> {
   return res.plan;
 }
 
+export async function updateFloorPlan(
+  id: number,
+  patch: Partial<Pick<FloorPlanDto, 'name' | 'display_order' | 'is_active'>>
+): Promise<FloorPlanDto> {
+  const res = await request<{ plan: FloorPlanDto }>(`/floor/plans/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+  return res.plan;
+}
+
+export async function deleteFloorPlan(id: number): Promise<void> {
+  await request(`/floor/plans/${id}`, { method: 'DELETE' });
+}
+
+export interface DiningTableDto {
+  id: number;
+  establishment_id: string;
+  floor_plan_id: number;
+  label: string;
+  pos_x: number;
+  pos_y: number;
+  width: number;
+  height: number;
+  capacity: number | null;
+  shape: string;
+  sort_order: number;
+  is_active: boolean;
+}
+
+export async function listDiningTables(floorPlanId?: number): Promise<DiningTableDto[]> {
+  const q = floorPlanId != null ? `?plan_id=${floorPlanId}` : '';
+  const res = await request<{ tables: DiningTableDto[] }>(`/floor/tables${q}`);
+  return res.tables;
+}
+
 export async function createDiningTable(input: {
   floor_plan_id: number;
   label: string;
   pos_x?: number;
   pos_y?: number;
+  capacity?: number | null;
   sort_order?: number;
-}): Promise<unknown> {
-  const res = await request<{ table: unknown }>('/floor/tables', {
+}): Promise<DiningTableDto> {
+  const res = await request<{ table: DiningTableDto }>('/floor/tables', {
     method: 'POST',
     body: JSON.stringify(input),
   });
   return res.table;
+}
+
+export async function updateDiningTable(
+  id: number,
+  patch: Partial<{
+    label: string;
+    capacity: number | null;
+    sort_order: number;
+    is_active: boolean;
+  }>
+): Promise<DiningTableDto> {
+  const res = await request<{ table: DiningTableDto }>(`/floor/tables/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+  return res.table;
+}
+
+export async function deleteDiningTable(id: number): Promise<void> {
+  await request(`/floor/tables/${id}`, { method: 'DELETE' });
 }
 
 export async function getFloorStatus(): Promise<DiningTableStatusDto[]> {

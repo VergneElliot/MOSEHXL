@@ -10,7 +10,7 @@ import { pool } from '../../db/pool';
 import { getEstablishmentId, requireAuth, requireEstablishmentAdmin } from '../auth';
 import { validateBody, validateParams, commonValidations, paramValidations } from '../../middleware/validation';
 import { assertPosOrderLinePermissions } from '../../middleware/orderPosLinePermissions';
-import { AppError, asyncHandler } from '../../middleware/errorHandler';
+import { AppError, asyncHandler, ValidationError } from '../../middleware/errorHandler';
 import { createOrderWithCompliance } from '../../services/orders/orderCreationService';
 import { attachOptionsToOrderItems } from '../../services/orders/orderItemOptionsService';
 
@@ -90,6 +90,45 @@ router.get('/waiters', asyncHandler(async (req, res) => {
   if (!establishmentId) return;
   const waiters = await OrderModel.listWaitersWithSales(establishmentId);
   res.json({ waiters });
+}));
+
+/**
+ * GET /api/orders/waiter-day-report?date=YYYY-MM-DD
+ * Non-fiscal CA by waiter for the business day containing `date` (cut→cut).
+ */
+router.get('/waiter-day-report', asyncHandler(async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
+  const dateRaw = typeof req.query.date === 'string' ? req.query.date : '';
+  if (!dateRaw) {
+    throw new ValidationError('date is required (YYYY-MM-DD)');
+  }
+  const day = new Date(dateRaw);
+  if (Number.isNaN(day.getTime())) {
+    throw new ValidationError('Invalid date format');
+  }
+
+  const { ClosureSettingsModel } = await import('../../models/closureSettings');
+  const { getBusinessDayPeriod } = await import('../../models/legalJournal/businessDayPeriod');
+  const { DEFAULT_APP_TIMEZONE } = await import('../../config/timezone');
+  const settings = await ClosureSettingsModel.getClosureSettings(establishmentId);
+  const cut = settings.daily_closure_time || '02:00';
+  const tz = settings.timezone || DEFAULT_APP_TIMEZONE;
+  const { start, end } = getBusinessDayPeriod(day, cut, tz);
+  const rows = await OrderModel.waiterDayReport(establishmentId, start.toDate(), end.toDate());
+  const total_amount = rows.reduce((sum, r) => sum + r.total_amount, 0);
+  const order_count = rows.reduce((sum, r) => sum + r.order_count, 0);
+  res.json({
+    date: start.format('YYYY-MM-DD'),
+    period_start: start.toISOString(),
+    period_end: end.toISOString(),
+    closure_time: cut,
+    timezone: tz,
+    order_count,
+    total_amount,
+    waiters: rows,
+    note: 'Rapport informatif — ce n’est pas un bulletin de clôture fiscal.',
+  });
 }));
 
 /**
