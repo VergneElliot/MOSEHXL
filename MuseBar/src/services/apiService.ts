@@ -120,6 +120,7 @@ export class ApiService {
     waiter_user_id?: number;
     waiter_display_name?: string;
     table_label?: string;
+    pinActorToken?: string;
   }): Promise<Order> {
     return ordersApi.createOrder(order);
   }

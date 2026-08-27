@@ -27,6 +27,10 @@ interface PinPadDialogProps {
   onSwitchToVerify: () => void;
   /** Required length rules when mode === 'set' (defaults to elevated 4–8). */
   setRules?: PinLengthRules;
+  /** Optional override copy (session gate / Mode A step-up). */
+  stepUp?: { title: string; description: string };
+  /** Hide “Définir mon PIN” (step-up / forced session prompts). */
+  hideSetPin?: boolean;
 }
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'ok', '0', 'back'] as const;
@@ -40,6 +44,8 @@ export const PinPadDialog: React.FC<PinPadDialogProps> = ({
   onSwitchToSet,
   onSwitchToVerify,
   setRules,
+  stepUp,
+  hideSetPin = false,
 }) => {
   const [digits, setDigits] = useState('');
   const [busy, setBusy] = useState(false);
@@ -125,19 +131,23 @@ export const PinPadDialog: React.FC<PinPadDialogProps> = ({
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <BadgeIcon />
-        {mode === 'verify'
-          ? 'Session PIN'
-          : rules.kind === 'basic'
-            ? 'Définir un PIN (2 chiffres)'
-            : `Définir un PIN (${rules.min_length}–${rules.max_length} chiffres)`}
+        {stepUp?.title
+          ? stepUp.title
+          : mode === 'verify'
+            ? 'Session PIN'
+            : rules.kind === 'basic'
+              ? 'Définir un PIN (2 chiffres)'
+              : `Définir un PIN (${rules.min_length}–${rules.max_length} chiffres)`}
       </DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          {mode === 'verify'
-            ? 'Entrez votre code PIN (2 chiffres pour le personnel de base, 4 à 8 pour les profils élevés), puis Valider.'
-            : rules.kind === 'basic'
-              ? 'PIN d’identification à 2 chiffres, unique dans l’établissement.'
-              : 'PIN renforcé (4 à 8 chiffres) — ce compte a des permissions élevées.'}
+          {stepUp?.description
+            ? stepUp.description
+            : mode === 'verify'
+              ? 'Entrez votre code PIN (2 chiffres pour le personnel de base, 4 à 8 pour les profils élevés), puis Valider.'
+              : rules.kind === 'basic'
+                ? 'PIN d’identification à 2 chiffres, unique dans l’établissement.'
+                : 'PIN renforcé (4 à 8 chiffres) — ce compte a des permissions élevées.'}
         </Typography>
         <Box
           sx={{
@@ -215,7 +225,9 @@ export const PinPadDialog: React.FC<PinPadDialogProps> = ({
         </Box>
       </DialogContent>
       <DialogActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
-        {mode === 'verify' ? (
+        {hideSetPin ? (
+          <span />
+        ) : mode === 'verify' ? (
           <Button size="small" onClick={onSwitchToSet} disabled={busy}>
             Définir mon PIN
           </Button>

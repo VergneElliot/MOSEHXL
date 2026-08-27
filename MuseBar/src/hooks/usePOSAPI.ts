@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { ApiService } from '../services/apiService';
 import { OrderItem, LocalSubBill, Order } from '../types';
 import { getFloorOrderAttribution } from '../services/floorOrderAttribution';
+import { usePinSessions } from '../contexts/PinSessionsContext';
 
 interface ChangeResponse {
   message?: string;
@@ -39,12 +40,17 @@ export const usePOSAPI = (
   onDataUpdate: () => void
 ): POSAPIActions => {
   const apiService = ApiService.getInstance();
+  const { activeSession } = usePinSessions();
 
   // Single code path: delegate to orders API (items mapping, sub_bills, happy_hour_discount_amount in orders.ts)
   const createOrder = useCallback(
     async (orderData: CreateOrderData) => {
       try {
         const attribution = getFloorOrderAttribution();
+        const pinActorToken = activeSession?.actor.token;
+        if (!pinActorToken) {
+          throw new Error('Session PIN requise pour créer une commande');
+        }
         const created = await apiService.createOrder({
           totalAmount: orderData.totalAmount,
           taxAmount: orderData.totalTax,
@@ -63,6 +69,7 @@ export const usePOSAPI = (
           waiter_user_id: orderData.waiterUserId ?? attribution?.waiterUserId,
           waiter_display_name: orderData.waiterDisplayName ?? attribution?.waiterDisplayName,
           table_label: orderData.tableLabel ?? attribution?.tableLabel ?? undefined,
+          pinActorToken,
         });
         onSuccess('Commande créée avec succès', created);
         onDataUpdate();
@@ -77,7 +84,7 @@ export const usePOSAPI = (
         throw error;
       }
     },
-    [apiService, onSuccess, onError, onDataUpdate]
+    [apiService, onSuccess, onError, onDataUpdate, activeSession?.actor.token]
   );
 
   const processChange = useCallback(

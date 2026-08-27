@@ -23,6 +23,9 @@ import {
 
 import { Category, Product, User } from '../../types';
 import { PERMISSIONS, type PermissionName } from '@mosehxl/types';
+import { useStepUpAuth } from '../../contexts/StepUpAuthContext';
+import { usePinSessions } from '../../contexts/PinSessionsContext';
+import { pinActorHasPermission } from '../../utils/pinSessionPermissions';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -106,6 +109,8 @@ const AppRouter: React.FC<AppRouterProps> = ({
   const [tabValue, setTabValue] = useState(0);
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
+  const { ensurePermission, hasGrant } = useStepUpAuth();
+  const { activeSession } = usePinSessions();
 
   const posLinePermissions = useMemo(
     () => ({
@@ -169,9 +174,63 @@ const AppRouter: React.FC<AppRouterProps> = ({
     return true;
   });
 
-  const handleTabChange = useCallback((_event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
+  const stepUpPermissionForTab = useCallback((tabValueKey: string): PermissionName | null => {
+    switch (tabValueKey) {
+      case 'menu':
+        return PERMISSIONS.access_menu;
+      case 'settings':
+        return PERMISSIONS.access_settings;
+      case 'closures':
+        return PERMISSIONS.access_closure;
+      case 'administration':
+        return PERMISSIONS.access_user_management;
+      default:
+        return null;
+    }
   }, []);
+
+  const handleTabChange = useCallback(
+    (_event: React.SyntheticEvent, newValue: number) => {
+      const tab = filteredTabs[newValue];
+      if (!tab) return;
+      const required = stepUpPermissionForTab(tab.value);
+      if (!required) {
+        setTabValue(newValue);
+        return;
+      }
+      const actor = activeSession?.actor;
+      if (
+        pinActorHasPermission(actor, required) ||
+        hasGrant(required) ||
+        (tab.value === 'administration' &&
+          actor &&
+          (actor.role === 'establishment_admin' ||
+            pinActorHasPermission(actor, PERMISSIONS.access_documents) ||
+            pinActorHasPermission(actor, PERMISSIONS.access_inbox) ||
+            pinActorHasPermission(actor, PERMISSIONS.access_reservations) ||
+            pinActorHasPermission(actor, PERMISSIONS.access_planning) ||
+            pinActorHasPermission(actor, PERMISSIONS.manage_floor_plan)))
+      ) {
+        setTabValue(newValue);
+        return;
+      }
+      void ensurePermission(required, {
+        title: `Accès — ${tab.label}`,
+        description: `PIN d’un profil autorisé pour ouvrir « ${tab.label} » (autorisation ponctuelle).`,
+      })
+        .then(() => setTabValue(newValue))
+        .catch(() => {
+          /* stay on current tab */
+        });
+    },
+    [
+      filteredTabs,
+      stepUpPermissionForTab,
+      activeSession?.actor,
+      hasGrant,
+      ensurePermission,
+    ]
+  );
 
   return (
     <Paper

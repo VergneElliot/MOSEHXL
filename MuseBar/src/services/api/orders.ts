@@ -151,12 +151,16 @@ export async function createOrder(order: {
   waiter_user_id?: number;
   waiter_display_name?: string;
   table_label?: string;
+  pinActorToken?: string;
 }): Promise<Order> {
   // Accounting: send exact amounts for storage (no rounding). Taxes are derived from
   // prices (taxAmount = totalPrice * taxRate / (1+taxRate)) and may be non-terminating;
   // rounding is for display only to avoid cumulative drift in closures/audits.
   const result = await request<RawOrder>('/orders', {
     method: 'POST',
+    headers: order.pinActorToken
+      ? { 'x-pin-actor-token': order.pinActorToken }
+      : undefined,
     body: JSON.stringify({
       total_amount: order.totalAmount,
       total_tax: order.taxAmount,
@@ -164,7 +168,7 @@ export async function createOrder(order: {
       status: order.status || 'completed',
       notes: order.notes,
       tips: order.tips || 0,
-      change: order.change || 0,
+      change: order.change ?? 0,
       ...(order.waiter_user_id != null ? { waiter_user_id: order.waiter_user_id } : {}),
       ...(order.waiter_display_name != null
         ? { waiter_display_name: order.waiter_display_name }

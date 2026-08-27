@@ -11,6 +11,8 @@ import ReturnDialog from './ReturnDialog';
 import PrintAfterSaleDialog from '../POS/PrintAfterSaleDialog';
 import WaiterDayReportPanel from './WaiterDayReportPanel';
 import { Order } from '../../types';
+import { useStepUpAuth } from '../../contexts/StepUpAuthContext';
+import { PERMISSIONS } from '@mosehxl/types';
 
 interface HistoryContainerProps {
   /** Backend permission `orders_cancel` (establishment admin has all permissions from API). */
@@ -20,6 +22,7 @@ interface HistoryContainerProps {
 const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn = true }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const { ensurePermission } = useStepUpAuth();
 
   // Custom hooks for state management
   const [state, actions] = useHistoryState();
@@ -87,7 +90,14 @@ const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn =
   };
 
   const handleReturnOrder = (order: Order) => {
-    actions.openReturnDialog(order);
+    void ensurePermission(PERMISSIONS.orders_cancel, {
+      title: 'Annulation / retour',
+      description: 'PIN d’un profil autorisé à annuler ou retourner une vente.',
+    })
+      .then(() => actions.openReturnDialog(order))
+      .catch(() => {
+        /* cancelled */
+      });
   };
 
   const handleCloseSnackbar = () => {
@@ -96,13 +106,22 @@ const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn =
 
   const handleConfirmReturn = () => {
     if (!state.orderToReturn) return;
-    api.processReturn({
-      order: state.orderToReturn,
-      reason: state.returnReason,
-      selectedItems: state.selectedItemsToReturn,
-      selectedTip: state.selectedTipToReturn,
-      isPartial: state.isPartialReturn,
-    });
+    void ensurePermission(PERMISSIONS.orders_cancel, {
+      title: 'Confirmer l’annulation',
+      description: 'PIN d’un profil autorisé à confirmer l’annulation / retour.',
+    })
+      .then(() => {
+        api.processReturn({
+          order: state.orderToReturn!,
+          reason: state.returnReason,
+          selectedItems: state.selectedItemsToReturn,
+          selectedTip: state.selectedTipToReturn,
+          isPartial: state.isPartialReturn,
+        });
+      })
+      .catch(() => {
+        /* cancelled */
+      });
   };
 
   return (

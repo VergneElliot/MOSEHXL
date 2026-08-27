@@ -10,6 +10,7 @@ import { pool } from '../../db/pool';
 import { getEstablishmentId, requireAuth, requireEstablishmentAdmin } from '../auth';
 import { validateBody, validateParams, commonValidations, paramValidations } from '../../middleware/validation';
 import { assertPosOrderLinePermissions } from '../../middleware/orderPosLinePermissions';
+import { requirePosPinActor } from '../../middleware/pinActor';
 import { AppError, asyncHandler, ValidationError } from '../../middleware/errorHandler';
 import { createOrderWithCompliance } from '../../services/orders/orderCreationService';
 import { attachOptionsToOrderItems } from '../../services/orders/orderItemOptionsService';
@@ -164,14 +165,22 @@ router.get('/:id', validateParams([paramValidations.id]), asyncHandler(async (re
  */
 router.post(
   '/',
+  requirePosPinActor,
   validateBody(commonValidations.orderCreate),
   assertPosOrderLinePermissions(),
   asyncHandler(async (req, res) => {
     const establishmentId = getEstablishmentId(req, res);
     if (!establishmentId) return;
     try {
+      const pinActor = req.pinActor;
+      const body = {
+        ...req.body,
+        // Sales attribution always comes from the active PIN session.
+        waiter_user_id: pinActor?.id ?? req.body?.waiter_user_id ?? null,
+        waiter_display_name: pinActor?.display_name ?? req.body?.waiter_display_name ?? null,
+      };
       const creationResult = await createOrderWithCompliance(
-        req.body,
+        body,
         {
           establishmentId,
           userId: req.user ? String(req.user.id) : undefined,

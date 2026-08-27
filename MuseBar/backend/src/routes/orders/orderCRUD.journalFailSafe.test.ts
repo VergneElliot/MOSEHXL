@@ -34,6 +34,23 @@ vi.mock('../../middleware/orderPosLinePermissions', () => ({
   assertPosOrderLinePermissions: () => (_req: express.Request, _res: express.Response, next: express.NextFunction) => next(),
 }));
 
+vi.mock('../../middleware/pinActor', () => ({
+  requirePosPinActor: (req: express.Request, _res: express.Response, next: express.NextFunction) => {
+    req.pinActor = {
+      token_use: 'pin_actor',
+      id: 42,
+      email: 'waiter@test.local',
+      role: 'staff',
+      establishment_id: '11111111-1111-1111-1111-111111111111',
+      display_name: 'Waiter Test',
+      permissions: ['access_pos'],
+    };
+    next();
+  },
+  requirePinActor: () => (_req: express.Request, _res: express.Response, next: express.NextFunction) => next(),
+  parsePinBody: (pin: unknown) => String(pin),
+}));
+
 vi.mock('../../models', () => ({
   OrderModel: {
     getAll: vi.fn(),

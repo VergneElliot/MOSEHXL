@@ -9,6 +9,7 @@ import { usePOSCatalogLogic } from '../../hooks/usePOSCatalogLogic';
 import { useFloorService } from '../../hooks/useFloorService';
 import { useAuth } from '../../hooks/useAuth';
 import { usePinSessions } from '../../contexts/PinSessionsContext';
+import { useStepUpAuth } from '../../contexts/StepUpAuthContext';
 import { setFloorOrderAttribution } from '../../services/floorOrderAttribution';
 import POSLayout from './POSLayout';
 import POSMenuPanel from './POSMenuPanel';
@@ -21,6 +22,7 @@ import { upsertLineNoteInOptions } from '../../utils/lineItemNote';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { saleLines, tipsFromOrder } from '../../hooks/usePOSOrderTotals';
 import { resolvePinLengthRules } from '../../utils/pinRules';
+import { PERMISSIONS } from '@mosehxl/types';
 
 const LazyPaymentDialog = React.lazy(() => import('./PaymentDialog'));
 const LazyPrintAfterSaleDialog = React.lazy(() => import('./PrintAfterSaleDialog'));
@@ -55,6 +57,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
 }) => {
   const [state, actions] = usePOSState();
   const { activeSessionId, sessions, updateActiveSession } = usePinSessions();
+  const { ensureSession, ensurePermission } = useStepUpAuth();
   const sessionSyncRef = React.useRef<string | null>(null);
   const [diversDialogOpen, setDiversDialogOpen] = useState(false);
   const [pourboireDialogOpen, setPourboireDialogOpen] = useState(false);
@@ -160,7 +163,17 @@ const POSContainer: React.FC<POSContainerProps> = ({
   );
 
   const handleAddToOrder = useCallback(
-    (item: OrderItem, quantity: number = 1) => {
+    async (item: OrderItem, quantity: number = 1) => {
+      try {
+        await ensureSession();
+      } catch {
+        actions.setSnackbar({
+          open: true,
+          message: 'Session PIN requise pour ajouter des articles',
+          severity: 'error',
+        });
+        return;
+      }
       const base = { ...item, quantity: 1 };
       const stamp = Date.now();
       const lines: OrderItem[] = [];
@@ -174,7 +187,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
       }
       actions.addLinesToOrder(lines);
     },
-    [actions.addLinesToOrder]
+    [actions.addLinesToOrder, actions.setSnackbar, ensureSession]
   );
 
   const buildOrderItem = useCallback(
@@ -214,7 +227,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
         setOptionDialogOpen(true);
         return;
       }
-      handleAddToOrder(buildOrderItem(product, []), quantity);
+      void handleAddToOrder(buildOrderItem(product, []), quantity);
     },
     [buildOrderItem, handleAddToOrder]
   );
@@ -222,7 +235,10 @@ const POSContainer: React.FC<POSContainerProps> = ({
   const handleConfirmProductOptions = useCallback(
     (selections: ProductOptionSelection[]) => {
       if (!pendingProduct) return;
-      handleAddToOrder(buildOrderItem(pendingProduct.product, selections), pendingProduct.quantity);
+      void handleAddToOrder(
+        buildOrderItem(pendingProduct.product, selections),
+        pendingProduct.quantity
+      );
       setPendingProduct(null);
     },
     [pendingProduct, buildOrderItem, handleAddToOrder]
@@ -245,14 +261,69 @@ const POSContainer: React.FC<POSContainerProps> = ({
       updateLineAt: actions.updateLineAt,
     });
 
-  const handleCheckout = useCallback(() => {
-    actions.setPaymentDialogOpen(true);
-  }, [actions.setPaymentDialogOpen]);
+  const gatedApplyHappyHour = useCallback(
+    async (index: number) => {
+      try {
+        await ensurePermission(PERMISSIONS.pos_happyhour_manual, {
+          title: 'Happy Hour manuel',
+          description: 'PIN d’un profil autorisé au Happy Hour manuel.',
+        });
+        handleApplyHappyHour(index);
+      } catch {
+        /* cancelled or denied */
+      }
+    },
+    [ensurePermission, handleApplyHappyHour]
+  );
+
+  const gatedApplyOffert = useCallback(
+    async (index: number) => {
+      try {
+        await ensurePermission(PERMISSIONS.pos_apply_offert, {
+          title: 'Offert',
+          description: 'PIN d’un profil autorisé à appliquer un offert.',
+        });
+        handleApplyOffert(index);
+      } catch {
+        /* cancelled or denied */
+      }
+    },
+    [ensurePermission, handleApplyOffert]
+  );
+
+  const gatedApplyPerso = useCallback(
+    async (index: number) => {
+      try {
+        await ensurePermission(PERMISSIONS.pos_apply_perso, {
+          title: 'Perso',
+          description: 'PIN d’un profil autorisé à appliquer un perso.',
+        });
+        handleApplyPerso(index);
+      } catch {
+        /* cancelled or denied */
+      }
+    },
+    [ensurePermission, handleApplyPerso]
+  );
+
+  const handleCheckout = useCallback(async () => {
+    try {
+      await ensureSession();
+      actions.setPaymentDialogOpen(true);
+    } catch {
+      actions.setSnackbar({
+        open: true,
+        message: 'Session PIN requise pour encaisser',
+        severity: 'error',
+      });
+    }
+  }, [actions.setPaymentDialogOpen, actions.setSnackbar, ensureSession]);
 
   const handleQuickPayment = useCallback(
     async (method: 'cash' | 'card') => {
       if (state.currentOrder.length === 0) return;
       try {
+        await ensureSession();
         const created = await createOrder({
           paymentMethod: method,
           totalAmount: orderTotal,
@@ -264,10 +335,17 @@ const POSContainer: React.FC<POSContainerProps> = ({
         void created;
         actions.clearOrder();
       } catch {
-        // Error already reported by usePOSAPI
+        // Error already reported by usePOSAPI or session cancelled
       }
     },
-    [state.currentOrder, orderTotal, orderTax, createOrder, actions.clearOrder]
+    [
+      state.currentOrder,
+      orderTotal,
+      orderTax,
+      createOrder,
+      actions.clearOrder,
+      ensureSession,
+    ]
   );
 
   const handleClearOrder = useCallback(() => {
@@ -357,7 +435,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
         isPerso: false,
         description: data.description.trim(),
       };
-      handleAddToOrder(item, 1);
+      void handleAddToOrder(item, 1);
     },
     [handleAddToOrder]
   );
@@ -381,7 +459,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
         isTip: true,
         description: 'Pourboire carte',
       };
-      handleAddToOrder(item, 1);
+      void handleAddToOrder(item, 1);
     },
     [handleAddToOrder]
   );
@@ -418,9 +496,21 @@ const POSContainer: React.FC<POSContainerProps> = ({
               onCheckout={handleCheckout}
               onQuickCard={handleQuickCard}
               onQuickCash={handleQuickCash}
-              onApplyHappyHour={posLinePermissions.happyHourManual ? handleApplyHappyHour : undefined}
-              onApplyOffert={posLinePermissions.offert ? handleApplyOffert : undefined}
-              onApplyPerso={posLinePermissions.perso ? handleApplyPerso : undefined}
+              onApplyHappyHour={
+                posLinePermissions.happyHourManual
+                  ? (index: number) => void gatedApplyHappyHour(index)
+                  : undefined
+              }
+              onApplyOffert={
+                posLinePermissions.offert
+                  ? (index: number) => void gatedApplyOffert(index)
+                  : undefined
+              }
+              onApplyPerso={
+                posLinePermissions.perso
+                  ? (index: number) => void gatedApplyPerso(index)
+                  : undefined
+              }
               onUpdateLineNote={handleUpdateLineNote}
               onDropProduct={handleDropProduct}
               onSelectTable={floor.requestMap}

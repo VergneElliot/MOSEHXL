@@ -17,7 +17,7 @@ import FloorCanvasView, { type FloorCanvasTable } from '../floor/FloorCanvasView
 import { SIZE_PRESETS, normalizeTableGeometry } from '../floor/floorGeometry';
 
 /**
- * Top-level Plan de salle: consult floor status (mutations stay on POS / elevated PIN later).
+ * Top-level Plan de salle: consult floor status only (mutations via POS / elevated PIN).
  */
 const FloorPlanConsultPanel: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -88,6 +88,9 @@ const FloorPlanConsultPanel: React.FC = () => {
           Consultation des tables et de leur occupation. Pour ouvrir ou modifier une addition,
           utilisez la Caisse (session PIN).
         </Typography>
+        <Alert severity="info" sx={{ mt: 1.5 }}>
+          Mode consultation uniquement — aucune ouverture, transfert ou fusion depuis cet onglet.
+        </Alert>
       </Box>
 
       {error && (

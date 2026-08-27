@@ -10,6 +10,7 @@ import { Login } from './components/auth';
 import type { User } from './types';
 import { AppHeader } from './components/common/AppHeader';
 import { PinSessionsProvider } from './contexts/PinSessionsContext';
+import { StepUpAuthProvider } from './contexts/StepUpAuthContext';
 import { useTranslation } from 'react-i18next';
 
 const SystemAdminRouter = React.lazy(() => import('./components/common/SystemAdminRouter'));
@@ -189,6 +190,7 @@ function App() {
             // Business Interface - viewport-height chain so tab content can use flex/scroll
             <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
               <PinSessionsProvider>
+                <StepUpAuthProvider>
                 <AppHeader
                   isHappyHourActive={isHappyHourActive}
                   timeUntilHappyHour={timeUntilHappyHour}
@@ -219,6 +221,7 @@ function App() {
                     onHappyHourStatusUpdate={updateHappyHourStatus}
                   />
                 </Box>
+                </StepUpAuthProvider>
               </PinSessionsProvider>
             </Box>
           )}
