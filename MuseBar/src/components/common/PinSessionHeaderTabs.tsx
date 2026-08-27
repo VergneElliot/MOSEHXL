@@ -14,7 +14,9 @@ import {
   Badge as BadgeIcon,
 } from '@mui/icons-material';
 import { usePinSessions } from '../../contexts/PinSessionsContext';
+import { useAuth } from '../../hooks/useAuth';
 import * as floorApi from '../../services/api/floor';
+import { resolvePinLengthRules } from '../../utils/pinRules';
 
 const LazyPinPadDialog = React.lazy(() => import('../POS/PinPadDialog'));
 
@@ -29,6 +31,11 @@ export const PinSessionHeaderTabs: React.FC = () => {
     addOrFocusSession,
     dismissSession,
   } = usePinSessions();
+  const { user, permissions } = useAuth();
+  const setRules = resolvePinLengthRules({
+    role: user?.role ?? 'staff',
+    permissions: permissions ?? user?.permissions ?? [],
+  });
   const [pinOpen, setPinOpen] = useState(false);
   const [pinMode, setPinMode] = useState<'verify' | 'set'>('verify');
   const [info, setInfo] = useState<string | null>(null);
@@ -145,6 +152,7 @@ export const PinSessionHeaderTabs: React.FC = () => {
         <LazyPinPadDialog
           open={pinOpen}
           mode={pinMode}
+          setRules={setRules}
           onClose={() => setPinOpen(false)}
           onVerify={handleVerify}
           onSetPin={handleSetPin}

@@ -54,8 +54,8 @@ export function requirePinActor(requiredPermission?: string) {
 export const requirePosPinActor = requirePinActor(P.access_pos);
 
 export function parsePinBody(pin: unknown): string {
-  if (typeof pin !== 'string' || !/^\d{6}$/.test(pin)) {
-    throw new ValidationError('pin must be exactly 6 digits');
+  if (typeof pin !== 'string' || !/^\d{2,8}$/.test(pin)) {
+    throw new ValidationError('pin must be 2 to 8 digits');
   }
   return pin;
 }

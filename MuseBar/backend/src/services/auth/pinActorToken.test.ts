@@ -65,10 +65,12 @@ describe('pinActorToken', () => {
 });
 
 describe('MembershipPinModel PIN format', () => {
-  it('accepts exactly 6 digits', () => {
-    expect(MembershipPinModel.isValidPinFormat('123456')).toBe(true);
-    expect(MembershipPinModel.isValidPinFormat('12345')).toBe(false);
-    expect(MembershipPinModel.isValidPinFormat('1234567')).toBe(false);
-    expect(MembershipPinModel.isValidPinFormat('12ab56')).toBe(false);
+  it('accepts 2–8 digit PINs for verify', () => {
+    expect(MembershipPinModel.isValidPinFormat('12')).toBe(true);
+    expect(MembershipPinModel.isValidPinFormat('1234')).toBe(true);
+    expect(MembershipPinModel.isValidPinFormat('12345678')).toBe(true);
+    expect(MembershipPinModel.isValidPinFormat('1')).toBe(false);
+    expect(MembershipPinModel.isValidPinFormat('123456789')).toBe(false);
+    expect(MembershipPinModel.isValidPinFormat('12ab')).toBe(false);
   });
 });

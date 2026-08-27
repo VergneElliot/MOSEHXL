@@ -65,8 +65,16 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
   });
 
   const { fetchUsers } = userActions;
-  const [pinStatusByUser, setPinStatusByUser] = useState<Record<number, boolean>>({});
-  const [pinDialog, setPinDialog] = useState<{ userId: number; email: string } | null>(null);
+  const [pinStatusByUser, setPinStatusByUser] = useState<
+    Record<number, { has_pin: boolean; kind: 'basic' | 'elevated'; min: number; max: number }>
+  >({});
+  const [pinDialog, setPinDialog] = useState<{
+    userId: number;
+    email: string;
+    kind: 'basic' | 'elevated';
+    min: number;
+    max: number;
+  } | null>(null);
   const [pinValue, setPinValue] = useState('');
   const [pinBusy, setPinBusy] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
@@ -76,9 +84,17 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
       users.map(async (u) => {
         try {
           const status = await floorApi.getPinStatus(u.id);
-          return [u.id, status.has_pin] as const;
+          return [
+            u.id,
+            {
+              has_pin: status.has_pin,
+              kind: status.pin_kind ?? 'basic',
+              min: status.min_length ?? 2,
+              max: status.max_length ?? 2,
+            },
+          ] as const;
         } catch {
-          return [u.id, false] as const;
+          return [u.id, { has_pin: false, kind: 'basic' as const, min: 2, max: 2 }] as const;
         }
       })
     );
@@ -138,6 +154,14 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
 
   const handleSavePin = async () => {
     if (!pinDialog) return;
+    if (pinValue.length < pinDialog.min || pinValue.length > pinDialog.max) {
+      setPinError(
+        pinDialog.kind === 'basic'
+          ? 'Le PIN doit contenir exactement 2 chiffres'
+          : `Le PIN doit contenir entre ${pinDialog.min} et ${pinDialog.max} chiffres`
+      );
+      return;
+    }
     setPinBusy(true);
     setPinError(null);
     try {
@@ -200,8 +224,12 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
                 <TableCell>
                   <Chip
                     size="small"
-                    label={pinStatusByUser[user.id] ? 'PIN défini' : 'Pas de PIN'}
-                    color={pinStatusByUser[user.id] ? 'success' : 'default'}
+                    label={
+                      pinStatusByUser[user.id]?.has_pin
+                        ? `PIN défini (${pinStatusByUser[user.id]?.kind === 'elevated' ? '4–8' : '2'})`
+                        : 'Pas de PIN'
+                    }
+                    color={pinStatusByUser[user.id]?.has_pin ? 'success' : 'default'}
                     variant="outlined"
                   />
                 </TableCell>
@@ -216,17 +244,24 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
                   </Button>
                   <Button
                     onClick={() => {
+                      const st = pinStatusByUser[user.id];
                       setPinError(null);
                       setPinValue('');
-                      setPinDialog({ userId: user.id, email: user.email });
+                      setPinDialog({
+                        userId: user.id,
+                        email: user.email,
+                        kind: st?.kind ?? 'basic',
+                        min: st?.min ?? 2,
+                        max: st?.max ?? 2,
+                      });
                     }}
                     variant="outlined"
                     size="small"
                     sx={{ mr: 1 }}
                   >
-                    {pinStatusByUser[user.id] ? 'Changer PIN' : 'Définir PIN'}
+                    {pinStatusByUser[user.id]?.has_pin ? 'Changer PIN' : 'Définir PIN'}
                   </Button>
-                  {pinStatusByUser[user.id] && (
+                  {pinStatusByUser[user.id]?.has_pin && (
                     <Button
                       onClick={() => void handleClearPin(user)}
                       variant="outlined"
@@ -314,20 +349,37 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
           <TextField
             autoFocus
             margin="dense"
-            label="PIN (6 chiffres)"
+            label={
+              pinDialog?.kind === 'elevated'
+                ? `PIN (${pinDialog.min}–${pinDialog.max} chiffres)`
+                : 'PIN (2 chiffres)'
+            }
             type="password"
             inputMode="numeric"
             fullWidth
             value={pinValue}
-            onChange={(e) => setPinValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            helperText="Le serveur refuse un PIN déjà utilisé par un autre membre."
+            onChange={(e) =>
+              setPinValue(
+                e.target.value.replace(/\D/g, '').slice(0, pinDialog?.max ?? 8)
+              )
+            }
+            helperText={
+              pinDialog?.kind === 'elevated'
+                ? 'Permissions élevées : 4 à 8 chiffres, unique dans l’établissement.'
+                : 'Personnel de base : exactement 2 chiffres, unique dans l’établissement.'
+            }
           />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPinDialog(null)}>Annuler</Button>
           <Button
             variant="contained"
-            disabled={pinBusy || pinValue.length !== 6}
+            disabled={
+              pinBusy ||
+              !pinDialog ||
+              pinValue.length < pinDialog.min ||
+              pinValue.length > pinDialog.max
+            }
             onClick={() => void handleSavePin()}
           >
             {pinBusy ? 'Enregistrement…' : 'Enregistrer'}

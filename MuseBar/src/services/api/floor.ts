@@ -96,7 +96,13 @@ export async function clearPin(userId: number): Promise<{ success: boolean; user
   return request(`/auth/pin/${userId}`, { method: 'DELETE' });
 }
 
-export async function getPinStatus(userId: number): Promise<{ user_id: number; has_pin: boolean }> {
+export async function getPinStatus(userId: number): Promise<{
+  user_id: number;
+  has_pin: boolean;
+  pin_kind?: 'basic' | 'elevated';
+  min_length?: number;
+  max_length?: number;
+}> {
   return request(`/auth/pin/status/${userId}`);
 }
 

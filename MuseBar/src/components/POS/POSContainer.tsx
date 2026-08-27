@@ -20,6 +20,7 @@ import type { ProductOptionSelection } from './ProductOptionDialog';
 import { upsertLineNoteInOptions } from '../../utils/lineItemNote';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { saleLines, tipsFromOrder } from '../../hooks/usePOSOrderTotals';
+import { resolvePinLengthRules } from '../../utils/pinRules';
 
 const LazyPaymentDialog = React.lazy(() => import('./PaymentDialog'));
 const LazyPrintAfterSaleDialog = React.lazy(() => import('./PrintAfterSaleDialog'));
@@ -524,6 +525,10 @@ const POSContainer: React.FC<POSContainerProps> = ({
           <LazyPinPadDialog
             open={floor.pinDialogOpen}
             mode={floor.pinDialogMode}
+            setRules={resolvePinLengthRules({
+              role: user?.role ?? 'staff',
+              permissions: permissions ?? user?.permissions ?? [],
+            })}
             onClose={() => {
               floor.setPinDialogOpen(false);
             }}

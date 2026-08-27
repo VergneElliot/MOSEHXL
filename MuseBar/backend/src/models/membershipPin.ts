@@ -1,10 +1,22 @@
 import bcrypt from 'bcrypt';
 import { pool } from '../db/pool';
 import { computeLockoutDurationMinutes, MAX_FAILED_LOGIN_ATTEMPTS } from '../routes/authLogin/config';
+import {
+  isValidPinFormatForRules,
+  isValidPinFormatForVerify,
+  pinRulesErrorMessage,
+  resolvePinLengthRules,
+  type PinLengthRules,
+  PIN_VERIFY_MAX_LENGTH,
+  PIN_VERIFY_MIN_LENGTH,
+} from '../services/auth/pinRules';
 
-export const PIN_MIN_LENGTH = 6;
-export const PIN_MAX_LENGTH = 6;
-export const PIN_PATTERN = /^\d{6}$/;
+export {
+  PIN_VERIFY_MIN_LENGTH as PIN_MIN_LENGTH,
+  PIN_VERIFY_MAX_LENGTH as PIN_MAX_LENGTH,
+  resolvePinLengthRules,
+  type PinLengthRules,
+};
 
 export interface MembershipPinRow {
   user_id: number;
@@ -27,8 +39,9 @@ function bcryptRounds(): number {
 }
 
 export class MembershipPinModel {
+  /** Accept any verifiable length (2–8). Set-path uses isValidPinFormatForRules. */
   static isValidPinFormat(pin: string): boolean {
-    return PIN_PATTERN.test(pin);
+    return isValidPinFormatForVerify(pin);
   }
 
   static async getMembershipWithPin(
@@ -76,10 +89,11 @@ export class MembershipPinModel {
   static async setPin(
     userId: number,
     establishmentId: string,
-    pin: string
+    pin: string,
+    rules: PinLengthRules
   ): Promise<void> {
-    if (!this.isValidPinFormat(pin)) {
-      throw new Error('PIN must be exactly 6 digits');
+    if (!isValidPinFormatForRules(pin, rules)) {
+      throw new Error(pinRulesErrorMessage(rules));
     }
     const pin_hash = await bcrypt.hash(pin, bcryptRounds());
     const result = await pool.query(
@@ -181,13 +195,6 @@ export class MembershipPinModel {
     );
   }
 
-  /**
-   * After a wrong PIN with no matching membership, bump failed attempts on every
-   * locked-or-unlocked membership that has a PIN in this establishment is too noisy.
-   * Instead callers record failure only when a candidate matched hash but was locked,
-   * or we scan all PIN memberships and increment none — verify route handles unknown PIN
-   * without attributing to a user (timing-safe-ish via constant bcrypt of dummy hash).
-   */
   static async listPinMemberships(establishmentId: string): Promise<MembershipPinRow[]> {
     const result = await pool.query(
       `SELECT m.user_id, m.establishment_id, m.role, m.is_active,

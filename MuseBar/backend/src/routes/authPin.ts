@@ -11,6 +11,7 @@ import {
   buildDisplayName,
   signPinActorToken,
 } from '../services/auth/pinActorToken';
+import { resolvePinLengthRules } from '../services/auth/pinRules';
 import { Logger } from '../utils/logger';
 
 const router = express.Router();
@@ -18,7 +19,7 @@ const router = express.Router();
 let dummyHashPromise: Promise<string> | null = null;
 function getDummyHash(): Promise<string> {
   if (!dummyHashPromise) {
-    dummyHashPromise = bcrypt.hash('000000', 12);
+    dummyHashPromise = bcrypt.hash('00000000', 12);
   }
   return dummyHashPromise;
 }
@@ -113,8 +114,13 @@ router.post(
       }
     }
 
+    const membership = await MembershipPinModel.getMembershipWithPin(targetUserId, establishmentId);
+    if (!membership) throw new NotFoundError('Active membership not found');
+    const permissions = await UserModel.getUserPermissions(targetUserId, establishmentId);
+    const rules = resolvePinLengthRules({ role: membership.role, permissions });
+
     try {
-      await MembershipPinModel.setPin(targetUserId, establishmentId, pin);
+      await MembershipPinModel.setPin(targetUserId, establishmentId, pin, rules);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to set PIN';
       if (message.includes('membership')) throw new NotFoundError(message);
@@ -180,7 +186,19 @@ router.get(
       throw new ValidationError('userId must be a positive integer');
     }
     const has_pin = await MembershipPinModel.hasPin(targetUserId, establishmentId);
-    return res.json({ user_id: targetUserId, has_pin });
+    const membership = await MembershipPinModel.getMembershipWithPin(targetUserId, establishmentId);
+    const permissions = await UserModel.getUserPermissions(targetUserId, establishmentId);
+    const rules = resolvePinLengthRules({
+      role: membership?.role ?? 'staff',
+      permissions,
+    });
+    return res.json({
+      user_id: targetUserId,
+      has_pin,
+      pin_kind: rules.kind,
+      min_length: rules.min_length,
+      max_length: rules.max_length,
+    });
   })
 );
 
