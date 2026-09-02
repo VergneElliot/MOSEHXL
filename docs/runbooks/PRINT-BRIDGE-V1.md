@@ -52,7 +52,7 @@ BRIDGE_KEY=<generated bridge key>
 PRINTER_DRIVER=network-escpos
 PRINTER_HOST=192.168.0.95
 PRINTER_PORT=9100
-POLL_INTERVAL_MS=2000
+POLL_INTERVAL_MS=1000
 ```
 
 If the printer receives a different DHCP address, update `PRINTER_HOST`.
@@ -87,6 +87,10 @@ MuseBar Print Bridge started
 
 Leave the terminal running during service. V1 is intentionally a terminal process; service/installer packaging can come later.
 
+**After a MuseBar cloud deploy:** restart the bridge process on the cashier PC (`Ctrl+C`, then `npm run bridge` again). The bridge is a separate LAN process — it does not update when the server deploys. Backend queue API stays compatible, but a restart clears stuck state and picks up any `.env` changes.
+
+Optional: set `POLL_INTERVAL_MS=1000` (default since 2026-09) for faster pickup when idle; the bridge already drains multiple queued jobs back-to-back without waiting between them.
+
 ---
 
 ## UAT
@@ -119,3 +123,4 @@ Kitchen enqueue failures are logged to the legal software journal (`KITCHEN_TICK
 3. **Printer timeout/refused**: verify the cashier PC is on the same LAN as the printer and `PRINTER_HOST:PRINTER_PORT` is reachable.
 4. **Duplicate prints**: check whether the bridge crashed after printing but before ACK. V1 retries conservatively after failed/claimed jobs.
 5. **Jobs remain pending**: the bridge is not running or cannot reach `MUSEBAR_API_URL`.
+6. **Delay before print (5–20 s)**: normal when several kitchen tickets are queued (one job per printer/route, processed sequentially). For a single receipt, check `POLL_INTERVAL_MS` (try `1000`), restart the bridge, and verify no job is stuck in `claimed` (re-queue after ~45 s if the bridge died mid-print). Multiple tickets from one sale (bar + cuisine) print one after another — not in parallel.

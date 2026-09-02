@@ -5,7 +5,7 @@ import { usePOSCatalogLogic } from '../../hooks/usePOSCatalogLogic';
 import { useTopSellerProductIds } from '../../hooks/useTopSellerProductIds';
 import CategoryFilter from './CategoryFilter';
 import ProductGrid from './ProductGrid';
-import { canUseVirtualization } from '../../utils/canUseVirtualization';
+import { shouldVirtualizeProductGrid } from '../../utils/canUseVirtualization';
 
 export interface POSMenuPanelProps {
   categories: Category[];
@@ -44,6 +44,10 @@ const POSMenuPanel = React.memo(function POSMenuPanel({
     topSellerProductIds
   );
 
+  const useVirtualization = shouldVirtualizeProductGrid(
+    filteredProducts.length + (onDiversClick ? 1 : 0) + (onPourboireClick ? 1 : 0)
+  );
+
   return (
     <>
       <Box sx={{ flexShrink: 0 }}>
@@ -59,7 +63,7 @@ const POSMenuPanel = React.memo(function POSMenuPanel({
           minHeight: 0,
           display: 'flex',
           flexDirection: 'column',
-          overflow: canUseVirtualization() ? 'hidden' : 'auto',
+          overflow: useVirtualization ? 'hidden' : 'auto',
           scrollbarGutter: 'stable',
         }}
       >
@@ -73,6 +77,7 @@ const POSMenuPanel = React.memo(function POSMenuPanel({
           onDiversClick={onDiversClick}
           onPourboireClick={onPourboireClick}
           favoriteProductIds={favoriteProductIds}
+          useVirtualization={useVirtualization}
         />
       </Box>
     </>

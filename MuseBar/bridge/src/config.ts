@@ -97,7 +97,7 @@ export function loadConfig(): BridgeConfig {
     printerHost: required('PRINTER_HOST'),
     printerPort,
     printers: parsePrintersJson(process.env.PRINTERS_JSON),
-    pollIntervalMs: optionalInt('POLL_INTERVAL_MS', 2000),
+    pollIntervalMs: optionalInt('POLL_INTERVAL_MS', 1000),
     printerTimeoutMs: optionalInt('PRINTER_TIMEOUT_MS', 8000),
   };
 }

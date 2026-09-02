@@ -57,6 +57,7 @@ async function run(): Promise<void> {
         continue;
       }
       await processJob(config, job);
+      // Drain the queue — no sleep between back-to-back jobs.
     } catch (error) {
       log('Bridge loop error', {
         error: error instanceof Error ? error.message : String(error),

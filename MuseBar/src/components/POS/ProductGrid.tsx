@@ -22,8 +22,6 @@ import { alpha } from '@mui/material/styles';
 import type { Theme } from '@mui/material/styles';
 import { VirtuosoGrid } from 'react-virtuoso';
 import { Product, Category } from '../../types';
-import { useGridColumnCount } from '../../hooks/useGridColumnCount';
-import { canUseVirtualization } from '../../utils/canUseVirtualization';
 import { POS_PRODUCT_DND_MIME } from './posProductDnD';
 import { setCompactDragGhost } from './posDragGhost';
 
@@ -38,6 +36,8 @@ interface ProductGridProps {
   onPourboireClick?: () => void;
   /** Product ids in establishment top sellers (Favoris). */
   favoriteProductIds?: ReadonlySet<string>;
+  /** When false, use plain CSS grid (smoother scroll for typical catalog sizes). */
+  useVirtualization?: boolean;
 }
 
 /**
@@ -57,13 +57,13 @@ const ProductGrid = React.memo(function ProductGrid({
   onDiversClick,
   onPourboireClick,
   favoriteProductIds,
+  useVirtualization = false,
 }: ProductGridProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const isLarge = useMediaQuery(theme.breakpoints.up('lg'));
-  const useVirtualization = canUseVirtualization();
-  const minColumnWidth = isMobile ? 190 : isLarge ? 230 : 220;
-  const { containerRef, columnCount } = useGridColumnCount(minColumnWidth);
+  // Breakpoint columns only — avoids ResizeObserver flapping with the scrollbar.
+  const columnCount = isMobile ? 2 : isLarge ? 4 : 3;
 
   const categoryColorMap = useMemo(() => {
     const map: Record<string, string | undefined> = {};
@@ -107,9 +107,13 @@ const ProductGrid = React.memo(function ProductGrid({
           component="div"
           {...props}
           sx={{
-            minHeight: 'var(--pos-grid-item-min-height, 280px)',
+            height: 'var(--pos-grid-item-height, 280px)',
+            minHeight: 'var(--pos-grid-item-height, 280px)',
+            maxHeight: 'var(--pos-grid-item-height, 280px)',
             display: 'flex',
             width: '100%',
+            overflow: 'hidden',
+            contain: 'layout style paint',
           }}
         >
           {children}
@@ -131,7 +135,7 @@ const ProductGrid = React.memo(function ProductGrid({
         offset += 1;
       }
       const product = products[index - offset];
-      return product ? `product-${index}` : `idx-${index}`;
+      return product ? `product-${product.id}` : `idx-${index}`;
     },
     [hasDiversSlot, hasPourboireSlot, products]
   );
@@ -212,9 +216,9 @@ const ProductGrid = React.memo(function ProductGrid({
         {onPourboireClick && (
           <PourboireCard onAdd={onPourboireClick} isMobile={isMobile} theme={theme} />
         )}
-        {products.map((product, index) => (
+        {products.map(product => (
           <ProductCard
-            key={`product-${index}`}
+            key={`product-${product.id}`}
             product={product}
             categoryColor={categoryColorMap[product.categoryId]}
             isHappyHourActive={isHappyHourActive}
@@ -231,19 +235,17 @@ const ProductGrid = React.memo(function ProductGrid({
 
   return (
     <Box
-      ref={containerRef}
       sx={{
         height: '100%',
         minHeight: 0,
-        scrollbarGutter: 'stable',
         ['--pos-grid-cols' as string]: columnCount,
-        ['--pos-grid-item-min-height' as string]: `${cardMinHeight}px`,
+        ['--pos-grid-item-height' as string]: `${cardMinHeight}px`,
       }}
     >
       <VirtuosoGrid
         style={{ height: '100%' }}
         totalCount={totalCount}
-        overscan={200}
+        overscan={columnCount * 2}
         components={gridComponents}
         computeItemKey={computeItemKey}
         itemContent={renderGridItem}
@@ -492,14 +494,17 @@ const ProductCard = React.memo(function ProductCard({
       sx={{
         width: '100%',
         height: '100%',
-        minHeight: isMobile ? CARD_MIN_HEIGHT_MOBILE : CARD_MIN_HEIGHT_DESKTOP,
+        maxHeight: '100%',
+        minHeight: 0,
         position: 'relative',
         display: 'flex',
         flexDirection: 'column',
+        overflow: 'hidden',
         border: `1px solid ${resolvedBorder}`,
         backgroundColor: resolvedBackground,
         transition: 'box-shadow 0.15s ease',
         cursor: 'grab',
+        contain: 'layout style paint',
         '&:active': { cursor: 'grabbing' },
         '&:hover': {
           boxShadow: 3,

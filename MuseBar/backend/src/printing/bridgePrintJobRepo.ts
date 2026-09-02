@@ -51,7 +51,7 @@ export interface CreateBridgePrintJobInput {
   expiresAt?: Date | null;
 }
 
-const CLAIM_TIMEOUT_MS = 2 * 60 * 1000;
+const CLAIM_TIMEOUT_MS = 45 * 1000;
 const DEFAULT_JOB_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_ATTEMPTS = 3;
 
