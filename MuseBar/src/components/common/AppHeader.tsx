@@ -4,7 +4,6 @@ import {
   Toolbar,
   Typography,
   Box,
-  Chip,
   Button,
   Menu,
   MenuItem,
@@ -20,6 +19,8 @@ import { User } from '../../types/auth';
 import { useTranslation } from 'react-i18next';
 import { TimeClockHeaderControl } from './TimeClockHeaderControl';
 import { PinSessionHeaderTabs } from './PinSessionHeaderTabs';
+import { DisplayScalePlaceholder } from './DisplayScalePlaceholder';
+import { HappyHourHeaderChip } from './HappyHourHeaderChip';
 
 interface AppHeaderProps {
   isHappyHourActive: boolean;
@@ -29,6 +30,9 @@ interface AppHeaderProps {
   onSwitchEstablishment?: (establishmentId: string) => Promise<void> | void;
   /** Show PIN session tabs (establishment POS shell). */
   showPinSessions?: boolean;
+  onHappyHourStatusUpdate?: () => void;
+  /** Établissement name from settings (Paramètres → Établissement). */
+  establishmentBrandName?: string;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
@@ -38,10 +42,18 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   user,
   onSwitchEstablishment,
   showPinSessions = false,
+  onHappyHourStatusUpdate = () => {},
+  establishmentBrandName = '',
 }) => {
   const { t } = useTranslation('common');
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [switching, setSwitching] = React.useState(false);
+
+  const membershipName =
+    user?.memberships?.find((m) => m.establishment_id === user?.establishment_id)?.name?.trim() ??
+    '';
+  const venueName = establishmentBrandName.trim() || membershipName;
+  const posTitle = venueName ? `${venueName} POS` : t('appTitleFallback');
 
   const memberships = user?.memberships ?? [];
   const showSwitcher =
@@ -74,8 +86,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     <AppBar position="static" sx={{ backgroundColor: '#1a1a1a' }}>
       <Toolbar sx={{ gap: 1, minHeight: { xs: 56, sm: 64 } }}>
         <RestaurantIcon sx={{ mr: 1, flexShrink: 0 }} />
-        <Typography variant="h6" component="div" sx={{ flexShrink: 0, mr: 1 }}>
-          {t('appTitle')}
+        <Typography variant="h6" component="div" sx={{ flexShrink: 0, mr: 1 }} noWrap>
+          {posTitle}
         </Typography>
 
         {showPinSessions && <PinSessionHeaderTabs />}
@@ -83,24 +95,15 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         {!showPinSessions && <Box sx={{ flexGrow: 1 }} />}
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, ml: 'auto', flexShrink: 0 }}>
+          {showPinSessions && <DisplayScalePlaceholder />}
           {user && user.role !== 'system_admin' && user.establishment_id && (
             <TimeClockHeaderControl />
           )}
-          {isHappyHourActive ? (
-            <Chip
-              label={t('happyHour.active')}
-              color="success"
-              variant="filled"
-              sx={{ fontWeight: 'bold', display: { xs: 'none', sm: 'flex' } }}
-            />
-          ) : (
-            <Chip
-              label={t('happyHour.in', { time: timeUntilHappyHour })}
-              color="warning"
-              variant="outlined"
-              sx={{ display: { xs: 'none', md: 'flex' } }}
-            />
-          )}
+          <HappyHourHeaderChip
+            isHappyHourActive={isHappyHourActive}
+            timeUntilHappyHour={timeUntilHappyHour}
+            onStatusUpdate={onHappyHourStatusUpdate}
+          />
 
           {user && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

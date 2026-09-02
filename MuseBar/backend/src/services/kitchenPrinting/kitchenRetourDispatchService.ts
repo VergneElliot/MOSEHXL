@@ -7,24 +7,25 @@ import {
   consolidateKitchenTicketLinesForPrint,
   type KitchenDispatchOrderItem,
 } from './kitchenTicketGrouping';
-import { renderKitchenOrderTicket } from './kitchenTicketRenderer';
+import { renderKitchenRetourTicket } from './kitchenTicketRenderer';
 import {
   loadKitchenPrinterSnapshotsByProduct,
 } from './kitchenPrinterSnapshot';
 import { ProductModel } from '../../models/database/productModel';
 
-interface FollowLogger {
+interface RetourLogger {
   error: (message: string, error: Error, category?: string) => void;
 }
 
-export async function dispatchKitchenFollowUpTickets(
+export async function dispatchKitchenRetourTickets(
   pool: Pool,
   input: {
     establishmentId: string;
+    ticketId: number;
     tableLabel?: string | null;
     items: KitchenDispatchOrderItem[];
     createdByUserId?: number;
-    logger?: FollowLogger;
+    logger?: RetourLogger;
   }
 ): Promise<{ enqueued: number; failures: number; jobIds: string[] }> {
   const productIds = input.items
@@ -66,12 +67,11 @@ export async function dispatchKitchenFollowUpTickets(
   for (const group of groups) {
     const printLines = consolidateKitchenTicketLinesForPrint(group.lines);
     try {
-      const payload = renderKitchenOrderTicket({
-        ticketDayNumber: 0,
+      const payload = renderKitchenRetourTicket({
+        ticketId: input.ticketId,
         createdAt: now,
         printerName: group.printer.name,
         lines: printLines,
-        followUp: true,
         tableLabel: input.tableLabel,
       });
       const job = await createBridgePrintJob(pool, {
@@ -84,7 +84,8 @@ export async function dispatchKitchenFollowUpTickets(
           kitchen_printer_id: group.printer.id,
           kitchen_printer_slug: group.printer.slug,
           kitchen_printer_name: group.printer.name,
-          ticket_kind: 'follow_up',
+          ticket_kind: 'retour',
+          open_ticket_id: input.ticketId,
           table_label: input.tableLabel ?? null,
           lines: printLines.map((line) => ({
             quantity: line.quantity,
@@ -99,7 +100,7 @@ export async function dispatchKitchenFollowUpTickets(
       failures += 1;
       const err = error instanceof Error ? error : new Error(String(error));
       input.logger?.error(
-        `Failed to enqueue à suivre ticket for printer ${group.printer.slug}`,
+        `Failed to enqueue retour ticket for printer ${group.printer.slug}`,
         err,
         'KITCHEN_PRINT'
       );
@@ -107,7 +108,8 @@ export async function dispatchKitchenFollowUpTickets(
         establishmentId: input.establishmentId,
         eventType: 'KITCHEN_TICKET_ENQUEUE_FAILED',
         eventData: {
-          ticket_kind: 'follow_up',
+          ticket_kind: 'retour',
+          open_ticket_id: input.ticketId,
           kitchen_printer_id: group.printer.id,
           error: err.message,
         },

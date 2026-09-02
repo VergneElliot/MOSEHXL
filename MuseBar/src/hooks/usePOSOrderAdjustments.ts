@@ -137,10 +137,47 @@ export const usePOSOrderAdjustments = ({
     [currentOrder, updateLineAt]
   );
 
+  const handleApplyRemise = useCallback(
+    (index: number, remise: { discountType: 'percentage' | 'fixed'; discountValue: number }) => {
+      const line = currentOrder[index];
+      if (!line || line.isTip) return;
+
+      const basePrice = line.originalPrice ?? line.unitPrice;
+      let discountedPrice: number;
+      if (remise.discountType === 'percentage') {
+        discountedPrice = basePrice * (1 - remise.discountValue / 100);
+      } else {
+        discountedPrice = Math.max(0, basePrice - remise.discountValue);
+      }
+      const taxAmount = discountedPrice * (line.taxRate / (1 + line.taxRate));
+      const remiseLabel =
+        remise.discountType === 'percentage'
+          ? `[Remise −${remise.discountValue}%]`
+          : `[Remise −${remise.discountValue.toFixed(2)}€]`;
+      const cleanedDesc =
+        line.description?.replace(/\s*\[Remise[^\]]*\]/g, '').trim() || '';
+      const description = cleanedDesc ? `${cleanedDesc} ${remiseLabel}` : remiseLabel;
+
+      updateLineAt(index, {
+        isHappyHourApplied: false,
+        isManualHappyHour: false,
+        isOffert: false,
+        isPerso: false,
+        originalPrice: basePrice,
+        unitPrice: discountedPrice,
+        totalPrice: discountedPrice,
+        taxAmount,
+        description,
+      });
+    },
+    [currentOrder, updateLineAt]
+  );
+
   return {
     handleApplyHappyHour,
     handleApplyOffert,
     handleApplyPerso,
+    handleApplyRemise,
   };
 };
 

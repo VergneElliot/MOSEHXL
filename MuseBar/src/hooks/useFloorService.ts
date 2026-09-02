@@ -2,6 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { OrderItem } from '../types';
 import * as floorApi from '../services/api/floor';
 import {
+  isFullCartSelection,
+  resolveTargetOrderItems,
+  ticketLineIdsFromItems,
+} from '../utils/posCartSelection';
+import {
   usePinSessions,
   type ActiveTableState,
   type PinActorState,
@@ -9,13 +14,42 @@ import {
 
 export type { ActiveTableState, PinActorState };
 
+export type FloorMapPendingAction = 'validate' | 'assign' | null;
+
+function withTableDraftStatus(items: OrderItem[]): OrderItem[] {
+  return items.map((line) =>
+    line.isTip ? line : { ...line, tableLineStatus: line.tableLineStatus ?? ('draft' as const) }
+  );
+}
+
+function buildActiveTableState(
+  table: floorApi.DiningTableStatusDto,
+  ticketId: number,
+  waiterUserId: number | null | undefined,
+  waiterDisplayName: string | null | undefined,
+  pinActor: PinActorState
+): ActiveTableState {
+  const assignedWaiterUserId = waiterUserId ?? pinActor.userId;
+  const assignedWaiterDisplayName =
+    waiterDisplayName ?? (assignedWaiterUserId === pinActor.userId ? pinActor.displayName : null);
+  return {
+    id: table.id,
+    label: table.label,
+    floorPlanId: table.floor_plan_id,
+    ticketId,
+    assignedWaiterUserId,
+    assignedWaiterDisplayName,
+  };
+}
+
 export function useFloorService(options: {
   currentOrder: OrderItem[];
   setCurrentOrder: (items: OrderItem[]) => void;
   onError: (message: string) => void;
   onInfo: (message: string) => void;
+  getCartSelectedIds?: () => Set<string>;
 }) {
-  const { currentOrder, setCurrentOrder, onError, onInfo } = options;
+  const { currentOrder, setCurrentOrder, onError, onInfo, getCartSelectedIds } = options;
   const {
     activeSession,
     addOrFocusSession,
@@ -23,15 +57,30 @@ export function useFloorService(options: {
     updateActiveSession,
   } = usePinSessions();
 
+  const getSelectedIds = useCallback(
+    () => getCartSelectedIds?.() ?? new Set<string>(),
+    [getCartSelectedIds]
+  );
+
+  const getActionItems = useCallback(
+    (order: OrderItem[] = currentOrder) => resolveTargetOrderItems(order, getSelectedIds()),
+    [currentOrder, getSelectedIds]
+  );
+
   const pinActor = activeSession?.actor ?? null;
   const activeTable = activeSession?.activeTable ?? null;
 
   const [pinDialogOpen, setPinDialogOpen] = useState(false);
   const [mapDialogOpen, setMapDialogOpen] = useState(false);
+  const [mapPurpose, setMapPurpose] = useState<'default' | 'validate' | 'assign' | 'move-table'>('default');
   const [pinDialogMode, setPinDialogMode] = useState<'verify' | 'set'>('verify');
   const pendingAfterPin = useRef<'map' | null>(null);
+  const pendingMapAction = useRef<FloorMapPendingAction>(null);
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipNextSync = useRef(false);
+  const validateTableOrderRef = useRef<
+    (order: OrderItem[], ticketIdOverride?: number) => Promise<void>
+  >(async () => {});
 
   const clearPin = useCallback(() => {
     dismissActiveSession();
@@ -79,8 +128,168 @@ export function useFloorService(options: {
       openPinDialog('verify');
       return;
     }
+    setMapPurpose('default');
     setMapDialogOpen(true);
   }, [pinActor, openPinDialog]);
+
+  const openMapForAction = useCallback(
+    (action: Exclude<FloorMapPendingAction, null>) => {
+      pendingMapAction.current = action;
+      setMapPurpose(action);
+      if (!pinActor) {
+        pendingAfterPin.current = 'map';
+        openPinDialog('verify');
+        return;
+      }
+      setMapDialogOpen(true);
+    },
+    [pinActor, openPinDialog]
+  );
+
+  const openMapForMoveTable = useCallback(() => {
+    setMapPurpose('move-table');
+    if (!pinActor) {
+      pendingAfterPin.current = 'map';
+      openPinDialog('verify');
+      return;
+    }
+    setMapDialogOpen(true);
+  }, [pinActor, openPinDialog]);
+
+  const closeMapDialog = useCallback(() => {
+    pendingMapAction.current = null;
+    setMapPurpose('default');
+    setMapDialogOpen(false);
+  }, []);
+
+  const applyTicketItemsToCart = useCallback(
+    (items: floorApi.OpenTicketItemDto[]) => {
+      const tips = currentOrder.filter((line) => line.isTip);
+      skipNextSync.current = true;
+      const mapped = floorApi.mapTicketItemsToOrderItems(items);
+      setCurrentOrder([...mapped, ...tips]);
+      updateActiveSession({ cart: [...mapped, ...tips] });
+    },
+    [currentOrder, setCurrentOrder, updateActiveSession]
+  );
+
+  const assignCartToTable = useCallback(
+    async (
+      table: floorApi.DiningTableStatusDto
+    ): Promise<{ items: OrderItem[]; ticketId: number } | null> => {
+      if (!pinActor) {
+        pendingAfterPin.current = 'map';
+        openPinDialog('verify');
+        return null;
+      }
+      const tips = currentOrder.filter((line) => line.isTip);
+      const sale = getActionItems();
+      if (sale.length === 0) {
+        onError('Aucun article à assigner');
+        return null;
+      }
+      const partialFromComptoir =
+        !activeTable && !isFullCartSelection(currentOrder, getSelectedIds());
+
+      try {
+        if (partialFromComptoir) {
+          let ticketId = table.open_ticket_id;
+          if (!ticketId) {
+            const { ticket } = await floorApi.openTicket(table.id, pinActor.token);
+            ticketId = ticket.id;
+          }
+          const { items } = await floorApi.getTicket(ticketId);
+          const existing = floorApi.mapTicketItemsToOrderItems(items);
+          const merged = [...existing, ...withTableDraftStatus(sale)];
+          const { items: saved } = await floorApi.replaceTicketItems(
+            ticketId,
+            merged,
+            pinActor.token
+          );
+          void saved;
+          const remaining = currentOrder.filter(
+            (line) => line.isTip || !sale.some((s) => s.id === line.id)
+          );
+          skipNextSync.current = true;
+          setCurrentOrder(remaining);
+          updateActiveSession({ cart: remaining });
+          setMapDialogOpen(false);
+          onInfo(`${sale.length} article(s) assigné(s) à la table ${table.label}`);
+          return { items: sale, ticketId };
+        }
+
+        const draftCart = withTableDraftStatus([...sale, ...tips]);
+        if (table.open_ticket_id) {
+          const { items, served_by_display_name } = await floorApi.getTicket(table.open_ticket_id);
+          const existing = floorApi.mapTicketItemsToOrderItems(items);
+          const merged = [...existing, ...withTableDraftStatus(sale), ...tips];
+          const tableState = buildActiveTableState(
+            table,
+            table.open_ticket_id,
+            table.last_served_by_user_id,
+            served_by_display_name ?? null,
+            pinActor
+          );
+          skipNextSync.current = true;
+          updateActiveSession({ activeTable: tableState, cart: merged });
+          setCurrentOrder(merged);
+          const { items: saved } = await floorApi.replaceTicketItems(
+            table.open_ticket_id,
+            merged,
+            pinActor.token
+          );
+          applyTicketItemsToCart(saved);
+          setMapDialogOpen(false);
+          onInfo(`Commande assignée à la table ${table.label}`);
+          return {
+            items: [...floorApi.mapTicketItemsToOrderItems(saved), ...tips],
+            ticketId: table.open_ticket_id,
+          };
+        }
+
+        const { ticket } = await floorApi.openTicket(table.id, pinActor.token);
+        const tableState = buildActiveTableState(
+          table,
+          ticket.id,
+          ticket.last_served_by_user_id ?? pinActor.userId,
+          pinActor.displayName,
+          pinActor
+        );
+        skipNextSync.current = true;
+        updateActiveSession({ activeTable: tableState, cart: draftCart });
+        setCurrentOrder(draftCart);
+        const { items: saved } = await floorApi.replaceTicketItems(
+          ticket.id,
+          draftCart,
+          pinActor.token
+        );
+        applyTicketItemsToCart(saved);
+        setMapDialogOpen(false);
+        onInfo(`Commande assignée à la table ${table.label}`);
+        return {
+          items: [...floorApi.mapTicketItemsToOrderItems(saved), ...tips],
+          ticketId: ticket.id,
+        };
+      } catch (error: unknown) {
+        const err = error as { message?: string };
+        onError(err.message || 'Impossible d’assigner la commande à la table');
+        return null;
+      }
+    },
+    [
+      pinActor,
+      currentOrder,
+      activeTable,
+      openPinDialog,
+      onError,
+      onInfo,
+      setCurrentOrder,
+      updateActiveSession,
+      applyTicketItemsToCart,
+      getActionItems,
+      getSelectedIds,
+    ]
+  );
 
   const bindTable = useCallback(
     (table: ActiveTableState, items: OrderItem[]) => {
@@ -97,12 +306,21 @@ export function useFloorService(options: {
     updateActiveSession({ activeTable: null });
   }, [updateActiveSession]);
 
-  const detachTableKeepTicket = useCallback(() => {
+  const detachTableKeepTicket = useCallback(async () => {
+    if (activeTable && pinActor) {
+      try {
+        await floorApi.discardDraftTicketItems(activeTable.ticketId, pinActor.token);
+      } catch (error: unknown) {
+        const err = error as { message?: string };
+        onError(err.message || 'Impossible de quitter la table');
+        return;
+      }
+    }
     skipNextSync.current = true;
     updateActiveSession({ activeTable: null, cart: [] });
     setCurrentOrder([]);
-    onInfo('Table laissée ouverte');
-  }, [setCurrentOrder, onInfo, updateActiveSession]);
+    onInfo('Mode comptoir');
+  }, [activeTable, pinActor, setCurrentOrder, onError, onInfo, updateActiveSession]);
 
   const selectFreeTable = useCallback(
     async (table: floorApi.DiningTableStatusDto) => {
@@ -111,15 +329,24 @@ export function useFloorService(options: {
         openPinDialog('verify');
         return;
       }
+      if (pendingMapAction.current) {
+        pendingMapAction.current = null;
+        const result = await assignCartToTable(table);
+        if (result) {
+          await validateTableOrderRef.current(result.items, result.ticketId);
+        }
+        return;
+      }
       try {
         const { ticket } = await floorApi.openTicket(table.id, pinActor.token);
         bindTable(
-          {
-            id: table.id,
-            label: table.label,
-            floorPlanId: table.floor_plan_id,
-            ticketId: ticket.id,
-          },
+          buildActiveTableState(
+            table,
+            ticket.id,
+            ticket.last_served_by_user_id ?? pinActor.userId,
+            pinActor.displayName,
+            pinActor
+          ),
           []
         );
       } catch (error: unknown) {
@@ -127,7 +354,7 @@ export function useFloorService(options: {
         onError(err.message || 'Impossible d’ouvrir la table');
       }
     },
-    [pinActor, openPinDialog, bindTable, onError]
+    [pinActor, openPinDialog, bindTable, onError, assignCartToTable]
   );
 
   const selectOccupiedTable = useCallback(
@@ -138,15 +365,24 @@ export function useFloorService(options: {
         openPinDialog('verify');
         return;
       }
+      if (pendingMapAction.current) {
+        pendingMapAction.current = null;
+        const result = await assignCartToTable(table);
+        if (result) {
+          await validateTableOrderRef.current(result.items, result.ticketId);
+        }
+        return;
+      }
       try {
-        const { ticket, items } = await floorApi.getTicket(table.open_ticket_id);
+        const { ticket, items, served_by_display_name } = await floorApi.getTicket(table.open_ticket_id);
         bindTable(
-          {
-            id: table.id,
-            label: table.label,
-            floorPlanId: table.floor_plan_id,
-            ticketId: ticket.id,
-          },
+          buildActiveTableState(
+            table,
+            ticket.id,
+            ticket.last_served_by_user_id,
+            served_by_display_name ?? null,
+            pinActor
+          ),
           floorApi.mapTicketItemsToOrderItems(items)
         );
       } catch (error: unknown) {
@@ -154,7 +390,7 @@ export function useFloorService(options: {
         onError(err.message || 'Impossible de charger la table');
       }
     },
-    [pinActor, openPinDialog, bindTable, onError]
+    [pinActor, openPinDialog, bindTable, onError, assignCartToTable]
   );
 
   const abandonActiveOrTable = useCallback(
@@ -208,6 +444,7 @@ export function useFloorService(options: {
         return;
       }
       try {
+        await floorApi.replaceTicketItems(activeTable.ticketId, currentOrder, pinActor.token);
         const { ticket } = await floorApi.transferTicket(
           activeTable.ticketId,
           diningTableId,
@@ -215,6 +452,7 @@ export function useFloorService(options: {
         );
         updateActiveSession({
           activeTable: {
+            ...activeTable,
             id: diningTableId,
             label,
             floorPlanId,
@@ -222,13 +460,14 @@ export function useFloorService(options: {
           },
         });
         onInfo(`Transféré vers table ${label}`);
+        setMapPurpose('default');
         setMapDialogOpen(false);
       } catch (error: unknown) {
         const err = error as { message?: string };
         onError(err.message || 'Transfert impossible');
       }
     },
-    [activeTable, pinActor, onError, onInfo, updateActiveSession]
+    [activeTable, pinActor, currentOrder, onError, onInfo, updateActiveSession]
   );
 
   const mergeActiveIntoTable = useCallback(
@@ -242,19 +481,21 @@ export function useFloorService(options: {
         return;
       }
       try {
+        await floorApi.replaceTicketItems(activeTable.ticketId, currentOrder, pinActor.token);
         const { target: merged } = await floorApi.mergeTickets(
           activeTable.ticketId,
           target.open_ticket_id,
           pinActor.token
         );
-        const { items } = await floorApi.getTicket(merged.id);
+        const { items, served_by_display_name } = await floorApi.getTicket(merged.id);
         bindTable(
-          {
-            id: target.id,
-            label: target.label,
-            floorPlanId: target.floor_plan_id,
-            ticketId: merged.id,
-          },
+          buildActiveTableState(
+            target,
+            merged.id,
+            merged.last_served_by_user_id,
+            served_by_display_name ?? null,
+            pinActor
+          ),
           floorApi.mapTicketItemsToOrderItems(items)
         );
         onInfo(`Fusionné sur table ${target.label}`);
@@ -263,7 +504,77 @@ export function useFloorService(options: {
         onError(err.message || 'Fusion impossible');
       }
     },
-    [activeTable, pinActor, bindTable, onError, onInfo]
+    [activeTable, pinActor, currentOrder, bindTable, onError, onInfo]
+  );
+
+  const moveToTable = useCallback(
+    async (table: floorApi.DiningTableStatusDto) => {
+      if (!activeTable || !pinActor) {
+        onError('Table active requise pour déplacer des articles');
+        return;
+      }
+      const sale = getActionItems();
+      if (sale.length === 0) {
+        onError('Aucun article à déplacer');
+        return;
+      }
+      const fullMove = isFullCartSelection(currentOrder, getSelectedIds());
+      try {
+        const { items: saved } = await floorApi.replaceTicketItems(
+          activeTable.ticketId,
+          currentOrder,
+          pinActor.token
+        );
+        const synced = floorApi.mapTicketItemsToOrderItems(saved);
+        const tips = currentOrder.filter((line) => line.isTip);
+        const syncedOrder = [...synced, ...tips];
+        const targets = resolveTargetOrderItems(syncedOrder, getSelectedIds());
+        const lineIds = ticketLineIdsFromItems(targets);
+
+        if (!fullMove && lineIds.length > 0) {
+          const result = await floorApi.moveTicketLines(
+            activeTable.ticketId,
+            table.id,
+            lineIds,
+            pinActor.token
+          );
+          applyTicketItemsToCart(result.source_items);
+          setMapPurpose('default');
+          setMapDialogOpen(false);
+          onInfo(
+            `${lineIds.length} article(s) déplacé(s) vers la table ${
+              result.target_table_label ?? table.label
+            }`
+          );
+          return;
+        }
+
+        if (table.open_ticket_id && table.open_ticket_id !== activeTable.ticketId) {
+          await mergeActiveIntoTable(table);
+          return;
+        }
+        if (!table.open_ticket_id) {
+          await transferActiveToTable(table.id, table.label, table.floor_plan_id);
+          return;
+        }
+        onError('Choisissez une autre table');
+      } catch (error: unknown) {
+        const err = error as { message?: string };
+        onError(err.message || 'Déplacement impossible');
+      }
+    },
+    [
+      activeTable,
+      pinActor,
+      currentOrder,
+      getActionItems,
+      getSelectedIds,
+      onError,
+      onInfo,
+      applyTicketItemsToCart,
+      mergeActiveIntoTable,
+      transferActiveToTable,
+    ]
   );
 
   const takeoverActive = useCallback(async () => {
@@ -272,13 +583,56 @@ export function useFloorService(options: {
       return;
     }
     try {
-      await floorApi.takeoverTicket(activeTable.ticketId, pinActor.token);
+      const { served_by_display_name } = await floorApi.takeoverTicket(
+        activeTable.ticketId,
+        pinActor.token
+      );
+      updateActiveSession({
+        activeTable: {
+          ...activeTable,
+          assignedWaiterUserId: pinActor.userId,
+          assignedWaiterDisplayName: served_by_display_name ?? pinActor.displayName,
+        },
+      });
       onInfo(`Prise en charge : ${pinActor.displayName}`);
     } catch (error: unknown) {
       const err = error as { message?: string };
       onError(err.message || 'Prise en charge impossible');
     }
-  }, [activeTable, pinActor, onError, onInfo]);
+  }, [activeTable, pinActor, onError, onInfo, updateActiveSession]);
+
+  const assignTicketWaiter = useCallback(
+    async (userId: number, displayName: string) => {
+      if (!pinActor) {
+        openPinDialog('verify');
+        onError('Badge requis');
+        return;
+      }
+      if (!activeTable) {
+        onError('Table active requise pour assigner un serveur');
+        return;
+      }
+      try {
+        const { served_by_display_name } = await floorApi.assignTicketWaiter(
+          activeTable.ticketId,
+          userId,
+          pinActor.token
+        );
+        updateActiveSession({
+          activeTable: {
+            ...activeTable,
+            assignedWaiterUserId: userId,
+            assignedWaiterDisplayName: served_by_display_name ?? displayName,
+          },
+        });
+        onInfo(`Serveur assigné : ${served_by_display_name ?? displayName}`);
+      } catch (error: unknown) {
+        const err = error as { message?: string };
+        onError(err.message || 'Assignation serveur impossible');
+      }
+    },
+    [pinActor, activeTable, openPinDialog, onError, onInfo, updateActiveSession]
+  );
 
   const printSuivre = useCallback(
     async (order: OrderItem[]) => {
@@ -290,9 +644,22 @@ export function useFloorService(options: {
       }
       try {
         if (activeTable) {
-          // Sync cart first so kitchen sees latest lines
-          await floorApi.replaceTicketItems(activeTable.ticketId, order, pinActor.token);
-          const result = await floorApi.printSuivreForTicket(activeTable.ticketId, pinActor.token);
+          const actionItems = getActionItems(order);
+          const { items } = await floorApi.replaceTicketItems(
+            activeTable.ticketId,
+            order,
+            pinActor.token
+          );
+          applyTicketItemsToCart(items);
+          const synced = floorApi.mapTicketItemsToOrderItems(items);
+          const suivreIds = ticketLineIdsFromItems(
+            resolveTargetOrderItems(synced, getSelectedIds())
+          );
+          const result = await floorApi.printSuivreForTicket(
+            activeTable.ticketId,
+            pinActor.token,
+            suivreIds.length > 0 ? suivreIds : undefined
+          );
           onInfo(
             result.enqueued > 0
               ? `À suivre envoyé (${result.enqueued})`
@@ -300,7 +667,7 @@ export function useFloorService(options: {
           );
           return;
         }
-        const sale = order.filter((line) => !line.isTip);
+        const sale = getActionItems(order);
         if (sale.length === 0) {
           onError('Aucun article à envoyer');
           return;
@@ -324,12 +691,101 @@ export function useFloorService(options: {
         onError(err.message || 'Impression À suivre échouée');
       }
     },
-    [pinActor, activeTable, openPinDialog, onError, onInfo]
+    [pinActor, activeTable, openPinDialog, onError, onInfo, applyTicketItemsToCart, getActionItems, getSelectedIds]
+  );
+
+  const validateTableOrder = useCallback(
+    async (order: OrderItem[], ticketIdOverride?: number) => {
+      if (!pinActor) {
+        openPinDialog('verify');
+        onError('Badge requis pour valider la commande table');
+        return;
+      }
+      const ticketId = ticketIdOverride ?? activeTable?.ticketId;
+      if (ticketId == null) {
+        onError('Table active requise');
+        return;
+      }
+      const targets = getActionItems(order);
+      const pending = targets.filter(
+        (line) => !line.isTip && line.tableLineStatus !== 'validated'
+      );
+      if (pending.length === 0) {
+        onError('Aucun article en attente de validation');
+        return;
+      }
+      try {
+        const { items: saved } = await floorApi.replaceTicketItems(
+          ticketId,
+          order,
+          pinActor.token
+        );
+        const synced = floorApi.mapTicketItemsToOrderItems(saved);
+        const draftLineIds = ticketLineIdsFromItems(
+          resolveTargetOrderItems(synced, getSelectedIds()).filter(
+            (line) => line.tableLineStatus !== 'validated'
+          )
+        );
+        const result = await floorApi.validateTicket(
+          ticketId,
+          pinActor.token,
+          draftLineIds.length > 0 ? draftLineIds : undefined
+        );
+        applyTicketItemsToCart(result.items);
+        onInfo(
+          result.print.enqueued > 0
+            ? `Commande table validée — ${result.print.enqueued} ticket(s) cuisine`
+            : 'Commande table validée (aucun ticket cuisine)'
+        );
+      } catch (error: unknown) {
+        const err = error as { message?: string };
+        onError(err.message || 'Validation commande table échouée');
+      }
+    },
+    [pinActor, activeTable, openPinDialog, onError, onInfo, applyTicketItemsToCart, getActionItems, getSelectedIds]
+  );
+
+  validateTableOrderRef.current = validateTableOrder;
+
+  const cancelValidatedTicketLine = useCallback(
+    async (ticketLineId: number) => {
+      if (!pinActor) {
+        onError('Badge requis');
+        return;
+      }
+      if (!activeTable) {
+        onError('Table active requise');
+        return;
+      }
+      try {
+        const result = await floorApi.cancelTicketLines(
+          activeTable.ticketId,
+          [ticketLineId],
+          pinActor.token
+        );
+        applyTicketItemsToCart(result.items);
+        onInfo(
+          result.print.enqueued > 0
+            ? `Retour envoyé — ${result.print.enqueued} ticket(s) cuisine`
+            : 'Article retiré de la commande'
+        );
+      } catch (error: unknown) {
+        const err = error as { message?: string };
+        onError(err.message || 'Retour impossible');
+      }
+    },
+    [pinActor, activeTable, onError, onInfo, applyTicketItemsToCart]
   );
 
   // Debounced cart → ticket sync
   useEffect(() => {
-    if (!activeTable || !pinActor) return;
+    if (!activeTable || !pinActor) {
+      if (syncTimer.current) {
+        clearTimeout(syncTimer.current);
+        syncTimer.current = null;
+      }
+      return;
+    }
     if (skipNextSync.current) {
       skipNextSync.current = false;
       return;
@@ -338,6 +794,9 @@ export function useFloorService(options: {
     syncTimer.current = setTimeout(() => {
       void floorApi
         .replaceTicketItems(activeTable.ticketId, currentOrder, pinActor.token)
+        .then(({ items }) => {
+          applyTicketItemsToCart(items);
+        })
         .catch((error: unknown) => {
           const err = error as { message?: string };
           onError(err.message || 'Synchronisation table échouée');
@@ -346,7 +805,7 @@ export function useFloorService(options: {
     return () => {
       if (syncTimer.current) clearTimeout(syncTimer.current);
     };
-  }, [currentOrder, activeTable, pinActor, onError]);
+  }, [currentOrder, activeTable, pinActor, onError, applyTicketItemsToCart]);
 
   return {
     pinActor,
@@ -354,14 +813,17 @@ export function useFloorService(options: {
     pinDialogOpen,
     pinDialogMode,
     mapDialogOpen,
+    mapPurpose,
     setPinDialogOpen,
-    setMapDialogOpen,
+    setMapDialogOpen: closeMapDialog,
     setPinDialogMode,
     clearPin,
     badgeIn,
     setMyPin,
     openPinDialog,
     requestMap,
+    openMapForAction,
+    openMapForMoveTable,
     selectFreeTable,
     selectOccupiedTable,
     abandonActiveOrTable,
@@ -370,7 +832,11 @@ export function useFloorService(options: {
     clearTableBinding,
     transferActiveToTable,
     mergeActiveIntoTable,
+    moveToTable,
     takeoverActive,
     printSuivre,
+    validateTableOrder,
+    assignTicketWaiter,
+    cancelValidatedTicketLine,
   };
 }

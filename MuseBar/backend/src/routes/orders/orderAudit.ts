@@ -5,6 +5,7 @@
 
 import express from 'express';
 import { AuditTrailModel } from '../../models/auditTrail';
+import { getOrderAuditActors } from '../../services/orders/orderHistoryEnrichment';
 import { Logger } from '../../utils/logger';
 import { getEstablishmentId, requireAnyPermission, requireAuth, requirePermission } from '../auth';
 import { P } from '../../permissions/registry';
@@ -68,7 +69,7 @@ router.get('/:orderId', requireAuth, requireAnyPermission([P.access_pos, P.acces
       return res.status(400).json({ error: 'Invalid order ID' });
     }
 
-    const entries = await AuditTrailModel.getOrderAuditEntries(establishmentId, orderId);
+    const entries = await getOrderAuditActors(establishmentId, orderId);
 
     res.json({
       order_id: orderId,

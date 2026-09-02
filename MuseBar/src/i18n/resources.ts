@@ -2,6 +2,7 @@ export const resources = {
   en: {
     common: {
       appTitle: 'MuseBar POS',
+      appTitleFallback: 'POS',
       loading: 'Loading...',
       errorPrefix: 'Error:',
       language: {
@@ -65,6 +66,7 @@ export const resources = {
   fr: {
     common: {
       appTitle: 'MuseBar POS',
+      appTitleFallback: 'POS',
       loading: 'Chargement...',
       errorPrefix: 'Erreur :',
       language: {

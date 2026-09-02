@@ -3,6 +3,7 @@ import { ProductModel } from '../models';
 import { ProductOptionGroupModel } from '../models/database/productOptionGroupModel';
 import { KitchenPrinterModel } from '../models/database/kitchenPrinterModel';
 import { AuditTrailModel } from '../models/auditTrail';
+import { BusinessDayStatsRepository } from '../models/legalJournal/businessDayStatsRepository';
 import { enrichProductsWithOperationalCatalog } from '../services/kitchenPrinting/kitchenPrinterCatalogService';
 import { getEstablishmentId, requireAuth, requireAnyPermission, requirePermission } from './auth';
 import { P } from '../permissions/registry';
@@ -54,6 +55,24 @@ async function logAuditOrThrow(
 }
 
 router.use(requireAuth);
+
+// GET /api/products/top-sellers — best sellers by quantity (POS Favoris)
+router.get('/top-sellers', readCatalog, asyncHandler(async (req, res) => {
+  const establishmentId = getEstablishmentId(req, res);
+  if (!establishmentId) return;
+  const limitRaw = req.query.limit;
+  const limit =
+    limitRaw != null ? Math.min(50, Math.max(1, parseInt(String(limitRaw), 10) || 10)) : 10;
+  try {
+    const products = await BusinessDayStatsRepository.getTopProductsForEstablishment(
+      establishmentId,
+      limit
+    );
+    res.json({ products });
+  } catch {
+    throw new AppError('Failed to fetch top sellers', 500, 'PRODUCTS_TOP_SELLERS_FAILED');
+  }
+}));
 
 // GET /api/products
 router.get('/', readCatalog, asyncHandler(async (req, res) => {

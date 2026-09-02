@@ -115,6 +115,9 @@ const AppRouter: React.FC<AppRouterProps> = ({
       happyHourManual: user.permissions?.includes(PERMISSIONS.pos_happyhour_manual) ?? false,
       offert: user.permissions?.includes(PERMISSIONS.pos_apply_offert) ?? false,
       perso: user.permissions?.includes(PERMISSIONS.pos_apply_perso) ?? false,
+      remise: user.permissions?.includes(PERMISSIONS.pos_happyhour_manual) ?? false,
+      reassignWaiter: user.permissions?.includes(PERMISSIONS.pos_reassign_waiter) ?? false,
+      interveneTable: user.permissions?.includes(PERMISSIONS.pos_intervene_table) ?? false,
     }),
     [user.permissions]
   );
@@ -177,6 +180,15 @@ const AppRouter: React.FC<AppRouterProps> = ({
     if (tab.permission) return user?.permissions?.includes(tab.permission) ?? false;
     return true;
   });
+
+  const posTabIndex = useMemo(
+    () => filteredTabs.findIndex((tab) => tab.value === 'pos'),
+    [filteredTabs]
+  );
+
+  const switchToPosTab = useCallback(() => {
+    if (posTabIndex >= 0) setTabValue(posTabIndex);
+  }, [posTabIndex]);
 
   const stepUpPermissionForTab = useCallback((tabValueKey: string): PermissionName | null => {
     switch (tabValueKey) {
@@ -323,7 +335,7 @@ const AppRouter: React.FC<AppRouterProps> = ({
             )}
             {tab.value === 'floor_plan' && (
               <Suspense fallback={<TabPanelFallback />}>
-                <LazyFloorPlanConsultPanel />
+                <LazyFloorPlanConsultPanel onSwitchToPos={switchToPosTab} />
               </Suspense>
             )}
             {tab.value === 'history' && (

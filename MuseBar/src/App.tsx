@@ -5,6 +5,7 @@ import { apiConfig } from './config/api';
 import { useAuth } from './hooks/useAuth';
 import { useHappyHour } from './hooks/useHappyHour';
 import { useDataManagement } from './hooks/useDataManagement';
+import { useEstablishmentBrandName } from './hooks/useEstablishmentBrandName';
 import AppRouter from './components/common/AppRouter';
 import { Login } from './components/auth';
 import type { User } from './types';
@@ -73,6 +74,11 @@ function App() {
     error,
     updateData,
   } = useDataManagement(!isSystemAdmin && isAuthenticated);
+
+  const establishmentBrandName = useEstablishmentBrandName(
+    !isSystemAdmin && isAuthenticated,
+    user?.establishment_id
+  );
 
   // Initialize API configuration on app start
   useEffect(() => {
@@ -198,6 +204,8 @@ function App() {
                   user={user!}
                   onSwitchEstablishment={handleSwitchEstablishment}
                   showPinSessions
+                  onHappyHourStatusUpdate={updateHappyHourStatus}
+                  establishmentBrandName={establishmentBrandName}
                 />
                 <Box
                   sx={{

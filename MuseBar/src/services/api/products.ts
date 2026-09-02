@@ -166,5 +166,17 @@ export async function deleteProduct(id: string): Promise<{ message?: string; act
 }
 export async function restoreProduct(id: string): Promise<void> { await request(`/products/${id}/restore`, { method: 'PUT' }); }
 
+export interface TopSellerRow {
+  product_id: number;
+  name: string;
+  qty: number;
+}
+
+export async function getTopSellers(limit = 10): Promise<TopSellerRow[]> {
+  const res = await request<{ products: TopSellerRow[] }>(
+    `/products/top-sellers?limit=${limit}`
+  );
+  return res.products ?? [];
+}
 
 

@@ -29,6 +29,9 @@ import {
   StickyNote2 as NoteIcon,
   TableRestaurant as TableIcon,
   Schedule as SuivreIcon,
+  Percent as RemiseIcon,
+  Done as ValidateIcon,
+  SwapHoriz as AssignIcon,
 } from '@mui/icons-material';
 import { OrderItem } from '../../types';
 import { Virtuoso } from 'react-virtuoso';
@@ -67,12 +70,23 @@ interface OrderSummaryProps {
   onUpdateLineNote?: (index: number, note: string) => void;
   /** Drop a product card onto the cart */
   onDropProduct?: (payload: PosProductDragPayload) => void;
+  /** Open remise dialog for selected line indices (empty = all eligible). */
+  onApplyRemise?: (indices: number[]) => void;
   /** Open floor map / select table */
   onSelectTable?: () => void;
   /** Label of bound table, if any */
   activeTableLabel?: string | null;
   /** Send kitchen follow-up (À suivre) */
   onSuivre?: () => void;
+  /** Validate table order without checkout (sync + kitchen tickets) */
+  onValidateTableOrder?: () => void;
+  /** Open assign-to table/waiter dialog */
+  onAssignOrder?: () => void;
+  /** Waiter assigned to the active table ticket (accounting) */
+  assignedWaiterDisplayName?: string | null;
+  /** Controlled cart line selection (empty = all lines for actions). */
+  cartSelectedIds: Set<string>;
+  onCartSelectedIdsChange: (ids: Set<string>) => void;
   formatCurrency: (amount: number) => string;
 }
 
@@ -97,17 +111,22 @@ const OrderSummary = React.memo(function OrderSummary({
   onApplyHappyHour,
   onApplyOffert,
   onApplyPerso,
+  onApplyRemise,
   onUpdateLineNote,
   onDropProduct,
   onSelectTable,
   activeTableLabel = null,
   onSuivre,
+  onValidateTableOrder,
+  onAssignOrder,
+  assignedWaiterDisplayName = null,
+  cartSelectedIds,
+  onCartSelectedIdsChange,
   formatCurrency,
 }: OrderSummaryProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const useVirtualization = canUseVirtualization();
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [dropActive, setDropActive] = useState(false);
   const [lineNoteDialog, setLineNoteDialog] = useState<{
     targetIds: string[];
@@ -118,11 +137,13 @@ const OrderSummary = React.memo(function OrderSummary({
   // Prune selection when lines disappear
   useEffect(() => {
     const alive = new Set(currentOrder.map(i => i.id));
-    setSelectedIds(prev => {
-      const next = new Set([...prev].filter(id => alive.has(id)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [currentOrder]);
+    const next = new Set([...cartSelectedIds].filter(id => alive.has(id)));
+    if (next.size !== cartSelectedIds.size) {
+      onCartSelectedIdsChange(next);
+    }
+  }, [currentOrder, cartSelectedIds, onCartSelectedIdsChange]);
+
+  const selectedIds = cartSelectedIds;
 
   const eligibleIds = useMemo(
     () => currentOrder.filter(i => !i.isTip).map(i => i.id),
@@ -142,6 +163,15 @@ const OrderSummary = React.memo(function OrderSummary({
     () => resolveTargetIds(currentOrder, selectedIds),
     [currentOrder, selectedIds]
   );
+
+  const hasPendingTableValidation = useMemo(() => {
+    const targets = currentOrder.filter((line) => targetIds.includes(line.id) && !line.isTip);
+    if (targets.length === 0) return false;
+    if (!activeTableLabel) return true;
+    return targets.some((line) => line.tableLineStatus !== 'validated');
+  }, [activeTableLabel, currentOrder, targetIds]);
+
+  const hasTargetItems = targetIds.length > 0;
 
   const totalLabelSx = {
     fontWeight: 800,
@@ -166,19 +196,23 @@ const OrderSummary = React.memo(function OrderSummary({
     '& .MuiButton-startIcon': { mr: 0.75 },
   } as const;
 
-  const toggleSelect = useCallback((id: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
+  const toggleSelect = useCallback(
+    (id: string) => {
+      const next = new Set(selectedIds);
       if (next.has(id)) next.delete(id);
       else next.add(id);
-      return next;
-    });
-  }, []);
+      onCartSelectedIdsChange(next);
+    },
+    [selectedIds, onCartSelectedIdsChange]
+  );
 
   const toggleSelectAll = useCallback(() => {
-    if (allEligibleSelected) setSelectedIds(new Set());
-    else setSelectedIds(new Set(eligibleIds));
-  }, [allEligibleSelected, eligibleIds]);
+    if (allEligibleSelected) {
+      onCartSelectedIdsChange(new Set());
+    } else {
+      onCartSelectedIdsChange(new Set(eligibleIds));
+    }
+  }, [allEligibleSelected, eligibleIds, onCartSelectedIdsChange]);
 
   const applyToTargets = useCallback(
     (fn?: (index: number) => void) => {
@@ -211,9 +245,14 @@ const OrderSummary = React.memo(function OrderSummary({
   }, [onUpdateLineNote, targetIds, currentOrder, indexById]);
 
   const handleClearOrder = useCallback(() => {
-    setSelectedIds(new Set());
+    onCartSelectedIdsChange(new Set());
     onClearOrder();
-  }, [onClearOrder]);
+  }, [onClearOrder, onCartSelectedIdsChange]);
+
+  const clearActionTitle = activeTableLabel
+    ? 'Quitter la table — retour mode comptoir'
+    : 'Vider la commande';
+  const clearActionDisabled = !activeTableLabel && currentOrder.length === 0;
 
   const handleDragOver = (e: React.DragEvent) => {
     const types = [...e.dataTransfer.types];
@@ -274,13 +313,14 @@ const OrderSummary = React.memo(function OrderSummary({
           index={index}
           isLast={index === currentOrder.length - 1}
           selected={selectedIds.has(item.id)}
+          showTableLineStatus={Boolean(activeTableLabel)}
           formatCurrency={formatCurrency}
           onToggleSelect={toggleSelect}
           onRemoveItem={onRemoveItem}
         />
       );
     },
-    [currentOrder, selectedIds, formatCurrency, toggleSelect, onRemoveItem]
+    [currentOrder, selectedIds, activeTableLabel, formatCurrency, toggleSelect, onRemoveItem]
   );
 
   const hasTargets = targetIds.length > 0;
@@ -348,6 +388,24 @@ const OrderSummary = React.memo(function OrderSummary({
           Perso
         </Button>
       )}
+      {onApplyRemise && (
+        <Button
+          variant="outlined"
+          color="secondary"
+          fullWidth
+          disabled={!hasTargets}
+          startIcon={<RemiseIcon />}
+          onClick={() => {
+            const indices = targetIds
+              .map((id) => indexById.get(id))
+              .filter((i): i is number => i != null);
+            onApplyRemise(indices);
+          }}
+          sx={actionBtnSx}
+        >
+          Remise
+        </Button>
+      )}
       {onUpdateLineNote && (
         <Button
           variant="outlined"
@@ -405,6 +463,43 @@ const OrderSummary = React.memo(function OrderSummary({
         Options de paiement
       </Button>
 
+      {onValidateTableOrder && (
+        <Tooltip
+          title={
+            activeTableLabel
+              ? 'Valider la commande table (cuisine, sans encaissement)'
+              : 'Choisir une table puis valider la commande'
+          }
+        >
+          <span>
+            <Button
+              variant="contained"
+              color="secondary"
+              fullWidth
+              disabled={!hasPendingTableValidation}
+              startIcon={<ValidateIcon />}
+              onClick={onValidateTableOrder}
+              sx={{ ...actionBtnSx, justifyContent: 'center' }}
+            >
+              Valider commande table
+            </Button>
+          </span>
+        </Tooltip>
+      )}
+
+      {onAssignOrder && (
+        <Button
+          variant="outlined"
+          fullWidth
+          disabled={!hasTargetItems}
+          startIcon={<AssignIcon />}
+          onClick={onAssignOrder}
+          sx={actionBtnSx}
+        >
+          Assigner à
+        </Button>
+      )}
+
       <Divider sx={{ my: 0.5 }} />
 
       <Tooltip title={activeTableLabel ? `Table ${activeTableLabel}` : 'Plan de salle'}>
@@ -426,7 +521,7 @@ const OrderSummary = React.memo(function OrderSummary({
           <Button
             variant="outlined"
             fullWidth
-            disabled={!onSuivre || currentOrder.filter((i) => !i.isTip).length === 0}
+            disabled={!onSuivre || !hasTargetItems}
             startIcon={<SuivreIcon />}
             onClick={onSuivre}
             sx={actionBtnSx}
@@ -491,23 +586,45 @@ const OrderSummary = React.memo(function OrderSummary({
               sx={{ flexShrink: 0 }}
               display="flex"
               justifyContent="space-between"
-              alignItems="center"
+              alignItems="flex-start"
               mb={0.25}
             >
-              <Typography variant="subtitle1" component="h2" sx={{ fontWeight: 700 }}>
-                Commande
-              </Typography>
-              {currentOrder.length > 0 && (
-                <IconButton
-                  onClick={handleClearOrder}
-                  color="error"
-                  size="small"
-                  title="Vider la commande"
-                  aria-label="Vider la commande"
-                >
-                  <ClearIcon />
-                </IconButton>
-              )}
+              <Box>
+                <Typography variant="subtitle1" component="h2" sx={{ fontWeight: 700 }}>
+                  Commande
+                </Typography>
+                {activeTableLabel ? (
+                  <Box>
+                    <Typography
+                      variant="caption"
+                      color="secondary.main"
+                      sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontWeight: 600 }}
+                    >
+                      <TableIcon sx={{ fontSize: 14 }} />
+                      Table {activeTableLabel}
+                    </Typography>
+                    {assignedWaiterDisplayName ? (
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                        Serveur : {assignedWaiterDisplayName}
+                      </Typography>
+                    ) : null}
+                  </Box>
+                ) : (
+                  <Typography variant="caption" color="text.secondary">
+                    Mode comptoir
+                  </Typography>
+                )}
+              </Box>
+              <IconButton
+                onClick={handleClearOrder}
+                color="error"
+                size="small"
+                disabled={clearActionDisabled}
+                title={clearActionTitle}
+                aria-label={clearActionTitle}
+              >
+                <ClearIcon />
+              </IconButton>
             </Box>
 
             {currentOrder.length > 0 && (
@@ -562,6 +679,7 @@ const OrderSummary = React.memo(function OrderSummary({
                       index={index}
                       isLast={index === currentOrder.length - 1}
                       selected={selectedIds.has(item.id)}
+                      showTableLineStatus={Boolean(activeTableLabel)}
                       formatCurrency={formatCurrency}
                       onToggleSelect={toggleSelect}
                       onRemoveItem={onRemoveItem}

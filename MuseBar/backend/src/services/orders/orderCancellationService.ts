@@ -1,4 +1,5 @@
 import { OrderItemModel, OrderModel, SubBillModel } from '../../models';
+import type { Order } from '../../models/interfaces';
 import LegalJournalModel from '../../models/legalJournal';
 import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';
@@ -17,6 +18,7 @@ export type UnifiedCancellationRequest = {
   itemsToCancel?: number[];
   includeTipReversal?: boolean;
   userId?: string;
+  performedByDisplayName?: string;
   ipAddress?: string;
   userAgent?: string;
 };
@@ -27,6 +29,23 @@ export type UnifiedCancellationResponse = {
 };
 
 const logger = Logger.getInstance();
+
+function salesAttributionFromOrder(order: Order) {
+  return {
+    waiter_user_id: order.waiter_user_id ?? null,
+    waiter_display_name: order.waiter_display_name ?? null,
+    table_label: order.table_label ?? null,
+  };
+}
+
+function appendPerformedByNote(
+  notes: string,
+  performedBy?: { userId?: string; displayName?: string }
+): string {
+  if (!performedBy?.userId) return notes;
+  const label = performedBy.displayName?.trim() || `user #${performedBy.userId}`;
+  return `${notes} | Effectué par: ${label}`;
+}
 
 async function cleanupCompensatingOrders(establishmentId: string, orderIds: number[]) {
   for (const orderId of orderIds) {
@@ -52,9 +71,12 @@ export class OrderCancellationService {
       itemsToCancel,
       includeTipReversal = false,
       userId,
+      performedByDisplayName,
       ipAddress,
       userAgent,
     } = input;
+
+    const performedBy = { userId, displayName: performedByDisplayName };
 
     if (!orderId || !reason || typeof reason !== 'string' || !reason.trim()) {
       return {
@@ -85,6 +107,8 @@ export class OrderCancellationService {
         body: { error: 'Only completed orders can be cancelled' },
       };
     }
+
+    const salesAttribution = salesAttributionFromOrder(originalOrder);
 
     const isChangeOperation =
       originalOrder.total_amount === 0 &&
@@ -117,12 +141,16 @@ export class OrderCancellationService {
           total_tax: 0,
           payment_method: originalOrder.payment_method,
           status: 'completed',
-          notes: `ANNULATION FAIRE DE LA MONNAIE - Raison: ${reason} - Order ID: ${orderId}`,
+          notes: appendPerformedByNote(
+            `ANNULATION FAIRE DE LA MONNAIE - Raison: ${reason} - Order ID: ${orderId}`,
+            performedBy
+          ),
           tips: 0,
           change: -amount,
           operation_type: 'change',
           change_amount: -amount,
           establishment_id: establishmentId,
+          ...salesAttribution,
         },
         establishmentId
       );
@@ -214,8 +242,12 @@ export class OrderCancellationService {
         total_tax: -cancellationTax,
         payment_method: originalOrder.payment_method,
         status: 'completed',
-        notes: `ANNULATION - ${cancellationType.toUpperCase()} - Raison: ${reason} - Order ID: ${orderId}`,
+        notes: appendPerformedByNote(
+          `ANNULATION - ${cancellationType.toUpperCase()} - Raison: ${reason} - Order ID: ${orderId}`,
+          performedBy
+        ),
         establishment_id: establishmentId,
+        ...salesAttribution,
       },
       establishmentId
     );
@@ -306,12 +338,16 @@ export class OrderCancellationService {
           total_tax: 0,
           payment_method: originalOrder.payment_method,
           status: 'completed',
-          notes: `ANNULATION POURBOIRE - Raison: ${reason} - Order ID: ${orderId}`,
+          notes: appendPerformedByNote(
+            `ANNULATION POURBOIRE - Raison: ${reason} - Order ID: ${orderId}`,
+            performedBy
+          ),
           tips: 0,
           change: -tipAmountToReverse,
           operation_type: 'change',
           change_amount: -tipAmountToReverse,
           establishment_id: establishmentId,
+          ...salesAttribution,
         },
         establishmentId
       );
@@ -383,6 +419,9 @@ export class OrderCancellationService {
           reason,
           cancelled_items: cancelledItems,
           cancellation_amount: -cancellationAmount,
+          performed_by_user_id: userId ?? null,
+          performed_by_display_name: performedByDisplayName ?? null,
+          attributed_waiter_user_id: salesAttribution.waiter_user_id,
         },
         ip_address: ipAddress,
         user_agent: userAgent,

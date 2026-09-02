@@ -62,6 +62,7 @@ router.post(
         itemsToCancel,
         includeTipReversal,
         userId,
+        performedByDisplayName: req.user?.email,
         ipAddress: req.ip,
         userAgent: Array.isArray(rawUserAgent) ? rawUserAgent[0] : rawUserAgent,
       });

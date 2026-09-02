@@ -18,6 +18,16 @@ type RawOrder = Partial<ApiOrder> &
     waiter_user_id?: number | null;
     waiter_display_name?: string | null;
     table_label?: string | null;
+    legal_sequence_number?: number | null;
+    kitchen_ticket_day_number?: number | null;
+    kitchen_print_targets?: Array<{
+      printer_id?: number | null;
+      printer_name?: string;
+      printer_slug?: string;
+      kitchen_ticket_day_number?: number | null;
+    }>;
+    cashier_user_id?: number | null;
+    cashier_display_name?: string | null;
     items?: Array<Partial<ApiOrderItem> & {
       id?: string | number;
       product_id?: string | number | null;
@@ -108,6 +118,22 @@ function mapRawOrder(order: RawOrder): Order {
     waiterUserId: order.waiter_user_id != null ? Number(order.waiter_user_id) : null,
     waiterDisplayName: order.waiter_display_name != null ? String(order.waiter_display_name) : null,
     tableLabel: order.table_label != null ? String(order.table_label) : null,
+    legalSequenceNumber:
+      order.legal_sequence_number != null ? Number(order.legal_sequence_number) : null,
+    kitchenTicketDayNumber:
+      order.kitchen_ticket_day_number != null
+        ? Number(order.kitchen_ticket_day_number)
+        : null,
+    kitchenPrintTargets: (order.kitchen_print_targets ?? []).map((p) => ({
+      printerId: p.printer_id != null ? Number(p.printer_id) : null,
+      printerName: String(p.printer_name ?? p.printer_slug ?? 'Imprimante'),
+      printerSlug: String(p.printer_slug ?? ''),
+      kitchenTicketDayNumber:
+        p.kitchen_ticket_day_number != null ? Number(p.kitchen_ticket_day_number) : null,
+    })),
+    cashierUserId: order.cashier_user_id != null ? Number(order.cashier_user_id) : null,
+    cashierDisplayName:
+      order.cashier_display_name != null ? String(order.cashier_display_name) : null,
   };
 }
 
@@ -120,11 +146,13 @@ export async function getOrdersPaginated(params: {
   limit?: number;
   offset?: number;
   waiterUserId?: number;
+  search?: string;
 }): Promise<{ orders: Order[]; total: number }> {
   const query = new URLSearchParams();
   if (params.limit != null) query.set('limit', String(params.limit));
   if (params.offset != null) query.set('offset', String(params.offset));
   if (params.waiterUserId != null) query.set('waiter_user_id', String(params.waiterUserId));
+  if (params.search?.trim()) query.set('search', params.search.trim());
 
   const response = await request<RawOrder[] | { orders?: RawOrder[]; total?: number }>(
     '/orders' + (query.toString() ? `?${query.toString()}` : '')
@@ -214,5 +242,17 @@ export async function createOrder(order: {
   };
 }
 
+export interface OrderAuditActor {
+  user_id: string | null;
+  display_name: string | null;
+  action_type: string;
+  timestamp: string;
+}
 
+export async function getOrderAudit(orderId: number): Promise<OrderAuditActor[]> {
+  const response = await request<{
+    audit_entries: OrderAuditActor[];
+  }>(`/orders/audit/${orderId}`);
+  return response.audit_entries ?? [];
+}
 

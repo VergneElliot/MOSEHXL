@@ -99,6 +99,7 @@ export class ApiService {
     limit?: number;
     offset?: number;
     waiterUserId?: number;
+    search?: string;
   }): Promise<{ orders: Order[]; total: number }> {
     if (params) {
       return ordersApi.getOrdersPaginated(params);

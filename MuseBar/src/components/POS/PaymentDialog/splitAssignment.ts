@@ -171,7 +171,7 @@ export function moveItemsToBill(
 ): LocalSubBill[] {
   if (!bills[billIndex] || items.length === 0) return bills;
   const sourceIds = items.map(i => i.id);
-  let next = clearItemsFromBills(bills, sourceIds);
+  const next = clearItemsFromBills(bills, sourceIds);
   const target = next[billIndex]!;
   const merged = [...target.items];
   for (const item of items) {
@@ -266,7 +266,7 @@ export function distributeCentsByWeights(totalC: number, weights: number[]): num
 
   const raw = weights.map(w => (totalC * w) / wSum);
   const floors = raw.map(r => Math.floor(r));
-  let rem = totalC - floors.reduce((a, b) => a + b, 0);
+  const rem = totalC - floors.reduce((a, b) => a + b, 0);
   const order = raw
     .map((r, i) => ({ i, frac: r - floors[i]! }))
     .sort((a, b) => b.frac - a.frac || a.i - b.i);
@@ -295,7 +295,7 @@ export function splitItemsByShareCents(
   if (allTargets.length === 0 || items.length === 0) return bills;
 
   const sourceIds = items.map(i => i.id);
-  let next = clearItemsFromBills(bills, sourceIds);
+  const next = clearItemsFromBills(bills, sourceIds);
   const weights = allTargets.map(i => Math.max(0, shareCentsByBill[i] ?? 0));
 
   for (const item of items) {

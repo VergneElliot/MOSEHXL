@@ -14,6 +14,7 @@ import { requirePosPinActor } from '../../middleware/pinActor';
 import { AppError, asyncHandler, ValidationError } from '../../middleware/errorHandler';
 import { createOrderWithCompliance } from '../../services/orders/orderCreationService';
 import { attachOptionsToOrderItems } from '../../services/orders/orderItemOptionsService';
+import { enrichOrdersForHistory } from '../../services/orders/orderHistoryEnrichment';
 
 const router = express.Router();
 const logger = Logger.getInstance();
@@ -30,12 +31,15 @@ router.get('/', asyncHandler(async (req, res) => {
     const limitRaw = req.query.limit;
     const offsetRaw = req.query.offset;
     const waiterRaw = req.query.waiter_user_id;
+    const searchRaw = req.query.search;
     const limit = typeof limitRaw === 'string' ? parseInt(limitRaw, 10) : undefined;
     const offset = typeof offsetRaw === 'string' ? parseInt(offsetRaw, 10) : undefined;
     const waiterUserId =
       typeof waiterRaw === 'string' && waiterRaw.trim() !== ''
         ? parseInt(waiterRaw, 10)
         : undefined;
+    const search =
+      typeof searchRaw === 'string' && searchRaw.trim() !== '' ? searchRaw.trim() : undefined;
 
     const shouldPaginate =
       (limit != null && Number.isFinite(limit) && limit > 0) ||
@@ -46,9 +50,11 @@ router.get('/', asyncHandler(async (req, res) => {
       ...(waiterUserId != null && Number.isFinite(waiterUserId) && waiterUserId > 0
         ? { waiterUserId }
         : {}),
+      ...(search ? { search } : {}),
     };
 
     const orders = await OrderModel.getAll(establishmentId, listOpts);
+    const enrichment = await enrichOrdersForHistory(establishmentId, orders);
     const ordersWithDetails = await Promise.all(
       orders.map(async (order) => {
         const items = await attachOptionsToOrderItems(
@@ -56,7 +62,22 @@ router.get('/', asyncHandler(async (req, res) => {
           establishmentId
         );
         const subBills = order.payment_method === 'split' ? await SubBillModel.getByOrderId(order.id, establishmentId) : [];
-        return { ...order, items, sub_bills: subBills, tips: order.tips || 0, change: order.change || 0 };
+        const extra = enrichment.get(order.id);
+        const kitchenDay = (order as unknown as Record<string, unknown>).kitchen_ticket_day_number;
+        return {
+          ...order,
+          items,
+          sub_bills: subBills,
+          tips: order.tips || 0,
+          change: order.change || 0,
+          legal_sequence_number: extra?.legal_sequence_number ?? null,
+          kitchen_ticket_day_number:
+            extra?.kitchen_ticket_day_number ??
+            (kitchenDay != null ? Number(kitchenDay) : null),
+          kitchen_print_targets: extra?.kitchen_print_targets ?? [],
+          cashier_user_id: extra?.cashier_user_id ?? null,
+          cashier_display_name: extra?.cashier_display_name ?? null,
+        };
       })
     );
 
@@ -65,12 +86,12 @@ router.get('/', asyncHandler(async (req, res) => {
       return;
     }
 
-    const total = await OrderModel.countAll(
-      establishmentId,
-      waiterUserId != null && Number.isFinite(waiterUserId) && waiterUserId > 0
+    const total = await OrderModel.countAll(establishmentId, {
+      ...(waiterUserId != null && Number.isFinite(waiterUserId) && waiterUserId > 0
         ? { waiterUserId }
-        : undefined
-    );
+        : {}),
+      ...(search ? { search } : {}),
+    });
 
     res.json({ orders: ordersWithDetails, total });
   } catch (error) {
@@ -175,9 +196,9 @@ router.post(
       const pinActor = req.pinActor;
       const body = {
         ...req.body,
-        // Sales attribution always comes from the active PIN session.
-        waiter_user_id: pinActor?.id ?? req.body?.waiter_user_id ?? null,
-        waiter_display_name: pinActor?.display_name ?? req.body?.waiter_display_name ?? null,
+        // Table / floor attribution from client; PIN session only when not specified.
+        waiter_user_id: req.body?.waiter_user_id ?? pinActor?.id ?? null,
+        waiter_display_name: req.body?.waiter_display_name ?? pinActor?.display_name ?? null,
       };
       const creationResult = await createOrderWithCompliance(
         body,

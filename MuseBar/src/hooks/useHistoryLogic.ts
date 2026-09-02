@@ -1,10 +1,22 @@
 import { useMemo } from 'react';
 import { Order } from '../types';
 import { formatCurrency } from '../utils/formatCurrency';
-import { formatDateOnly, formatDate } from '../utils/formatDate';
+import { formatDate } from '../utils/formatDate';
+
+export function getPaymentMethodLabel(method: string): string {
+  switch (method) {
+    case 'cash':
+      return 'Espèces';
+    case 'card':
+      return 'Carte';
+    case 'split':
+      return 'Mixte';
+    default:
+      return method;
+  }
+}
 
 export interface HistoryLogic {
-  filteredOrders: Order[];
   formatCurrency: (amount: number) => string;
   formatDateTime: (date: Date | string) => string;
   getPaymentMethodLabel: (method: string) => string;
@@ -15,66 +27,8 @@ export interface HistoryLogic {
   getOrderSummary: (order: Order) => string;
 }
 
-export const useHistoryLogic = (orders: Order[], search: string): HistoryLogic => {
-  // Filter orders based on search query
-  const filteredOrders = useMemo(() => {
-    if (!search.trim()) {
-      return orders;
-    }
-
-    const searchLower = search.toLowerCase();
-    return orders.filter(order => {
-      // Search by order ID
-      if (order.id.toLowerCase().includes(searchLower)) {
-        return true;
-      }
-
-      // Search by date (using shared French date formatting)
-      const dateStr = formatDateOnly(order.createdAt);
-      if (dateStr.includes(searchLower)) {
-        return true;
-      }
-
-      // Search by payment method
-      if (getPaymentMethodLabel(order.paymentMethod).toLowerCase().includes(searchLower)) {
-        return true;
-      }
-
-      // Search by order items
-      const hasMatchingItem = order.items.some(item =>
-        item.productName.toLowerCase().includes(searchLower)
-      );
-      if (hasMatchingItem) {
-        return true;
-      }
-
-      // Search by total amount
-      const totalStr = formatCurrency(order.totalAmount);
-      if (totalStr.includes(search)) {
-        return true;
-      }
-
-      return false;
-    });
-  }, [orders, search]);
-
-  const formatDateTime = (date: Date | string): string => {
-    // Use shared French date+time formatting helper
-    return formatDate(date);
-  };
-
-  const getPaymentMethodLabel = (method: string): string => {
-    switch (method) {
-      case 'cash':
-        return 'Espèces';
-      case 'card':
-        return 'Carte';
-      case 'split':
-        return 'Mixte';
-      default:
-        return method;
-    }
-  };
+export const useHistoryLogic = (): HistoryLogic => {
+  const formatDateTime = (date: Date | string): string => formatDate(date);
 
   const getStatusColor = (
     status: string
@@ -92,37 +46,31 @@ export const useHistoryLogic = (orders: Order[], search: string): HistoryLogic =
   };
 
   const calculateOrderTotal = (order: Order): number => {
-    // Calculate base total from items
     const itemsTotal = order.items.reduce((total, item) => total + item.totalPrice, 0);
-
-    // Add tips if any
     const tips = order.tips || 0;
-
-    // Subtract change if any
     const change = order.change || 0;
-
     return itemsTotal + tips - change;
   };
 
   const getOrderSummary = (order: Order): string => {
     const itemCount = order.items.length;
     const firstItems = order.items.slice(0, 2);
-    const summary = firstItems.map(item => `${item.quantity}x ${item.productName}`).join(', ');
-
+    const summary = firstItems.map((item) => `${item.quantity}x ${item.productName}`).join(', ');
     if (itemCount > 2) {
       return `${summary}, +${itemCount - 2} autre${itemCount - 2 > 1 ? 's' : ''}`;
     }
-
     return summary;
   };
 
-  return {
-    filteredOrders,
-    formatCurrency,
-    formatDateTime,
-    getPaymentMethodLabel,
-    getStatusColor,
-    calculateOrderTotal,
-    getOrderSummary,
-  };
+  return useMemo(
+    () => ({
+      formatCurrency,
+      formatDateTime,
+      getPaymentMethodLabel,
+      getStatusColor,
+      calculateOrderTotal,
+      getOrderSummary,
+    }),
+    []
+  );
 };

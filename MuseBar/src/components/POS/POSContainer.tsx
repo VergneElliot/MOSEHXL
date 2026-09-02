@@ -14,14 +14,18 @@ import { setFloorOrderAttribution } from '../../services/floorOrderAttribution';
 import POSLayout from './POSLayout';
 import POSMenuPanel from './POSMenuPanel';
 import POSOrderPanel from './POSOrderPanel';
-import FloorBadgeStrip from './FloorBadgeStrip';
+import POSSearchBar from './POSSearchBar';
+import RemiseDialog, { type RemiseFormData } from './RemiseDialog';
+import AssignOrderDialog from './AssignOrderDialog';
 import type { DiversFormData } from './DiversDialog';
 import type { PourboireFormData } from './PourboireDialog';
 import type { ProductOptionSelection } from './ProductOptionDialog';
 import { upsertLineNoteInOptions } from '../../utils/lineItemNote';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { saleLines, tipsFromOrder } from '../../hooks/usePOSOrderTotals';
+import { resolveTargetOrderItems } from '../../utils/posCartSelection';
 import { resolvePinLengthRules } from '../../utils/pinRules';
+import { pinActorHasPermission } from '../../utils/pinSessionPermissions';
 import { PERMISSIONS } from '@mosehxl/types';
 
 const LazyPaymentDialog = React.lazy(() => import('./PaymentDialog'));
@@ -41,6 +45,9 @@ interface POSContainerProps {
     happyHourManual: boolean;
     offert: boolean;
     perso: boolean;
+    remise: boolean;
+    reassignWaiter: boolean;
+    interveneTable: boolean;
   };
 }
 
@@ -53,6 +60,9 @@ const POSContainer: React.FC<POSContainerProps> = ({
     happyHourManual: true,
     offert: true,
     perso: true,
+    remise: true,
+    reassignWaiter: false,
+    interveneTable: false,
   },
 }) => {
   const [state, actions] = usePOSState();
@@ -65,6 +75,10 @@ const POSContainer: React.FC<POSContainerProps> = ({
   const [pendingProduct, setPendingProduct] = useState<{ product: Product; quantity: number } | null>(null);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [lastOrderId, setLastOrderId] = useState<number | null>(null);
+  const [remiseDialogOpen, setRemiseDialogOpen] = useState(false);
+  const [remiseTargetIndices, setRemiseTargetIndices] = useState<number[]>([]);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [cartSelectedIds, setCartSelectedIds] = useState<Set<string>>(new Set());
 
   const floorOnError = useCallback(
     (message: string) => {
@@ -84,6 +98,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
     setCurrentOrder: actions.setCurrentOrder,
     onError: floorOnError,
     onInfo: floorOnInfo,
+    getCartSelectedIds: () => cartSelectedIds,
   });
 
   const { user, permissions } = useAuth();
@@ -91,6 +106,24 @@ const POSContainer: React.FC<POSContainerProps> = ({
   const canManageFloor =
     user?.role === 'establishment_admin' ||
     permissions.includes('manage_floor_plan');
+
+  const canReassignWaiter =
+    pinActorHasPermission(floor.pinActor, PERMISSIONS.pos_reassign_waiter) ||
+    posLinePermissions.reassignWaiter;
+
+  const ensureTableIntervention = useCallback(async () => {
+    const table = floor.activeTable;
+    const actor = floor.pinActor;
+    if (!table || !actor) return;
+    const assignedId = table.assignedWaiterUserId;
+    if (assignedId == null || actor.userId === assignedId) return;
+    if (actor.role === 'establishment_admin') return;
+    await ensurePermission(PERMISSIONS.pos_intervene_table, {
+      title: 'Intervention sur une autre table',
+      description:
+        'PIN autorisé pour modifier une table assignée à un autre serveur. L’addition reste sur son Z.',
+    });
+  }, [floor.activeTable, floor.pinActor, ensurePermission]);
 
   // Load cart when switching PIN session tabs
   useEffect(() => {
@@ -108,9 +141,13 @@ const POSContainer: React.FC<POSContainerProps> = ({
 
   useEffect(() => {
     if (floor.pinActor) {
+      const waiterUserId =
+        floor.activeTable?.assignedWaiterUserId ?? floor.pinActor.userId;
+      const waiterDisplayName =
+        floor.activeTable?.assignedWaiterDisplayName ?? floor.pinActor.displayName;
       setFloorOrderAttribution({
-        waiterUserId: floor.pinActor.userId,
-        waiterDisplayName: floor.pinActor.displayName,
+        waiterUserId,
+        waiterDisplayName,
         tableLabel: floor.activeTable?.label ?? null,
       });
     } else {
@@ -166,6 +203,9 @@ const POSContainer: React.FC<POSContainerProps> = ({
     async (item: OrderItem, quantity: number = 1) => {
       try {
         await ensureSession();
+        if (floor.activeTable) {
+          await ensureTableIntervention();
+        }
       } catch {
         actions.setSnackbar({
           open: true,
@@ -174,7 +214,11 @@ const POSContainer: React.FC<POSContainerProps> = ({
         });
         return;
       }
-      const base = { ...item, quantity: 1 };
+      const base = {
+        ...item,
+        quantity: 1,
+        ...(floor.activeTable ? { tableLineStatus: 'draft' as const } : {}),
+      };
       const stamp = Date.now();
       const lines: OrderItem[] = [];
       for (let i = 0; i < quantity; i++) {
@@ -187,7 +231,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
       }
       actions.addLinesToOrder(lines);
     },
-    [actions.addLinesToOrder, actions.setSnackbar, ensureSession]
+    [actions.addLinesToOrder, actions.setSnackbar, ensureSession, floor.activeTable, ensureTableIntervention]
   );
 
   const buildOrderItem = useCallback(
@@ -245,25 +289,183 @@ const POSContainer: React.FC<POSContainerProps> = ({
   );
 
   const handleUpdateLineNote = useCallback(
-    (index: number, note: string) => {
+    async (index: number, note: string) => {
       const line = state.currentOrder[index];
       if (!line) return;
-      actions.updateLineAt(index, {
-        options: upsertLineNoteInOptions(line.options, note),
-      });
+      try {
+        if (floor.activeTable) await ensureTableIntervention();
+        actions.updateLineAt(index, {
+          options: upsertLineNoteInOptions(line.options, note),
+        });
+      } catch {
+        /* cancelled */
+      }
     },
-    [actions.updateLineAt, state.currentOrder]
+    [actions.updateLineAt, state.currentOrder, floor.activeTable, ensureTableIntervention]
   );
 
-  const { handleApplyHappyHour, handleApplyOffert, handleApplyPerso } =
+  const { handleApplyHappyHour, handleApplyOffert, handleApplyPerso, handleApplyRemise } =
     usePOSOrderAdjustments({
       currentOrder: state.currentOrder,
       updateLineAt: actions.updateLineAt,
     });
 
+  const handleCategorySelect = useCallback(
+    (categoryId: string) => {
+      actions.setSearchQuery('');
+      actions.setSelectedCategory(categoryId);
+    },
+    [actions.setSearchQuery, actions.setSelectedCategory]
+  );
+
+  const handleRequestRemise = useCallback(
+    async (indices: number[]) => {
+      if (!posLinePermissions.remise) return;
+      try {
+        if (floor.activeTable) await ensureTableIntervention();
+        await ensurePermission(PERMISSIONS.pos_happyhour_manual, {
+          title: 'Remise',
+          description: 'PIN d’un profil autorisé à appliquer une remise.',
+        });
+        setRemiseTargetIndices(indices);
+        setRemiseDialogOpen(true);
+      } catch {
+        /* cancelled */
+      }
+    },
+    [ensurePermission, posLinePermissions.remise, floor.activeTable, ensureTableIntervention]
+  );
+
+  const handleConfirmRemise = useCallback(
+    (data: RemiseFormData) => {
+      remiseTargetIndices.forEach((index) => handleApplyRemise(index, data));
+      setRemiseTargetIndices([]);
+    },
+    [remiseTargetIndices, handleApplyRemise]
+  );
+
+  const handleValidateTableOrder = useCallback(async () => {
+    try {
+      await ensureSession();
+      const targets = resolveTargetOrderItems(state.currentOrder, cartSelectedIds);
+      if (targets.length === 0) {
+        floorOnError('Aucun article à valider');
+        return;
+      }
+      if (floor.activeTable) {
+        await ensureTableIntervention();
+      }
+      if (!floor.activeTable) {
+        floor.openMapForAction('validate');
+        return;
+      }
+      await floor.validateTableOrder(state.currentOrder);
+    } catch {
+      /* session cancelled */
+    }
+  }, [
+    ensureSession,
+    floor,
+    state.currentOrder,
+    cartSelectedIds,
+    floorOnError,
+    ensureTableIntervention,
+  ]);
+
+  const handleAssignOrderOpen = useCallback(async () => {
+    try {
+      await ensureSession();
+      if (resolveTargetOrderItems(state.currentOrder, cartSelectedIds).length === 0) {
+        floorOnError('Sélectionnez au moins un article');
+        return;
+      }
+      if (floor.activeTable) {
+        await ensureTableIntervention();
+      }
+      setAssignDialogOpen(true);
+    } catch {
+      /* session cancelled */
+    }
+  }, [ensureSession, floor.activeTable, state.currentOrder, cartSelectedIds, floorOnError, ensureTableIntervention]);
+
+  const handleSuivre = useCallback(async () => {
+    try {
+      await ensureSession();
+      if (resolveTargetOrderItems(state.currentOrder, cartSelectedIds).length === 0) {
+        floorOnError('Aucun article à envoyer');
+        return;
+      }
+      if (floor.activeTable) {
+        await ensureTableIntervention();
+      }
+      await floor.printSuivre(state.currentOrder);
+    } catch {
+      /* session cancelled */
+    }
+  }, [
+    ensureSession,
+    floor,
+    state.currentOrder,
+    cartSelectedIds,
+    floorOnError,
+    ensureTableIntervention,
+  ]);
+
+  const handleAssignToTable = useCallback(async () => {
+    try {
+      await ensureSession();
+      if (floor.activeTable) {
+        await ensureTableIntervention();
+      }
+      if (floor.activeTable) {
+        floor.openMapForMoveTable();
+        return;
+      }
+      floor.openMapForAction('assign');
+    } catch {
+      /* session cancelled */
+    }
+  }, [ensureSession, floor, ensureTableIntervention]);
+
+  const handleMoveToTable = useCallback(
+    async (table: Parameters<typeof floor.moveToTable>[0]) => {
+      try {
+        await ensureSession();
+        await ensureTableIntervention();
+        await floor.moveToTable(table);
+      } catch {
+        /* cancelled */
+      }
+    },
+    [ensureSession, ensureTableIntervention, floor]
+  );
+
+  const handleAssignToWaiter = useCallback(
+    async (userId: number, displayName: string) => {
+      try {
+        await ensurePermission(PERMISSIONS.pos_reassign_waiter, {
+          title: 'Réassigner un serveur',
+          description: 'PIN d’un profil autorisé à réassigner le serveur d’une table.',
+        });
+        await floor.assignTicketWaiter(userId, displayName);
+      } catch {
+        /* cancelled or denied */
+      }
+    },
+    [ensurePermission, floor]
+  );
+
+  const handleBeforeWaiterStep = useCallback(async () => {
+    await ensurePermission(PERMISSIONS.pos_reassign_waiter, {
+      title: 'Réassigner un serveur',
+      description: 'PIN d’un profil autorisé à réassigner le serveur d’une table.',
+    });
+  }, [ensurePermission]);
+
   const gatedApplyHappyHour = useCallback(
     async (index: number) => {
       try {
+        if (floor.activeTable) await ensureTableIntervention();
         await ensurePermission(PERMISSIONS.pos_happyhour_manual, {
           title: 'Happy Hour manuel',
           description: 'PIN d’un profil autorisé au Happy Hour manuel.',
@@ -273,12 +475,13 @@ const POSContainer: React.FC<POSContainerProps> = ({
         /* cancelled or denied */
       }
     },
-    [ensurePermission, handleApplyHappyHour]
+    [ensurePermission, handleApplyHappyHour, floor.activeTable, ensureTableIntervention]
   );
 
   const gatedApplyOffert = useCallback(
     async (index: number) => {
       try {
+        if (floor.activeTable) await ensureTableIntervention();
         await ensurePermission(PERMISSIONS.pos_apply_offert, {
           title: 'Offert',
           description: 'PIN d’un profil autorisé à appliquer un offert.',
@@ -288,12 +491,13 @@ const POSContainer: React.FC<POSContainerProps> = ({
         /* cancelled or denied */
       }
     },
-    [ensurePermission, handleApplyOffert]
+    [ensurePermission, handleApplyOffert, floor.activeTable, ensureTableIntervention]
   );
 
   const gatedApplyPerso = useCallback(
     async (index: number) => {
       try {
+        if (floor.activeTable) await ensureTableIntervention();
         await ensurePermission(PERMISSIONS.pos_apply_perso, {
           title: 'Perso',
           description: 'PIN d’un profil autorisé à appliquer un perso.',
@@ -303,7 +507,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
         /* cancelled or denied */
       }
     },
-    [ensurePermission, handleApplyPerso]
+    [ensurePermission, handleApplyPerso, floor.activeTable, ensureTableIntervention]
   );
 
   const handleCheckout = useCallback(async () => {
@@ -349,8 +553,45 @@ const POSContainer: React.FC<POSContainerProps> = ({
   );
 
   const handleClearOrder = useCallback(() => {
-    actions.clearOrder();
-  }, [actions.clearOrder]);
+    if (floor.activeTable) {
+      void floor.detachTableKeepTicket();
+      return;
+    }
+    if (state.currentOrder.length > 0) {
+      actions.clearOrder();
+    }
+  }, [floor, state.currentOrder.length, actions.clearOrder]);
+
+  const handleRemoveItem = useCallback(
+    async (index: number) => {
+      const line = state.currentOrder[index];
+      if (!line) return;
+      if (
+        floor.activeTable &&
+        line.tableLineStatus === 'validated' &&
+        line.ticketLineId != null
+      ) {
+        try {
+          await ensureTableIntervention();
+          await ensurePermission(PERMISSIONS.orders_cancel, {
+            title: 'Retour article',
+            description: 'PIN d’un profil autorisé à annuler un article validé (ticket cuisine).',
+          });
+          await floor.cancelValidatedTicketLine(line.ticketLineId);
+        } catch {
+          /* cancelled or denied */
+        }
+        return;
+      }
+      try {
+        if (floor.activeTable) await ensureTableIntervention();
+      } catch {
+        return;
+      }
+      actions.removeFromOrder(index);
+    },
+    [state.currentOrder, floor, ensurePermission, ensureTableIntervention, actions.removeFromOrder]
+  );
 
   const handleQuickCard = useCallback(() => {
     void handleQuickPayment('card');
@@ -466,12 +707,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
 
   return (
     <Box sx={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <FloorBadgeStrip
-        sessionName={floor.pinActor?.displayName ?? null}
-        tableLabel={floor.activeTable?.label ?? null}
-        onOpenSession={() => floor.openPinDialog('verify')}
-        onTableClick={floor.requestMap}
-      />
+      <POSSearchBar searchQuery={state.searchQuery} onSearchChange={actions.setSearchQuery} />
       <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', width: '100%' }}>
         <POSLayout
           menuContent={
@@ -481,8 +717,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
               isHappyHourActive={isHappyHourActive}
               selectedCategory={state.selectedCategory}
               searchQuery={state.searchQuery}
-              onCategorySelect={actions.setSelectedCategory}
-              onSearchChange={actions.setSearchQuery}
+              onCategorySelect={handleCategorySelect}
               onRequestAddProduct={handleRequestAddProduct}
               onDiversClick={handleDiversClick}
               onPourboireClick={handlePourboireClick}
@@ -491,7 +726,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
           orderContent={
             <POSOrderPanel
               currentOrder={state.currentOrder}
-              onRemoveItem={actions.removeFromOrder}
+              onRemoveItem={handleRemoveItem}
               onClearOrder={handleClearOrder}
               onCheckout={handleCheckout}
               onQuickCard={handleQuickCard}
@@ -511,15 +746,21 @@ const POSContainer: React.FC<POSContainerProps> = ({
                   ? (index: number) => void gatedApplyPerso(index)
                   : undefined
               }
+              onApplyRemise={
+                posLinePermissions.remise ? (indices) => void handleRequestRemise(indices) : undefined
+              }
               onUpdateLineNote={handleUpdateLineNote}
               onDropProduct={handleDropProduct}
               onSelectTable={floor.requestMap}
               activeTableLabel={floor.activeTable?.label ?? null}
               onSuivre={
-                floor.pinActor
-                  ? () => void floor.printSuivre(state.currentOrder)
-                  : () => floor.openPinDialog('verify')
+                floor.pinActor ? () => void handleSuivre() : () => floor.openPinDialog('verify')
               }
+              onValidateTableOrder={() => void handleValidateTableOrder()}
+              onAssignOrder={() => void handleAssignOrderOpen()}
+              assignedWaiterDisplayName={floor.activeTable?.assignedWaiterDisplayName ?? null}
+              cartSelectedIds={cartSelectedIds}
+              onCartSelectedIdsChange={setCartSelectedIds}
             />
           }
           orderBadge={state.currentOrder.length}
@@ -598,6 +839,27 @@ const POSContainer: React.FC<POSContainerProps> = ({
         </Suspense>
       )}
 
+      <RemiseDialog
+        open={remiseDialogOpen}
+        onClose={() => {
+          setRemiseDialogOpen(false);
+          setRemiseTargetIndices([]);
+        }}
+        onConfirm={handleConfirmRemise}
+      />
+
+      <AssignOrderDialog
+        open={assignDialogOpen}
+        onClose={() => setAssignDialogOpen(false)}
+        hasActiveTable={Boolean(floor.activeTable)}
+        assignedWaiterDisplayName={floor.activeTable?.assignedWaiterDisplayName ?? null}
+        canReassignWaiter={canReassignWaiter}
+        pinActorToken={floor.pinActor?.token ?? null}
+        onAssignTable={handleAssignToTable}
+        onBeforeWaiterStep={handleBeforeWaiterStep}
+        onAssignWaiter={(userId, displayName) => void handleAssignToWaiter(userId, displayName)}
+      />
+
       {(optionDialogOpen || pendingProduct) && (
         <Suspense fallback={null}>
           <LazyProductOptionDialog
@@ -634,17 +896,13 @@ const POSContainer: React.FC<POSContainerProps> = ({
         <Suspense fallback={null}>
           <LazyFloorMapDialog
             open={floor.mapDialogOpen}
-            onClose={() => floor.setMapDialogOpen(false)}
+            onClose={() => floor.setMapDialogOpen()}
+            mapPurpose={floor.mapPurpose}
             activeTicketId={floor.activeTable?.ticketId ?? null}
             onSelectFree={(t) => void floor.selectFreeTable(t)}
             onSelectOccupied={(t) => void floor.selectOccupiedTable(t)}
-            onTransferTo={(t) =>
-              void floor.transferActiveToTable(t.id, t.label, t.floor_plan_id)
-            }
-            onMergeInto={(t) => void floor.mergeActiveIntoTable(t)}
-            onAbandon={(id) => void floor.abandonActiveOrTable(id)}
-            onDetach={floor.detachTableKeepTicket}
-            onTakeover={() => void floor.takeoverActive()}
+            onTransferTo={(t) => void handleMoveToTable(t)}
+            onMergeInto={(t) => void handleMoveToTable(t)}
             canManageFloor={canManageFloor}
           />
         </Suspense>

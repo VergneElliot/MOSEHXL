@@ -1,4 +1,5 @@
 import { formatOrderItemOptionLabel } from '../../utils/orderItemOptions';
+import React, { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -15,9 +16,13 @@ import {
   TableRow,
   Paper,
   Chip,
+  Stack,
+  Divider,
+  CircularProgress,
 } from '@mui/material';
 import { Order } from '../../types';
 import { formatCurrency } from '../../utils/formatCurrency';
+import { getOrderAudit, type OrderAuditActor } from '../../services/api/orders';
 
 interface OrderDetailsDialogProps {
   order: Order | null;
@@ -26,12 +31,33 @@ interface OrderDetailsDialogProps {
   getPaymentMethodLabel: (method: string) => string;
 }
 
+const actionTypeLabel: Record<string, string> = {
+  ORDER_CREATED: 'Création / encaissement',
+  ORDER_CANCELLED: 'Annulation',
+  ORDER_REFUNDED: 'Retour',
+};
+
 const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
   order,
   onClose,
   formatDateTime,
   getPaymentMethodLabel,
 }) => {
+  const [audit, setAudit] = useState<OrderAuditActor[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+
+  useEffect(() => {
+    if (!order) {
+      setAudit([]);
+      return;
+    }
+    setAuditLoading(true);
+    void getOrderAudit(Number(order.id))
+      .then(setAudit)
+      .catch(() => setAudit([]))
+      .finally(() => setAuditLoading(false));
+  }, [order]);
+
   if (!order) return null;
 
   const isChange = order.operationType === 'change';
@@ -66,10 +92,10 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     }
     if (order.paymentMethod === 'split' && order.subBills && order.subBills.length > 0) {
       const card = order.subBills
-        .filter(s => s.paymentMethod === 'card')
+        .filter((s) => s.paymentMethod === 'card')
         .reduce((sum, s) => sum + s.amount, 0);
       const cash = order.subBills
-        .filter(s => s.paymentMethod === 'cash')
+        .filter((s) => s.paymentMethod === 'cash')
         .reduce((sum, s) => sum + s.amount, 0);
       const parts: string[] = [];
       if (card !== 0) parts.push(`${formatCurrency(card)} Carte`);
@@ -90,17 +116,109 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
   const statusLabel =
     order.status === 'completed' ? 'Terminé' : order.status === 'pending' ? 'En attente' : 'Annulé';
 
+  const kitchenPrinters =
+    order.kitchenPrintTargets && order.kitchenPrintTargets.length > 0
+      ? order.kitchenPrintTargets
+      : order.kitchenTicketDayNumber != null
+        ? [
+            {
+              printerName: 'Cuisine / bar',
+              printerSlug: '',
+              kitchenTicketDayNumber: order.kitchenTicketDayNumber,
+            },
+          ]
+        : [];
+
   return (
     <Dialog open={!!order} onClose={onClose} maxWidth="sm" fullWidth scroll="paper">
       <DialogTitle>
-        Détails de la commande #{String(order.id).slice(0, 8)}…
-        <Chip label={statusLabel} size="small" sx={{ ml: 1 }} color={order.status === 'completed' ? 'success' : 'default'} />
+        Commande{' '}
+        {order.legalSequenceNumber != null
+          ? `n° ${order.legalSequenceNumber}`
+          : `#${order.id}`}
+        <Chip
+          label={statusLabel}
+          size="small"
+          sx={{ ml: 1 }}
+          color={order.status === 'completed' ? 'success' : 'default'}
+        />
       </DialogTitle>
       <DialogContent dividers>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <Typography variant="body2" color="textSecondary">
-            📅 {formatDateTime(order.createdAt)}
-          </Typography>
+          <Stack spacing={0.5}>
+            <Typography variant="body2" color="text.secondary">
+              {formatDateTime(order.createdAt)}
+            </Typography>
+            <Typography variant="body2">
+              ID technique : <strong>{order.id}</strong>
+            </Typography>
+            {order.legalSequenceNumber != null && (
+              <Typography variant="body2">
+                N° ticket fiscal (journal) : <strong>#{order.legalSequenceNumber}</strong>
+              </Typography>
+            )}
+            {order.kitchenTicketDayNumber != null && (
+              <Typography variant="body2">
+                N° ticket cuisine / bar (journée) :{' '}
+                <strong>#{order.kitchenTicketDayNumber}</strong>
+              </Typography>
+            )}
+            {order.tableLabel && (
+              <Typography variant="body2">
+                Table : <strong>{order.tableLabel}</strong>
+              </Typography>
+            )}
+          </Stack>
+
+          {(order.waiterDisplayName || order.cashierDisplayName) && (
+            <Box>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Personnel
+              </Typography>
+              {order.waiterDisplayName && (
+                <Typography variant="body2">
+                  Serveur (Z) : <strong>{order.waiterDisplayName}</strong>
+                  {order.waiterUserId != null && (
+                    <Typography component="span" variant="caption" color="text.secondary">
+                      {' '}
+                      (id {order.waiterUserId})
+                    </Typography>
+                  )}
+                </Typography>
+              )}
+              {order.cashierDisplayName && (
+                <Typography variant="body2">
+                  Encaissement : <strong>{order.cashierDisplayName}</strong>
+                  {order.cashierUserId != null && (
+                    <Typography component="span" variant="caption" color="text.secondary">
+                      {' '}
+                      (id {order.cashierUserId})
+                    </Typography>
+                  )}
+                </Typography>
+              )}
+            </Box>
+          )}
+
+          {kitchenPrinters.length > 0 && (
+            <Box>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Impressions cuisine / bar
+              </Typography>
+              <Stack spacing={0.5}>
+                {kitchenPrinters.map((p, idx) => (
+                  <Typography key={`${p.printerSlug}-${idx}`} variant="body2">
+                    {p.printerName}
+                    {p.kitchenTicketDayNumber != null && (
+                      <> — ticket n° <strong>{p.kitchenTicketDayNumber}</strong></>
+                    )}
+                  </Typography>
+                ))}
+              </Stack>
+            </Box>
+          )}
+
+          <Divider />
 
           {!isChange && order.items.length > 0 && (
             <TableContainer component={Paper} variant="outlined">
@@ -115,7 +233,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {order.items.map(item => (
+                  {order.items.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>
                         <Box>
@@ -144,7 +262,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
           )}
 
           {isChange && (
-            <Typography variant="body2" color="textSecondary" fontStyle="italic">
+            <Typography variant="body2" color="text.secondary" fontStyle="italic">
               {isTipChange
                 ? 'Opération de pourboire (ajustement de caisse) — pas d’articles.'
                 : 'Opération « faire de la monnaie » — pas d’articles.'}
@@ -164,16 +282,18 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
                 </Box>
               </>
             )}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', mt: 1 }}>
+            <Box
+              sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', mt: 1 }}
+            >
               <Typography>Total TTC</Typography>
               <Typography>{formatCurrency(totalTTC)}</Typography>
             </Box>
             {order.tips != null && order.tips > 0 && (
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                <Typography variant="body2" color="textSecondary">
+                <Typography variant="body2" color="text.secondary">
                   Pourboire
                 </Typography>
-                <Typography variant="body2" color="textSecondary">
+                <Typography variant="body2" color="text.secondary">
                   +{formatCurrency(order.tips)}
                 </Typography>
               </Box>
@@ -181,17 +301,45 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
           </Box>
 
           <Box>
-            <Typography variant="subtitle2" color="textSecondary" gutterBottom>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
               Paiement
             </Typography>
             {getPaymentBreakdown()}
           </Box>
 
           {order.notes && order.notes.trim() && (
-            <Typography variant="body2" color="textSecondary">
+            <Typography variant="body2" color="text.secondary">
               Note : {order.notes}
             </Typography>
           )}
+
+          <Box>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+              Journal d’actions
+            </Typography>
+            {auditLoading ? (
+              <CircularProgress size={20} />
+            ) : audit.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                Aucune entrée d’audit enregistrée.
+              </Typography>
+            ) : (
+              <Stack spacing={0.75}>
+                {audit.map((entry, idx) => (
+                  <Typography key={`${entry.action_type}-${idx}`} variant="body2">
+                    {formatDateTime(entry.timestamp)} —{' '}
+                    {actionTypeLabel[entry.action_type] ?? entry.action_type}
+                    {entry.display_name ? (
+                      <>
+                        {' '}
+                        par <strong>{entry.display_name}</strong>
+                      </>
+                    ) : null}
+                  </Typography>
+                ))}
+              </Stack>
+            )}
+          </Box>
         </Box>
       </DialogContent>
       <DialogActions>

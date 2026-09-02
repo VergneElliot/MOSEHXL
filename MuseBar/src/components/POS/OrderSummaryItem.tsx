@@ -1,5 +1,5 @@
 import React from 'react';
-import { ListItem, Box, Typography, IconButton, Checkbox, Divider } from '@mui/material';
+import { ListItem, Box, Typography, IconButton, Checkbox, Divider, Chip } from '@mui/material';
 import { Delete as DeleteIcon } from '@mui/icons-material';
 import type { OrderItem } from '../../types';
 import { formatOrderItemOptionLabel } from '../../utils/orderItemOptions';
@@ -10,6 +10,7 @@ interface OrderSummaryItemProps {
   index: number;
   isLast: boolean;
   selected: boolean;
+  showTableLineStatus?: boolean;
   formatCurrency: (amount: number) => string;
   onToggleSelect: (id: string) => void;
   onRemoveItem: (index: number) => void;
@@ -20,11 +21,15 @@ const OrderSummaryItem = React.memo(function OrderSummaryItem({
   index,
   isLast,
   selected,
+  showTableLineStatus = false,
   formatCurrency,
   onToggleSelect,
   onRemoveItem,
 }: OrderSummaryItemProps) {
   const lineNote = getLineNoteFromOptions(item.options);
+  const isValidatedTableLine = showTableLineStatus && item.tableLineStatus === 'validated';
+  const isDraftTableLine =
+    showTableLineStatus && item.tableLineStatus !== 'validated' && !item.isTip;
 
   return (
     <>
@@ -33,8 +38,14 @@ const OrderSummaryItem = React.memo(function OrderSummaryItem({
         sx={{
           px: 0.5,
           py: 1,
-          bgcolor: selected ? 'action.selected' : 'transparent',
+          bgcolor: selected ? 'action.selected' : isDraftTableLine ? 'action.hover' : 'transparent',
           borderRadius: 1,
+          borderLeft: isValidatedTableLine ? 3 : isDraftTableLine ? 3 : 0,
+          borderColor: isValidatedTableLine
+            ? 'success.main'
+            : isDraftTableLine
+              ? 'warning.main'
+              : 'transparent',
           cursor: 'pointer',
           '&:hover': { bgcolor: selected ? 'action.selected' : 'action.hover' },
         }}
@@ -52,18 +63,28 @@ const OrderSummaryItem = React.memo(function OrderSummaryItem({
           />
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={0.2}>
-              <Typography
-                variant="body1"
-                sx={{
-                  fontWeight: 700,
-                  fontSize: { xs: '1.1rem', md: '1.25rem' },
-                  lineHeight: 1.2,
-                  flexGrow: 1,
-                  pr: 0.5,
-                }}
-              >
-                {item.productName}
-              </Typography>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography
+                  variant="body1"
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: { xs: '1.1rem', md: '1.25rem' },
+                    lineHeight: 1.2,
+                    pr: 0.5,
+                  }}
+                >
+                  {item.productName}
+                </Typography>
+                {showTableLineStatus && !item.isTip && (
+                  <Chip
+                    label={isValidatedTableLine ? 'Validé' : 'En attente'}
+                    size="small"
+                    color={isValidatedTableLine ? 'success' : 'warning'}
+                    variant="outlined"
+                    sx={{ mt: 0.35, height: 22, fontSize: '0.68rem', fontWeight: 700 }}
+                  />
+                )}
+              </Box>
               <IconButton
                 onClick={e => {
                   e.stopPropagation();
@@ -72,7 +93,7 @@ const OrderSummaryItem = React.memo(function OrderSummaryItem({
                 size="small"
                 color="error"
                 sx={{ ml: 0.25, p: 0.5 }}
-                aria-label="Supprimer"
+                aria-label={isValidatedTableLine ? 'Retour article' : 'Supprimer'}
               >
                 <DeleteIcon fontSize="small" />
               </IconButton>

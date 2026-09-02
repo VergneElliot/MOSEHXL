@@ -61,7 +61,20 @@ export const PinSessionHeaderTabs: React.FC = () => {
   };
 
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0, flex: 1 }}>
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 0.75,
+        minWidth: 0,
+        flex: 1,
+        px: 0.5,
+        py: 0.25,
+        borderRadius: 1,
+        border: '1px solid rgba(255,255,255,0.18)',
+        bgcolor: 'rgba(0,0,0,0.22)',
+      }}
+    >
       {sessions.length > 0 ? (
         <Tabs
           value={activeSessionId ?? false}
@@ -73,14 +86,22 @@ export const PinSessionHeaderTabs: React.FC = () => {
             minHeight: 40,
             maxWidth: { xs: 180, sm: 320, md: 480 },
             '& .MuiTab-root': {
-              minHeight: 40,
-              py: 0.5,
-              px: 1,
+              minHeight: 36,
+              py: 0.25,
+              px: 0.75,
+              mx: 0.25,
               textTransform: 'none',
               color: 'rgba(255,255,255,0.75)',
+              borderRadius: 1,
+              border: '1px solid transparent',
+              minWidth: 'auto',
             },
-            '& .Mui-selected': { color: '#fff !important' },
-            '& .MuiTabs-indicator': { backgroundColor: '#fff' },
+            '& .Mui-selected': {
+              color: '#fff !important',
+              bgcolor: 'rgba(255,255,255,0.12)',
+              border: '1px solid rgba(255,255,255,0.35)',
+            },
+            '& .MuiTabs-indicator': { display: 'none' },
           }}
         >
           {sessions.map((s) => (

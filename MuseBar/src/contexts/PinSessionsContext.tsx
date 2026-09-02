@@ -22,6 +22,8 @@ export interface ActiveTableState {
   label: string;
   floorPlanId: number;
   ticketId: number;
+  assignedWaiterUserId?: number | null;
+  assignedWaiterDisplayName?: string | null;
 }
 
 export interface PinSession {

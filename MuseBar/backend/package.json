@@ -18,7 +18,9 @@
     "migration:migrate": "ts-node src/migrations/cli.ts migrate",
     "migration:rollback": "ts-node src/migrations/cli.ts rollback",
     "migration:status": "ts-node src/migrations/cli.ts status",
-    "migration:create": "ts-node src/migrations/cli.ts create"
+    "migration:create": "ts-node src/migrations/cli.ts create",
+    "script:backfill-order-item-product-ids": "ts-node scripts/backfill-order-item-product-ids.ts",
+    "script:diagnose-top-sellers": "ts-node scripts/diagnose-top-sellers.ts"
   },
   "keywords": [
     "pos",

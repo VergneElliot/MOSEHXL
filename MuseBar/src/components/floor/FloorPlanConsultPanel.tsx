@@ -1,83 +1,75 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
+  Button,
   Chip,
   CircularProgress,
-  Dialog,
-  DialogContent,
-  DialogTitle,
+  Snackbar,
   Stack,
   Tab,
   Tabs,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material';
-import * as floorApi from '../../services/api/floor';
-import FloorCanvasView, { type FloorCanvasTable } from '../floor/FloorCanvasView';
-import { SIZE_PRESETS, normalizeTableGeometry } from '../floor/floorGeometry';
+import { useAuth } from '../../hooks/useAuth';
+import { useFloorPlanManagement } from '../../hooks/useFloorPlanManagement';
+import { resolvePinLengthRules } from '../../utils/pinRules';
+import FloorCanvasView, { type FloorCanvasTable } from './FloorCanvasView';
+import { SIZE_PRESETS, normalizeTableGeometry } from './floorGeometry';
 
-/**
- * Top-level Plan de salle: consult floor status only (mutations via POS / elevated PIN).
- */
-const FloorPlanConsultPanel: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [tables, setTables] = useState<floorApi.DiningTableStatusDto[]>([]);
-  const [plans, setPlans] = useState<floorApi.FloorPlanDto[]>([]);
-  const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
-  const [detail, setDetail] = useState<floorApi.DiningTableStatusDto | null>(null);
+const LazyPinPadDialog = React.lazy(() => import('../POS/PinPadDialog'));
 
-  const reload = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [status, planList] = await Promise.all([
-        floorApi.getFloorStatus(),
-        floorApi.listFloorPlans(),
-      ]);
-      setTables(status);
-      setPlans(planList);
-      setSelectedPlanId((prev) => {
-        const active = planList.filter((p) => p.is_active);
-        if (prev != null && active.some((p) => p.id === prev)) return prev;
-        return active[0]?.id ?? planList[0]?.id ?? null;
-      });
-    } catch (err: unknown) {
-      const e = err as { message?: string };
-      setError(e.message || 'Impossible de charger le plan de salle');
-    } finally {
-      setLoading(false);
-    }
+interface FloorPlanConsultPanelProps {
+  onSwitchToPos?: () => void;
+}
+
+const FloorPlanConsultPanel: React.FC<FloorPlanConsultPanelProps> = ({ onSwitchToPos }) => {
+  const { user, permissions } = useAuth();
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error';
+  }>({ open: false, message: '', severity: 'success' });
+
+  const onInfo = useCallback((message: string) => {
+    setSnackbar({ open: true, message, severity: 'success' });
   }, []);
 
-  useEffect(() => {
-    void reload();
-    const t = window.setInterval(() => void reload(), 15000);
-    return () => window.clearInterval(t);
-  }, [reload]);
+  const onError = useCallback((message: string) => {
+    setSnackbar({ open: true, message, severity: 'error' });
+  }, []);
 
-  const activePlans = useMemo(() => plans.filter((p) => p.is_active), [plans]);
-  const planTables = useMemo(
-    () => (selectedPlanId != null ? tables.filter((t) => t.floor_plan_id === selectedPlanId) : []),
-    [tables, selectedPlanId]
-  );
+  const floor = useFloorPlanManagement({ onInfo, onError, onSwitchToPos });
 
   const canvasTables: FloorCanvasTable[] = useMemo(
     () =>
-      planTables.map((t) => {
-        const occupied = t.open_ticket_id != null;
+      floor.planTables.map((t) => {
+        const occupied = t.has_validated_items === true;
+        const hasOpenTicket = t.open_ticket_id != null;
+        const isActive =
+          floor.activeTicketId != null && t.open_ticket_id === floor.activeTicketId;
+        const disabled =
+          floor.mode === 'transfer'
+            ? hasOpenTicket
+            : floor.mode === 'merge'
+              ? !occupied || isActive
+              : false;
         return {
           id: t.id,
           label: t.label,
           ...normalizeTableGeometry(t),
           shape: t.shape || 'rectangle',
-          capacity: t.capacity,
+          capacity: t.capacity != null ? Number(t.capacity) : null,
           occupied,
+          isActive,
+          disabled,
           width: t.width || SIZE_PRESETS.M.width,
           height: t.height || SIZE_PRESETS.M.height,
         };
       }),
-    [planTables]
+    [floor.planTables, floor.activeTicketId, floor.mode]
   );
 
   return (
@@ -85,43 +77,85 @@ const FloorPlanConsultPanel: React.FC = () => {
       <Box>
         <Typography variant="h5">Plan de salle</Typography>
         <Typography variant="body2" color="text.secondary">
-          Consultation des tables et de leur occupation. Pour ouvrir ou modifier une addition,
-          utilisez la Caisse (session PIN).
+          Gestion des tables : ouvrir, transférer, fusionner ou abandonner une addition. Une session
+          PIN est requise.
         </Typography>
-        <Alert severity="info" sx={{ mt: 1.5 }}>
-          Mode consultation uniquement — aucune ouverture, transfert ou fusion depuis cet onglet.
-        </Alert>
       </Box>
 
-      {error && (
-        <Alert severity="error" onClose={() => setError(null)}>
-          {error}
+      {!floor.pinActor ? (
+        <Alert
+          severity="info"
+          action={
+            <Button color="inherit" size="small" onClick={floor.requirePin}>
+              Badge
+            </Button>
+          }
+        >
+          Ouvrez une session PIN pour agir sur les tables.
+        </Alert>
+      ) : (
+        <Alert severity="success" sx={{ py: 0.5 }}>
+          Session : <strong>{floor.pinActor.displayName}</strong>
+          {floor.activeTable ? (
+            <>
+              {' '}
+              — table active : <strong>{floor.activeTable.label}</strong>
+              {floor.activeTable.assignedWaiterDisplayName && (
+                <> (serveur : {floor.activeTable.assignedWaiterDisplayName})</>
+              )}
+            </>
+          ) : (
+            <> — aucune table active (mode Ouvrir / charger pour en sélectionner une)</>
+          )}
         </Alert>
       )}
 
-      {loading && tables.length === 0 ? (
+      {floor.activeTicketId != null && (
+        <Box>
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={floor.mode}
+            onChange={(_e, next) => {
+              if (next) floor.setMode(next);
+            }}
+          >
+            <ToggleButton value="select">Ouvrir / charger</ToggleButton>
+            <ToggleButton value="transfer">Transférer</ToggleButton>
+            <ToggleButton value="merge">Fusionner</ToggleButton>
+          </ToggleButtonGroup>
+          <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
+            {floor.mode === 'transfer' && 'Choisissez une table libre (destination).'}
+            {floor.mode === 'merge' && 'Choisissez une autre table occupée (cible).'}
+            {floor.mode === 'select' &&
+              'Touchez une table pour l’ouvrir dans la Caisse (session active).'}
+          </Typography>
+        </Box>
+      )}
+
+      {floor.loading && floor.tables.length === 0 ? (
         <Box display="flex" justifyContent="center" p={4}>
           <CircularProgress />
         </Box>
-      ) : tables.length === 0 ? (
+      ) : floor.tables.length === 0 ? (
         <Alert severity="info">Aucune table configurée — créez un plan dans Administration.</Alert>
       ) : (
         <>
-          {activePlans.length > 1 && (
+          {floor.activePlans.length > 1 && (
             <Tabs
-              value={selectedPlanId ?? false}
-              onChange={(_e, value: number) => setSelectedPlanId(value)}
+              value={floor.selectedPlanId ?? false}
+              onChange={(_e, value: number) => floor.setSelectedPlanId(value)}
               variant="scrollable"
               allowScrollButtonsMobile
             >
-              {activePlans.map((plan) => (
+              {floor.activePlans.map((plan) => (
                 <Tab key={plan.id} value={plan.id} label={plan.name} sx={{ textTransform: 'none' }} />
               ))}
             </Tabs>
           )}
-          {activePlans.length === 1 && (
+          {floor.activePlans.length === 1 && (
             <Typography variant="subtitle1" fontWeight={600}>
-              {activePlans[0]?.name}
+              {floor.activePlans[0]?.name}
             </Typography>
           )}
           <Box sx={{ flex: 1, minHeight: 420 }}>
@@ -131,56 +165,73 @@ const FloorPlanConsultPanel: React.FC = () => {
               snapEnabled={false}
               onSelect={(id) => {
                 if (id == null) return;
-                setDetail(planTables.find((t) => t.id === id) ?? null);
+                const table = floor.planTables.find((t) => t.id === id);
+                if (table) floor.handleTableSelect(table);
               }}
             />
           </Box>
-          <Stack direction="row" spacing={1}>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             <Chip size="small" color="success" variant="outlined" label="Libre" />
             <Chip size="small" color="warning" variant="outlined" label="Occupée" />
           </Stack>
         </>
       )}
 
-      <Dialog open={detail != null} onClose={() => setDetail(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>Table {detail?.label}</DialogTitle>
-        <DialogContent>
-          {detail && (
-            <Stack spacing={1} sx={{ pt: 1 }}>
-              <Typography variant="body2">
-                Statut :{' '}
-                <strong>{detail.open_ticket_id != null ? 'Occupée' : 'Libre'}</strong>
-              </Typography>
-              {detail.capacity != null && (
-                <Typography variant="body2">Couverts (capacité) : {detail.capacity}</Typography>
-              )}
-              {detail.open_ticket_id != null && (
-                <>
-                  <Typography variant="body2">Ticket #{detail.open_ticket_id}</Typography>
-                  {detail.opened_by_user_id != null && (
-                    <Typography variant="body2">
-                      Ouvert par utilisateur #{detail.opened_by_user_id}
-                    </Typography>
-                  )}
-                  {detail.last_served_by_user_id != null && (
-                    <Typography variant="body2">
-                      Dernier service : utilisateur #{detail.last_served_by_user_id}
-                    </Typography>
-                  )}
-                  {detail.open_ticket_updated_at && (
-                    <Typography variant="caption" color="text.secondary">
-                      MAJ : {new Date(detail.open_ticket_updated_at).toLocaleString('fr-FR')}
-                    </Typography>
-                  )}
-                </>
-              )}
-              <Typography variant="caption" color="text.secondary">
-                Consultation seule — actions sur la Caisse.
-              </Typography>
-            </Stack>
-          )}
-        </DialogContent>
-      </Dialog>
+      {floor.activeTicketId != null && (
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ pt: 1 }}>
+          <Button color="inherit" variant="outlined" onClick={() => void floor.takeoverActiveTicket()}>
+            Prendre en charge
+          </Button>
+          <Button color="inherit" variant="outlined" onClick={() => void floor.detachFromTable()}>
+            Laisser ouverte
+          </Button>
+          <Button
+            color="error"
+            variant="outlined"
+            onClick={() => void floor.abandonActiveTicket()}
+          >
+            Abandonner
+          </Button>
+        </Stack>
+      )}
+
+      {floor.pinDialogOpen && (
+        <Suspense fallback={null}>
+          <LazyPinPadDialog
+            open={floor.pinDialogOpen}
+            mode={floor.pinDialogMode}
+            setRules={resolvePinLengthRules({
+              role: user?.role ?? 'staff',
+              permissions: permissions ?? user?.permissions ?? [],
+            })}
+            onClose={() => floor.setPinDialogOpen(false)}
+            onVerify={floor.badgeIn}
+            onSetPin={async (pin) => {
+              await import('../../services/api/floor').then((m) => m.setPin(pin));
+              onInfo('PIN enregistré');
+              floor.setPinDialogMode('verify');
+            }}
+            onSwitchToSet={() => floor.setPinDialogMode('set')}
+            onSwitchToVerify={() => floor.setPinDialogMode('verify')}
+          />
+        </Suspense>
+      )}
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          severity={snackbar.severity}
+          variant="filled"
+          onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

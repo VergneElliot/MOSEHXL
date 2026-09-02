@@ -13,20 +13,107 @@ const ALLOWED_ORDER_UPDATE_FIELDS = [
   'total_amount', 'total_tax', 'payment_method', 'status', 'notes', 'tips', 'change'
 ] as const;
 
+type OrderListOpts = {
+  limit?: number;
+  offset?: number;
+  waiterUserId?: number;
+  search?: string;
+};
+
+function buildOrderListFilters(
+  establishmentId: string,
+  opts?: OrderListOpts
+): { whereSql: string; values: Array<string | number> } {
+  const values: Array<string | number> = [establishmentId];
+  let whereSql = 'WHERE o.establishment_id = $1';
+
+  if (opts?.waiterUserId != null && Number.isFinite(opts.waiterUserId) && opts.waiterUserId > 0) {
+    values.push(opts.waiterUserId);
+    whereSql += ` AND o.waiter_user_id = $${values.length}`;
+  }
+
+  const term = opts?.search?.trim();
+  if (term) {
+    const pattern = `%${term.replace(/%/g, '\\%').replace(/_/g, '\\_')}%`;
+    values.push(pattern);
+    const pIdx = values.length;
+    const amountTerm = term.replace(',', '.');
+    const numericOnly = /^\d+$/.test(term);
+    const amountNumeric = parseFloat(amountTerm);
+    const hasAmount = Number.isFinite(amountNumeric);
+
+    const orParts = [
+      `CAST(o.id AS TEXT) ILIKE $${pIdx}`,
+      `COALESCE(o.waiter_display_name, '') ILIKE $${pIdx}`,
+      `COALESCE(o.table_label, '') ILIKE $${pIdx}`,
+      `COALESCE(o.notes, '') ILIKE $${pIdx}`,
+      `CAST(o.total_amount AS TEXT) ILIKE $${pIdx}`,
+      `COALESCE(o.kitchen_ticket_day_number::text, '') ILIKE $${pIdx}`,
+      `EXISTS (
+        SELECT 1 FROM legal_journal lj
+        WHERE lj.establishment_id = o.establishment_id
+          AND lj.order_id = o.id
+          AND lj.transaction_type = 'SALE'
+          AND CAST(lj.sequence_number AS TEXT) ILIKE $${pIdx}
+      )`,
+      `EXISTS (
+        SELECT 1 FROM order_items oi
+        WHERE oi.order_id = o.id AND oi.product_name ILIKE $${pIdx}
+      )`,
+      `EXISTS (
+        SELECT 1 FROM audit_trail at
+        LEFT JOIN users u ON u.id = CASE
+          WHEN at.user_id ~ '^[0-9]+$' THEN at.user_id::int
+          ELSE NULL
+        END
+        WHERE at.establishment_id = o.establishment_id
+          AND at.resource_type = 'ORDER'
+          AND at.resource_id = o.id::text
+          AND (
+            COALESCE(u.first_name, '') ILIKE $${pIdx}
+            OR COALESCE(u.last_name, '') ILIKE $${pIdx}
+            OR COALESCE(u.email, '') ILIKE $${pIdx}
+            OR COALESCE(at.user_id, '') ILIKE $${pIdx}
+          )
+      )`,
+    ];
+
+    if (numericOnly) {
+      values.push(parseInt(term, 10));
+      const nIdx = values.length;
+      orParts.push(`o.id = $${nIdx}`);
+      orParts.push(`o.waiter_user_id = $${nIdx}`);
+      orParts.push(`o.kitchen_ticket_day_number = $${nIdx}`);
+      orParts.push(
+        `EXISTS (
+          SELECT 1 FROM legal_journal lj
+          WHERE lj.establishment_id = o.establishment_id
+            AND lj.order_id = o.id
+            AND lj.transaction_type = 'SALE'
+            AND lj.sequence_number = $${nIdx}
+        )`
+      );
+    }
+
+    if (hasAmount) {
+      values.push(amountNumeric);
+      const aIdx = values.length;
+      orParts.push(`ROUND(o.total_amount::numeric, 2) = ROUND($${aIdx}::numeric, 2)`);
+    }
+
+    whereSql += ` AND (${orParts.join(' OR ')})`;
+  }
+
+  return { whereSql, values };
+}
+
 export const OrderModel = {
   async getAll(
     establishmentId: string,
-    opts?: { limit?: number; offset?: number; waiterUserId?: number }
+    opts?: OrderListOpts
   ): Promise<Order[]> {
-    const values: Array<string | number> = [establishmentId];
-    let query = 'SELECT * FROM orders WHERE establishment_id = $1';
-
-    if (opts?.waiterUserId != null && Number.isFinite(opts.waiterUserId) && opts.waiterUserId > 0) {
-      values.push(opts.waiterUserId);
-      query += ` AND waiter_user_id = $${values.length}`;
-    }
-
-    query += ' ORDER BY created_at DESC';
+    const { whereSql, values } = buildOrderListFilters(establishmentId, opts);
+    let query = `SELECT o.* FROM orders o ${whereSql} ORDER BY o.created_at DESC`;
 
     if (opts?.limit != null && Number.isFinite(opts.limit) && opts.limit > 0) {
       values.push(opts.limit);
@@ -44,14 +131,10 @@ export const OrderModel = {
 
   async countAll(
     establishmentId: string,
-    opts?: { waiterUserId?: number }
+    opts?: Pick<OrderListOpts, 'waiterUserId' | 'search'>
   ): Promise<number> {
-    const values: Array<string | number> = [establishmentId];
-    let query = 'SELECT COUNT(*)::int AS total FROM orders WHERE establishment_id = $1';
-    if (opts?.waiterUserId != null && Number.isFinite(opts.waiterUserId) && opts.waiterUserId > 0) {
-      values.push(opts.waiterUserId);
-      query += ` AND waiter_user_id = $${values.length}`;
-    }
+    const { whereSql, values } = buildOrderListFilters(establishmentId, opts);
+    const query = `SELECT COUNT(*)::int AS total FROM orders o ${whereSql}`;
     const totalResult = await pool.query(query, values);
     return totalResult.rows[0]?.total ?? 0;
   },

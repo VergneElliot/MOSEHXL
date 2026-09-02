@@ -37,6 +37,8 @@ export interface DiningTableStatusDto {
   open_ticket_updated_at: string | null;
   opened_by_user_id: number | null;
   last_served_by_user_id: number | null;
+  /** True when the open ticket has at least one validated line (service en cours). */
+  has_validated_items: boolean;
 }
 
 export interface OpenTicketDto {
@@ -72,6 +74,9 @@ export interface OpenTicketItemDto {
   kitchen_printer_ids_snapshot: unknown;
   print_pickup_slip_snapshot: boolean;
   sort_order: number;
+  line_status?: 'draft' | 'validated' | 'cancelled';
+  validated_at?: string | null;
+  kitchen_sent_at?: string | null;
 }
 
 function pinHeaders(pinActorToken: string): Record<string, string> {
@@ -217,7 +222,47 @@ export async function deleteDiningTable(id: number): Promise<void> {
 
 export async function getFloorStatus(): Promise<DiningTableStatusDto[]> {
   const res = await request<{ tables: DiningTableStatusDto[] }>('/floor/status');
-  return res.tables.map((t) => normalizeDiningTable(t) as DiningTableStatusDto);
+  return res.tables.map(
+    (t) =>
+      ({
+        ...normalizeDiningTable(t),
+        open_ticket_id: t.open_ticket_id ?? null,
+        open_ticket_updated_at: t.open_ticket_updated_at ?? null,
+        opened_by_user_id: t.opened_by_user_id ?? null,
+        last_served_by_user_id: t.last_served_by_user_id ?? null,
+        has_validated_items: t.has_validated_items === true,
+      }) as DiningTableStatusDto
+  );
+}
+
+export interface OngoingOrderItemDto {
+  id: number;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  line_status: 'draft' | 'validated';
+  kitchen_sent_at: string | null;
+  validated_at: string | null;
+  fulfillment_status: 'pending_validation' | 'validated' | 'kitchen_sent';
+}
+
+export interface OngoingOrderDto {
+  ticket_id: number;
+  table_id: number;
+  table_label: string;
+  waiter_user_id: number | null;
+  waiter_display_name: string | null;
+  updated_at: string;
+  validated_line_count: number;
+  draft_line_count: number;
+  total_amount: number;
+  items: OngoingOrderItemDto[];
+}
+
+export async function listOngoingOrders(): Promise<OngoingOrderDto[]> {
+  const res = await request<{ orders: OngoingOrderDto[] }>('/floor/ongoing-orders');
+  return res.orders ?? [];
 }
 
 export async function openTicket(
@@ -233,7 +278,7 @@ export async function openTicket(
 
 export async function getTicket(
   ticketId: number
-): Promise<{ ticket: OpenTicketDto; items: OpenTicketItemDto[] }> {
+): Promise<{ ticket: OpenTicketDto; items: OpenTicketItemDto[]; served_by_display_name?: string | null }> {
   return request(`/floor/tickets/${ticketId}`);
 }
 
@@ -242,7 +287,82 @@ export async function replaceTicketItems(
   items: OrderItem[],
   pinActorToken: string
 ): Promise<{ ticket: OpenTicketDto; items: OpenTicketItemDto[] }> {
-  const payload = saleLines(items).map((item, index) => ({
+  const payload = saleLines(items)
+    .filter((item) => item.tableLineStatus !== 'validated')
+    .map((item, index) => mapOrderItemToTicketPayload(item, index));
+
+  return request(`/floor/tickets/${ticketId}/items`, {
+    method: 'PUT',
+    headers: pinHeaders(pinActorToken),
+    body: JSON.stringify({ items: payload }),
+  });
+}
+
+export async function validateTicket(
+  ticketId: number,
+  pinActorToken: string,
+  lineIds?: number[]
+): Promise<{ ticket: OpenTicketDto; items: OpenTicketItemDto[]; print: { enqueued: number; failures: number } }> {
+  return request(`/floor/tickets/${ticketId}/validate`, {
+    method: 'POST',
+    headers: pinHeaders(pinActorToken),
+    body: JSON.stringify(lineIds?.length ? { line_ids: lineIds } : {}),
+  });
+}
+
+export async function moveTicketLines(
+  ticketId: number,
+  targetDiningTableId: number,
+  lineIds: number[],
+  pinActorToken: string
+): Promise<{
+  source: OpenTicketDto;
+  target: OpenTicketDto;
+  target_table_label: string | null;
+  served_by_display_name?: string | null;
+  source_items: OpenTicketItemDto[];
+  target_items: OpenTicketItemDto[];
+  moved_line_ids: number[];
+}> {
+  return request(`/floor/tickets/${ticketId}/move-lines`, {
+    method: 'POST',
+    headers: pinHeaders(pinActorToken),
+    body: JSON.stringify({
+      target_dining_table_id: targetDiningTableId,
+      line_ids: lineIds,
+    }),
+  });
+}
+
+export async function discardDraftTicketItems(
+  ticketId: number,
+  pinActorToken: string
+): Promise<{ ticket: OpenTicketDto; items: OpenTicketItemDto[] }> {
+  return request(`/floor/tickets/${ticketId}/discard-drafts`, {
+    method: 'POST',
+    headers: pinHeaders(pinActorToken),
+    body: JSON.stringify({}),
+  });
+}
+
+export async function cancelTicketLines(
+  ticketId: number,
+  lineIds: number[],
+  pinActorToken: string
+): Promise<{
+  ticket: OpenTicketDto;
+  items: OpenTicketItemDto[];
+  print: { enqueued: number; failures: number };
+}> {
+  return request(`/floor/tickets/${ticketId}/cancel-lines`, {
+    method: 'POST',
+    headers: pinHeaders(pinActorToken),
+    body: JSON.stringify({ line_ids: lineIds }),
+  });
+}
+
+function mapOrderItemToTicketPayload(item: OrderItem, index: number) {
+  return {
     product_id: item.productId
       ? Number.isNaN(parseInt(String(item.productId), 10))
         ? null
@@ -264,13 +384,7 @@ export async function replaceTicketItems(
     description: item.description || '',
     options_json: mapOrderItemOptionsToApiPayload(item.options) ?? [],
     sort_order: index,
-  }));
-
-  return request(`/floor/tickets/${ticketId}/items`, {
-    method: 'PUT',
-    headers: pinHeaders(pinActorToken),
-    body: JSON.stringify({ items: payload }),
-  });
+  };
 }
 
 export async function abandonTicket(
@@ -311,11 +425,37 @@ export async function transferTicket(
 export async function takeoverTicket(
   ticketId: number,
   pinActorToken: string
-): Promise<{ ticket: OpenTicketDto }> {
+): Promise<{ ticket: OpenTicketDto; served_by_display_name?: string | null }> {
   return request(`/floor/tickets/${ticketId}/takeover`, {
     method: 'POST',
     headers: pinHeaders(pinActorToken),
     body: JSON.stringify({}),
+  });
+}
+
+export interface ServiceStaffMember {
+  user_id: number;
+  display_name: string;
+  email: string;
+  role: string;
+}
+
+export async function listServiceStaff(pinActorToken: string): Promise<ServiceStaffMember[]> {
+  const res = await request<{ staff: ServiceStaffMember[] }>('/floor/service-staff', {
+    headers: pinHeaders(pinActorToken),
+  });
+  return res.staff;
+}
+
+export async function assignTicketWaiter(
+  ticketId: number,
+  userId: number,
+  pinActorToken: string
+): Promise<{ ticket: OpenTicketDto; served_by_display_name?: string | null }> {
+  return request(`/floor/tickets/${ticketId}/assign-waiter`, {
+    method: 'POST',
+    headers: pinHeaders(pinActorToken),
+    body: JSON.stringify({ user_id: userId }),
   });
 }
 
@@ -365,10 +505,16 @@ export async function listOrderWaiters(): Promise<
 }
 
 export function mapTicketItemsToOrderItems(items: OpenTicketItemDto[]): OrderItem[] {
-  return items.map((item, index) => {
+  return items.map((item) => {
     const optionsRaw = Array.isArray(item.options_json) ? item.options_json : [];
+    const lineStatus =
+      item.line_status === 'validated' || item.line_status === 'draft'
+        ? item.line_status
+        : 'validated';
     return {
-      id: `ticket-${item.id}-${index}`,
+      id: `ticket-line-${item.id}`,
+      ticketLineId: item.id,
+      tableLineStatus: lineStatus,
       productId: item.product_id != null ? String(item.product_id) : null,
       productName: item.product_name,
       quantity: Number(item.quantity),

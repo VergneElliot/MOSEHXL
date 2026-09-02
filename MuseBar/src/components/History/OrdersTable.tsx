@@ -91,10 +91,12 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
       <Table size={isMobile ? 'small' : 'medium'}>
         <TableHead>
           <TableRow>
-            <TableCell>ID</TableCell>
+            <TableCell>N° fiscal</TableCell>
+            <TableCell>N° cuisine</TableCell>
             <TableCell>Date & Heure</TableCell>
             {!isMobile && <TableCell>Articles</TableCell>}
             <TableCell>Total</TableCell>
+            {!isMobile && <TableCell>Serveur / Encaissement</TableCell>}
             <TableCell>Paiement</TableCell>
             <TableCell>Statut</TableCell>
             <TableCell align="center">Actions</TableCell>
@@ -111,15 +113,24 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
               onClick={() => onViewOrder(order)}
             >
               <TableCell>
-                <Typography
-                  variant="body2"
-                  sx={{
-                    fontFamily: 'monospace',
-                    fontSize: isMobile ? '0.75rem' : '0.875rem',
-                  }}
-                >
-                  {order.id.substring(0, 8)}...
+                <Typography variant="body2" fontWeight={700}>
+                  {order.legalSequenceNumber != null ? `#${order.legalSequenceNumber}` : '—'}
                 </Typography>
+                <Typography variant="caption" color="text.secondary" fontFamily="monospace">
+                  id {order.id}
+                </Typography>
+              </TableCell>
+
+              <TableCell>
+                {order.kitchenTicketDayNumber != null ? (
+                  <Typography variant="body2" fontWeight={600}>
+                    #{order.kitchenTicketDayNumber}
+                  </Typography>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    —
+                  </Typography>
+                )}
               </TableCell>
 
               <TableCell>
@@ -152,6 +163,25 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
                   </Typography>
                 )}
               </TableCell>
+
+              {!isMobile && (
+                <TableCell>
+                  <Typography variant="body2">
+                    {order.waiterDisplayName ?? '—'}
+                  </Typography>
+                  {order.cashierDisplayName &&
+                    order.cashierDisplayName !== order.waiterDisplayName && (
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        Encaissé : {order.cashierDisplayName}
+                      </Typography>
+                    )}
+                  {order.tableLabel && (
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      Table {order.tableLabel}
+                    </Typography>
+                  )}
+                </TableCell>
+              )}
 
               <TableCell>
                 <Chip

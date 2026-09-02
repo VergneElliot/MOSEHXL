@@ -27,6 +27,10 @@ export interface OrderItem {
   isPerso?: boolean; // For employee complimentary items (price = 0)
   /** Card tip line — not part of CA; stored as orders.tips (+card / −cash on closures). */
   isTip?: boolean;
+  /** Open table line id (open_ticket_items.id) when bound to a floor ticket. */
+  ticketLineId?: number;
+  /** draft = not yet validated; validated = sent to kitchen / committed on table. */
+  tableLineStatus?: 'draft' | 'validated';
   originalPrice?: number; // Store original price for reverting discounts
   description?: string; // Description for special items like Divers
   options?: OrderItemOption[];
@@ -53,6 +57,18 @@ export interface Order {
   waiterUserId?: number | null;
   waiterDisplayName?: string | null;
   tableLabel?: string | null;
+  /** Legal journal sequence number (ticket fiscal). */
+  legalSequenceNumber?: number | null;
+  /** Daily kitchen/bar ticket number (same across printers for the order). */
+  kitchenTicketDayNumber?: number | null;
+  kitchenPrintTargets?: Array<{
+    printerId: number | null;
+    printerName: string;
+    printerSlug: string;
+    kitchenTicketDayNumber: number | null;
+  }>;
+  cashierUserId?: number | null;
+  cashierDisplayName?: string | null;
 }
 
 export interface Payment {

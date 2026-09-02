@@ -176,3 +176,57 @@ export function renderKitchenCancellationTicket(input: {
   appendKitchenTicketFooter(parts);
   return parts.join('\n');
 }
+
+export function renderKitchenRetourTicket(input: {
+  ticketId: number;
+  createdAt: Date | string;
+  printerName: string;
+  lines: KitchenTicketLine[];
+  tableLabel?: string | null;
+}): string {
+  const parts = [
+    ESC_POS.INIT,
+    kitchenTicketAlertSequence(),
+    ESC_POS.CENTER,
+    ESC_POS.BOLD_ON,
+    ESC_POS.DOUBLE_SIZE,
+    'RETOUR',
+    ESC_POS.NORMAL_SIZE,
+    ESC_POS.BOLD_OFF,
+    normalizeThermalText(`Commande #${input.ticketId}`),
+    ESC_POS.LEFT,
+    '',
+  ];
+
+  if (input.tableLabel) {
+    parts.push(ESC_POS.BOLD_ON, normalizeThermalText(`Table ${input.tableLabel}`), ESC_POS.BOLD_OFF, '');
+  }
+
+  parts.push(
+    normalizeThermalText(input.printerName),
+    normalizeThermalText(formatTimestamp(input.createdAt)),
+    '================================',
+    ''
+  );
+
+  parts.push(ESC_POS.BOLD_ON, ESC_POS.DOUBLE_SIZE);
+  for (const line of input.lines) {
+    parts.push(`-${line.quantity}x ${normalizeThermalText(line.product_name)}`);
+    if (line.option_variants?.length) {
+      for (const variant of line.option_variants) {
+        const label = formatVariantLabel(variant.options) || 'Classique';
+        parts.push(normalizeThermalText(`  -${variant.quantity}x ${label}`));
+      }
+    } else {
+      for (const option of line.options) {
+        const rendered = formatOptionLine(option);
+        if (rendered) parts.push(normalizeThermalText(rendered));
+      }
+    }
+    parts.push('');
+  }
+  parts.push(ESC_POS.NORMAL_SIZE, ESC_POS.BOLD_OFF);
+
+  appendKitchenTicketFooter(parts);
+  return parts.join('\n');
+}

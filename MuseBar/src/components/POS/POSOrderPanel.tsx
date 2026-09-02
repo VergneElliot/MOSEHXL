@@ -15,11 +15,17 @@ export interface POSOrderPanelProps {
   onApplyHappyHour?: (index: number) => void;
   onApplyOffert?: (index: number) => void;
   onApplyPerso?: (index: number) => void;
+  onApplyRemise?: (indices: number[]) => void;
   onUpdateLineNote?: (index: number, note: string) => void;
   onDropProduct?: (payload: PosProductDragPayload) => void;
   onSelectTable?: () => void;
   activeTableLabel?: string | null;
   onSuivre?: () => void;
+  onValidateTableOrder?: () => void;
+  onAssignOrder?: () => void;
+  assignedWaiterDisplayName?: string | null;
+  cartSelectedIds: Set<string>;
+  onCartSelectedIdsChange: (ids: Set<string>) => void;
 }
 
 const POSOrderPanel = React.memo(function POSOrderPanel({
@@ -32,11 +38,17 @@ const POSOrderPanel = React.memo(function POSOrderPanel({
   onApplyHappyHour,
   onApplyOffert,
   onApplyPerso,
+  onApplyRemise,
   onUpdateLineNote,
   onDropProduct,
   onSelectTable,
   activeTableLabel,
   onSuivre,
+  onValidateTableOrder,
+  onAssignOrder,
+  assignedWaiterDisplayName,
+  cartSelectedIds,
+  onCartSelectedIdsChange,
 }: POSOrderPanelProps) {
   const { orderTotal, orderTax, orderSubtotal, tipsTotal, canProcessPayment } =
     usePOSOrderTotals(currentOrder);
@@ -57,11 +69,17 @@ const POSOrderPanel = React.memo(function POSOrderPanel({
       onApplyHappyHour={onApplyHappyHour}
       onApplyOffert={onApplyOffert}
       onApplyPerso={onApplyPerso}
+      onApplyRemise={onApplyRemise}
       onUpdateLineNote={onUpdateLineNote}
       onDropProduct={onDropProduct}
       onSelectTable={onSelectTable}
       activeTableLabel={activeTableLabel}
       onSuivre={onSuivre}
+      onValidateTableOrder={onValidateTableOrder}
+      onAssignOrder={onAssignOrder}
+      assignedWaiterDisplayName={assignedWaiterDisplayName}
+      cartSelectedIds={cartSelectedIds}
+      onCartSelectedIdsChange={onCartSelectedIdsChange}
       formatCurrency={formatCurrency}
     />
   );

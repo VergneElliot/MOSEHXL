@@ -82,6 +82,8 @@ export const ALL_PERMISSIONS: Permission[] = [
   { key: 'pos_happyhour_manual', label: 'POS — Happy Hour (bouton manuel)' },
   { key: 'pos_apply_offert', label: 'POS — Offert' },
   { key: 'pos_apply_perso', label: 'POS — Perso' },
+  { key: 'pos_reassign_waiter', label: 'POS — Réassigner un serveur à une table' },
+  { key: 'pos_intervene_table', label: 'POS — Intervenir sur la table d’un autre serveur' },
   { key: 'orders_cancel', label: 'Annulation / retour (historique)' },
 ];
 

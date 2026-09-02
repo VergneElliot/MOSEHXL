@@ -1,56 +1,24 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Box,
-  Chip,
-  TextField,
-  InputAdornment,
-  useTheme,
-  useMediaQuery,
-  IconButton,
-  Tooltip,
-  Collapse,
-} from '@mui/material';
-import { Search as SearchIcon, Close as CloseIcon } from '@mui/icons-material';
+import React, { useMemo } from 'react';
+import { Box, Chip, useTheme, useMediaQuery } from '@mui/material';
+import { Star as StarIcon } from '@mui/icons-material';
 import { Category } from '../../types';
+import { FAVORITES_CATEGORY_ID } from '../../hooks/usePOSCatalogLogic';
 
 interface CategoryFilterProps {
   categories: Category[];
   selectedCategory: string;
-  searchQuery: string;
   onCategorySelect: (categoryId: string) => void;
-  onSearchChange: (query: string) => void;
 }
 
 const CategoryFilter: React.FC<CategoryFilterProps> = ({
   categories,
   selectedCategory,
-  searchQuery,
   onCategorySelect,
-  onSearchChange,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const [searchExpanded, setSearchExpanded] = useState(Boolean(searchQuery));
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
-  const activeCategories = categories.filter(cat => cat.isActive);
-  const hasSearchValue = searchQuery.trim().length > 0;
-
-  useEffect(() => {
-    if (hasSearchValue) {
-      setSearchExpanded(true);
-    }
-  }, [hasSearchValue]);
-
-  useEffect(() => {
-    if (!searchExpanded) return;
-    // Wait for the Collapse animation/layout so the input exists & is focusable
-    const id = window.setTimeout(() => {
-      searchInputRef.current?.focus();
-      searchInputRef.current?.select?.();
-    }, 80);
-    return () => window.clearTimeout(id);
-  }, [searchExpanded]);
+  const activeCategories = categories.filter((cat) => cat.isActive);
 
   const getChipTextColor = useMemo(
     () => (backgroundColor: string) => {
@@ -64,94 +32,24 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({
   );
 
   return (
-    <Box sx={{ mb: 3 }}>
-      {/* Search + categories on same line to save vertical space */}
+    <Box sx={{ mb: 2, px: { xs: 0, md: 0 } }}>
       <Box
         sx={{
           display: 'flex',
-          alignItems: 'center',
+          flexWrap: 'wrap',
           gap: 1,
-          mb: 0.5,
+          overflowX: isMobile ? 'auto' : 'visible',
+          pb: isMobile ? 1 : 0,
+          '&::-webkit-scrollbar': { height: 6 },
+          '&::-webkit-scrollbar-track': {
+            backgroundColor: theme.palette.grey[200],
+            borderRadius: 3,
+          },
+          '&::-webkit-scrollbar-thumb': {
+            backgroundColor: theme.palette.grey[400],
+            borderRadius: 3,
+          },
         }}
-      >
-        {!searchExpanded ? (
-          <Tooltip title="Rechercher un produit">
-            <IconButton
-              onClick={() => setSearchExpanded(true)}
-              aria-label="Ouvrir la recherche"
-              size={isMobile ? 'small' : 'medium'}
-              sx={{
-                flexShrink: 0,
-                height: isMobile ? 36 : 42,
-                width: isMobile ? 36 : 42,
-                borderRadius: 999,
-                bgcolor: theme.palette.primary.main,
-                color: theme.palette.primary.contrastText,
-                boxShadow: 1,
-                '&:hover': { bgcolor: theme.palette.primary.dark },
-                '&:focus-visible': {
-                  outline: `3px solid ${theme.palette.primary.light}`,
-                  outlineOffset: 2,
-                },
-              }}
-            >
-              <SearchIcon />
-            </IconButton>
-          </Tooltip>
-        ) : (
-          <Collapse in={searchExpanded} orientation="horizontal" timeout={180} sx={{ width: { xs: '100%', md: 320 } }}>
-            <TextField
-              fullWidth
-              placeholder="Rechercher un produit..."
-              value={searchQuery}
-              onChange={e => onSearchChange(e.target.value)}
-              inputRef={searchInputRef}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      size="small"
-                      onClick={() => {
-                        onSearchChange('');
-                        setSearchExpanded(false);
-                      }}
-                      aria-label="Fermer la recherche"
-                    >
-                      <CloseIcon fontSize="small" />
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-              size={isMobile ? 'small' : 'medium'}
-            />
-          </Collapse>
-        )}
-
-        <Box
-          sx={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 1,
-            overflowX: isMobile ? 'auto' : 'visible',
-            pb: isMobile ? 1 : 0,
-            flex: 1,
-            '&::-webkit-scrollbar': {
-              height: 6,
-            },
-            '&::-webkit-scrollbar-track': {
-              backgroundColor: theme.palette.grey[200],
-              borderRadius: 3,
-            },
-            '&::-webkit-scrollbar-thumb': {
-              backgroundColor: theme.palette.grey[400],
-              borderRadius: 3,
-            },
-          }}
       >
         <Chip
           label="Tous"
@@ -171,7 +69,30 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({
           }}
         />
 
-        {activeCategories.map(category => {
+        <Chip
+          icon={<StarIcon />}
+          label="Favoris"
+          onClick={() => onCategorySelect(FAVORITES_CATEGORY_ID)}
+          color={selectedCategory === FAVORITES_CATEGORY_ID ? 'primary' : 'default'}
+          variant={selectedCategory === FAVORITES_CATEGORY_ID ? 'filled' : 'outlined'}
+          size="medium"
+          sx={{
+            minWidth: 'fit-content',
+            flexShrink: 0,
+            height: isMobile ? 36 : 42,
+            '& .MuiChip-label': {
+              px: isMobile ? 1.35 : 1.7,
+              fontSize: isMobile ? '0.92rem' : '1rem',
+              fontWeight: 700,
+            },
+            ...(selectedCategory !== FAVORITES_CATEGORY_ID && {
+              borderColor: theme.palette.warning.main,
+              color: theme.palette.warning.dark,
+            }),
+          }}
+        />
+
+        {activeCategories.map((category) => {
           const baseColor = category.color || theme.palette.grey[100];
           const isSelected = selectedCategory === category.id;
           const backgroundColor = isSelected ? theme.palette.primary.main : baseColor;
@@ -206,7 +127,6 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({
             />
           );
         })}
-      </Box>
       </Box>
     </Box>
   );

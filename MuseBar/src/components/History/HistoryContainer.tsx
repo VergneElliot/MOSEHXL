@@ -1,5 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Box, Typography, Alert, Snackbar, useTheme, useMediaQuery } from '@mui/material';
+import {
+  Box,
+  Typography,
+  Alert,
+  Snackbar,
+  useTheme,
+  useMediaQuery,
+  Tabs,
+  Tab,
+} from '@mui/material';
 import { useHistoryState } from '../../hooks/useHistoryState';
 import { useHistoryAPI } from '../../hooks/useHistoryAPI';
 import { useHistoryLogic } from '../../hooks/useHistoryLogic';
@@ -10,6 +19,7 @@ import OrderDetailsDialog from './OrderDetailsDialog';
 import ReturnDialog from './ReturnDialog';
 import PrintAfterSaleDialog from '../POS/PrintAfterSaleDialog';
 import WaiterDayReportPanel from './WaiterDayReportPanel';
+import OngoingOrdersPanel from './OngoingOrdersPanel';
 import { Order } from '../../types';
 import { useStepUpAuth } from '../../contexts/StepUpAuthContext';
 import { PERMISSIONS } from '@mosehxl/types';
@@ -24,10 +34,8 @@ const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn =
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { ensurePermission } = useStepUpAuth();
 
-  // Custom hooks for state management
   const [state, actions] = useHistoryState();
-
-  // Server-side pagination (Backend can paginate orders list)
+  const [sectionTab, setSectionTab] = useState(0);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [totalOrders, setTotalOrders] = useState(0);
@@ -35,9 +43,9 @@ const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn =
   const [waiters, setWaiters] = useState<
     Array<{ waiter_user_id: number; waiter_display_name: string }>
   >([]);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  // Custom hook for business logic
-  const logic = useHistoryLogic(state.orders, state.search);
+  const logic = useHistoryLogic();
 
   const getPagination = useCallback(() => {
     return { limit: rowsPerPage, offset: page * rowsPerPage };
@@ -47,7 +55,8 @@ const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn =
     return waiterUserId === '' ? undefined : waiterUserId;
   }, [waiterUserId]);
 
-  // Custom hook for API calls
+  const getSearch = useCallback(() => debouncedSearch, [debouncedSearch]);
+
   const api = useHistoryAPI(
     actions.setOrders,
     setTotalOrders,
@@ -58,29 +67,31 @@ const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn =
     actions.setReturnError,
     actions.closeReturnDialog,
     getPagination,
-    getWaiterUserId
+    getWaiterUserId,
+    getSearch
   );
 
-  // Avoid including `api` in effect deps (useHistoryState recreates some callbacks).
   const apiRef = useRef(api);
   apiRef.current = api;
 
-  // Load stats once on mount
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(state.search), 300);
+    return () => window.clearTimeout(t);
+  }, [state.search]);
+
   useEffect(() => {
     apiRef.current.loadStats();
     void import('../../services/api/floor')
       .then((mod) => mod.listOrderWaiters())
       .then(setWaiters)
       .catch(() => setWaiters([]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load orders whenever pagination or waiter filter changes
   useEffect(() => {
+    if (sectionTab !== 0) return;
     apiRef.current.loadOrders({ limit: rowsPerPage, offset: page * rowsPerPage });
-  }, [page, rowsPerPage, waiterUserId]);
+  }, [page, rowsPerPage, waiterUserId, debouncedSearch, sectionTab]);
 
-  // Event handlers
   const handleViewOrder = (order: Order) => {
     actions.setSelectedOrder(order);
   };
@@ -126,74 +137,83 @@ const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn =
 
   return (
     <Box>
-      {/* Header */}
       <Box sx={{ mb: 3 }}>
         <Typography variant={isMobile ? 'h5' : 'h4'} component="h1" gutterBottom>
-          📊 Historique des Ventes
+          Historique
         </Typography>
         <Typography variant="body2" color="textSecondary">
-          Consultez l'historique des commandes, les statistiques de vente et gérez les retours
+          Ventes encaissées et commandes en cours sur le plan de salle
         </Typography>
       </Box>
 
-      {/* Statistics Cards */}
-      <StatsCards
-        stats={state.stats}
-        loading={state.loading}
-        formatCurrency={logic.formatCurrency}
-      />
+      <Tabs
+        value={sectionTab}
+        onChange={(_e, v) => setSectionTab(v)}
+        sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
+      >
+        <Tab label="Ventes" sx={{ textTransform: 'none', fontWeight: 600 }} />
+        <Tab label="En cours" sx={{ textTransform: 'none', fontWeight: 600 }} />
+      </Tabs>
 
-      <WaiterDayReportPanel />
+      {sectionTab === 0 && (
+        <>
+          <StatsCards
+            stats={state.stats}
+            loading={state.loading}
+            formatCurrency={logic.formatCurrency}
+          />
 
-      {/* Search Bar */}
-      <SearchBar
-        search={state.search}
-        onSearchChange={(newSearch) => {
-          actions.setSearch(newSearch);
-          setPage(0);
-        }}
-        waiterUserId={waiterUserId}
-        waiters={waiters}
-        onWaiterChange={(id) => {
-          setPage(0);
-          setWaiterUserId(id);
-        }}
-      />
+          <WaiterDayReportPanel />
 
-      {/* Orders Table */}
-      <OrdersTable
-        orders={logic.filteredOrders}
-        loading={state.loading}
-        page={page}
-        rowsPerPage={rowsPerPage}
-        totalCount={state.search ? logic.filteredOrders.length : totalOrders}
-        onPageChange={setPage}
-        onRowsPerPageChange={(newRowsPerPage) => {
-          setRowsPerPage(newRowsPerPage);
-          setPage(0);
-        }}
-        onViewOrder={handleViewOrder}
-        onPrintReceipt={handlePrintReceipt}
-        onReturnOrder={handleReturnOrder}
-        canReturnOrCancel={canCancelOrReturn}
-        formatCurrency={logic.formatCurrency}
-        formatDateTime={logic.formatDateTime}
-        getPaymentMethodLabel={logic.getPaymentMethodLabel}
-        getStatusColor={logic.getStatusColor}
-        getOrderSummary={logic.getOrderSummary}
-      />
+          <SearchBar
+            search={state.search}
+            onSearchChange={(newSearch) => {
+              actions.setSearch(newSearch);
+              setPage(0);
+            }}
+            placeholder="Rechercher : n° ticket, n° cuisine, montant, article, serveur, table…"
+            waiterUserId={waiterUserId}
+            waiters={waiters}
+            onWaiterChange={(id) => {
+              setPage(0);
+              setWaiterUserId(id);
+            }}
+          />
 
-      {/* Results Summary */}
-      {state.search && !state.loading && (
-        <Box mt={2}>
-          <Typography variant="body2" color="textSecondary" align="center">
-            {logic.filteredOrders.length} résultat{logic.filteredOrders.length > 1 ? 's' : ''}{' '}
-            trouvé{logic.filteredOrders.length > 1 ? 's' : ''} pour "{state.search}"
-          </Typography>
-        </Box>
+          <OrdersTable
+            orders={state.orders}
+            loading={state.loading}
+            page={page}
+            rowsPerPage={rowsPerPage}
+            totalCount={totalOrders}
+            onPageChange={setPage}
+            onRowsPerPageChange={(newRowsPerPage) => {
+              setRowsPerPage(newRowsPerPage);
+              setPage(0);
+            }}
+            onViewOrder={handleViewOrder}
+            onPrintReceipt={handlePrintReceipt}
+            onReturnOrder={handleReturnOrder}
+            canReturnOrCancel={canCancelOrReturn}
+            formatCurrency={logic.formatCurrency}
+            formatDateTime={logic.formatDateTime}
+            getPaymentMethodLabel={logic.getPaymentMethodLabel}
+            getStatusColor={logic.getStatusColor}
+            getOrderSummary={logic.getOrderSummary}
+          />
+
+          {state.search && !state.loading && (
+            <Box mt={2}>
+              <Typography variant="body2" color="textSecondary" align="center">
+                {totalOrders} résultat{totalOrders > 1 ? 's' : ''} pour « {state.search} »
+              </Typography>
+            </Box>
+          )}
+        </>
       )}
 
-      {/* Success/Error Messages */}
+      {sectionTab === 1 && <OngoingOrdersPanel />}
+
       <Snackbar
         open={!!state.returnSuccess}
         autoHideDuration={4000}
@@ -226,7 +246,6 @@ const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn =
         </Alert>
       </Snackbar>
 
-      {/* Order details dialog (view) */}
       <OrderDetailsDialog
         order={state.selectedOrder}
         onClose={() => actions.setSelectedOrder(null)}
@@ -234,7 +253,6 @@ const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn =
         getPaymentMethodLabel={logic.getPaymentMethodLabel}
       />
 
-      {/* Return / cancellation dialog */}
       <ReturnDialog
         open={state.returnDialogOpen}
         order={state.orderToReturn}

@@ -16,6 +16,7 @@ import {
   Remove as RemoveIcon,
   Category as DiversIcon,
   VolunteerActivism as TipIcon,
+  Star as StarIcon,
 } from '@mui/icons-material';
 import { alpha } from '@mui/material/styles';
 import type { Theme } from '@mui/material/styles';
@@ -35,6 +36,8 @@ interface ProductGridProps {
   formatCurrency: (amount: number) => string;
   onDiversClick?: () => void;
   onPourboireClick?: () => void;
+  /** Product ids in establishment top sellers (Favoris). */
+  favoriteProductIds?: ReadonlySet<string>;
 }
 
 /**
@@ -53,6 +56,7 @@ const ProductGrid = React.memo(function ProductGrid({
   formatCurrency,
   onDiversClick,
   onPourboireClick,
+  favoriteProductIds,
 }: ProductGridProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -127,7 +131,7 @@ const ProductGrid = React.memo(function ProductGrid({
         offset += 1;
       }
       const product = products[index - offset];
-      return product?.id ?? `idx-${index}`;
+      return product ? `product-${index}` : `idx-${index}`;
     },
     [hasDiversSlot, hasPourboireSlot, products]
   );
@@ -156,6 +160,7 @@ const ProductGrid = React.memo(function ProductGrid({
           product={product}
           categoryColor={categoryColorMap[product.categoryId]}
           isHappyHourActive={isHappyHourActive}
+          isFavorite={favoriteProductIds?.has(String(product.id)) ?? false}
           onRequestAddProduct={onRequestAddProduct}
           calculateProductPrice={calculateProductPrice}
           formatCurrency={formatCurrency}
@@ -173,6 +178,7 @@ const ProductGrid = React.memo(function ProductGrid({
       products,
       categoryColorMap,
       isHappyHourActive,
+      favoriteProductIds,
       onRequestAddProduct,
       calculateProductPrice,
       formatCurrency,
@@ -206,12 +212,13 @@ const ProductGrid = React.memo(function ProductGrid({
         {onPourboireClick && (
           <PourboireCard onAdd={onPourboireClick} isMobile={isMobile} theme={theme} />
         )}
-        {products.map(product => (
+        {products.map((product, index) => (
           <ProductCard
-            key={product.id}
+            key={`product-${index}`}
             product={product}
             categoryColor={categoryColorMap[product.categoryId]}
             isHappyHourActive={isHappyHourActive}
+            isFavorite={favoriteProductIds?.has(String(product.id)) ?? false}
             onRequestAddProduct={onRequestAddProduct}
             calculateProductPrice={calculateProductPrice}
             formatCurrency={formatCurrency}
@@ -414,6 +421,7 @@ interface ProductCardProps {
   product: Product;
   categoryColor?: string;
   isHappyHourActive: boolean;
+  isFavorite?: boolean;
   onRequestAddProduct: (product: Product, quantity: number) => void;
   calculateProductPrice: (product: Product, isHappyHour: boolean) => number;
   formatCurrency: (amount: number) => string;
@@ -424,6 +432,7 @@ const ProductCard = React.memo(function ProductCard({
   product,
   categoryColor,
   isHappyHourActive,
+  isFavorite = false,
   onRequestAddProduct,
   calculateProductPrice,
   formatCurrency,
@@ -497,6 +506,34 @@ const ProductCard = React.memo(function ProductCard({
         },
       }}
     >
+      {isFavorite && (
+        <Box
+          aria-label="Favori"
+          title="Favori"
+          sx={{
+            position: 'absolute',
+            top: 8,
+            left: 8,
+            zIndex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: isMobile ? 28 : 34,
+            height: isMobile ? 28 : 34,
+            borderRadius: '50%',
+            bgcolor: alpha(theme.palette.warning.main, 0.18),
+            border: `1px solid ${alpha(theme.palette.warning.dark, 0.45)}`,
+          }}
+        >
+          <StarIcon
+            sx={{
+              fontSize: isMobile ? 18 : 22,
+              color: theme.palette.warning.dark,
+            }}
+          />
+        </Box>
+      )}
+
       {isDiscounted && (
         <Chip
           label="Happy Hour"
@@ -534,6 +571,7 @@ const ProductCard = React.memo(function ProductCard({
             WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical',
             flexShrink: 0,
+            pl: isFavorite ? (isMobile ? 4 : 5) : 0,
             pr: isDiscounted ? 10 : 0,
           }}
         >

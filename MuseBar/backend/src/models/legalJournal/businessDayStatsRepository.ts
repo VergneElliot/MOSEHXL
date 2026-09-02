@@ -20,6 +20,12 @@ export interface TopProductRow {
   qty: number;
 }
 
+export interface TopProductByIdRow {
+  product_id: number;
+  name: string;
+  qty: number;
+}
+
 export class BusinessDayStatsRepository {
   /**
    * Fetch orders and sub-bills for the given establishment and period.
@@ -79,6 +85,47 @@ export class BusinessDayStatsRepository {
       [orderIds]
     );
 
+    return topResult.rows;
+  }
+
+  /**
+   * Best sellers for an establishment (all completed/paid orders, by quantity sold).
+   * Resolves product_id from product_name when legacy lines lack product_id.
+   */
+  static async getTopProductsForEstablishment(
+    establishmentId: string,
+    limit = 10
+  ): Promise<TopProductByIdRow[]> {
+    const capped = Math.min(50, Math.max(1, limit));
+    const topResult = await pool.query(
+      `WITH resolved AS (
+         SELECT
+           oi.quantity,
+           COALESCE(
+             oi.product_id,
+             (
+               SELECT p.id
+               FROM products p
+               WHERE p.establishment_id = o.establishment_id
+                 AND LOWER(TRIM(p.name)) = LOWER(TRIM(oi.product_name))
+               ORDER BY p.is_active DESC, p.id ASC
+               LIMIT 1
+             )
+           ) AS product_id,
+           oi.product_name
+         FROM order_items oi
+         INNER JOIN orders o ON o.id = oi.order_id
+         WHERE o.establishment_id = $1
+           AND o.status IN ('completed', 'paid')
+       )
+       SELECT product_id, product_name AS name, SUM(quantity)::int AS qty
+       FROM resolved
+       WHERE product_id IS NOT NULL
+       GROUP BY product_id, product_name
+       ORDER BY qty DESC, product_name ASC
+       LIMIT $2`,
+      [establishmentId, capped]
+    );
     return topResult.rows;
   }
 }
