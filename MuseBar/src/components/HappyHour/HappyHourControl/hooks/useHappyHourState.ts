@@ -1,3 +1,4 @@
+import { logger } from '../../../../utils/logger';
 /**
  * Happy Hour State Management
  * Core state management and data loading for happy hour functionality
@@ -63,7 +64,7 @@ export const useHappyHourState = (products: Product[] = []): UseHappyHourStateRe
         loading: false,
       }));
     } catch (error) {
-      console.error('Failed to load happy hour data:', error);
+      logger.error('Failed to load happy hour data:', error);
       setState(prev => ({ ...prev, loading: false }));
     }
   }, [happyHourService, products]);

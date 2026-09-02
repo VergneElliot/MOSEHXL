@@ -1,3 +1,4 @@
+import { logger } from '../../../utils/logger';
 /**
  * Happy Hour Schedule Component
  * Displays and manages individual product discounts
@@ -27,6 +28,7 @@ import {
   Cancel as CancelIcon,
   Discount as DiscountIcon,
 } from '@mui/icons-material';
+import { calculateHappyHourPriceWithLabel } from '@mosehxl/types';
 import { HappyHourScheduleProps } from './types';
 import { Product } from '../../../types';
 
@@ -47,24 +49,13 @@ export const HappyHourSchedule: React.FC<HappyHourScheduleProps> = ({
    * Calculate happy hour price for a product
    */
   const calculateHappyHourPrice = (product: Product) => {
-    const discountType = product.happyHourDiscountType || 'percentage';
-    const discountValue = product.happyHourDiscountValue || 0.2; // Default 20%
-
-    let happyHourPrice: number;
-    let value: number;
-    let label: string;
-
-    if (discountType === 'percentage') {
-      value = discountValue;
-      happyHourPrice = product.price * (1 - discountValue);
-      label = `-${(discountValue * 100).toFixed(0)}%`;
-    } else {
-      value = discountValue;
-      happyHourPrice = Math.max(0, product.price - discountValue);
-      label = `-${discountValue.toFixed(2)}€`;
-    }
-
-    return { price: happyHourPrice, value, label };
+    const result = calculateHappyHourPriceWithLabel({
+      price: product.price,
+      happyHourDiscountType: product.happyHourDiscountType,
+      happyHourDiscountValue: product.happyHourDiscountValue,
+      isHappyHourEligible: product.isHappyHourEligible,
+    });
+    return { price: result.price, value: result.discountValue, label: result.label };
   };
 
   /**
@@ -74,7 +65,7 @@ export const HappyHourSchedule: React.FC<HappyHourScheduleProps> = ({
     try {
       await onSaveProduct(productId);
     } catch (error) {
-      console.error('Error saving product:', error);
+      logger.error('Error saving product:', error);
     }
   };
 

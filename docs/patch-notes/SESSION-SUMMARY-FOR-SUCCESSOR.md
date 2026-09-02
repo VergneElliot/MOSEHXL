@@ -1,5 +1,7 @@
 # Session Summary for Successor Agent
 
+> **STALE (last verified 2026-09-02):** This handoff predates legal journal fail-safe, per-establishment scoping, PIN sessions, and admin-space features. Use [CURRENT-TRUTH.md](../CURRENT-TRUTH.md) and [LATEST-INDEX.md](./LATEST-INDEX.md) instead.
+
 **Purpose:** Handoff document for the next AI agent (or developer) working on the MOSEHXL MuseBar V2 project. Read this first to understand what was done, why, where things stand, and what to do next.
 
 **Branch:** `development`  

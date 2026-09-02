@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Grid, Card, CardContent, Typography, CircularProgress, Alert } from '@mui/material';
 import { EstablishmentService } from '../../../services/establishmentService';
 import { ensureAuthentication } from '../../../services/authHelper';
+import { logger } from '../../../utils/logger';
 
 interface EstablishmentStatsData {
   total_establishments: string;
@@ -25,7 +26,7 @@ export const EstablishmentStats: React.FC = () => {
         const statsData = await EstablishmentService.getEstablishmentStats();
         setStats(statsData);
       } catch (err) {
-        console.error('Error loading establishment stats:', err);
+        logger.error('Error loading establishment stats:', err);
         setError('Erreur lors du chargement des statistiques');
       } finally {
         setLoading(false);

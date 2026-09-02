@@ -1,3 +1,4 @@
+import { logger } from '../../../utils/logger';
 /**
  * Closure Settings Component
  * Handles automatic closure configuration and scheduler management
@@ -65,7 +66,7 @@ export const ClosureSettings: React.FC<ClosureSettingsProps> = ({
     try {
       await onSave();
     } catch (error) {
-      console.error('Error saving closure settings:', error);
+      logger.error('Error saving closure settings:', error);
     }
   };
 
@@ -73,7 +74,7 @@ export const ClosureSettings: React.FC<ClosureSettingsProps> = ({
     try {
       await onTriggerManualCheck();
     } catch (error) {
-      console.error('Error triggering manual check:', error);
+      logger.error('Error triggering manual check:', error);
     }
   };
 

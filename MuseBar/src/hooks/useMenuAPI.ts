@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { DataService } from '../services/dataService';
 import { Category, Product } from '../types';
 import { CategoryFormData, ProductFormData } from './useMenuState';
+import { logger } from '../utils/logger';
 
 export interface MenuAPIActions {
   createCategory: (categoryData: CategoryFormData) => Promise<void>;
@@ -36,7 +37,7 @@ export const useMenuAPI = (
       const archived = await dataService.getArchivedProducts();
       setArchivedProducts(archived);
     } catch (error) {
-      console.error('Error loading archived products:', error);
+      logger.error('Error loading archived products:', error);
       showError('Erreur lors du chargement des produits archivés');
     }
   }, [dataService, setArchivedProducts, showError]);
@@ -46,7 +47,7 @@ export const useMenuAPI = (
       const archived = await dataService.getArchivedCategories();
       setArchivedCategories(archived);
     } catch (error) {
-      console.error('Error loading archived categories:', error);
+      logger.error('Error loading archived categories:', error);
       showError('Erreur lors du chargement des catégories archivées');
     }
   }, [dataService, setArchivedCategories, showError]);

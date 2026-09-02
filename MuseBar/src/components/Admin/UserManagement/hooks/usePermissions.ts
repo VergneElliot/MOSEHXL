@@ -1,3 +1,4 @@
+import { logger } from '../../../../utils/logger';
 /**
  * Permission Management
  * Handles user permission operations and state
@@ -41,7 +42,7 @@ export const usePermissions = () => {
       
       setPermState(state);
     } catch (error) {
-      console.error('Failed to load permissions:', error);
+      logger.error('Failed to load permissions:', error);
       setPermError('Failed to load user permissions');
     }
   }, []);
@@ -85,7 +86,7 @@ export const usePermissions = () => {
       closePermDialog();
       return true;
     } catch (error) {
-      console.error('Failed to save permissions:', error);
+      logger.error('Failed to save permissions:', error);
       setPermError('Failed to save permissions');
       return false;
     } finally {

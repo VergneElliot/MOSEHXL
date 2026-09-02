@@ -1,3 +1,4 @@
+import { logger } from '../../../../utils/logger';
 /**
  * Closure Settings Management
  * Handles automated daily closure configuration and scheduling
@@ -75,7 +76,7 @@ export const useClosureSettings = ({
         onSchedulerUpdate(data.scheduler);
       }
     } catch (error) {
-      console.error('Error loading closure settings:', error);
+      logger.error('Error loading closure settings:', error);
       onUpdate(defaultClosureSettings);
     } finally {
       onLoadingChange(false);
@@ -119,7 +120,7 @@ export const useClosureSettings = ({
         onSchedulerUpdate(data.scheduler);
       }
     } catch (error) {
-      console.error('Error saving closure settings:', error);
+      logger.error('Error saving closure settings:', error);
       throw error;
     } finally {
       onSavingChange(false);
@@ -137,7 +138,7 @@ export const useClosureSettings = ({
         onSchedulerUpdate(data.scheduler);
       }
     } catch (error) {
-      console.error('Error triggering manual closure check:', error);
+      logger.error('Error triggering manual closure check:', error);
       throw error;
     } finally {
       onSavingChange(false);

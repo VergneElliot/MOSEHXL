@@ -22,6 +22,7 @@ import { EstablishmentService } from '../../../services/establishmentService';
 import { SystemEstablishment } from '../../../types/system';
 import { ensureAuthentication } from '../../../services/authHelper';
 import { formatDateOnly } from '../../../utils/formatDate';
+import { logger } from '../../../utils/logger';
 
 export const EstablishmentsList: React.FC = () => {
   const [establishments, setEstablishments] = useState<SystemEstablishment[]>([]);
@@ -36,7 +37,7 @@ export const EstablishmentsList: React.FC = () => {
       const response = await EstablishmentService.searchEstablishments();
       setEstablishments(response.data.establishments);
     } catch (err) {
-      console.error('Error loading establishments:', err);
+      logger.error('Error loading establishments:', err);
       setError('Erreur lors du chargement des établissements');
     } finally {
       setLoading(false);
@@ -56,7 +57,7 @@ export const EstablishmentsList: React.FC = () => {
       await EstablishmentService.deleteEstablishment(id);
       await loadEstablishments(); // Refresh the list
     } catch (error) {
-      console.error('Error deleting establishment:', error);
+      logger.error('Error deleting establishment:', error);
       setError('Erreur lors de la suppression de l\'établissement');
     }
   };

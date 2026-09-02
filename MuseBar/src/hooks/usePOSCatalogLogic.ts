@@ -1,14 +1,17 @@
 import { useCallback, useMemo } from 'react';
+import { calculateHappyHourPrice } from '@mosehxl/types';
 import { Product, Category } from '../types';
 import { formatCurrency } from '../utils/formatCurrency';
 import { HappyHourService } from '../services/happyHourService';
+import {
+  FAVORITES_CATEGORY_ID,
+  filterProductsBySearch,
+  orderProductsForCategoryView,
+  orderProductsForFavoritesView,
+  orderProductsForTousView,
+} from '../utils/posCatalogOrdering';
 
-const normalizeAccents = (str: string): string => {
-  return str
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
-};
+export { FAVORITES_CATEGORY_ID };
 
 export interface POSCatalogLogic {
   filteredProducts: Product[];
@@ -22,67 +25,43 @@ export const usePOSCatalogLogic = (
   categories: Category[],
   selectedCategory: string,
   searchQuery: string,
-  isHappyHourActive: boolean
+  isHappyHourActive: boolean,
+  topSellerProductIds: string[] = []
 ): POSCatalogLogic => {
-  void categories;
   void isHappyHourActive;
 
   const filteredProducts = useMemo(() => {
-    let filtered = products.filter(product => product.isActive);
+    let ordered: Product[];
 
     if (searchQuery.trim()) {
-      const normalizedQuery = normalizeAccents(searchQuery.trim());
-      filtered = filtered.filter(product =>
-        normalizeAccents(product.name).includes(normalizedQuery)
-      );
-      return filtered;
+      const active = products.filter((p) => p.isActive);
+      ordered = filterProductsBySearch(active, searchQuery);
+    } else if (selectedCategory === FAVORITES_CATEGORY_ID) {
+      ordered = orderProductsForFavoritesView(products, topSellerProductIds);
+    } else if (!selectedCategory) {
+      ordered = orderProductsForTousView(products, categories, topSellerProductIds);
+    } else {
+      ordered = orderProductsForCategoryView(products, selectedCategory);
     }
 
-    if (selectedCategory) {
-      filtered = filtered.filter(product => product.categoryId?.toString() === selectedCategory);
-    }
-
-    return filtered;
-  }, [products, selectedCategory, searchQuery]);
+    return ordered;
+  }, [products, categories, selectedCategory, searchQuery, topSellerProductIds]);
 
   const calculateProductPrice = useCallback((product: Product, isHappyHour: boolean): number => {
-    if (!isHappyHour || !product.isHappyHourEligible) {
-      return product.price;
-    }
-
     const baseSettings = HappyHourService.getInstance().getSettings();
-    const productVal = product.happyHourDiscountValue;
-    const productValNum =
-      typeof productVal === 'number'
-        ? productVal
-        : Number.isNaN(Number(productVal))
-          ? 0
-          : Number(productVal);
-    const hasIndividualDiscount = productValNum > 0;
-    const type: 'percentage' | 'fixed' = hasIndividualDiscount
-      ? (product.happyHourDiscountType ?? 'percentage')
-      : (baseSettings.discountType ?? 'percentage');
-    let value: number;
-    if (hasIndividualDiscount) {
-      value = productValNum;
-    } else {
-      const raw = baseSettings.discountValue;
-      if (typeof raw === 'number' && !Number.isNaN(raw)) {
-        value = raw;
-      } else {
-        const n = Number(raw);
-        value = Number.isNaN(n) ? 0 : n;
+    return calculateHappyHourPrice(
+      {
+        price: product.price,
+        isHappyHourEligible: product.isHappyHourEligible,
+        happyHourDiscountType: product.happyHourDiscountType,
+        happyHourDiscountValue: product.happyHourDiscountValue,
+      },
+      isHappyHour,
+      {
+        discountType: baseSettings.discountType,
+        discountValue: baseSettings.discountValue,
       }
-    }
-
-    if (type === 'percentage' && value > 1) {
-      value = value / 100;
-    }
-
-    if (type === 'percentage') {
-      return product.price * (1 - value);
-    }
-    return Math.max(0, product.price - value);
+    );
   }, []);
 
   return {

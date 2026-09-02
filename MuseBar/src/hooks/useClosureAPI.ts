@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { ApiService } from '../services/apiService';
 import { ClosureBulletin } from './useClosureState';
 import type { ClosureTodayStatus, LiveMonthlyStats } from '../types/api';
+import { logger } from '../utils/logger';
 
 export interface ClosureAPIActions {
   loadBulletins: (pagination?: { limit: number; offset: number; type?: CreateClosureData['type'] }) => Promise<void>;
@@ -59,7 +60,7 @@ export const useClosureAPI = (
     } catch (err) {
       const errorMessage = 'Erreur lors du chargement des bulletins de clôture';
       setError(errorMessage);
-      console.error('Error loading closure bulletins:', err);
+      logger.error('Error loading closure bulletins:', err);
     } finally {
       setLoading(false);
     }
@@ -70,7 +71,7 @@ export const useClosureAPI = (
       const { data } = await apiService.get<ClosureTodayStatus>('/legal/closure/today-status');
       setTodayStatus(data ?? null);
     } catch (err) {
-      console.error('Error loading today status:', err);
+      logger.error('Error loading today status:', err);
     }
   }, [setTodayStatus, apiService]);
 
@@ -108,7 +109,7 @@ export const useClosureAPI = (
         grace_period_minutes: data?.grace_period_minutes ?? data?.closure_grace_period_minutes ?? '',
       });
     } catch (err) {
-      console.error('Error loading closure settings:', err);
+      logger.error('Error loading closure settings:', err);
     }
   }, [setClosureSettings, apiService]);
 

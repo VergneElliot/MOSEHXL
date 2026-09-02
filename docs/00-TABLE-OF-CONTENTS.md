@@ -1,5 +1,7 @@
 # MOSEHXL — Documentation Hub
 
+> **Partially stale (last verified 2026-09-02):** Manual index below stops around patch #454. For recent work use [LATEST-INDEX.md](./patch-notes/LATEST-INDEX.md) (auto-generated, currently #471+).
+
 Welcome to the MOSEHXL project documentation. This is your central reference for understanding every piece of this project, from the fundamentals of the technologies used to the detailed patch notes of every fix applied.
 
 The documentation is organized into two sections:

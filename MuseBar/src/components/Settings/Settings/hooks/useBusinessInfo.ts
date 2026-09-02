@@ -1,3 +1,4 @@
+import { logger } from '../../../../utils/logger';
 /**
  * Business Information Management
  * Handles company and legal business details
@@ -50,7 +51,7 @@ export const useBusinessInfo = ({
       // Do NOT reset to defaults on failure (e.g. 429 or transient error):
       // the form would lose data the user already entered or that was loaded
       // on a previous successful call.  Keep current state; the user can retry.
-      console.error('Error loading business info:', error);
+      logger.error('Error loading business info:', error);
     } finally {
       onLoadingChange(false);
     }
@@ -113,7 +114,7 @@ export const useBusinessInfo = ({
       });
       await loadBusinessInfo(); // Reload to get updated data
     } catch (error) {
-      console.error('Error saving business info:', error);
+      logger.error('Error saving business info:', error);
       throw error;
     } finally {
       onSavingChange(false);

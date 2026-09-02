@@ -1,3 +1,4 @@
+import { logger } from '../../../utils/logger';
 /**
  * Happy Hour Form Component
  * Configuration form for happy hour settings
@@ -62,7 +63,7 @@ export const HappyHourForm: React.FC<HappyHourFormProps> = ({
     try {
       await onSave();
     } catch (error) {
-      console.error('Error saving happy hour settings:', error);
+      logger.error('Error saving happy hour settings:', error);
     }
   };
 

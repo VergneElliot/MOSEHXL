@@ -11,6 +11,7 @@ import { EstablishmentForm } from './EstablishmentForm';
 import { CreateEstablishmentRequest } from '../../../types/system';
 import { useEstablishments } from '../../../hooks/useEstablishments';
 import { ensureAuthentication } from '../../../services/authHelper';
+import { logger } from '../../../utils/logger';
 
 interface CreateEstablishmentDialogProps {
   open: boolean;
@@ -74,7 +75,7 @@ export const CreateEstablishmentDialog: React.FC<CreateEstablishmentDialogProps>
       }, 2000);
       
     } catch (err) {
-      console.error('❌ Error creating establishment:', err);
+      logger.error('❌ Error creating establishment:', err);
       setError('Erreur lors de la création de l\'établissement');
     } finally {
       setLoading(false);

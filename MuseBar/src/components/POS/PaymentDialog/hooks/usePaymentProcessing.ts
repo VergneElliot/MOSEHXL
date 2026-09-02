@@ -1,3 +1,4 @@
+import { logger } from '../../../../utils/logger';
 /**
  * Payment Processing
  * Tips: sum of Pourboire cart lines → orders.tips (not sale items).
@@ -59,7 +60,7 @@ export const usePaymentProcessing = ({
       onSuccess(created);
       onReset();
     } catch (error) {
-      console.error('Payment failed:', error);
+      logger.error('Payment failed:', error);
       onError(error instanceof Error ? error.message : 'Payment processing failed');
     } finally {
       onLoading(false);
@@ -117,7 +118,7 @@ export const usePaymentProcessing = ({
       onSuccess(created);
       onReset();
     } catch (error) {
-      console.error('Split payment failed:', error);
+      logger.error('Split payment failed:', error);
       onError(error instanceof Error ? error.message : 'Split payment processing failed');
     } finally {
       onLoading(false);

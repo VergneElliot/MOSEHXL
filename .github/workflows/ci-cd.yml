@@ -7,7 +7,7 @@ on:
     branches: [ main, development ]
 
 env:
-  NODE_VERSION: '18'
+  NODE_VERSION: '20'
   POSTGRES_VERSION: '13'
 
 jobs:
@@ -40,6 +40,10 @@ jobs:
     - name: Run frontend type checking
       working-directory: MuseBar
       run: npm run type-check
+
+    - name: Run frontend format check
+      working-directory: MuseBar
+      run: npm run format:check
 
     - name: Run frontend tests
       working-directory: MuseBar
@@ -121,7 +125,22 @@ jobs:
         DB_USER: postgres
         DB_PASSWORD: postgres
         DB_NAME: mosehxl_test
+        JWT_SECRET: test-jwt-secret-for-ci-minimum-32-chars
+        NODE_ENV: test
       run: npm run test:coverage
+
+    - name: Run real-db compliance tests
+      working-directory: MuseBar/backend
+      env:
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_USER: postgres
+        DB_PASSWORD: postgres
+        DB_NAME: mosehxl_test
+        JWT_SECRET: test-jwt-secret-for-ci-minimum-32-chars
+        NODE_ENV: test
+        RUN_REAL_DB_TESTS: 'true'
+      run: npm run test:real-db
 
     - name: Upload backend test coverage
       uses: codecov/codecov-action@v4

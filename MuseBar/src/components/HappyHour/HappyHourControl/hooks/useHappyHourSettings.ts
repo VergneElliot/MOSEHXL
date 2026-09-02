@@ -1,3 +1,4 @@
+import { logger } from '../../../../utils/logger';
 /**
  * Happy Hour Settings Management
  * Handles CRUD operations for happy hour settings
@@ -24,7 +25,7 @@ export const useHappyHourSettings = ({ onSettingsUpdate, onStatusUpdate }: UseHa
       onSettingsUpdate(settings);
       onStatusUpdate();
     } catch (error) {
-      console.error('Failed to update settings:', error);
+      logger.error('Failed to update settings:', error);
       throw error;
     }
   }, [happyHourService, onSettingsUpdate, onStatusUpdate]);

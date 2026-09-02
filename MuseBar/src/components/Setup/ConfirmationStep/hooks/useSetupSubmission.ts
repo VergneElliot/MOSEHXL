@@ -1,3 +1,4 @@
+import { logger } from '../../../../utils/logger';
 /**
  * Setup Submission Logic
  * Handles the final setup submission and API interaction
@@ -102,7 +103,7 @@ export const useSetupSubmission = ({ onSuccess, onError, onLoading }: UseSetupSu
         return false;
       }
     } catch (error) {
-      console.error('Setup submission failed:', error);
+      logger.error('Setup submission failed:', error);
       onError(
         error instanceof Error 
           ? error.message 

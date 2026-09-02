@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+bash scripts/check-staged-files.sh
+npx lint-staged

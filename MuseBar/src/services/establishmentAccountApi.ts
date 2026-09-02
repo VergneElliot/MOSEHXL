@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 /**
  * API service for establishment account creation.
  * Uses the centralized request() from api/core for auth, timeout, and 401 handling (audit #47).
@@ -19,7 +20,7 @@ export async function validateInvitation(token: string): Promise<InvitationValid
       `/establishment-account-creation/validate/${encodeURIComponent(token)}`
     );
   } catch (error: unknown) {
-    console.error('Error validating invitation:', error);
+    logger.error('Error validating invitation:', error);
     throw error;
   }
 }
@@ -36,7 +37,7 @@ export async function createAccount(
       { method: 'POST', body: JSON.stringify(body) }
     );
   } catch (error: unknown) {
-    console.error('Error creating account:', error);
+    logger.error('Error creating account:', error);
     throw error;
   }
 }
@@ -50,7 +51,7 @@ export async function checkHealth(): Promise<{ status: string; message: string }
       '/establishment-account-creation/health'
     );
   } catch (error: unknown) {
-    console.error('Error checking service health:', error);
+    logger.error('Error checking service health:', error);
     throw error;
   }
 }

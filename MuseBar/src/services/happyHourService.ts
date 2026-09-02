@@ -1,5 +1,6 @@
 import { HappyHourSettings } from '../types';
 import * as settingsApi from './api/settings';
+import { logger } from '../utils/logger';
 
 export class HappyHourService {
   private static instance: HappyHourService;
@@ -20,7 +21,7 @@ export class HappyHourService {
         this.settings = { ...this.settings, ...JSON.parse(saved) };
       }
     } catch (error) {
-      console.error('Erreur lors du chargement des paramètres Happy Hour:', error);
+      logger.error('Erreur lors du chargement des paramètres Happy Hour:', error);
     }
   }
 
@@ -116,7 +117,7 @@ export class HappyHourService {
     try {
       localStorage.setItem('musebar-happyhour-settings', JSON.stringify(this.settings));
     } catch (error) {
-      console.error('Erreur lors de la sauvegarde des paramètres Happy Hour:', error);
+      logger.error('Erreur lors de la sauvegarde des paramètres Happy Hour:', error);
     }
     void this.persistToApi();
   }
@@ -151,7 +152,7 @@ export class HappyHourService {
     try {
       localStorage.setItem('musebar-happyhour-settings', JSON.stringify(this.settings));
     } catch (error) {
-      console.error('Erreur lors de la sauvegarde de l\'activation manuelle Happy Hour:', error);
+      logger.error('Erreur lors de la sauvegarde de l\'activation manuelle Happy Hour:', error);
     }
     void this.persistToApi();
   }

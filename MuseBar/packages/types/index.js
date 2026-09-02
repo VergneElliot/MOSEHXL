@@ -1,23 +1,21 @@
-'use strict';
-
-const PERMISSIONS = {
-  access_pos: 'access_pos',
-  access_menu: 'access_menu',
-  access_settings: 'access_settings',
-  access_closure: 'access_closure',
-  access_compliance: 'access_compliance',
-  access_user_management: 'access_user_management',
-  access_documents: 'access_documents',
-  access_inbox: 'access_inbox',
-  access_reservations: 'access_reservations',
-  access_planning: 'access_planning',
-  manage_floor_plan: 'manage_floor_plan',
-  pos_happyhour_manual: 'pos_happyhour_manual',
-  pos_apply_offert: 'pos_apply_offert',
-  pos_apply_perso: 'pos_apply_perso',
-  orders_cancel: 'orders_cancel',
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __exportStar = (this && this.__exportStar) || function(m, exports) {
+    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
-
-module.exports = {
-  PERMISSIONS,
-};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.PERMISSIONS = void 0;
+var permissions_1 = require("./permissions");
+Object.defineProperty(exports, "PERMISSIONS", { enumerable: true, get: function () { return permissions_1.PERMISSIONS; } });
+__exportStar(require("./pinRules"), exports);
+__exportStar(require("./happyHourPricing"), exports);

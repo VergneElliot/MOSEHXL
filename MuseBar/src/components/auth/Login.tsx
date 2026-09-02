@@ -14,6 +14,7 @@ import { apiService } from '../../services/apiService';
 import type { User } from '../../types';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from '../common/LanguageSwitcher';
+import { logger } from '../../utils/logger';
 
 interface LoginProps {
   onLogin: (
@@ -71,7 +72,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         data.refreshExpiresIn
       );
     } catch (err: unknown) {
-      console.error('Login error:', err);
+      logger.error('Login error:', err);
       setError(err instanceof Error ? err.message : t('auth.networkError', { ns: 'common' }));
     } finally {
       setLoading(false);

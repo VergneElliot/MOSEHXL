@@ -1,3 +1,4 @@
+import { logger } from '../../utils/logger';
 /**
  * Business Setup Wizard - Main component for establishment owner setup
  */
@@ -101,7 +102,7 @@ export const BusinessSetupWizard: React.FC = () => {
         setLoading(false);
         
       } catch (err) {
-        console.error('Invitation validation error:', err);
+        logger.error('Invitation validation error:', err);
         setError('Failed to validate invitation. Please try again.');
         setLoading(false);
       }

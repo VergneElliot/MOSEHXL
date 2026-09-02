@@ -1,3 +1,4 @@
+import { logger } from '../../../utils/logger';
 /**
  * Core Error Boundary Component
  * Lightweight error boundary focused on error catching and state management
@@ -51,8 +52,8 @@ export class ErrorBoundaryCore extends Component<ErrorBoundaryProps, ErrorBounda
     // Log error in development
     if (import.meta.env.DEV) {
       console.group(`🚨 Error Boundary [${errorId}]`);
-      console.error('Error:', error);
-      console.error('Component Stack:', errorInfo.componentStack);
+      logger.error('Error:', error);
+      logger.error('Component Stack:', errorInfo.componentStack);
       console.groupEnd();
     }
 

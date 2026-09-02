@@ -1,5 +1,7 @@
 # 00 - Pause Checkpoint (Self-Certification)
 
+> **STALE vs signing packet (last verified 2026-09-02):** Engineering dossier in this folder is ready-to-sign at v2.0.2; this pause note reflects an earlier July 2026 stop. See [07-SIGNING-PACKET.md](./07-SIGNING-PACKET.md) and [README.md](./README.md) for current status.
+
 **Status:** Paused — safe to resume later  
 **Paused on:** 2026-07-01  
 **Git anchor:** `development` @ `4815a0a` (`docs(legal): add self-certification evidence templates`)  

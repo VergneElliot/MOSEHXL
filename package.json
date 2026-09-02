@@ -7,11 +7,25 @@
     "start:frontend": "npm run start --workspace MuseBar",
     "start:backend": "npm run start --workspace MuseBar/backend",
     "dev:backend": "npm run dev --workspace MuseBar/backend",
-    "build": "npm run build --workspace MuseBar && npm run build --workspace MuseBar/backend && npm run build --workspace MuseBar/bridge",
+    "build": "npm run build --workspace @mosehxl/types && npm run build --workspace MuseBar && npm run build --workspace MuseBar/backend && npm run build --workspace MuseBar/bridge",
     "build:frontend": "npm run build --workspace MuseBar",
     "build:backend": "npm run build --workspace MuseBar/backend",
     "build:bridge": "npm run build --workspace MuseBar/bridge",
-    "docs:patch-notes-index": "node scripts/generate-patch-notes-index.js"
+    "build:types": "npm run build --workspace @mosehxl/types",
+    "docs:patch-notes-index": "node scripts/generate-patch-notes-index.js",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.4.3"
+  },
+  "lint-staged": {
+    "MuseBar/src/**/*.{ts,tsx}": [
+      "npm run lint --workspace MuseBar -- --fix"
+    ],
+    "MuseBar/backend/src/**/*.ts": [
+      "npm run lint --workspace MuseBar/backend -- --fix"
+    ]
   },
   "workspaces": [
     "MuseBar",
