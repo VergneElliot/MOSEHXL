@@ -56,6 +56,7 @@ Domain skills live in `.cursor/skills/`. Read the relevant skill before touching
 | `backend-api-route` | New or changed Express routes |
 | `frontend-feature` | React containers, hooks, ApiService |
 | `pos-and-floor-service` | POS cart, floor plan, open tickets, kitchen |
+| `administration-space` | Documents, inbox, reservations, planning, admin floor editor |
 | `printing-and-receipts` | Receipts, kitchen printers, print bridge |
 | `testing-and-ci` | Vitest, CI jobs, real-db tests |
 
