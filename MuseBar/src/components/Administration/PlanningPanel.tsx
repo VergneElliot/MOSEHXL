@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogTitle,
   MenuItem,
+  Paper,
   Table,
   TableBody,
   TableCell,
@@ -18,12 +19,18 @@ import {
 } from '@mui/material';
 import {
   createShift,
+  createLeave,
   deleteShift,
   duplicatePlanningWeek,
   getStaffIcs,
+  listLeaves,
   listPlanningStaff,
   listShifts,
+  previewLeaveCount,
+  updateLeaveStatus,
   updateShift,
+  type LeaveCountPreviewDto,
+  type StaffLeaveDto,
   type StaffShiftDto,
 } from '../../services/api/adminSpace';
 import AdminMonthCalendar, {
@@ -42,6 +49,15 @@ function startOfWeek(d: Date): Date {
   return x;
 }
 
+const LEAVE_TYPE_LABELS: Record<string, string> = {
+  paid_leave: 'Congés payés',
+  rtt: 'RTT',
+  sick_leave: 'Maladie',
+  unpaid_leave: 'Sans solde',
+  family_event: 'Événement familial',
+  other: 'Autre',
+};
+
 const PlanningPanel: React.FC = () => {
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
@@ -49,8 +65,20 @@ const PlanningPanel: React.FC = () => {
     Array<{ id: number; email: string; first_name: string | null; last_name: string | null }>
   >([]);
   const [shifts, setShifts] = useState<StaffShiftDto[]>([]);
+  const [leaves, setLeaves] = useState<StaffLeaveDto[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const [leaveForm, setLeaveForm] = useState<{
+    user_id: number;
+    leave_type: StaffLeaveDto['leave_type'];
+    starts_on: string;
+    ends_on: string;
+    half_day_start: boolean;
+    half_day_end: boolean;
+    note: string;
+  } | null>(null);
+  const [leavePreview, setLeavePreview] = useState<LeaveCountPreviewDto | null>(null);
   const [form, setForm] = useState<{
     id?: number;
     user_id: number;
@@ -75,12 +103,14 @@ const PlanningPanel: React.FC = () => {
   const refresh = useCallback(async () => {
     try {
       setError(null);
-      const [staffRes, shiftsRes] = await Promise.all([
+      const [staffRes, shiftsRes, leavesRes] = await Promise.all([
         listPlanningStaff(),
         listShifts(loadRange.from, loadRange.to),
+        listLeaves(loadRange.from, loadRange.to),
       ]);
       setStaff(staffRes.staff);
       setShifts(shiftsRes.shifts);
+      setLeaves(leavesRes.leaves);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Chargement impossible');
     }
@@ -89,6 +119,34 @@ const PlanningPanel: React.FC = () => {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!leaveOpen || !leaveForm?.starts_on || !leaveForm?.ends_on) {
+      setLeavePreview(null);
+      return;
+    }
+    if (leaveForm.ends_on < leaveForm.starts_on) {
+      setLeavePreview(null);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void previewLeaveCount({
+        starts_on: leaveForm.starts_on,
+        ends_on: leaveForm.ends_on,
+        half_day_start: leaveForm.half_day_start,
+        half_day_end: leaveForm.half_day_end,
+      })
+        .then(setLeavePreview)
+        .catch(() => setLeavePreview(null));
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [
+    leaveOpen,
+    leaveForm?.starts_on,
+    leaveForm?.ends_on,
+    leaveForm?.half_day_start,
+    leaveForm?.half_day_end,
+  ]);
 
   const nameOf = (id: number) => {
     const u = staff.find((s) => s.id === id);
@@ -108,29 +166,42 @@ const PlanningPanel: React.FC = () => {
     });
   };
 
-  const calendarItems: AdminCalendarItem[] = useMemo(
-    () =>
-      shifts.map((s) => {
-        const start = new Date(s.starts_at);
-        const end = new Date(s.ends_at);
-        const time = `${start.toLocaleTimeString('fr-FR', {
-          hour: '2-digit',
-          minute: '2-digit',
-        })}–${end.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
-        const pending = s.approval_status === 'pending_employee';
+  const calendarItems: AdminCalendarItem[] = useMemo(() => {
+    const shiftItems = shifts.map((s) => {
+      const start = new Date(s.starts_at);
+      const end = new Date(s.ends_at);
+      const time = `${start.toLocaleTimeString('fr-FR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })}–${end.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+      const pending = s.approval_status === 'pending_employee';
+      return {
+        id: s.id,
+        startsAt: start,
+        title: `${time} · ${nameOf(s.user_id)}${s.label ? ` · ${s.label}` : ''}${
+          pending ? ' (en attente)' : ''
+        }`,
+        subtitle: pending ? 'En attente de confirmation employé' : s.label || undefined,
+        color: pending ? '#ed6c02' : '#1565c0',
+      };
+    });
+    const leaveItems = leaves
+      .filter((l) => l.status === 'approved' || l.status === 'pending')
+      .map((l) => {
+        const start = new Date(`${l.starts_on}T08:00:00`);
+        const label = LEAVE_TYPE_LABELS[l.leave_type] ?? l.leave_type;
+        const pending = l.status === 'pending';
         return {
-          id: s.id,
+          id: `leave-${l.id}`,
           startsAt: start,
-          title: `${time} · ${nameOf(s.user_id)}${s.label ? ` · ${s.label}` : ''}${
-            pending ? ' (en attente)' : ''
-          }`,
-          subtitle: pending ? 'En attente de confirmation employé' : s.label || undefined,
-          color: pending ? '#ed6c02' : '#1565c0',
+          title: `${label} · ${nameOf(l.user_id)}${pending ? ' (demande)' : ''}`,
+          subtitle: l.note || undefined,
+          color: pending ? '#9c27b0' : '#2e7d32',
         };
-      }),
+      });
+    return [...shiftItems, ...leaveItems];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [shifts, staff]
-  );
+  }, [shifts, leaves, staff]);
 
   const openCreate = (day?: Date) => {
     const base = day ? new Date(day) : new Date(weekStart);
@@ -156,6 +227,27 @@ const PlanningPanel: React.FC = () => {
       <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
         <Button variant="contained" onClick={() => openCreate()}>
           Ajouter une vacation
+        </Button>
+        <Button
+          variant="outlined"
+          onClick={() => {
+            const today = new Date();
+            const pad = (n: number) => String(n).padStart(2, '0');
+            const d = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+            setLeaveForm({
+              user_id: staff[0]?.id ?? 0,
+              leave_type: 'paid_leave',
+              starts_on: d,
+              ends_on: d,
+              half_day_start: false,
+              half_day_end: false,
+              note: '',
+            });
+            setLeavePreview(null);
+            setLeaveOpen(true);
+          }}
+        >
+          Demander un congé
         </Button>
         <Button
           onClick={async () => {
@@ -186,6 +278,7 @@ const PlanningPanel: React.FC = () => {
           openCreate(day);
         }}
         onItemClick={(item) => {
+          if (typeof item.id === 'string' && item.id.startsWith('leave-')) return;
           const shift = shifts.find((s) => s.id === item.id);
           if (!shift) return;
           const start = new Date(shift.starts_at);
@@ -323,6 +416,161 @@ const PlanningPanel: React.FC = () => {
           ))}
         </TableBody>
       </Table>
+
+      {leaves.filter((l) => l.status === 'pending').length > 0 && (
+        <Paper variant="outlined" sx={{ p: 2, mt: 3 }}>
+          <Typography variant="subtitle1" gutterBottom>
+            Congés en attente d&apos;approbation
+          </Typography>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Employé</TableCell>
+                <TableCell>Type</TableCell>
+                <TableCell>Période</TableCell>
+                <TableCell align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {leaves
+                .filter((l) => l.status === 'pending')
+                .map((l) => (
+                  <TableRow key={l.id}>
+                    <TableCell>{nameOf(l.user_id)}</TableCell>
+                    <TableCell>{LEAVE_TYPE_LABELS[l.leave_type] ?? l.leave_type}</TableCell>
+                    <TableCell>
+                      {l.starts_on} → {l.ends_on}
+                    </TableCell>
+                    <TableCell align="right">
+                      <Button
+                        size="small"
+                        color="success"
+                        onClick={async () => {
+                          await updateLeaveStatus(l.id, { status: 'approved' });
+                          await refresh();
+                        }}
+                      >
+                        Approuver
+                      </Button>
+                      <Button
+                        size="small"
+                        color="error"
+                        onClick={async () => {
+                          await updateLeaveStatus(l.id, { status: 'rejected' });
+                          await refresh();
+                        }}
+                      >
+                        Refuser
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+        </Paper>
+      )}
+
+      <Dialog open={leaveOpen} onClose={() => setLeaveOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Demande de congé</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2.5, overflow: 'visible' }}>
+          <TextField
+            select
+            label="Employé"
+            value={leaveForm?.user_id ?? ''}
+            onChange={(e) => setLeaveForm({ ...leaveForm!, user_id: Number(e.target.value) })}
+            fullWidth
+            InputLabelProps={{ shrink: true }}
+          >
+            {staff.map((s) => (
+              <MenuItem key={s.id} value={s.id}>
+                {nameOf(s.id)}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            label="Type"
+            value={leaveForm?.leave_type ?? 'paid_leave'}
+            onChange={(e) =>
+              setLeaveForm({
+                ...leaveForm!,
+                leave_type: e.target.value as StaffLeaveDto['leave_type'],
+              })
+            }
+            fullWidth
+            InputLabelProps={{ shrink: true }}
+          >
+            {Object.entries(LEAVE_TYPE_LABELS).map(([k, v]) => (
+              <MenuItem key={k} value={k}>
+                {v}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            type="date"
+            label="Du"
+            InputLabelProps={{ shrink: true }}
+            value={leaveForm?.starts_on ?? ''}
+            onChange={(e) => setLeaveForm({ ...leaveForm!, starts_on: e.target.value })}
+            fullWidth
+          />
+          <TextField
+            type="date"
+            label="Au"
+            InputLabelProps={{ shrink: true }}
+            value={leaveForm?.ends_on ?? ''}
+            onChange={(e) => setLeaveForm({ ...leaveForm!, ends_on: e.target.value })}
+            fullWidth
+          />
+          <TextField
+            label="Motif (optionnel)"
+            value={leaveForm?.note ?? ''}
+            onChange={(e) => setLeaveForm({ ...leaveForm!, note: e.target.value })}
+            fullWidth
+            multiline
+            rows={2}
+          />
+          {leavePreview && (
+            <Alert severity="info">
+              <strong>{leavePreview.counted_days} jour(s) compté(s)</strong> pour le décompte CP
+              {leavePreview.return_on ? ` · reprise le ${leavePreview.return_on}` : ''}.
+              {leavePreview.excluded_public_holidays.length > 0 && (
+                <>
+                  {' '}
+                  Jours fériés dans la période (non comptés) :{' '}
+                  {leavePreview.excluded_public_holidays
+                    .map((h) => `${h.name} (${h.date})`)
+                    .join(', ')}
+                  .
+                </>
+              )}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLeaveOpen(false)}>Annuler</Button>
+          <Button
+            variant="contained"
+            onClick={async () => {
+              if (!leaveForm?.user_id) return;
+              try {
+                await createLeave({
+                  ...leaveForm,
+                  auto_approve: true,
+                });
+                setLeaveOpen(false);
+                setLeaveForm(null);
+                setLeavePreview(null);
+                await refresh();
+              } catch (err) {
+                setError(err instanceof Error ? err.message : 'Création impossible');
+              }
+            }}
+          >
+            Enregistrer (approuvé)
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>{form?.id ? 'Modifier' : 'Nouvelle'} vacation</DialogTitle>

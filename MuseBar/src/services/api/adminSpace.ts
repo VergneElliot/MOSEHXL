@@ -280,7 +280,11 @@ export async function listTimeClockStaff() {
 }
 
 export async function punchTimeClock(userId: number, password: string) {
-  return request<{ action: 'clock_in' | 'clock_out'; entry: TimeEntryDto }>(
+  return request<{
+    action: 'clock_in' | 'clock_out';
+    entry: TimeEntryDto;
+    leave_warning?: string;
+  }>(
     '/admin/time-clock/punch',
     {
       method: 'POST',
@@ -328,6 +332,218 @@ export async function updateTimeClockNetwork(payload: {
       body: JSON.stringify(payload),
     }
   );
+}
+
+export interface LaborViolationDto {
+  code: string;
+  severity: 'info' | 'warning' | 'error';
+  user_id: number;
+  message: string;
+  at?: string;
+  details?: Record<string, unknown>;
+}
+
+export interface ReconciliationRowDto {
+  user_id: number;
+  day: string;
+  planned_minutes: number;
+  actual_minutes: number;
+  delta_minutes: number;
+}
+
+export async function getPayrollSummary(from: string, to: string) {
+  const qs = new URLSearchParams({ from, to });
+  return request<PayrollSummaryDto>(`/admin/time-clock/payroll-summary?${qs}`);
+}
+
+export interface PayrollLeaveLineDto {
+  leave_id: number;
+  leave_type: string;
+  requested_from: string;
+  requested_to: string;
+  counted_days: number;
+  count_from: string;
+  count_through: string;
+  return_on: string;
+}
+
+export interface PayrollEmployeeRowDto {
+  user_id: number;
+  first_name: string | null;
+  last_name: string | null;
+  email: string;
+  total_minutes: number;
+  hours_decimal: number;
+  hours_formatted: string;
+  meals: number;
+  paid_leave_days: number;
+  rtt_days: number;
+  other_leave_days: number;
+  entry_count: number;
+  leave_lines: PayrollLeaveLineDto[];
+}
+
+export interface PayrollSummaryDto {
+  from: string;
+  to: string;
+  payroll_settings: Record<string, unknown>;
+  employees: PayrollEmployeeRowDto[];
+  notes: string[];
+}
+
+export async function downloadAccountantExport(from: string, to: string): Promise<void> {
+  if (!apiConfig.isReady()) await apiConfig.initialize();
+  const qs = new URLSearchParams({ from, to, format: 'accountant' });
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(apiConfig.getEndpoint(`/api/admin/time-clock/export?${qs}`), {
+    headers,
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || `Export failed (${res.status})`);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `paie-${from.slice(0, 10)}-${to.slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function getTimeClockCompliance(from: string, to: string) {
+  const qs = new URLSearchParams({ from, to });
+  return request<{
+    violations: LaborViolationDto[];
+    reconciliation: ReconciliationRowDto[];
+    settings: Record<string, unknown>;
+  }>(`/admin/time-clock/compliance?${qs}`);
+}
+
+export async function downloadTimeClockExport(from: string, to: string): Promise<void> {
+  if (!apiConfig.isReady()) await apiConfig.initialize();
+  const qs = new URLSearchParams({ from, to });
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(apiConfig.getEndpoint(`/api/admin/time-clock/export?${qs}`), {
+    headers,
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || `Export failed (${res.status})`);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `pointage-${from.slice(0, 10)}-${to.slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export type LeaveType =
+  | 'paid_leave'
+  | 'rtt'
+  | 'sick_leave'
+  | 'unpaid_leave'
+  | 'family_event'
+  | 'other';
+
+export interface StaffLeaveDto {
+  id: number;
+  user_id: number;
+  leave_type: LeaveType;
+  starts_on: string;
+  ends_on: string;
+  half_day_start: boolean;
+  half_day_end: boolean;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  note: string | null;
+  review_note: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string;
+}
+
+export interface LeaveBalanceDto {
+  user_id: number;
+  first_name: string | null;
+  last_name: string | null;
+  email: string;
+  year: number;
+  paid_leave_days: number;
+  rtt_days: number;
+  used_paid_leave: number;
+  used_rtt: number;
+  remaining_paid_leave: number;
+  remaining_rtt: number;
+}
+
+export async function listLeaves(from: string, to: string, status?: string) {
+  const qs = new URLSearchParams({ from, to });
+  if (status) qs.set('status', status);
+  return request<{ leaves: StaffLeaveDto[] }>(`/admin/leaves?${qs}`);
+}
+
+export async function createLeave(payload: {
+  user_id: number;
+  leave_type: LeaveType;
+  starts_on: string;
+  ends_on: string;
+  half_day_start?: boolean;
+  half_day_end?: boolean;
+  note?: string;
+  auto_approve?: boolean;
+}) {
+  return request<{ leave: StaffLeaveDto }>('/admin/leaves', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateLeaveStatus(
+  id: number,
+  payload: { status: 'approved' | 'rejected' | 'cancelled'; review_note?: string }
+) {
+  return request<{ leave: StaffLeaveDto }>(`/admin/leaves/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getLeaveBalances(year: number) {
+  return request<{ year: number; balances: LeaveBalanceDto[] }>(
+    `/admin/leaves/balances?year=${year}`
+  );
+}
+
+export interface LeaveCountPreviewDto {
+  counted_days: number;
+  count_from: string;
+  count_through: string;
+  return_on: string;
+  mode: string;
+  excluded_public_holidays: Array<{ date: string; name: string }>;
+}
+
+export async function previewLeaveCount(params: {
+  starts_on: string;
+  ends_on: string;
+  half_day_start?: boolean;
+  half_day_end?: boolean;
+}) {
+  const qs = new URLSearchParams({
+    starts_on: params.starts_on,
+    ends_on: params.ends_on,
+  });
+  if (params.half_day_start) qs.set('half_day_start', 'true');
+  if (params.half_day_end) qs.set('half_day_end', 'true');
+  return request<LeaveCountPreviewDto>(`/admin/leaves/preview-count?${qs}`);
 }
 
 export interface AdminDocumentDto {

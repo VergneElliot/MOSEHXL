@@ -93,6 +93,27 @@ export function weekdayKeyFromDate(d: Date): WeekdayKey {
   return map[d.getDay()]!;
 }
 
+/** JS getDay() 0=Sun … 6=Sat for each WeekdayKey */
+export const WEEKDAY_KEY_TO_JS_DOW: Record<WeekdayKey, number> = {
+  sun: 0,
+  mon: 1,
+  tue: 2,
+  wed: 3,
+  thu: 4,
+  fri: 5,
+  sat: 6,
+};
+
+/** Days the establishment is open for service (not marked closed in opening hours). */
+export function openDaysOfWeekFromHours(hours: OpeningHoursSettings): number[] {
+  return WEEKDAYS.filter((k) => !hours.weekly[k].closed).map((k) => WEEKDAY_KEY_TO_JS_DOW[k]);
+}
+
+/** Days habitually closed in the establishment (excluded from CP in jours ouvrés). */
+export function closedDaysOfWeekFromHours(hours: OpeningHoursSettings): number[] {
+  return WEEKDAYS.filter((k) => hours.weekly[k].closed).map((k) => WEEKDAY_KEY_TO_JS_DOW[k]);
+}
+
 function timeToMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(':').map(Number);
   return (h || 0) * 60 + (m || 0);

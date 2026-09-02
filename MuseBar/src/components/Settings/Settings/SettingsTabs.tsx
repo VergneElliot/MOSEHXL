@@ -11,12 +11,14 @@ import {
   Print as PrintIcon,
   LocalBar as HappyHourIcon,
   AccessTime as HoursIcon,
+  Storefront as StorefrontIcon,
   Wifi as WifiIcon,
   RestaurantMenu as MenuIcon,
 } from '@mui/icons-material';
 import { SettingsTab } from './types';
 import { EstablishmentSettings } from './EstablishmentSettings';
 import { OpeningHoursSettingsPanel } from './OpeningHoursSettings';
+import { EstablishmentOperatingHoursPanel } from './EstablishmentOperatingHoursSettings';
 import { TimeClockNetworkSettings } from './TimeClockNetworkSettings';
 import { ClosureSettings } from './ClosureSettings';
 import { PrinterSetup } from '../../PrinterSetup';
@@ -117,6 +119,12 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
         label: 'Plages de réservations',
         icon: <HoursIcon />,
         component: <OpeningHoursSettingsPanel />,
+      },
+      {
+        id: 'operating_hours',
+        label: "Horaires d'ouverture",
+        icon: <StorefrontIcon />,
+        component: <EstablishmentOperatingHoursPanel />,
       },
       {
         id: 'time_clock_network',

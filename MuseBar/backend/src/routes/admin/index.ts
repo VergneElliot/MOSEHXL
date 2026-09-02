@@ -5,6 +5,7 @@ import reservationsRouter from './reservations';
 import planningRouter from './planning';
 import emailStatusRouter from './emailStatus';
 import timeClockRouter from './timeClock';
+import leavesRouter from './leaves';
 
 const router = express.Router();
 
@@ -14,5 +15,6 @@ router.use('/reservations', reservationsRouter);
 router.use('/planning', planningRouter);
 router.use('/email-status', emailStatusRouter);
 router.use('/time-clock', timeClockRouter);
+router.use('/leaves', leavesRouter);
 
 export default router;

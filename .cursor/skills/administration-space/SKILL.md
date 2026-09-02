@@ -43,6 +43,7 @@ routes/admin/index.ts
   ├── /inbox         → inbox.ts (SendGrid inbound parse webhook + UI reads)
   ├── /reservations  → reservations.ts (+ public booking routes under /api/public)
   ├── /planning      → planning.ts (shifts, recurrence, ICS tokens)
+  ├── /leaves        → leaves.ts (congés, balances, approval)
   ├── /email-status  → emailStatus.ts (SendGrid health for admin UI)
   └── /time-clock    → timeClock.ts (IP-restricted punch in/out)
 ```
@@ -106,7 +107,7 @@ Track major polish passes here when completing an area:
 | Documents | baseline shipped |
 | Inbox | baseline shipped |
 | Réservations | baseline shipped |
-| Planning | baseline shipped |
-| Pointage | baseline shipped |
+| Planning | baseline + congés slice A |
+| Pointage | UI tabs + compliance report (slice A) |
 | Plans de tables (editor) | **active — major work expected** |
 | Users / Compliance / Audit | embedded from legacy tabs |

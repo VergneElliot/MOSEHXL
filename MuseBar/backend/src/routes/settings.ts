@@ -18,6 +18,7 @@ import {
   OpeningHoursSettingsModel,
   normalizeOpeningHours,
 } from '../models/openingHoursSettings';
+import { EstablishmentOperatingHoursModel } from '../models/establishmentOperatingHours';
 import { logSoftwareEventBestEffort } from '../services/legal/softwareEventJournal';
 import { logError } from '../utils/logger';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
@@ -144,6 +145,52 @@ router.put(
       eventData: { timezone: settings.timezone },
     });
     return res.json({ settings, configured: true });
+  })
+);
+
+/**
+ * GET /api/settings/operating-hours
+ * Real opening schedule — used for CP décompte (not reservation windows).
+ */
+router.get(
+  '/operating-hours',
+  requireEstablishmentAdminOrPermission(P.access_settings),
+  asyncHandler(async (req, res) => {
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
+    const configured = await EstablishmentOperatingHoursModel.isConfigured(establishmentId);
+    const settings = await EstablishmentOperatingHoursModel.get(establishmentId);
+    return res.json({
+      settings,
+      configured,
+      fallback_from_reservations: !configured,
+    });
+  })
+);
+
+/**
+ * PUT /api/settings/operating-hours
+ */
+router.put(
+  '/operating-hours',
+  requireEstablishmentAdminOrPermission(P.access_settings),
+  asyncHandler(async (req, res) => {
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
+    const body = req.body || {};
+    const raw =
+      body.settings && typeof body.settings === 'object' ? body.settings : body;
+    const settings = await EstablishmentOperatingHoursModel.upsert(
+      establishmentId,
+      normalizeOpeningHours(raw)
+    );
+    await logSoftwareEventBestEffort({
+      establishmentId,
+      eventType: 'OPERATING_HOURS_UPDATED',
+      userId: req.user ? String(req.user.id) : undefined,
+      eventData: { timezone: settings.timezone },
+    });
+    return res.json({ settings, configured: true, fallback_from_reservations: false });
   })
 );
 

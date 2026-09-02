@@ -21,6 +21,15 @@ import {
   isValidIpOrCidr,
   normalizeAllowedIps,
 } from '../../models/timeEntry';
+import {
+  buildComplianceReport,
+  buildPayrollCsv,
+  checkPunchLeaveConflict,
+} from '../../services/labor/laborReportService';
+import {
+  buildAccountantCsv,
+  buildPayrollSummary,
+} from '../../services/labor/payrollReportService';
 
 const router = express.Router();
 
@@ -85,6 +94,11 @@ router.post(
       );
     }
 
+    const leaveCheck = await checkPunchLeaveConflict(establishmentId, userId);
+    if (leaveCheck.block) {
+      throw new AppError(leaveCheck.message ?? 'Congé approuvé', 409, 'TIME_CLOCK_ON_LEAVE');
+    }
+
     try {
       const entry = await TimeEntryModel.clockIn({
         establishmentId,
@@ -92,7 +106,10 @@ router.post(
         ip: network.ip,
         source: 'self',
       });
-      return res.status(201).json({ entry });
+      return res.status(201).json({
+        entry,
+        leave_warning: leaveCheck.on_leave ? leaveCheck.message : undefined,
+      });
     } catch (error) {
       const code = (error as Error & { code?: string }).code;
       if (code === 'TIME_ENTRY_ALREADY_OPEN' || code === '23505') {
@@ -208,6 +225,11 @@ router.post(
       throw new AuthorizationError('Mot de passe incorrect');
     }
 
+    const leaveCheck = await checkPunchLeaveConflict(establishmentId, targetUserId);
+    if (leaveCheck.block) {
+      throw new AppError(leaveCheck.message ?? 'Congé approuvé', 409, 'TIME_CLOCK_ON_LEAVE');
+    }
+
     const open = await TimeEntryModel.getOpenEntry(establishmentId, targetUserId);
     if (open) {
       const entry = await TimeEntryModel.clockOut({
@@ -215,7 +237,11 @@ router.post(
         userId: targetUserId,
         ip: network.ip,
       });
-      return res.json({ action: 'clock_out', entry });
+      return res.json({
+        action: 'clock_out',
+        entry,
+        leave_warning: leaveCheck.on_leave ? leaveCheck.message : undefined,
+      });
     }
 
     try {
@@ -225,7 +251,11 @@ router.post(
         ip: network.ip,
         source: 'shared_terminal',
       });
-      return res.status(201).json({ action: 'clock_in', entry });
+      return res.status(201).json({
+        action: 'clock_in',
+        entry,
+        leave_warning: leaveCheck.on_leave ? leaveCheck.message : undefined,
+      });
     } catch (error) {
       const code = (error as Error & { code?: string }).code;
       if (code === 'TIME_ENTRY_ALREADY_OPEN' || code === '23505') {
@@ -265,6 +295,71 @@ router.get(
       userId: Number.isFinite(userId) ? userId : undefined,
     });
     return res.json({ entries, totals });
+  })
+);
+
+router.get(
+  '/payroll-summary',
+  requireAuth,
+  requireEstablishmentAdminOrPermission(P.access_planning),
+  asyncHandler(async (req, res) => {
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
+    const from = typeof req.query.from === 'string' ? req.query.from : '';
+    const to = typeof req.query.to === 'string' ? req.query.to : '';
+    if (!from || !to) throw new ValidationError('from and to are required (ISO datetimes)');
+    const report = await buildPayrollSummary(establishmentId, from, to);
+    return res.json(report);
+  })
+);
+
+router.get(
+  '/compliance',
+  requireAuth,
+  requireEstablishmentAdminOrPermission(P.access_planning),
+  asyncHandler(async (req, res) => {
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
+    const from = typeof req.query.from === 'string' ? req.query.from : '';
+    const to = typeof req.query.to === 'string' ? req.query.to : '';
+    if (!from || !to) throw new ValidationError('from and to are required (ISO datetimes)');
+    const report = await buildComplianceReport(establishmentId, from, to);
+    return res.json(report);
+  })
+);
+
+router.get(
+  '/export',
+  requireAuth,
+  requireEstablishmentAdminOrPermission(P.access_planning),
+  asyncHandler(async (req, res) => {
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
+    const from = typeof req.query.from === 'string' ? req.query.from : '';
+    const to = typeof req.query.to === 'string' ? req.query.to : '';
+    if (!from || !to) throw new ValidationError('from and to are required (ISO datetimes)');
+
+    const format = typeof req.query.format === 'string' ? req.query.format : 'detail';
+    if (format === 'accountant') {
+      const report = await buildPayrollSummary(establishmentId, from, to);
+      const csv = buildAccountantCsv(report);
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="paie-${from.slice(0, 10)}-${to.slice(0, 10)}.csv"`
+      );
+      return res.send('\uFEFF' + csv);
+    }
+
+    const entries = await TimeEntryModel.list(establishmentId, { from, to });
+    const totals = await TimeEntryModel.totalsByUser(establishmentId, { from, to });
+    const csv = buildPayrollCsv(entries, totals);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="pointage-${from.slice(0, 10)}-${to.slice(0, 10)}.csv"`
+    );
+    return res.send('\uFEFF' + csv);
   })
 );
 

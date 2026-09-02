@@ -1,11 +1,13 @@
 import express from 'express';
 import { getEstablishmentId, requireAuth, requireEstablishmentAdminOrPermission } from '../auth';
 import { P } from '../../permissions/registry';
-import { asyncHandler, NotFoundError, ValidationError } from '../../middleware/errorHandler';
+import { asyncHandler, NotFoundError, ValidationError, AppError } from '../../middleware/errorHandler';
 import { StaffShiftModel, isValidRecurrence } from '../../models/staffShift';
 import { UserModel } from '../../models/user';
 import { pool } from '../../db/pool';
 import { notifyEmployeeShiftConfirmation } from '../../services/planning/planningEmailService';
+import { StaffLeaveModel } from '../../models/staffLeave';
+import { shiftOverlapsApprovedLeave } from '../../services/labor/laborCompliance';
 
 const router = express.Router();
 router.use(requireAuth, requireEstablishmentAdminOrPermission(P.access_planning));
@@ -67,6 +69,34 @@ router.post(
 
     const belongs = await UserModel.userBelongsToEstablishment(userId, establishmentId);
     if (!belongs) throw new ValidationError('Employé introuvable dans cet établissement');
+
+    const approvedLeaves = await StaffLeaveModel.listApprovedForRange(
+      establishmentId,
+      startsAt,
+      endsAt
+    );
+    const leaveSpans = approvedLeaves.map((l) => ({
+      user_id: l.user_id,
+      starts_on: l.starts_on,
+      ends_on: l.ends_on,
+      half_day_start: l.half_day_start,
+      half_day_end: l.half_day_end,
+      status: l.status,
+      leave_type: l.leave_type,
+    }));
+    const overlap = shiftOverlapsApprovedLeave(
+      new Date(startsAt),
+      new Date(endsAt),
+      leaveSpans,
+      userId
+    );
+    if (overlap) {
+      throw new AppError(
+        `Impossible de planifier : congé approuvé (${overlap.leave_type}) du ${overlap.starts_on} au ${overlap.ends_on}.`,
+        409,
+        'SHIFT_ON_APPROVED_LEAVE'
+      );
+    }
 
     let created;
     try {
