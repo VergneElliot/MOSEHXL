@@ -7,6 +7,14 @@ export interface BridgePrintJob {
   payload_base64: string;
   attempt_count?: number;
   metadata?: Record<string, unknown>;
+  created_at?: string;
+  /** Milliseconds the job waited in cloud queue before this poll claim. */
+  queued_ms?: number;
+}
+
+export interface BridgePollResponse {
+  job?: BridgePrintJob | null;
+  queued_ms?: number;
 }
 
 function bridgeHeaders(config: BridgeConfig): Record<string, string> {
@@ -42,8 +50,9 @@ export async function pollJob(config: BridgeConfig): Promise<BridgePrintJob | nu
   if (!response.ok) {
     throw new Error(`Poll failed (${response.status}): ${await readError(response)}`);
   }
-  const body = await response.json() as { job?: BridgePrintJob | null };
-  return body.job ?? null;
+  const body = await response.json() as BridgePollResponse;
+  if (!body.job) return null;
+  return { ...body.job, queued_ms: body.queued_ms };
 }
 
 export async function ackJob(config: BridgeConfig, jobId: string): Promise<void> {

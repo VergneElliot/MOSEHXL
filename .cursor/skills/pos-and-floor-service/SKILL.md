@@ -72,8 +72,14 @@ dispatchKitchenTicketsForCompletedOrder
 
 ## Hot path (Caisse catalog)
 
-- `ProductGrid`: `React.memo` + `react-virtuoso`
+- `ProductGrid`: plain DOM + static `ProductGrid.css` (no MUI Card/`sx` per card, no Virtuoso).
+  ~70 cards stay in DOM; performance target is instant category switch on establishment POS.
+- `POSMenuPanel`: passes `catalogView` key to remount grid on mode change; `showFavoriteBadge`
+  only on **Tous** / **Favoris**.
+- **Tous list keys:** `` `${index}:${product.id}` `` — favorites are duplicated at top and in
+  category sections; never use `key={product.id}` alone.
 - Pricing: `usePOSCatalogLogic` → `@mosehxl/types` `calculateHappyHourPrice`
+- Favoris data: `useTopSellerProductIds` + `posCatalogOrdering.ts`
 
 ## Refinement status (living)
 

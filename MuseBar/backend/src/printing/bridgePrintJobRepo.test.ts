@@ -152,7 +152,13 @@ describe('bridgePrintJobRepo', () => {
           { status: 'failed', count: 1 },
         ],
       })
-      .mockResolvedValueOnce({ rows: [{ printed_at: new Date('2026-06-18T10:00:00Z') }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          printed_at: new Date('2026-06-18T10:00:05.000Z'),
+          created_at: new Date('2026-06-18T10:00:00.000Z'),
+          claimed_at: new Date('2026-06-18T10:00:02.000Z'),
+        }],
+      })
       .mockResolvedValueOnce({
         rows: [{ failed_at: new Date('2026-06-18T11:00:00Z'), last_error: 'offline' }],
       })
@@ -167,6 +173,9 @@ describe('bridgePrintJobRepo', () => {
     expect(status.pending).toBe(2);
     expect(status.failed).toBe(1);
     expect(status.lastError).toBe('offline');
-    expect(status.lastPrintedAt).toBe('2026-06-18T10:00:00.000Z');
+    expect(status.lastPrintedAt).toBe('2026-06-18T10:00:05.000Z');
+    expect(status.lastTotalLatencyMs).toBe(5000);
+    expect(status.lastQueueWaitMs).toBe(2000);
+    expect(status.lastPrintDurationMs).toBe(3000);
   });
 });

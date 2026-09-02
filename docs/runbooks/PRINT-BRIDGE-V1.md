@@ -52,7 +52,7 @@ BRIDGE_KEY=<generated bridge key>
 PRINTER_DRIVER=network-escpos
 PRINTER_HOST=192.168.0.95
 PRINTER_PORT=9100
-POLL_INTERVAL_MS=1000
+POLL_INTERVAL_MS=500
 ```
 
 If the printer receives a different DHCP address, update `PRINTER_HOST`.
@@ -89,7 +89,7 @@ Leave the terminal running during service. V1 is intentionally a terminal proces
 
 **After a MuseBar cloud deploy:** restart the bridge process on the cashier PC (`Ctrl+C`, then `npm run bridge` again). The bridge is a separate LAN process — it does not update when the server deploys. Backend queue API stays compatible, but a restart clears stuck state and picks up any `.env` changes.
 
-Optional: set `POLL_INTERVAL_MS=1000` (default since 2026-09) for faster pickup when idle; the bridge already drains multiple queued jobs back-to-back without waiting between them.
+Optional: set `POLL_INTERVAL_MS=500` (default since 2026-09) for faster pickup when idle; the bridge already drains multiple queued jobs back-to-back without waiting between them.
 
 ---
 
@@ -123,4 +123,27 @@ Kitchen enqueue failures are logged to the legal software journal (`KITCHEN_TICK
 3. **Printer timeout/refused**: verify the cashier PC is on the same LAN as the printer and `PRINTER_HOST:PRINTER_PORT` is reachable.
 4. **Duplicate prints**: check whether the bridge crashed after printing but before ACK. V1 retries conservatively after failed/claimed jobs.
 5. **Jobs remain pending**: the bridge is not running or cannot reach `MUSEBAR_API_URL`.
-6. **Delay before print (5–20 s)**: normal when several kitchen tickets are queued (one job per printer/route, processed sequentially). For a single receipt, check `POLL_INTERVAL_MS` (try `1000`), restart the bridge, and verify no job is stuck in `claimed` (re-queue after ~45 s if the bridge died mid-print). Multiple tickets from one sale (bar + cuisine) print one after another — not in parallel.
+6. **Delay before print (5–20 s)**: normal when several kitchen tickets are queued (one job per printer/route, processed sequentially). For a single receipt, check `POLL_INTERVAL_MS` (default `500`; try `500` or lower only if the bar LAN is stable), restart the bridge, and verify no job is stuck in `claimed` (re-queue after ~45 s if the bridge died mid-print). Multiple tickets from one sale (bar + cuisine) print one after another — not in parallel.
+
+### Diagnosing print latency
+
+Each print produces timing data in three places:
+
+| Where | What to look for |
+|-------|------------------|
+| **Bridge terminal** | `queuedMs` (cloud queue + poll wait), `printMs` (LAN → printer), `totalMs` (claim → ACK) |
+| **Cloud logs** (`PRINT_JOB_CLAIMED`) | `queued_ms` at claim time |
+| **GET `/api/printing/bridge/status`** | `lastQueueWaitMs`, `lastPrintDurationMs`, `lastTotalLatencyMs` on the last successful print |
+
+**How to read it:**
+
+- **`queuedMs` high (~5–10 s), `printMs` low (<1 s)** → bridge was not polling (restart bridge, lower `POLL_INTERVAL_MS`), slow bar internet to cloud, or jobs stuck in `claimed`.
+- **`queuedMs` low, `printMs` high** → printer LAN issue (`PRINTER_HOST` unreachable, wrong IP, Wi‑Fi drop).
+- **Both low but user still waits** → delay is *before* enqueue (slow sale API / kitchen dispatch) — check backend logs around order completion, not the bridge.
+
+Quick check from the bar PC (replace key and establishment id):
+
+```bash
+curl -s -H "x-bridge-key: YOUR_KEY" \
+  "https://mosehxl.com/api/printing/bridge/status?establishment_id=YOUR_EST_ID" | jq .
+```

@@ -16,6 +16,26 @@ Fiscal sequence counters are never reset across versions.
 
 ---
 
+## [Unreleased]
+
+**Fiscal impact:** PATCH (no ISCA parameter change).
+
+### Fixed
+
+- POS product grid: restored fast category switching on establishment hardware by replacing
+  per-card MUI/Emotion rendering with plain DOM + static CSS; removed Virtuoso and
+  `content-visibility` from the catalog grid.
+- POS scroll tearing on product cards (hover shadow repaints during scroll).
+- Favoris block stuck at top after leaving **Tous** (duplicate React list keys on catalog
+  view that intentionally lists favorites twice).
+
+### Changed
+
+- Print bridge: default poll interval 500 ms; queue/print latency fields on status API and
+  bridge logs (`queuedMs`, `printMs`) for troubleshooting slow receipts.
+
+---
+
 ## [2.0.3] — 2026-07-23 — post-freeze thoroughness (COMP batch)
 
 **Fiscal impact:** PATCH (no ISCA parameter change — reconciliation tolerance,

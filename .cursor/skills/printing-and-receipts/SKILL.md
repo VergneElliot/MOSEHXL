@@ -39,6 +39,16 @@ cd MuseBar/bridge && npm run build && npm start
 
 Bridge connects establishment LAN printer to backend job queue.
 
+### Latency and diagnostics (2026-09)
+
+- Default `POLL_INTERVAL_MS=500` (bridge `.env`; UI snippet in `printingConfigRepo`).
+- Bridge logs per job: `queuedMs` (cloud queue wait), `printMs` (LAN→printer), `totalMs`.
+- Poll API returns `queued_ms` + `created_at`; claim logs include `queued_ms`.
+- `GET /api/printing/bridge/status` (with `x-bridge-key`) exposes
+  `lastQueueWaitMs`, `lastPrintDurationMs`, `lastTotalLatencyMs`.
+- Runbook troubleshooting: `docs/runbooks/PRINT-BRIDGE-V1.md` § Diagnosing print latency.
+- After cloud deploy: restart bridge on bar PC (separate LAN process).
+
 ## Kitchen printing flow
 
 1. Order completes → `dispatchKitchenTicketsForCompletedOrder`

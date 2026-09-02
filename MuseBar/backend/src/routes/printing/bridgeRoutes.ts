@@ -24,13 +24,18 @@ router.get('/bridge/poll', asyncHandler(async (req: Request, res: Response) => {
     return res.json({ job: null });
   }
 
+  const queuedMs = Math.max(0, Date.now() - job.created_at.getTime());
+
   getLogger().info('PRINT_JOB_CLAIMED', {
     job_id: job.id,
     establishment_id: establishmentId,
     document_type: job.document_type,
+    queued_ms: queuedMs,
+    attempt: job.attempt_count,
   });
 
   return res.json({
+    queued_ms: queuedMs,
     job: {
       id: job.id,
       document_type: job.document_type,
@@ -38,6 +43,7 @@ router.get('/bridge/poll', asyncHandler(async (req: Request, res: Response) => {
       payload_base64: job.payload_base64,
       attempt_count: job.attempt_count,
       metadata: job.metadata,
+      created_at: job.created_at.toISOString(),
     },
   });
 }));

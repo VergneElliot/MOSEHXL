@@ -39,6 +39,12 @@ export interface BridgeQueueStatus {
   lastPrintedAt: string | null;
   lastFailedAt: string | null;
   lastError: string | null;
+  /** Milliseconds from job creation to last successful print (cloud queue + bridge + printer). */
+  lastTotalLatencyMs: number | null;
+  /** Milliseconds from job creation to last claim (poll / network delay indicator). */
+  lastQueueWaitMs: number | null;
+  /** Milliseconds from last claim to print ACK (bridge LAN + printer). */
+  lastPrintDurationMs: number | null;
 }
 
 export interface CreateBridgePrintJobInput {
@@ -293,7 +299,7 @@ export async function getBridgeQueueStatus(
     }
 
     const lastPrinted = await client.query(
-      `SELECT printed_at
+      `SELECT printed_at, created_at, claimed_at
        FROM printing_jobs
        WHERE establishment_id = $1
          AND status = 'printed'
@@ -315,12 +321,30 @@ export async function getBridgeQueueStatus(
 
     const printedAt = lastPrinted.rows[0]?.printed_at;
     const failedAt = lastFailed.rows[0]?.failed_at;
+    const createdAt = lastPrinted.rows[0]?.created_at;
+    const claimedAt = lastPrinted.rows[0]?.claimed_at;
+
+    const lastTotalLatencyMs =
+      printedAt instanceof Date && createdAt instanceof Date
+        ? Math.max(0, printedAt.getTime() - createdAt.getTime())
+        : null;
+    const lastQueueWaitMs =
+      claimedAt instanceof Date && createdAt instanceof Date
+        ? Math.max(0, claimedAt.getTime() - createdAt.getTime())
+        : null;
+    const lastPrintDurationMs =
+      printedAt instanceof Date && claimedAt instanceof Date
+        ? Math.max(0, printedAt.getTime() - claimedAt.getTime())
+        : null;
 
     return {
       ...counts,
       lastPrintedAt: toIsoString(printedAt),
       lastFailedAt: toIsoString(failedAt),
       lastError: typeof lastFailed.rows[0]?.last_error === 'string' ? lastFailed.rows[0].last_error : null,
+      lastTotalLatencyMs,
+      lastQueueWaitMs,
+      lastPrintDurationMs,
     };
   } catch (error) {
     await client.query('ROLLBACK');

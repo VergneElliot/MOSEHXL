@@ -13,16 +13,25 @@ function log(message: string, extra?: Record<string, unknown>): void {
 }
 
 async function processJob(config: BridgeConfig, job: BridgePrintJob): Promise<void> {
+  const receivedAt = Date.now();
   log('Print job received', {
     jobId: job.id,
     documentType: job.document_type,
     kitchenPrinterSlug: job.metadata?.kitchen_printer_slug,
     attempt: job.attempt_count,
+    queuedMs: job.queued_ms ?? null,
   });
   try {
+    const printStartedAt = Date.now();
     await printEscPosJob(job, config);
+    const printMs = Date.now() - printStartedAt;
     await ackJob(config, job.id);
-    log('Print job ACKed', { jobId: job.id });
+    log('Print job ACKed', {
+      jobId: job.id,
+      printMs,
+      totalMs: Date.now() - receivedAt,
+      queuedMs: job.queued_ms ?? null,
+    });
   } catch (error) {
     log('Print job failed', {
       jobId: job.id,
