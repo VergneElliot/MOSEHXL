@@ -10,6 +10,7 @@ export interface UserRowActionsProps {
   onDeactivate: () => void;
   onReactivate: () => void;
   onPurge: () => void;
+  onUnlock: () => void;
 }
 
 /**
@@ -25,6 +26,7 @@ const UserRowActions: React.FC<UserRowActionsProps> = ({
   onDeactivate,
   onReactivate,
   onPurge,
+  onUnlock,
 }) => {
   if (!isActive) {
     return (
@@ -52,6 +54,9 @@ const UserRowActions: React.FC<UserRowActionsProps> = ({
           Effacer PIN
         </Button>
       )}
+      <Button onClick={onUnlock} variant="outlined" size="small">
+        Déverrouiller
+      </Button>
       <Button onClick={onDeactivate} variant="outlined" color="error" size="small">
         Désactiver
       </Button>

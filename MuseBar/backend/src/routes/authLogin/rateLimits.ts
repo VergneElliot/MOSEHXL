@@ -6,7 +6,7 @@ import {
   resolveLoginRateLimitKey,
 } from '../../middleware/security/AuthEndpointRateLimit';
 
-const authRateLimitBase = process.env.NODE_ENV === 'development' ? 5 : 1;
+const authRateLimitBase = process.env.NODE_ENV === 'development' ? 5 : 3;
 const authLimiterPool = process.env.NODE_ENV === 'test' ? undefined : pool;
 
 const authRateLimitLogger = {

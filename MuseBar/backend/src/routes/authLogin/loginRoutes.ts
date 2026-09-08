@@ -98,7 +98,7 @@ loginRoutes.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
     const valid = await UserModel.verifyPassword(user, password);
     if (!valid) {
       const failedAttempts = await UserModel.incrementFailedLoginAttempts(user.id);
-      const lockThreshold = toPositiveFiniteNumber(MAX_FAILED_LOGIN_ATTEMPTS, 5);
+      const lockThreshold = toPositiveFiniteNumber(MAX_FAILED_LOGIN_ATTEMPTS, 8);
       if (failedAttempts >= lockThreshold) {
         const nextLockoutCount = (user.lockout_count ?? 0) + 1;
         const lockMinutes = computeLockoutDurationMinutes(nextLockoutCount);

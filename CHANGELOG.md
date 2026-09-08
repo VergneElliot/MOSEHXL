@@ -88,6 +88,9 @@ Fiscal sequence counters are never reset across versions.
 
 ### Fixed
 
+- Auth : verrouillage après échecs de login beaucoup plus court (défaut 2→15 min au lieu de
+  15→240) ; bouton **Déverrouiller** en Gestion des utilisateurs ; pages publiques
+  (`/reserve/…`) n’attendent plus le bootstrap de session.
 - Floor : à suivre / abandon / clôture ne réécrivent plus le serveur assigné ; la route
   « takeover » et le bouton « Prendre en charge » sont retirés (réassignation via Assigner à).
 - Permissions : `access_compliance` (journal légal / conformité) était impossible à attribuer —

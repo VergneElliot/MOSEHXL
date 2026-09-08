@@ -124,6 +124,40 @@ export const useUserActions = ({
     }
   }, [onError]);
 
+  /** Clear failed-login lockout so the member can sign in again. */
+  const unlockUser = useCallback(async (userId: number): Promise<boolean> => {
+    onError(null);
+    try {
+      await apiService.put(`/auth/users/${userId}/unlock`, {});
+      return true;
+    } catch (err) {
+      onError((err as { message?: string }).message || 'Impossible de déverrouiller le compte');
+      return false;
+    }
+  }, [onError]);
+
+  const confirmDeactivate = useCallback(
+    async (user: { id: number; email: string }): Promise<boolean> => {
+      const ok = window.confirm(
+        `Désactiver le compte ${user.email} ? Son PIN est effacé et ses sessions sont fermées. ` +
+          'Le compte est conservé pour la traçabilité de ses actions passées.'
+      );
+      return ok ? deactivateUser(user.id) : false;
+    },
+    [deactivateUser]
+  );
+
+  const confirmPurge = useCallback(
+    async (user: { id: number; email: string }): Promise<boolean> => {
+      const ok = window.confirm(
+        `Supprimer définitivement ${user.email} ? Irréversible, et refusé si le compte a la ` +
+          'moindre activité enregistrée.'
+      );
+      return ok ? purgeUser(user.id) : false;
+    },
+    [purgeUser]
+  );
+
   const updateUserRole = useCallback(async (
     userId: number,
     role: EstablishmentAssignableRole
@@ -150,8 +184,21 @@ export const useUserActions = ({
       deactivateUser,
       reactivateUser,
       purgeUser,
+      unlockUser,
+      confirmDeactivate,
+      confirmPurge,
       updateUserRole,
     }),
-    [fetchUsers, createUser, deactivateUser, reactivateUser, purgeUser, updateUserRole]
+    [
+      fetchUsers,
+      createUser,
+      deactivateUser,
+      reactivateUser,
+      purgeUser,
+      unlockUser,
+      confirmDeactivate,
+      confirmPurge,
+      updateUserRole,
+    ]
   );
 };

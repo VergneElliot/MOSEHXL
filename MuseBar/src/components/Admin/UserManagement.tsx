@@ -155,12 +155,7 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
   };
 
   const handleDeactivateUser = async (user: (typeof userState.users)[number]) => {
-    const confirmed = window.confirm(
-      `Désactiver le compte ${user.email} ? Son PIN est effacé et ses sessions sont fermées. ` +
-        'Le compte est conservé pour la traçabilité de ses actions passées.'
-    );
-    if (!confirmed) return;
-    if (await userActions.deactivateUser(user.id)) userActions.fetchUsers();
+    if (await userActions.confirmDeactivate(user)) userActions.fetchUsers();
   };
 
   const handleReactivateUser = async (user: (typeof userState.users)[number]) => {
@@ -168,12 +163,13 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
   };
 
   const handlePurgeUser = async (user: (typeof userState.users)[number]) => {
-    const confirmed = window.confirm(
-      `Supprimer définitivement ${user.email} ? Irréversible, et refusé si le compte a la ` +
-        'moindre activité enregistrée.'
-    );
-    if (!confirmed) return;
-    if (await userActions.purgeUser(user.id)) userActions.fetchUsers();
+    if (await userActions.confirmPurge(user)) userActions.fetchUsers();
+  };
+
+  const handleUnlockUser = async (user: (typeof userState.users)[number]) => {
+    if (await userActions.unlockUser(user.id)) {
+      window.alert(`Compte ${user.email} déverrouillé — les tentatives échouées sont remises à zéro.`);
+    }
   };
 
   const handleSavePin = async () => {
@@ -272,6 +268,7 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
                     onDeactivate={() => void handleDeactivateUser(user)}
                     onReactivate={() => void handleReactivateUser(user)}
                     onPurge={() => void handlePurgeUser(user)}
+                    onUnlock={() => void handleUnlockUser(user)}
                   />
                 </TableCell>
               </TableRow>
