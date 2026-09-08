@@ -24,9 +24,9 @@ export interface CreateOrderData {
   cashReceived?: number;
   change?: number;
   notes?: string;
-  waiterUserId?: number;
-  waiterDisplayName?: string;
-  tableLabel?: string;
+  waiterUserId?: number | null;
+  waiterDisplayName?: string | null;
+  tableLabel?: string | null;
 }
 
 export interface ChangeData {
@@ -66,9 +66,18 @@ export const usePOSAPI = (
           tips: orderData.tips ?? 0,
           change: orderData.change ?? 0,
           notes: orderData.notes,
-          waiter_user_id: orderData.waiterUserId ?? attribution?.waiterUserId,
-          waiter_display_name: orderData.waiterDisplayName ?? attribution?.waiterDisplayName,
-          table_label: orderData.tableLabel ?? attribution?.tableLabel ?? undefined,
+          waiter_user_id:
+            orderData.waiterUserId !== undefined
+              ? orderData.waiterUserId
+              : (attribution?.waiterUserId ?? null),
+          waiter_display_name:
+            orderData.waiterDisplayName !== undefined
+              ? orderData.waiterDisplayName
+              : (attribution?.waiterDisplayName ?? null),
+          table_label:
+            orderData.tableLabel !== undefined
+              ? orderData.tableLabel
+              : (attribution?.tableLabel ?? null),
           pinActorToken,
         });
         onSuccess('Commande créée avec succès', created);

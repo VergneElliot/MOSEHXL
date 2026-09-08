@@ -28,6 +28,7 @@ describe('kitchenTicketRenderer', () => {
     expect(ticket).toContain(ESC_POS.DOUBLE_SIZE);
     expect(ticket).toContain(ESC_POS.BEEP);
     expect(ticket).toContain(ESC_POS.feedLines(8));
+    expect(ticket).toContain('01/07/2026 16:30');
     expect(ticket).not.toContain('EUR');
     expect(ticket).not.toMatch(/\d+[.,]\d{2}/);
   });

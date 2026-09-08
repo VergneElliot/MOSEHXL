@@ -29,6 +29,7 @@ import {
   uploadDocument,
   type AdminDocumentDto,
 } from '../../services/api/adminSpace';
+import { ParisDateField } from '../common/ParisDateTimeField';
 
 function daysUntil(dateStr: string | null): number | null {
   if (!dateStr) return null;
@@ -256,13 +257,10 @@ const DocumentsPanel: React.FC = () => {
               ))}
             </Select>
           </FormControl>
-          <TextField
-            label="Date d'expiration"
-            type="date"
-            InputLabelProps={{ shrink: true }}
+          <ParisDateField
+            label="Date d'expiration (jj/mm/aaaa)"
             value={expiresAt}
-            onChange={(e) => setExpiresAt(e.target.value)}
-            fullWidth
+            onChange={setExpiresAt}
           />
         </DialogContent>
         <DialogActions>
@@ -298,15 +296,10 @@ const DocumentsPanel: React.FC = () => {
                   ))}
                 </Select>
               </FormControl>
-              <TextField
-                label="Date d'expiration"
-                type="date"
-                InputLabelProps={{ shrink: true }}
+              <ParisDateField
+                label="Date d'expiration (jj/mm/aaaa)"
                 value={editDoc.expires_at?.slice(0, 10) ?? ''}
-                onChange={(e) =>
-                  setEditDoc({ ...editDoc, expires_at: e.target.value || null })
-                }
-                fullWidth
+                onChange={(ymd) => setEditDoc({ ...editDoc, expires_at: ymd || null })}
               />
             </>
           )}

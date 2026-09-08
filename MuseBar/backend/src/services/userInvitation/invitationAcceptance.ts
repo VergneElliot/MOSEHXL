@@ -8,6 +8,7 @@ import { pool } from '../../db/pool';
 import { Logger } from '../../utils/logger';
 import { InvitationQueries } from '../../utils/database';
 import { EstablishmentModel, CreateEstablishmentData } from '../../models/establishment';
+import { MembershipModel } from '../../models/membership';
 import { mapInvitationRoleLabelToCanonicalRole } from '../../auth/roleVocabulary';
 import { 
   InvitationAcceptanceData, 
@@ -101,6 +102,7 @@ export class InvitationAcceptance {
          SET role = 'establishment_admin', is_active = TRUE, updated_at = CURRENT_TIMESTAMP`,
         [adminUserId, establishment.id]
       );
+      await MembershipModel.ensureCalendarColor(adminUserId, establishment.id, client);
 
       // Update invitation status
       await client.query(`

@@ -10,6 +10,7 @@ import { P } from '../../permissions/registry';
 import { validateBody } from '../../middleware/validation';
 import { AppError, asyncHandler } from '../../middleware/errorHandler';
 import { OrderCancellationService } from '../../services/orders/orderCancellationService';
+import { resolveActor } from '../../services/auth/actorContext';
 
 const router = express.Router();
 const logger = Logger.getInstance();
@@ -46,7 +47,6 @@ router.post(
           .json({ error: 'Order ID and cancellation reason are required' });
       }
 
-      // Validate cancellation type
       const validTypes = ['full', 'partial', 'items-only'];
       if (!validTypes.includes(cancellationType)) {
         return res.status(400).json({ error: 'Invalid cancellation type' });
@@ -65,6 +65,7 @@ router.post(
         performedByDisplayName: req.user?.email,
         ipAddress: req.ip,
         userAgent: Array.isArray(rawUserAgent) ? rawUserAgent[0] : rawUserAgent,
+        actor: resolveActor(req),
       });
       res.status(result.status).json(result.body);
     } catch (error: unknown) {

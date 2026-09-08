@@ -11,6 +11,10 @@ import { getEstablishmentId, requireAuth, requirePermission } from '../auth';
 import { P } from '../../permissions/registry';
 import { Logger } from '../../utils/logger';
 import { AppError, asyncHandler, ConflictError, NotFoundError, ValidationError } from '../../middleware/errorHandler';
+import {
+  createClosureWithFailClosedJournal,
+  type ClosureJournalPayload,
+} from '../../services/legal/closureCreationService';
 
 const router = express.Router();
 const logger = Logger.getInstance();
@@ -19,114 +23,6 @@ function parseDailyClosureMode(value: unknown): DailyClosureMode {
   if (value == null || value === '') return 'business_day';
   if (value === 'close_now' || value === 'business_day') return value;
   throw new ValidationError('mode must be business_day or close_now');
-}
-
-type ClosureJournalPayload = {
-  id?: number;
-  closure_type?: string;
-  total_amount?: number | string;
-  total_vat?: number | string;
-  period_start?: Date | string;
-  period_end?: Date | string;
-  closure_hash?: string;
-  first_sequence?: number;
-  last_sequence?: number;
-  is_closed?: boolean;
-};
-
-async function appendClosureJournalEntry(
-  establishmentId: string,
-  closureType: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL',
-  closure: ClosureJournalPayload,
-  forceCreate: boolean,
-  userId?: string
-) {
-  const rawAmount =
-    typeof closure.total_amount === 'number'
-      ? closure.total_amount
-      : parseFloat(String(closure.total_amount ?? 0));
-  const rawVat =
-    typeof closure.total_vat === 'number'
-      ? closure.total_vat
-      : parseFloat(String(closure.total_vat ?? 0));
-
-  const totalAmount = Number.isFinite(rawAmount) ? rawAmount : 0;
-  const totalVat = Number.isFinite(rawVat) ? rawVat : 0;
-
-  return await LegalJournalModel.logClosure(
-    establishmentId,
-    closureType,
-    totalAmount,
-    totalVat,
-    {
-      closure_bulletin_id: closure.id ?? null,
-      closure_type: closureType,
-      period_start: closure.period_start ?? null,
-      period_end: closure.period_end ?? null,
-      closure_hash: closure.closure_hash ?? null,
-      first_sequence: closure.first_sequence ?? null,
-      last_sequence: closure.last_sequence ?? null,
-      force: forceCreate,
-    },
-    userId
-  );
-}
-
-async function createClosureWithFailClosedJournal(
-  establishmentId: string,
-  closureType: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL',
-  forceCreate: boolean,
-  userId: string | undefined,
-  createOpenClosure: () => Promise<ClosureJournalPayload>,
-  emailRecipients?: string[]
-): Promise<ClosureJournalPayload> {
-  const closure = await createOpenClosure();
-  const closureId = Number(closure.id);
-  if (!Number.isFinite(closureId)) {
-    throw new AppError('Failed to create closure bulletin', 500, 'LEGAL_CLOSURE_BULLETIN_CREATE_FAILED');
-  }
-
-  try {
-    await appendClosureJournalEntry(establishmentId, closureType, closure, forceCreate, userId);
-  } catch (error) {
-    logger.error(
-      `Legal journal closure append failed (${closureType}) for bulletin ${String(closure.id ?? 'unknown')}`,
-      error instanceof Error ? error : new Error(String(error)),
-      'LEGAL_JOURNAL'
-    );
-
-    const rolledBack = await LegalJournalModel.deleteOpenClosureBulletin(closureId, establishmentId);
-    if (!rolledBack) {
-      logger.error(
-        `Failed to rollback open closure bulletin ${closureId} after journal append failure`,
-        new Error('Open closure bulletin rollback affected 0 rows'),
-        'LEGAL_CLOSURE'
-      );
-    }
-
-    throw new AppError(
-      'Failed to persist legal journal entry for closure bulletin',
-      500,
-      'LEGAL_CLOSURE_JOURNAL_APPEND_FAILED'
-    );
-  }
-
-  const finalized = await LegalJournalModel.closeOpenClosureBulletin(closureId, establishmentId);
-  if (!finalized) {
-    throw new AppError('Failed to finalize closure bulletin', 500, 'LEGAL_CLOSURE_FINALIZE_FAILED');
-  }
-
-  // Best-effort accounting email — must not fail fiscal create.
-  void import('../../services/documents/closureAutoEmail').then(({ maybeAutoEmailClosureBulletin }) =>
-    maybeAutoEmailClosureBulletin({
-      establishmentId,
-      bulletinId: closureId,
-      operatorId: userId,
-      extraRecipients: emailRecipients,
-    })
-  );
-
-  return finalized as unknown as ClosureJournalPayload;
 }
 
 function parseForceFlag(force: unknown): boolean {

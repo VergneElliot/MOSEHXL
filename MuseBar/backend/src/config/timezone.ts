@@ -4,4 +4,6 @@
  * when no establishment-specific or settings-based timezone is provided.
  * France-only deployment: Europe/Paris (handles DST automatically).
  */
-export const DEFAULT_APP_TIMEZONE = 'Europe/Paris';
+import { APP_TIMEZONE } from '@mosehxl/types';
+
+export const DEFAULT_APP_TIMEZONE = APP_TIMEZONE;

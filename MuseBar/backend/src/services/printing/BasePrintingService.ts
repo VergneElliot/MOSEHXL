@@ -9,6 +9,7 @@ import {
   ESC_POS 
 } from './types';
 import { formatEuroAmount } from '../../utils/formatCurrency';
+import { formatDateOnly, formatDateTime } from '@mosehxl/types';
 import { groupReceiptLineItemsForPrint } from '../../printing/printLineGrouping';
 
 function normalizeThermalText(content: string): string {
@@ -136,7 +137,7 @@ export abstract class BasePrintingService implements IPrintingService {
     content += ESC_POS.BOLD_OFF;
     content += `Type: ${typeLabel}\n`;
     content += `Commande: ${data.order_id}\n`;
-    content += `Date: ${new Date(data.created_at).toLocaleString('fr-FR')}\n`;
+    content += `Date: ${formatDateTime(data.created_at)}\n`;
     content += `Paiement: ${this.formatPaymentMethod(data.payment_method)}\n`;
 
     if (isInvoice && data.customer_info) {
@@ -260,8 +261,8 @@ export abstract class BasePrintingService implements IPrintingService {
     content += ESC_POS.BOLD_ON;
     content += `Type: ${this.formatClosureType(data.closure_type)}\n`;
     content += ESC_POS.BOLD_OFF;
-    content += `Periode: ${new Date(data.period_start).toLocaleDateString('fr-FR')}\n`;
-    content += `         ${new Date(data.period_end).toLocaleDateString('fr-FR')}\n`;
+    content += `Periode: ${formatDateOnly(data.period_start)}\n`;
+    content += `         ${formatDateOnly(data.period_end)}\n`;
     content += `Bulletin #${data.id}\n`;
     
     content += '================================\n';

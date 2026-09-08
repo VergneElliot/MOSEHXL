@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import { ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
 import type { SystemSecurityLog } from '../../../types/system';
+import { formatDate } from '../../../utils/formatDate';
 
 interface SecurityLogsListProps {
   logs: SystemSecurityLog[];
@@ -41,9 +42,7 @@ export const SecurityLogsList: React.FC<SecurityLogsListProps> = ({ logs, loadin
     }
   };
 
-  const formatTimestamp = (timestamp: string) => {
-    return new Date(timestamp).toLocaleString('fr-FR');
-  };
+  const formatTimestamp = (timestamp: string) => formatDate(timestamp);
 
   if (loading) {
     return (

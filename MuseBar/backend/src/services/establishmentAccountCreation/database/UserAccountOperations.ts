@@ -5,6 +5,7 @@ import type { SignOptions } from 'jsonwebtoken';
 import { Logger } from '../../../utils/logger';
 import { validatePassword, validatePasswordWithBreachCheck } from '../../../utils/passwordValidation';
 import { UserQueries } from '../../../utils/database';
+import { MembershipModel } from '../../../models/membership';
 
 export interface UserAccountData {
   email: string;
@@ -141,6 +142,7 @@ export class UserAccountOperations {
              updated_at = CURRENT_TIMESTAMP`,
         [user.id, establishmentId, membershipRole]
       );
+      await MembershipModel.ensureCalendarColor(Number(user.id), establishmentId, client);
 
       const token = this.generateJWTToken({
         id: parseInt(String(user.id), 10),
@@ -325,6 +327,7 @@ export class UserAccountOperations {
              SET role = 'establishment_admin', is_active = TRUE, updated_at = CURRENT_TIMESTAMP`,
             [updated.id, establishmentId]
           );
+          await MembershipModel.ensureCalendarColor(Number(updated.id), establishmentId, client);
         }
 
         this.logger.info(`Updated existing user: ${setupData.email}`);
@@ -364,6 +367,7 @@ export class UserAccountOperations {
            ON CONFLICT (user_id, establishment_id) DO NOTHING`,
           [created.id, establishmentId]
         );
+        await MembershipModel.ensureCalendarColor(Number(created.id), establishmentId, client);
       }
 
       this.logger.info(`Created new user: ${setupData.email}`);

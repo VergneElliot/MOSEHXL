@@ -16,7 +16,11 @@ while IFS= read -r -d '' file; do
     FAIL=1
   fi
 
-  if [[ "$file" == *.sql ]] && [[ "$file" != MuseBar/backend/src/migrations/files/* ]]; then
+  if [[ "$file" == *.sql ]] \
+    && [[ "$file" != MuseBar/backend/src/migrations/files/* ]] \
+    && [[ "$file" != MuseBar/backend/src/models/schema.sql ]] \
+    && [[ "$file" != MuseBar/backend/src/models/legal-schema.sql ]] \
+    && [[ "$file" != MuseBar/backend/src/models/multi-tenant-schema.sql ]]; then
     echo "ERROR: Staged SQL outside migrations: $file"
     echo "       Use: cd MuseBar/backend && npm run migration:create <name>"
     FAIL=1

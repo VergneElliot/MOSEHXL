@@ -176,9 +176,9 @@ export async function createOrder(order: {
   tips?: number;
   change?: number;
   sub_bills?: Array<{ payment_method: 'cash' | 'card'; amount: number }>;
-  waiter_user_id?: number;
-  waiter_display_name?: string;
-  table_label?: string;
+  waiter_user_id?: number | null;
+  waiter_display_name?: string | null;
+  table_label?: string | null;
   pinActorToken?: string;
 }): Promise<Order> {
   // Accounting: send exact amounts for storage (no rounding). Taxes are derived from
@@ -197,11 +197,9 @@ export async function createOrder(order: {
       notes: order.notes,
       tips: order.tips || 0,
       change: order.change ?? 0,
-      ...(order.waiter_user_id != null ? { waiter_user_id: order.waiter_user_id } : {}),
-      ...(order.waiter_display_name != null
-        ? { waiter_display_name: order.waiter_display_name }
-        : {}),
-      ...(order.table_label != null ? { table_label: order.table_label } : {}),
+      waiter_user_id: order.waiter_user_id ?? null,
+      waiter_display_name: order.waiter_display_name ?? null,
+      table_label: order.table_label ?? null,
       items: order.items.map(item => ({
         product_id: item.productId ? (isNaN(parseInt(String(item.productId))) ? null : parseInt(String(item.productId))) : null,
         product_name: item.productName,

@@ -61,13 +61,20 @@ export class LegalJournalModel {
       items?: unknown[];
       created_at?: Date;
     },
-    userId?: string
+    userId?: string,
+    actor?: Record<string, unknown> | null
   ) {
-    return await JournalOperations.logTransaction(order, userId);
+    return await JournalOperations.logTransaction(order, userId, actor);
   }
 
-  static async logChange(establishmentId: string, orderId: number, amount: number, userId?: string) {
-    return await JournalOperations.logChange(establishmentId, orderId, amount, userId);
+  static async logChange(
+    establishmentId: string,
+    orderId: number,
+    amount: number,
+    userId?: string,
+    actor?: Record<string, unknown> | null
+  ) {
+    return await JournalOperations.logChange(establishmentId, orderId, amount, userId, actor);
   }
 
   static async logClosure(

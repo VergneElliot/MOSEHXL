@@ -24,6 +24,7 @@ import AdminMonthCalendar, {
   addMonths,
   startOfMonth,
 } from '../Administration/AdminMonthCalendar';
+import { formatDateLong, parisYmdHmToUtcIso } from '../../utils/formatDate';
 
 interface DayHours {
   closed: boolean;
@@ -88,12 +89,7 @@ function buildOpenTimeSlots(day: DayHours, stepMin = 30): string[] {
 }
 
 function formatDateFr(d: Date): string {
-  return d.toLocaleDateString('fr-FR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  return formatDateLong(d);
 }
 
 const PublicReservationPage: React.FC = () => {
@@ -196,10 +192,7 @@ const PublicReservationPage: React.FC = () => {
     setError(null);
     try {
       if (!apiConfig.isReady()) await apiConfig.initialize();
-      const [y, mo, d] = selectedDayKey.split('-').map(Number);
-      const [hh, mm] = selectedTime.split(':').map(Number);
-      const local = new Date(y!, mo! - 1, d!, hh || 0, mm || 0, 0, 0);
-      const startsAt = local.toISOString();
+      const startsAt = parisYmdHmToUtcIso(selectedDayKey, selectedTime);
       const res = await fetch(
         apiConfig.getEndpoint(`/api/public/reservations/${encodeURIComponent(slug)}`),
         {

@@ -4,6 +4,7 @@
  * See Epson "Server Direct Print" / ePOS-Print documentation for full element reference.
  */
 
+import { formatDateOnly, formatDateTime } from '@mosehxl/types';
 import type { ClosureBulletinData, ReceiptData } from './types';
 import { groupReceiptLineItemsForPrint } from '../../printing/printLineGrouping';
 
@@ -55,7 +56,7 @@ export function receiptToEposPrintXml(data: ReceiptData): string {
   if (data.business_info.tax_identification) lines.push(line(`TVA: ${data.business_info.tax_identification}`));
   lines.push('<text>&#10;</text>');
   lines.push(line(`${docLabel} #${docNumber}  Commande #${data.order_id}`));
-  lines.push(line(`Date: ${new Date(data.created_at).toLocaleString('fr-FR')}`));
+  lines.push(line(`Date: ${formatDateTime(data.created_at)}`));
   lines.push(line(`Paiement: ${data.payment_method}`));
   lines.push(line(`Type: ${docTypeLabel}`));
   lines.push('<text>&#10;</text>');
@@ -177,7 +178,7 @@ export function closureBulletinToEposPrintXml(data: ClosureBulletinData): string
   lines.push(line(`Bulletin de clôture — ${data.closure_type}`));
   lines.push(
     line(
-      `${new Date(data.period_start).toLocaleDateString('fr-FR')} → ${new Date(data.period_end).toLocaleDateString('fr-FR')}`
+      `${formatDateOnly(data.period_start)} → ${formatDateOnly(data.period_end)}`
     )
   );
   lines.push('<text>&#10;</text>');

@@ -17,12 +17,10 @@ import { DiningTableModel, FloorPlanModel } from '../models/database/floorModel'
 import { OpenTicketModel, type OpenTicketItemInput } from '../models/database/openTicketModel';
 import { MembershipModel } from '../models/membership';
 import { AuditTrailModel } from '../models/auditTrail';
-import { assertCanInterveneOnTicket } from '../services/floor/floorTicketAuth';
+import { requireOpenTicketForActor, assertCanAbandonTicket } from '../services/floor/floorTicketAuth';
 import { requirePosPinActor, requirePinActor } from '../middleware/pinActor';
 import { pool } from '../db/pool';
-
 const router = express.Router();
-
 function formatUserDisplayName(input: {
   first_name: string | null;
   last_name: string | null;
@@ -414,11 +412,7 @@ router.put(
     if (!Number.isInteger(id)) throw new ValidationError('Invalid ticket id');
     const items = parseTicketItems(req.body?.items);
     try {
-      const ticket = await OpenTicketModel.get(id, establishmentId);
-      if (!ticket || ticket.status !== 'open') {
-        throw new NotFoundError('Open ticket not found or already closed');
-      }
-      assertCanInterveneOnTicket(ticket, actor);
+      const ticket = await requireOpenTicketForActor(id, establishmentId, actor);
       const saved = await OpenTicketModel.syncDraftItems(id, establishmentId, items);
       const updatedTicket = await OpenTicketModel.get(id, establishmentId);
       return res.json({ ticket: updatedTicket, items: saved });
@@ -442,11 +436,7 @@ router.post(
     const actor = req.pinActor!;
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) throw new ValidationError('Invalid ticket id');
-    const ticket = await OpenTicketModel.get(id, establishmentId);
-    if (!ticket || ticket.status !== 'open') {
-      throw new NotFoundError('Open ticket not found or already closed');
-    }
-    assertCanInterveneOnTicket(ticket, actor);
+    const ticket = await requireOpenTicketForActor(id, establishmentId, actor);
     const table = await DiningTableModel.get(ticket.dining_table_id, establishmentId);
 
     const lineIdsRaw = req.body?.line_ids;
@@ -507,11 +497,7 @@ router.post(
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) throw new ValidationError('Invalid ticket id');
     try {
-      const ticket = await OpenTicketModel.get(id, establishmentId);
-      if (!ticket || ticket.status !== 'open') {
-        throw new NotFoundError('Open ticket not found or already closed');
-      }
-      assertCanInterveneOnTicket(ticket, actor);
+      const ticket = await requireOpenTicketForActor(id, establishmentId, actor);
       const items = await OpenTicketModel.discardDraftItems(id, establishmentId);
       const updatedTicket = await OpenTicketModel.get(id, establishmentId);
       return res.json({ ticket: updatedTicket, items });
@@ -544,11 +530,7 @@ router.post(
       .filter((n: number) => Number.isInteger(n) && n > 0);
     if (lineIds.length === 0) throw new ValidationError('line_ids contains no valid ids');
 
-    const ticket = await OpenTicketModel.get(id, establishmentId);
-    if (!ticket || ticket.status !== 'open') {
-      throw new NotFoundError('Open ticket not found or already closed');
-    }
-    assertCanInterveneOnTicket(ticket, actor);
+    const ticket = await requireOpenTicketForActor(id, establishmentId, actor);
     const table = await DiningTableModel.get(ticket.dining_table_id, establishmentId);
 
     try {
@@ -612,7 +594,9 @@ router.post(
     const actor = req.pinActor!;
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) throw new ValidationError('Invalid ticket id');
-    const ticket = await OpenTicketModel.abandon(id, establishmentId, actor.id);
+    await requireOpenTicketForActor(id, establishmentId, actor);
+    await assertCanAbandonTicket(id, establishmentId, actor);
+    const ticket = await OpenTicketModel.abandon(id, establishmentId);
     if (!ticket) throw new NotFoundError('Open ticket not found or already closed');
     return res.json({ ticket });
   })
@@ -632,6 +616,7 @@ router.post(
     if (!Number.isInteger(orderId) || orderId <= 0) {
       throw new ValidationError('order_id is required');
     }
+    const existing = await requireOpenTicketForActor(id, establishmentId, actor);
     const ticket = await OpenTicketModel.closeWithOrder(id, establishmentId, orderId, actor.id);
     if (!ticket) throw new NotFoundError('Open ticket not found or already closed');
     return res.json({ ticket });
@@ -661,11 +646,7 @@ router.post(
       .filter((n: number) => Number.isInteger(n) && n > 0);
     if (lineIds.length === 0) throw new ValidationError('line_ids contains no valid ids');
 
-    const sourceTicket = await OpenTicketModel.get(id, establishmentId);
-    if (!sourceTicket || sourceTicket.status !== 'open') {
-      throw new NotFoundError('Open ticket not found or already closed');
-    }
-    assertCanInterveneOnTicket(sourceTicket, actor);
+    const sourceTicket = await requireOpenTicketForActor(id, establishmentId, actor);
 
     try {
       const result = await OpenTicketModel.moveLines(
@@ -718,11 +699,7 @@ router.post(
     const diningTableId = Number(req.body?.dining_table_id);
     if (!Number.isInteger(id)) throw new ValidationError('Invalid ticket id');
     if (!Number.isInteger(diningTableId)) throw new ValidationError('dining_table_id is required');
-    const existing = await OpenTicketModel.get(id, establishmentId);
-    if (!existing || existing.status !== 'open') {
-      throw new NotFoundError('Open ticket not found or already closed');
-    }
-    assertCanInterveneOnTicket(existing, actor);
+    const existing = await requireOpenTicketForActor(id, establishmentId, actor);
     try {
       const ticket = await OpenTicketModel.transferTable(id, establishmentId, diningTableId, actor.id);
       return res.json({ ticket });
@@ -740,22 +717,6 @@ router.post(
   })
 );
 
-router.post(
-  '/tickets/:id/takeover',
-  requireAuth,
-  requirePosPinActor,
-  asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req, res);
-    if (!establishmentId) return;
-    const actor = req.pinActor!;
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id)) throw new ValidationError('Invalid ticket id');
-    const ticket = await OpenTicketModel.takeover(id, establishmentId, actor.id);
-    if (!ticket) throw new NotFoundError('Open ticket not found or already closed');
-    const served_by_display_name = await resolveWaiterDisplayName(ticket.last_served_by_user_id);
-    return res.json({ ticket, served_by_display_name });
-  })
-);
 
 router.post(
   '/tickets/:id/assign-waiter',
@@ -809,11 +770,7 @@ router.post(
     const targetTicketId = Number(req.body?.target_ticket_id);
     if (!Number.isInteger(id)) throw new ValidationError('Invalid ticket id');
     if (!Number.isInteger(targetTicketId)) throw new ValidationError('target_ticket_id is required');
-    const sourceTicket = await OpenTicketModel.get(id, establishmentId);
-    if (!sourceTicket || sourceTicket.status !== 'open') {
-      throw new NotFoundError('Open ticket not found or already closed');
-    }
-    assertCanInterveneOnTicket(sourceTicket, actor);
+    const sourceTicket = await requireOpenTicketForActor(id, establishmentId, actor);
     try {
       const result = await OpenTicketModel.mergeInto(id, targetTicketId, establishmentId, actor.id);
       return res.json(result);
@@ -840,10 +797,7 @@ router.post(
     const actor = req.pinActor!;
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) throw new ValidationError('Invalid ticket id');
-    const ticket = await OpenTicketModel.get(id, establishmentId);
-    if (!ticket || ticket.status !== 'open') {
-      throw new NotFoundError('Open ticket not found or already closed');
-    }
+    const ticket = await requireOpenTicketForActor(id, establishmentId, actor);
     const table = await DiningTableModel.get(ticket.dining_table_id, establishmentId);
     let items = await OpenTicketModel.listActiveItems(id, establishmentId);
     const itemIdsRaw = req.body?.item_ids;
@@ -873,7 +827,7 @@ router.post(
       })),
     });
 
-    await OpenTicketModel.touchServer(id, establishmentId, actor.id);
+    await OpenTicketModel.touchActivity(id, establishmentId);
     return res.json(result);
   })
 );

@@ -9,11 +9,12 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material';
 import { apiCore } from '../../services/api';
 import { formatCurrency } from '../../utils/formatCurrency';
+import { parisTodayYmd } from '../../utils/formatDate';
+import { ParisDateField } from '../common/ParisDateTimeField';
 
 type WaiterDayReport = {
   date: string;
@@ -28,6 +29,7 @@ type WaiterDayReport = {
     order_count: number;
     total_amount: number;
   }>;
+  comptoir: { order_count: number; total_amount: number };
   note?: string;
 };
 
@@ -41,11 +43,9 @@ function fmt(iso: string): string {
   return Number.isNaN(d.getTime()) ? iso : PARIS_SHORT.format(d);
 }
 
-/**
- * Non-fiscal CA par serveur for one business day (cut→cut).
- */
+/** Non-fiscal CA par serveur + Total comptoir for one business day (cut→cut). */
 const WaiterDayReportPanel: React.FC = () => {
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => parisTodayYmd());
   const [report, setReport] = useState<WaiterDayReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -73,22 +73,25 @@ const WaiterDayReportPanel: React.FC = () => {
     void load(date);
   }, [date, load]);
 
+  const hasRows =
+    report != null &&
+    (report.waiters.length > 0 || report.comptoir.order_count > 0);
+
   return (
     <Paper sx={{ p: 2, mb: 2 }}>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center', mb: 1 }}>
         <Typography variant="h6">CA par serveur</Typography>
-        <TextField
+        <ParisDateField
           size="small"
-          type="date"
-          label="Journée commerciale"
-          InputLabelProps={{ shrink: true }}
+          label="Journée commerciale (jj/mm/aaaa)"
           value={date}
-          onChange={(e) => setDate(e.target.value)}
+          onChange={setDate}
+          fullWidth={false}
         />
       </Box>
       <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-        Rapport informatif (pas un bulletin fiscal). Fenêtre selon l’heure de coupure des
-        paramètres.
+        Rapport informatif (pas un bulletin fiscal). Ventes à table par serveur ; ventes
+        directes dans Total comptoir.
       </Typography>
       {error && (
         <Alert severity="error" sx={{ mb: 1 }}>
@@ -114,13 +117,24 @@ const WaiterDayReportPanel: React.FC = () => {
               </TableHead>
               <TableBody>
                 {report.waiters.map((row) => (
-                  <TableRow key={row.waiter_user_id ?? 'none'}>
+                  <TableRow key={row.waiter_user_id ?? `none-${row.waiter_display_name}`}>
                     <TableCell>{row.waiter_display_name}</TableCell>
                     <TableCell align="right">{row.order_count}</TableCell>
                     <TableCell align="right">{formatCurrency(row.total_amount)}</TableCell>
                   </TableRow>
                 ))}
-                {report.waiters.length === 0 && (
+                {report.comptoir.order_count > 0 && (
+                  <TableRow>
+                    <TableCell>
+                      <strong>Total comptoir</strong>
+                    </TableCell>
+                    <TableCell align="right">{report.comptoir.order_count}</TableCell>
+                    <TableCell align="right">
+                      {formatCurrency(report.comptoir.total_amount)}
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!hasRows && (
                   <TableRow>
                     <TableCell colSpan={3}>Aucune vente sur cette journée commerciale.</TableCell>
                   </TableRow>

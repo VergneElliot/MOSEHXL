@@ -11,36 +11,12 @@ import {
   type ActiveTableState,
   type PinActorState,
 } from '../contexts/PinSessionsContext';
+import { useTableInterventionGate } from './useTableInterventionGate';
+import { buildActiveTableState, withTableDraftStatus } from './floorActiveTable';
 
 export type { ActiveTableState, PinActorState };
 
 export type FloorMapPendingAction = 'validate' | 'assign' | null;
-
-function withTableDraftStatus(items: OrderItem[]): OrderItem[] {
-  return items.map((line) =>
-    line.isTip ? line : { ...line, tableLineStatus: line.tableLineStatus ?? ('draft' as const) }
-  );
-}
-
-function buildActiveTableState(
-  table: floorApi.DiningTableStatusDto,
-  ticketId: number,
-  waiterUserId: number | null | undefined,
-  waiterDisplayName: string | null | undefined,
-  pinActor: PinActorState
-): ActiveTableState {
-  const assignedWaiterUserId = waiterUserId ?? pinActor.userId;
-  const assignedWaiterDisplayName =
-    waiterDisplayName ?? (assignedWaiterUserId === pinActor.userId ? pinActor.displayName : null);
-  return {
-    id: table.id,
-    label: table.label,
-    floorPlanId: table.floor_plan_id,
-    ticketId,
-    assignedWaiterUserId,
-    assignedWaiterDisplayName,
-  };
-}
 
 export function useFloorService(options: {
   currentOrder: OrderItem[];
@@ -69,6 +45,7 @@ export function useFloorService(options: {
 
   const pinActor = activeSession?.actor ?? null;
   const activeTable = activeSession?.activeTable ?? null;
+  const ensureTableIntervention = useTableInterventionGate(activeTable, pinActor);
 
   const [pinDialogOpen, setPinDialogOpen] = useState(false);
   const [mapDialogOpen, setMapDialogOpen] = useState(false);
@@ -309,6 +286,7 @@ export function useFloorService(options: {
   const detachTableKeepTicket = useCallback(async () => {
     if (activeTable && pinActor) {
       try {
+        await ensureTableIntervention();
         await floorApi.discardDraftTicketItems(activeTable.ticketId, pinActor.token);
       } catch (error: unknown) {
         const err = error as { message?: string };
@@ -320,7 +298,15 @@ export function useFloorService(options: {
     updateActiveSession({ activeTable: null, cart: [] });
     setCurrentOrder([]);
     onInfo('Mode comptoir');
-  }, [activeTable, pinActor, setCurrentOrder, onError, onInfo, updateActiveSession]);
+  }, [
+    activeTable,
+    pinActor,
+    setCurrentOrder,
+    onError,
+    onInfo,
+    updateActiveSession,
+    ensureTableIntervention,
+  ]);
 
   const selectFreeTable = useCallback(
     async (table: floorApi.DiningTableStatusDto) => {
@@ -400,6 +386,7 @@ export function useFloorService(options: {
         return;
       }
       try {
+        await ensureTableIntervention();
         await floorApi.abandonTicket(ticketId, pinActor.token);
         if (activeTable?.ticketId === ticketId) {
           skipNextSync.current = true;
@@ -412,7 +399,15 @@ export function useFloorService(options: {
         onError(err.message || 'Abandon impossible');
       }
     },
-    [pinActor, activeTable, setCurrentOrder, onError, onInfo, updateActiveSession]
+    [
+      pinActor,
+      activeTable,
+      setCurrentOrder,
+      onError,
+      onInfo,
+      updateActiveSession,
+      ensureTableIntervention,
+    ]
   );
 
   const closeActiveTicketAfterOrder = useCallback(
@@ -426,6 +421,7 @@ export function useFloorService(options: {
             : NaN;
       if (!Number.isFinite(parsed) || parsed <= 0) return;
       try {
+        await ensureTableIntervention();
         await floorApi.closeTicket(activeTable.ticketId, parsed, pinActor.token);
       } catch (error: unknown) {
         const err = error as { message?: string };
@@ -434,7 +430,7 @@ export function useFloorService(options: {
         updateActiveSession({ activeTable: null });
       }
     },
-    [activeTable, pinActor, onError, updateActiveSession]
+    [activeTable, pinActor, onError, updateActiveSession, ensureTableIntervention]
   );
 
   const transferActiveToTable = useCallback(
@@ -576,30 +572,6 @@ export function useFloorService(options: {
       transferActiveToTable,
     ]
   );
-
-  const takeoverActive = useCallback(async () => {
-    if (!activeTable || !pinActor) {
-      onError('Badge et table active requis');
-      return;
-    }
-    try {
-      const { served_by_display_name } = await floorApi.takeoverTicket(
-        activeTable.ticketId,
-        pinActor.token
-      );
-      updateActiveSession({
-        activeTable: {
-          ...activeTable,
-          assignedWaiterUserId: pinActor.userId,
-          assignedWaiterDisplayName: served_by_display_name ?? pinActor.displayName,
-        },
-      });
-      onInfo(`Prise en charge : ${pinActor.displayName}`);
-    } catch (error: unknown) {
-      const err = error as { message?: string };
-      onError(err.message || 'Prise en charge impossible');
-    }
-  }, [activeTable, pinActor, onError, onInfo, updateActiveSession]);
 
   const assignTicketWaiter = useCallback(
     async (userId: number, displayName: string) => {
@@ -833,7 +805,6 @@ export function useFloorService(options: {
     transferActiveToTable,
     mergeActiveIntoTable,
     moveToTable,
-    takeoverActive,
     printSuivre,
     validateTableOrder,
     assignTicketWaiter,

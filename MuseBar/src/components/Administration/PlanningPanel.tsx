@@ -18,17 +18,16 @@ import {
   Typography,
 } from '@mui/material';
 import {
-  createShift,
   createLeave,
-  deleteShift,
+  commitPlanningShifts,
   duplicatePlanningWeek,
   getStaffIcs,
   listLeaves,
   listPlanningStaff,
   listShifts,
   previewLeaveCount,
+  resetAllShifts,
   updateLeaveStatus,
-  updateShift,
   type LeaveCountPreviewDto,
   type StaffLeaveDto,
   type StaffShiftDto,
@@ -40,6 +39,22 @@ import AdminMonthCalendar, {
   toLocalDateInputValue,
   type AdminCalendarItem,
 } from './AdminMonthCalendar';
+import {
+  applyPlanningDraftToShifts,
+  emptyPlanningDraft,
+  localIdToTempId,
+  planningDraftCount,
+  planningDraftIsDirty,
+  setPlanningUiDirty,
+  type PlanningDraftState,
+} from './planningDraft';
+import { ParisDateField, ParisDateTimeField } from '../common/ParisDateTimeField';
+import {
+  formatDateOnly,
+  formatTime,
+  parisDateTimeLocalToUtcIso,
+  utcToParisDateTimeLocal,
+} from '../../utils/formatDate';
 
 function startOfWeek(d: Date): Date {
   const x = new Date(d);
@@ -62,11 +77,20 @@ const PlanningPanel: React.FC = () => {
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [staff, setStaff] = useState<
-    Array<{ id: number; email: string; first_name: string | null; last_name: string | null }>
+    Array<{
+      id: number;
+      email: string;
+      first_name: string | null;
+      last_name: string | null;
+      calendar_color?: string;
+    }>
   >([]);
   const [shifts, setShifts] = useState<StaffShiftDto[]>([]);
+  const [draft, setDraft] = useState<PlanningDraftState>(() => emptyPlanningDraft());
   const [leaves, setLeaves] = useState<StaffLeaveDto[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [discardOpen, setDiscardOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [leaveForm, setLeaveForm] = useState<{
@@ -86,7 +110,12 @@ const PlanningPanel: React.FC = () => {
     ends_at: string;
     label: string;
     recurrence: 'once' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+    series_id?: string | null;
   } | null>(null);
+  const [seriesScopeOpen, setSeriesScopeOpen] = useState(false);
+  const [seriesScopeAction, setSeriesScopeAction] = useState<'save' | 'delete' | null>(null);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const weekEnd = useMemo(() => addDays(weekStart, 7), [weekStart]);
   const days = useMemo(
@@ -119,6 +148,29 @@ const PlanningPanel: React.FC = () => {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  const dirty = planningDraftIsDirty(draft);
+  const dirtyCount = planningDraftCount(draft);
+
+  useEffect(() => {
+    setPlanningUiDirty(dirty);
+    return () => setPlanningUiDirty(false);
+  }, [dirty]);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [dirty]);
+
+  const displayShifts = useMemo(
+    () => applyPlanningDraftToShifts(shifts, draft),
+    [shifts, draft]
+  );
 
   useEffect(() => {
     if (!leaveOpen || !leaveForm?.starts_on || !leaveForm?.ends_on) {
@@ -155,11 +207,16 @@ const PlanningPanel: React.FC = () => {
     return n || u.email;
   };
 
+  const colorOf = (id: number) => {
+    const u = staff.find((s) => s.id === id);
+    return u?.calendar_color || '#1565C0';
+  };
+
   const shiftsFor = (userId: number, day: Date) => {
     const dayStart = new Date(day);
     dayStart.setHours(0, 0, 0, 0);
     const dayEnd = addDays(dayStart, 1);
-    return shifts.filter((s) => {
+    return displayShifts.filter((s) => {
       if (s.user_id !== userId) return false;
       const start = new Date(s.starts_at);
       return start >= dayStart && start < dayEnd;
@@ -167,22 +224,22 @@ const PlanningPanel: React.FC = () => {
   };
 
   const calendarItems: AdminCalendarItem[] = useMemo(() => {
-    const shiftItems = shifts.map((s) => {
+    const shiftItems = displayShifts.map((s) => {
       const start = new Date(s.starts_at);
-      const end = new Date(s.ends_at);
-      const time = `${start.toLocaleTimeString('fr-FR', {
-        hour: '2-digit',
-        minute: '2-digit',
-      })}–${end.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
-      const pending = s.approval_status === 'pending_employee';
+      const time = `${formatTime(s.starts_at)}–${formatTime(s.ends_at)}`;
+      const pending = s.approval_status === 'pending_employee' || Boolean(s._draft);
       return {
         id: s.id,
         startsAt: start,
         title: `${time} · ${nameOf(s.user_id)}${s.label ? ` · ${s.label}` : ''}${
           pending ? ' (en attente)' : ''
         }`,
-        subtitle: pending ? 'En attente de confirmation employé' : s.label || undefined,
-        color: pending ? '#ed6c02' : '#1565c0',
+        subtitle: pending
+          ? s._draft
+            ? 'Modification non enregistrée'
+            : 'En attente de confirmation employé'
+          : s.label || undefined,
+        color: pending ? '#ED6C02' : colorOf(s.user_id),
       };
     });
     const leaveItems = leaves
@@ -201,7 +258,7 @@ const PlanningPanel: React.FC = () => {
       });
     return [...shiftItems, ...leaveItems];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shifts, leaves, staff]);
+  }, [displayShifts, leaves, staff]);
 
   const openCreate = (day?: Date) => {
     const base = day ? new Date(day) : new Date(weekStart);
@@ -213,8 +270,149 @@ const PlanningPanel: React.FC = () => {
       ends_at: endStr,
       label: '',
       recurrence: 'once',
+      series_id: null,
     });
     setOpen(true);
+  };
+
+  const seriesSiblingCount = useMemo(() => {
+    if (!form?.series_id) return 0;
+    return displayShifts.filter((s) => s.series_id === form.series_id).length;
+  }, [form?.series_id, displayShifts]);
+
+  const persistShift = (applyTo: 'one' | 'series') => {
+    if (!form?.user_id) return;
+    const starts_at = parisDateTimeLocalToUtcIso(form.starts_at);
+    const ends_at = parisDateTimeLocalToUtcIso(form.ends_at);
+    setError(null);
+    if (form.id != null && form.id > 0) {
+      setDraft((prev) => {
+        const updates = prev.updates.filter((u) => u.id !== form.id);
+        updates.push({
+          id: form.id!,
+          apply_to: applyTo,
+          user_id: form.user_id,
+          starts_at,
+          ends_at,
+          label: form.label || undefined,
+        });
+        return { ...prev, updates };
+      });
+    } else if (form.id != null && form.id < 0) {
+      // Editing a local create — update the create op
+      setDraft((prev) => ({
+        ...prev,
+        creates: prev.creates.map((c) =>
+          localIdToTempId(c.localId) === form.id
+            ? {
+                ...c,
+                user_id: form.user_id,
+                starts_at,
+                ends_at,
+                label: form.label || undefined,
+              }
+            : c
+        ),
+      }));
+    } else {
+      setDraft((prev) => ({
+        ...prev,
+        creates: [
+          ...prev.creates,
+          {
+            localId: `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            user_id: form.user_id,
+            starts_at,
+            ends_at,
+            label: form.label || undefined,
+            recurrence: form.recurrence || 'once',
+          },
+        ],
+      }));
+    }
+    setSeriesScopeOpen(false);
+    setSeriesScopeAction(null);
+    setOpen(false);
+    setForm(null);
+  };
+
+  const removeShift = (applyTo: 'one' | 'series') => {
+    if (!form?.id) return;
+    setError(null);
+    if (form.id < 0) {
+      setDraft((prev) => ({
+        ...prev,
+        creates: prev.creates.filter((c) => localIdToTempId(c.localId) !== form.id),
+      }));
+    } else {
+      setDraft((prev) => {
+        const updates = prev.updates.filter((u) => u.id !== form.id);
+        const deletes = prev.deletes.filter((d) => d.id !== form.id);
+        deletes.push({ id: form.id!, apply_to: applyTo });
+        return { ...prev, updates, deletes };
+      });
+    }
+    setSeriesScopeOpen(false);
+    setSeriesScopeAction(null);
+    setOpen(false);
+    setForm(null);
+  };
+
+  const requestSave = () => {
+    if (!form?.user_id) return;
+    if (form.id && form.id > 0 && form.series_id) {
+      setSeriesScopeAction('save');
+      setSeriesScopeOpen(true);
+      return;
+    }
+    persistShift('one');
+  };
+
+  const requestDelete = () => {
+    if (!form?.id) return;
+    if (form.id > 0 && form.series_id) {
+      setSeriesScopeAction('delete');
+      setSeriesScopeOpen(true);
+      return;
+    }
+    if (!window.confirm('Supprimer cette vacation ?')) return;
+    removeShift('one');
+  };
+
+  const saveAllChanges = async () => {
+    if (!dirty) return;
+    setBusy(true);
+    setError(null);
+    setSaveMessage(null);
+    try {
+      const result = await commitPlanningShifts({
+        creates: draft.creates.map((c) => ({
+          user_id: c.user_id,
+          starts_at: c.starts_at,
+          ends_at: c.ends_at,
+          label: c.label,
+          recurrence: c.recurrence,
+        })),
+        updates: draft.updates,
+        deletes: draft.deletes,
+      });
+      setDraft(emptyPlanningDraft());
+      setSaveMessage(
+        result.message ||
+          `Enregistré : ${result.created_count} créées, ${result.updated_count} modifiées, ${result.deleted_count} supprimées.`
+      );
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Enregistrement impossible');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const discardChanges = () => {
+    setDraft(emptyPlanningDraft());
+    setDiscardOpen(false);
+    setSaveMessage('Modifications locales annulées');
   };
 
   return (
@@ -224,9 +422,47 @@ const PlanningPanel: React.FC = () => {
           {error}
         </Alert>
       )}
+      {saveMessage && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSaveMessage(null)}>
+          {saveMessage}
+        </Alert>
+      )}
+      {dirty && (
+        <Alert
+          severity="warning"
+          sx={{ mb: 2 }}
+          action={
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button color="inherit" size="small" onClick={() => setDiscardOpen(true)} disabled={busy}>
+                Annuler
+              </Button>
+              <Button
+                color="inherit"
+                size="small"
+                variant="outlined"
+                onClick={() => void saveAllChanges()}
+                disabled={busy}
+              >
+                Enregistrer ({dirtyCount})
+              </Button>
+            </Box>
+          }
+        >
+          {dirtyCount} modification(s) non enregistrée(s) — les e-mails de confirmation seront
+          envoyés uniquement à l’enregistrement.
+        </Alert>
+      )}
       <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
         <Button variant="contained" onClick={() => openCreate()}>
           Ajouter une vacation
+        </Button>
+        <Button
+          variant="contained"
+          color="success"
+          onClick={() => void saveAllChanges()}
+          disabled={!dirty || busy}
+        >
+          Enregistrer les modifications{dirty ? ` (${dirtyCount})` : ''}
         </Button>
         <Button
           variant="outlined"
@@ -264,6 +500,14 @@ const PlanningPanel: React.FC = () => {
           Dupliquer la semaine →
         </Button>
         <Button onClick={() => window.print()}>Imprimer</Button>
+        <Button
+          color="error"
+          variant="outlined"
+          onClick={() => setResetConfirmOpen(true)}
+          disabled={busy}
+        >
+          Réinitialiser le planning
+        </Button>
       </Box>
 
       <AdminMonthCalendar
@@ -279,16 +523,15 @@ const PlanningPanel: React.FC = () => {
         }}
         onItemClick={(item) => {
           if (typeof item.id === 'string' && item.id.startsWith('leave-')) return;
-          const shift = shifts.find((s) => s.id === item.id);
+          const shift = displayShifts.find((s) => s.id === item.id);
           if (!shift) return;
           const start = new Date(shift.starts_at);
-          const end = new Date(shift.ends_at);
           setWeekStart(startOfWeek(start));
           setForm({
             id: shift.id,
             user_id: shift.user_id,
-            starts_at: toLocalDateInputValue(start, start.getHours(), start.getMinutes()),
-            ends_at: toLocalDateInputValue(end, end.getHours(), end.getMinutes()),
+            starts_at: utcToParisDateTimeLocal(shift.starts_at),
+            ends_at: utcToParisDateTimeLocal(shift.ends_at),
             label: shift.label || '',
             recurrence:
               shift.recurrence === 'daily' ||
@@ -297,6 +540,7 @@ const PlanningPanel: React.FC = () => {
               shift.recurrence === 'yearly'
                 ? shift.recurrence
                 : 'once',
+            series_id: shift.series_id ?? null,
           });
           setOpen(true);
         }}
@@ -308,7 +552,7 @@ const PlanningPanel: React.FC = () => {
       <Box sx={{ display: 'flex', gap: 1, mb: 1, flexWrap: 'wrap', alignItems: 'center' }}>
         <Button onClick={() => setWeekStart(addDays(weekStart, -7))}>Semaine précédente</Button>
         <Typography fontWeight={600}>
-          Semaine du {weekStart.toLocaleDateString('fr-FR')}
+          Semaine du {formatDateOnly(weekStart)}
         </Typography>
         <Button onClick={() => setWeekStart(addDays(weekStart, 7))}>Semaine suivante</Button>
       </Box>
@@ -327,7 +571,7 @@ const PlanningPanel: React.FC = () => {
                 }}
                 title="Cliquer pour ajouter une vacation ce jour"
               >
-                {d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}
+                {formatDateOnly(d)}
               </TableCell>
             ))}
             <TableCell>ICS</TableCell>
@@ -353,44 +597,77 @@ const PlanningPanel: React.FC = () => {
                       ends_at: toLocalDateInputValue(d, 18, 0),
                       label: '',
                       recurrence: 'once',
+                      series_id: null,
                     });
                     setOpen(true);
                   }}
                 >
                   {shiftsFor(u.id, d).map((s) => {
-                    const pending = s.approval_status === 'pending_employee';
+                    const pending = s.approval_status === 'pending_employee' || Boolean(s._draft);
                     return (
                       <Box
                         key={s.id}
                         onClick={(e) => e.stopPropagation()}
                         sx={{
-                          bgcolor: pending ? 'warning.main' : 'primary.light',
-                          color: pending ? 'warning.contrastText' : 'primary.contrastText',
+                          bgcolor: pending ? 'warning.main' : colorOf(s.user_id),
+                          color: pending ? 'warning.contrastText' : 'common.white',
                           borderRadius: 1,
                           p: 0.5,
                           mb: 0.5,
                           fontSize: 12,
                         }}
-                        title={pending ? 'En attente de confirmation employé' : undefined}
+                        title={
+                          s._draft
+                            ? 'Non enregistré'
+                            : pending
+                              ? 'En attente de confirmation employé'
+                              : undefined
+                        }
                       >
-                        {new Date(s.starts_at).toLocaleTimeString('fr-FR', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                        –
-                        {new Date(s.ends_at).toLocaleTimeString('fr-FR', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                        {formatTime(s.starts_at)}–{formatTime(s.ends_at)}
                         {s.label ? ` ${s.label}` : ''}
-                        {pending ? ' (attente)' : ''}
+                        {s._draft ? ' *' : pending ? ' (attente)' : ''}
                         <Button
                           size="small"
                           sx={{ color: 'inherit', minWidth: 0, p: 0, ml: 0.5 }}
-                          onClick={async () => {
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (s.id > 0 && s.series_id) {
+                              setForm({
+                                id: s.id,
+                                user_id: s.user_id,
+                                starts_at: utcToParisDateTimeLocal(s.starts_at),
+                                ends_at: utcToParisDateTimeLocal(s.ends_at),
+                                label: s.label || '',
+                                recurrence:
+                                  s.recurrence === 'daily' ||
+                                  s.recurrence === 'weekly' ||
+                                  s.recurrence === 'monthly' ||
+                                  s.recurrence === 'yearly'
+                                    ? s.recurrence
+                                    : 'once',
+                                series_id: s.series_id ?? null,
+                              });
+                              setSeriesScopeAction('delete');
+                              setSeriesScopeOpen(true);
+                              return;
+                            }
                             if (!window.confirm('Supprimer cette vacation ?')) return;
-                            await deleteShift(s.id);
-                            await refresh();
+                            if (s.id < 0) {
+                              setDraft((prev) => ({
+                                ...prev,
+                                creates: prev.creates.filter(
+                                  (c) => localIdToTempId(c.localId) !== s.id
+                                ),
+                              }));
+                            } else {
+                              setDraft((prev) => {
+                                const updates = prev.updates.filter((u) => u.id !== s.id);
+                                const deletes = prev.deletes.filter((d) => d.id !== s.id);
+                                deletes.push({ id: s.id, apply_to: 'one' });
+                                return { ...prev, updates, deletes };
+                              });
+                            }
                           }}
                         >
                           ×
@@ -506,21 +783,15 @@ const PlanningPanel: React.FC = () => {
               </MenuItem>
             ))}
           </TextField>
-          <TextField
-            type="date"
-            label="Du"
-            InputLabelProps={{ shrink: true }}
+          <ParisDateField
+            label="Du (jj/mm/aaaa)"
             value={leaveForm?.starts_on ?? ''}
-            onChange={(e) => setLeaveForm({ ...leaveForm!, starts_on: e.target.value })}
-            fullWidth
+            onChange={(ymd) => setLeaveForm({ ...leaveForm!, starts_on: ymd })}
           />
-          <TextField
-            type="date"
-            label="Au"
-            InputLabelProps={{ shrink: true }}
+          <ParisDateField
+            label="Au (jj/mm/aaaa)"
             value={leaveForm?.ends_on ?? ''}
-            onChange={(e) => setLeaveForm({ ...leaveForm!, ends_on: e.target.value })}
-            fullWidth
+            onChange={(ymd) => setLeaveForm({ ...leaveForm!, ends_on: ymd })}
           />
           <TextField
             label="Motif (optionnel)"
@@ -598,21 +869,17 @@ const PlanningPanel: React.FC = () => {
               </MenuItem>
             ))}
           </TextField>
-          <TextField
-            type="datetime-local"
-            label="Début"
-            InputLabelProps={{ shrink: true }}
+          <ParisDateTimeField
+            dateLabel="Début — date (jj/mm/aaaa)"
+            timeLabel="Début — heure (HH:mm)"
             value={form?.starts_at || ''}
-            onChange={(e) => setForm({ ...form!, starts_at: e.target.value })}
-            fullWidth
+            onChange={(next) => setForm({ ...form!, starts_at: next })}
           />
-          <TextField
-            type="datetime-local"
-            label="Fin"
-            InputLabelProps={{ shrink: true }}
+          <ParisDateTimeField
+            dateLabel="Fin — date (jj/mm/aaaa)"
+            timeLabel="Fin — heure (HH:mm)"
             value={form?.ends_at || ''}
-            onChange={(e) => setForm({ ...form!, ends_at: e.target.value })}
-            fullWidth
+            onChange={(next) => setForm({ ...form!, ends_at: next })}
           />
           {!form?.id && (
             <TextField
@@ -632,7 +899,7 @@ const PlanningPanel: React.FC = () => {
               }
               fullWidth
               InputLabelProps={{ shrink: true }}
-              helperText="Une seule confirmation employé couvre toute la série récurrente."
+              helperText="Les e-mails partent à l’enregistrement du planning (bouton Enregistrer les modifications)."
             >
               <MenuItem value="once">Une seule fois</MenuItem>
               <MenuItem value="daily">Tous les jours</MenuItem>
@@ -640,6 +907,13 @@ const PlanningPanel: React.FC = () => {
               <MenuItem value="monthly">Tous les mois</MenuItem>
               <MenuItem value="yearly">Tous les ans</MenuItem>
             </TextField>
+          )}
+          {form?.id && form.series_id && (
+            <Alert severity="info">
+              Cette vacation appartient à une série ({seriesSiblingCount || 'plusieurs'} occurrence
+              {seriesSiblingCount > 1 ? 's' : ''}). À l’enregistrement ou à la suppression, vous
+              pourrez choisir d’appliquer le changement à toute la série.
+            </Alert>
           )}
           <TextField
             label="Libellé"
@@ -650,58 +924,139 @@ const PlanningPanel: React.FC = () => {
         </DialogContent>
         <DialogActions>
           {form?.id && (
-            <Button
-              color="error"
-              sx={{ mr: 'auto' }}
-              onClick={async () => {
-                if (!form.id || !window.confirm('Supprimer cette vacation ?')) return;
-                await deleteShift(form.id);
-                setOpen(false);
-                setForm(null);
-                await refresh();
-              }}
-            >
+            <Button color="error" sx={{ mr: 'auto' }} disabled={busy} onClick={requestDelete}>
               Supprimer
             </Button>
           )}
-          <Button onClick={() => setOpen(false)}>Annuler</Button>
+          <Button onClick={() => setOpen(false)} disabled={busy}>
+            Annuler
+          </Button>
+          <Button variant="contained" disabled={busy} onClick={requestSave}>
+            {form?.id ? 'Appliquer' : 'Ajouter'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={seriesScopeOpen}
+        onClose={() => {
+          if (busy) return;
+          setSeriesScopeOpen(false);
+          setSeriesScopeAction(null);
+        }}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>
+          {seriesScopeAction === 'delete'
+            ? 'Supprimer la série ?'
+            : 'Modifier la série ?'}
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            Cette vacation fait partie d’une série récurrente
+            {seriesSiblingCount > 0 ? ` (${seriesSiblingCount} occurrences visibles)` : ''}.
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {seriesScopeAction === 'delete'
+              ? 'Choisissez de supprimer uniquement cette occurrence, ou toutes les vacations liées.'
+              : 'Choisissez d’appliquer les modifications uniquement à cette occurrence, ou à toutes les vacations liées (horaires décalés de la même façon).'}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ flexWrap: 'wrap', gap: 1 }}>
           <Button
+            disabled={busy}
+            onClick={() => {
+              setSeriesScopeOpen(false);
+              setSeriesScopeAction(null);
+            }}
+          >
+            Annuler
+          </Button>
+          <Button
+            disabled={busy}
+            variant="outlined"
+            onClick={() =>
+              seriesScopeAction === 'delete' ? removeShift('one') : persistShift('one')
+            }
+          >
+            Cette vacation seulement
+          </Button>
+          <Button
+            disabled={busy}
             variant="contained"
+            color={seriesScopeAction === 'delete' ? 'error' : 'primary'}
+            onClick={() =>
+              seriesScopeAction === 'delete'
+                ? removeShift('series')
+                : persistShift('series')
+            }
+          >
+            Toute la série
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={discardOpen} onClose={() => setDiscardOpen(false)}>
+        <DialogTitle>Annuler les modifications ?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            Les {dirtyCount} modification(s) non enregistrée(s) seront perdues.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDiscardOpen(false)}>Retour</Button>
+          <Button color="error" variant="contained" onClick={discardChanges}>
+            Annuler les modifications
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={resetConfirmOpen}
+        onClose={() => !busy && setResetConfirmOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Réinitialiser le planning</DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Cette action est irréversible.
+          </Alert>
+          <Typography>
+            Êtes-vous sûr de vouloir supprimer la totalité de tous les plannings (toutes les
+            vacations de cet établissement) ?
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Les congés ne sont pas concernés — seuls les créneaux du planning (vacations) seront
+            effacés.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={busy} onClick={() => setResetConfirmOpen(false)}>
+            Annuler
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            disabled={busy}
             onClick={async () => {
-              if (!form?.user_id) return;
-              const payload = {
-                user_id: form.user_id,
-                starts_at: new Date(form.starts_at).toISOString(),
-                ends_at: new Date(form.ends_at).toISOString(),
-                label: form.label || undefined,
-              };
+              setBusy(true);
               try {
-                if (form.id) {
-                  await updateShift(form.id, payload);
-                } else {
-                  const created = await createShift({
-                    ...payload,
-                    recurrence: form.recurrence || 'once',
-                  });
-                  const count = created.created_count || 1;
-                  const pendingMsg = created.confirmation_pending
-                    ? ' Un e-mail de confirmation a été envoyé à l’employé.'
-                    : '';
-                  alert(
-                    count > 1
-                      ? `${count} vacations créées (série).${pendingMsg}`
-                      : `Vacation créée.${pendingMsg}`
-                  );
-                }
-                setOpen(false);
-                setForm(null);
+                setError(null);
+                const result = await resetAllShifts();
+                setDraft(emptyPlanningDraft());
+                setResetConfirmOpen(false);
+                alert(`${result.deleted} vacation(s) supprimée(s).`);
                 await refresh();
               } catch (err) {
-                setError(err instanceof Error ? err.message : 'Enregistrement impossible');
+                setError(err instanceof Error ? err.message : 'Réinitialisation impossible');
+              } finally {
+                setBusy(false);
               }
             }}
           >
-            {form?.id ? 'Enregistrer' : 'Créer'}
+            Oui, tout supprimer
           </Button>
         </DialogActions>
       </Dialog>

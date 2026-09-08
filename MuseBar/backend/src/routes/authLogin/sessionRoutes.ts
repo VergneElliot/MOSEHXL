@@ -57,6 +57,9 @@ sessionRoutes.get('/me', requireAuth, asyncHandler(async (req, res) => {
     ]);
 
     const userRow = userResult;
+    const activeMembership = establishmentId
+      ? memberships.find((m) => m.establishment_id === establishmentId)
+      : memberships[0];
 
     return res.json({
       id: userId,
@@ -67,6 +70,9 @@ sessionRoutes.get('/me', requireAuth, asyncHandler(async (req, res) => {
       first_name: userRow?.first_name || '',
       last_name: userRow?.last_name || '',
       email_verified: userRow?.email_verified ?? false,
+      phone: userRow?.phone || '',
+      date_of_birth: userRow?.date_of_birth || '',
+      calendar_color: activeMembership?.calendar_color || null,
       permissions,
       memberships: MembershipModel.toApiList(memberships),
       support_impersonation: req.user!.support_impersonation ?? null,
@@ -75,6 +81,127 @@ sessionRoutes.get('/me', requireAuth, asyncHandler(async (req, res) => {
     throw new AppError('Internal server error', 500, 'AUTH_ME_FAILED');
   }
 }));
+
+sessionRoutes.get(
+  '/me/profile',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = req.user!.id;
+    const establishmentId = req.user!.establishment_id ?? null;
+    if (!establishmentId) {
+      throw new ValidationError('Aucun établissement actif');
+    }
+    const [profile, membership, used] = await Promise.all([
+      UserModel.getAuthMeProfile(userId),
+      MembershipModel.get(userId, establishmentId),
+      MembershipModel.listUsedCalendarColors(establishmentId, userId),
+    ]);
+    if (!profile || !membership) {
+      throw new NotFoundError('Profil introuvable');
+    }
+    return res.json({
+      email: req.user!.email,
+      first_name: profile.first_name || '',
+      last_name: profile.last_name || '',
+      phone: profile.phone || '',
+      date_of_birth: profile.date_of_birth || '',
+      calendar_color: membership.calendar_color,
+      available_colors: MembershipModel.availableColorsForUser(
+        used,
+        membership.calendar_color
+      ),
+      used_colors: used,
+    });
+  })
+);
+
+sessionRoutes.patch(
+  '/me/profile',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = req.user!.id;
+    const establishmentId = req.user!.establishment_id ?? null;
+    if (!establishmentId) {
+      throw new ValidationError('Aucun établissement actif');
+    }
+
+    const firstName =
+      req.body.first_name !== undefined
+        ? req.body.first_name == null
+          ? null
+          : String(req.body.first_name)
+        : undefined;
+    const lastName =
+      req.body.last_name !== undefined
+        ? req.body.last_name == null
+          ? null
+          : String(req.body.last_name)
+        : undefined;
+    const phone =
+      req.body.phone !== undefined
+        ? req.body.phone == null
+          ? null
+          : String(req.body.phone)
+        : undefined;
+    const dateOfBirth =
+      req.body.date_of_birth !== undefined
+        ? req.body.date_of_birth == null || req.body.date_of_birth === ''
+          ? null
+          : String(req.body.date_of_birth)
+        : undefined;
+
+    if (phone && !/^[\d\s\-+().]{0,40}$/.test(phone)) {
+      throw new ValidationError('Numéro de téléphone invalide');
+    }
+    if (dateOfBirth && !/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) {
+      throw new ValidationError('Date de naissance invalide (AAAA-MM-JJ)');
+    }
+
+    const personal = await UserModel.updatePersonalProfile(userId, {
+      first_name: firstName,
+      last_name: lastName,
+      phone,
+      date_of_birth: dateOfBirth,
+    });
+
+    let membership = await MembershipModel.get(userId, establishmentId);
+    if (!membership) throw new NotFoundError('Profil introuvable');
+
+    if (req.body.calendar_color != null && String(req.body.calendar_color).trim() !== '') {
+      try {
+        membership = await MembershipModel.setCalendarColor(
+          userId,
+          establishmentId,
+          String(req.body.calendar_color)
+        );
+      } catch (error) {
+        const code = (error as Error & { code?: string }).code;
+        if (code === 'INVALID_COLOR') {
+          throw new ValidationError('Couleur invalide (attendu #RRGGBB)');
+        }
+        if (code === 'COLOR_TAKEN') {
+          throw new ValidationError('Cette couleur est déjà utilisée dans l’établissement');
+        }
+        throw error;
+      }
+    }
+
+    const used = await MembershipModel.listUsedCalendarColors(establishmentId, userId);
+    return res.json({
+      email: req.user!.email,
+      first_name: personal.first_name || '',
+      last_name: personal.last_name || '',
+      phone: personal.phone || '',
+      date_of_birth: personal.date_of_birth || '',
+      calendar_color: membership.calendar_color,
+      available_colors: MembershipModel.availableColorsForUser(
+        used,
+        membership.calendar_color
+      ),
+      used_colors: used,
+    });
+  })
+);
 
 // ---------------------------------------------------------------------------
 // POST /api/auth/switch-establishment — re-issue JWT for another membership

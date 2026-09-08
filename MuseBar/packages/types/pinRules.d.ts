@@ -1,4 +1,7 @@
-/** Permissions that require an elevated (4–8 digit) PIN. */
+/**
+ * Permissions that require an elevated (4–8 digit) PIN. Derived from the tier table so a
+ * new specific permission can never silently stay reachable with a 2-digit PIN.
+ */
 export declare const ELEVATED_PIN_PERMISSIONS: readonly string[];
 export declare const PIN_BASIC_LENGTH = 2;
 export declare const PIN_ELEVATED_MIN_LENGTH = 4;

@@ -17,6 +17,7 @@ interface ApiUser {
   first_name?: string;
   last_name?: string;
   permissions?: string[];
+  is_active?: boolean;
 }
 
 function mapApiUser(raw: ApiUser): User {
@@ -28,6 +29,7 @@ function mapApiUser(raw: ApiUser): User {
     role: raw.role,
     establishment_id: raw.establishment_id,
     permissions: raw.permissions,
+    isActive: raw.is_active !== false,
   };
 }
 
@@ -84,14 +86,40 @@ export const useUserActions = ({
     }
   }, [onUserAdd, onError]);
 
-  const deleteUser = useCallback(async (userId: number): Promise<boolean> => {
+  /** Deactivation, not deletion: the account stays so its past actions remain attributable. */
+  const deactivateUser = useCallback(async (userId: number): Promise<boolean> => {
     onError(null);
-    
+
     try {
       await apiService.delete(`/auth/users/${userId}`);
       return true;
-    } catch {
-      onError('Failed to delete user');
+    } catch (err) {
+      onError((err as { message?: string }).message || 'Impossible de désactiver le compte');
+      return false;
+    }
+  }, [onError]);
+
+  const reactivateUser = useCallback(async (userId: number): Promise<boolean> => {
+    onError(null);
+
+    try {
+      await apiService.post(`/auth/users/${userId}/reactivate`, {});
+      return true;
+    } catch (err) {
+      onError((err as { message?: string }).message || 'Impossible de réactiver le compte');
+      return false;
+    }
+  }, [onError]);
+
+  /** Refused by the backend as soon as the account has any recorded activity. */
+  const purgeUser = useCallback(async (userId: number): Promise<boolean> => {
+    onError(null);
+
+    try {
+      await apiService.delete(`/auth/users/${userId}/purge`);
+      return true;
+    } catch (err) {
+      onError((err as { message?: string }).message || 'Impossible de supprimer le compte');
       return false;
     }
   }, [onError]);
@@ -119,9 +147,11 @@ export const useUserActions = ({
     () => ({
       fetchUsers,
       createUser,
-      deleteUser,
+      deactivateUser,
+      reactivateUser,
+      purgeUser,
       updateUserRole,
     }),
-    [fetchUsers, createUser, deleteUser, updateUserRole]
+    [fetchUsers, createUser, deactivateUser, reactivateUser, purgeUser, updateUserRole]
   );
 };

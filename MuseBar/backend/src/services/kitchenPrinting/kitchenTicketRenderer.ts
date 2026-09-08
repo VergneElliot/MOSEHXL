@@ -1,3 +1,4 @@
+import { formatDateTime } from '@mosehxl/types';
 import { ESC_POS } from '../printing/types';
 import type { KitchenTicketLine } from './kitchenTicketTypes';
 import {
@@ -33,9 +34,8 @@ function normalizeThermalText(content: string): string {
 }
 
 function formatTimestamp(value: Date | string): string {
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleString('fr-FR');
+  const formatted = formatDateTime(value);
+  return formatted === 'N/A' ? '' : formatted;
 }
 
 function formatOptionLine(option: KitchenTicketLine['options'][number]): string | null {

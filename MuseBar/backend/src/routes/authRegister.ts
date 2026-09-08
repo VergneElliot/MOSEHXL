@@ -17,6 +17,8 @@ import {
   requireSetupSecret,
 } from '../middleware/auth';
 import { P } from '../permissions/registry';
+import { applyPermissionGrants } from '../services/auth/permissionGrantService';
+import { deactivateStaffAccount } from '../services/auth/staffAccountLifecycle';
 import { logSoftwareEventBestEffort } from '../services/legal/softwareEventJournal';
 import { validatePasswordWithBreachCheck } from '../utils/passwordValidation';
 
@@ -234,15 +236,6 @@ router.get('/system-security-logs', requireAuth, requireAdmin, asyncHandler(asyn
 }));
 
 // ---------------------------------------------------------------------------
-// GET /api/auth/users — list users scoped to the requester's establishment
-// ---------------------------------------------------------------------------
-router.get('/users', requireAuth, canManageUsers, asyncHandler(async (req, res) => {
-  const establishmentId = req.user!.establishment_id!;
-  const rows = await UserModel.listUsersByEstablishment(establishmentId);
-  return res.json(rows);
-}));
-
-// ---------------------------------------------------------------------------
 // GET /api/auth/users/:id/permissions — establishment-scoped
 // ---------------------------------------------------------------------------
 router.get('/users/:id/permissions', requireAuth, canManageUsers, asyncHandler(async (req, res) => {
@@ -277,13 +270,17 @@ router.post('/users/:id/permissions', requireAuth, canManageUsers, asyncHandler(
     throw new AuthorizationError('User does not belong to your establishment');
   }
 
-  await UserModel.setUserPermissions(userId, permissions, establishmentId);
+  const result = await applyPermissionGrants({
+    targetUserId: userId,
+    establishmentId,
+    requested: permissions,
+  });
   await logAuditOrThrow({
     user_id: String(req.user!.id),
     action_type: 'SET_PERMISSIONS',
     resource_type: 'USER',
     resource_id: String(userId),
-    action_details: { permissions },
+    action_details: { permissions: result.granted, pin_cleared: result.pin_cleared },
     ip_address: ip,
     user_agent: userAgent,
   }, 'SET_USER_PERMISSIONS_POST');
@@ -293,12 +290,13 @@ router.post('/users/:id/permissions', requireAuth, canManageUsers, asyncHandler(
     userId: String(req.user!.id),
     eventData: {
       target_user_id: userId,
-      permissions_count: permissions.length,
+      permissions_count: result.granted.length,
+      pin_cleared: result.pin_cleared,
       method: 'POST',
     },
   });
 
-  return res.json({ userId, permissions });
+  return res.json({ userId, permissions: result.permissions, pin_cleared: result.pin_cleared });
 }));
 
 // ---------------------------------------------------------------------------
@@ -318,13 +316,17 @@ router.put('/users/:id/permissions', requireAuth, canManageUsers, asyncHandler(a
     throw new AuthorizationError('User does not belong to your establishment');
   }
 
-  await UserModel.setUserPermissions(userId, permissions, establishmentId);
+  const result = await applyPermissionGrants({
+    targetUserId: userId,
+    establishmentId,
+    requested: permissions,
+  });
   await logAuditOrThrow({
     user_id: String(req.user!.id),
     action_type: 'SET_PERMISSIONS',
     resource_type: 'USER',
     resource_id: String(userId),
-    action_details: { permissions },
+    action_details: { permissions: result.granted, pin_cleared: result.pin_cleared },
     ip_address: req.ip,
     user_agent: req.headers['user-agent'],
   }, 'SET_USER_PERMISSIONS_PUT');
@@ -334,12 +336,13 @@ router.put('/users/:id/permissions', requireAuth, canManageUsers, asyncHandler(a
     userId: String(req.user!.id),
     eventData: {
       target_user_id: userId,
-      permissions_count: permissions.length,
+      permissions_count: result.granted.length,
+      pin_cleared: result.pin_cleared,
       method: 'PUT',
     },
   });
 
-  return res.json({ userId, permissions });
+  return res.json({ userId, permissions: result.permissions, pin_cleared: result.pin_cleared });
 }));
 
 // ---------------------------------------------------------------------------
@@ -459,14 +462,15 @@ router.post('/users', requireAuth, canManageUsers, asyncHandler(async (req, res)
 }));
 
 // ---------------------------------------------------------------------------
-// DELETE /api/auth/users/:id — remove membership from the requester's establishment
+// DELETE /api/auth/users/:id — deactivate; the account stays for traceability.
+// Hard deletion lives in routes/staffAccounts.ts and requires an empty footprint.
 // ---------------------------------------------------------------------------
 router.delete('/users/:id', requireAuth, canManageUsers, asyncHandler(async (req, res) => {
   const userId = parseInt(req.params.id ?? '', 10);
   const establishmentId = req.user!.establishment_id!;
 
   if (userId === req.user!.id) {
-    throw new ValidationError('You cannot delete your own account');
+    throw new ValidationError('You cannot deactivate your own account');
   }
 
   const owns = await UserModel.userBelongsToEstablishment(userId, establishmentId);
@@ -474,26 +478,27 @@ router.delete('/users/:id', requireAuth, canManageUsers, asyncHandler(async (req
     throw new AuthorizationError('User does not belong to your establishment');
   }
 
-  await MembershipModel.remove(userId, establishmentId);
+  const result = await deactivateStaffAccount(userId, establishmentId);
   await logAuditOrThrow({
     user_id: String(req.user!.id),
-    action_type: 'DELETE_USER',
+    action_type: 'DEACTIVATE_USER',
     resource_type: 'USER',
     resource_id: String(userId),
-    action_details: { removed_membership_establishment_id: establishmentId },
+    action_details: { establishment_id: establishmentId, ...result },
     ip_address: req.ip,
     user_agent: req.headers['user-agent'],
-  }, 'DELETE_ESTABLISHMENT_USER');
+  }, 'DEACTIVATE_ESTABLISHMENT_USER');
   await logSoftwareEventBestEffort({
     establishmentId,
     eventType: 'ESTABLISHMENT_USER_DELETED',
     userId: String(req.user!.id),
     eventData: {
       target_user_id: userId,
+      deactivated: true,
     },
   });
 
-  return res.json({ success: true });
+  return res.json({ success: true, ...result });
 }));
 
 // ---------------------------------------------------------------------------

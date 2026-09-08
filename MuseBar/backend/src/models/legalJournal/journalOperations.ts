@@ -34,7 +34,15 @@ export class JournalOperations {
     );
   }
 
-  static async logTransaction(order: OrderForJournal, userId?: string): Promise<JournalEntry> {
+  /**
+   * @param actor Account + PIN identity that rang the sale. Stored in `transaction_data`, which
+   * is outside the hashed payload, so recording it cannot alter the chain of existing entries.
+   */
+  static async logTransaction(
+    order: OrderForJournal,
+    userId?: string,
+    actor?: Record<string, unknown> | null
+  ): Promise<JournalEntry> {
     if (!order.establishment_id) {
       throw new Error('order.establishment_id is required for legal journal (multi-tenant)');
     }
@@ -55,7 +63,8 @@ export class JournalOperations {
         order_id: order.id,
         items: order.items || [],
         timestamp: order.created_at || new Date(),
-        register_id: JournalSigning.getRegisterKey(order.establishment_id)
+        register_id: JournalSigning.getRegisterKey(order.establishment_id),
+        ...(actor ? { actor } : {})
       },
       userId
     );
@@ -135,7 +144,13 @@ export class JournalOperations {
     );
   }
 
-  static async logChange(establishmentId: string, orderId: number, amount: number, userId?: string): Promise<JournalEntry> {
+  static async logChange(
+    establishmentId: string,
+    orderId: number,
+    amount: number,
+    userId?: string,
+    actor?: Record<string, unknown> | null
+  ): Promise<JournalEntry> {
     return await this.addEntry(
       establishmentId,
       'CHANGE',
@@ -148,6 +163,7 @@ export class JournalOperations {
         cash: -amount,
         operation: 'faire_de_la_monnaie',
         register_id: JournalSigning.getRegisterKey(establishmentId),
+        ...(actor ? { actor } : {}),
       },
       userId
     );

@@ -11,6 +11,7 @@ import { UseHappyHourReturn, EditForm } from './types';
 import { HappyHourService } from '../../../services/happyHourService';
 import { useHappyHourState, useHappyHourSettings, useHappyHourProducts } from './hooks';
 import { formatCurrency } from '../../../utils/formatCurrency';
+import { formatTime } from '../../../utils/formatDate';
 
 import { Product } from '../../../types';
 
@@ -128,7 +129,7 @@ export const useHappyHourControl = (
     },
     
     // Utility functions
-    getCurrentTime: () => new Date().toLocaleTimeString(),
+    getCurrentTime: () => formatTime(new Date()),
     formatCurrency,
     calculateHappyHourPrice: (product) => {
       const discount = productsHook.getEffectiveDiscount(product, state.settings);

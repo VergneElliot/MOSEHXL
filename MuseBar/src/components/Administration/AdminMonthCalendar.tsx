@@ -110,7 +110,11 @@ const AdminMonthCalendar: React.FC<AdminMonthCalendarProps> = ({
           <ChevronLeft />
         </IconButton>
         <Typography variant="h6" sx={{ flex: 1, textAlign: 'center', textTransform: 'capitalize' }}>
-          {month.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+          {new Intl.DateTimeFormat('fr-FR', {
+            timeZone: 'Europe/Paris',
+            month: 'long',
+            year: 'numeric',
+          }).format(month)}
         </Typography>
         <Button size="small" onClick={() => onMonthChange(startOfMonth(new Date()))}>
           Aujourd&apos;hui

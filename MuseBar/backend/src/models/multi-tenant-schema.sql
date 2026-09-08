@@ -24,6 +24,8 @@ ALTER TABLE users
 ADD COLUMN IF NOT EXISTS establishment_id UUID REFERENCES establishments(id),
 ADD COLUMN IF NOT EXISTS first_name VARCHAR(100),
 ADD COLUMN IF NOT EXISTS last_name VARCHAR(100),
+ADD COLUMN IF NOT EXISTS phone VARCHAR(40),
+ADD COLUMN IF NOT EXISTS date_of_birth DATE,
 ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'cashier',
 ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE,
 ADD COLUMN IF NOT EXISTS email_verification_token VARCHAR(255),
@@ -33,6 +35,29 @@ ADD COLUMN IF NOT EXISTS invitation_token VARCHAR(255),
 ADD COLUMN IF NOT EXISTS invitation_expires TIMESTAMPTZ,
 ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ,
 ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+
+-- Membership calendar color (unique per active membership in an establishment)
+CREATE TABLE IF NOT EXISTS user_establishment_memberships (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  establishment_id UUID NOT NULL REFERENCES establishments(id) ON DELETE CASCADE,
+  role VARCHAR(32) NOT NULL DEFAULT 'staff',
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  calendar_color VARCHAR(7) NOT NULL DEFAULT '#1565C0',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT user_establishment_memberships_role_check
+    CHECK (role IN ('establishment_admin', 'staff')),
+  CONSTRAINT user_establishment_memberships_unique
+    UNIQUE (user_id, establishment_id)
+);
+
+ALTER TABLE user_establishment_memberships
+  ADD COLUMN IF NOT EXISTS calendar_color VARCHAR(7) NOT NULL DEFAULT '#1565C0';
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_membership_calendar_color_per_est
+  ON user_establishment_memberships (establishment_id, upper(calendar_color))
+  WHERE is_active = TRUE;
 
 -- Update existing users to have verified emails (backward compatibility)
 UPDATE users SET email_verified = TRUE WHERE email_verified IS NULL;

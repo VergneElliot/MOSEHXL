@@ -1,4 +1,4 @@
-import React, { Suspense, useMemo, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Box, Tab, Tabs, Typography, Alert, CircularProgress } from '@mui/material';
 import {
   Description as DocsIcon,
@@ -11,14 +11,17 @@ import {
   Gavel as ComplianceIcon,
   TableRestaurant as FloorIcon,
 } from '@mui/icons-material';
-import { PERMISSIONS } from '@mosehxl/types';
+import { PERMISSIONS, type PermissionName } from '@mosehxl/types';
 import type { User } from '../../types/auth';
+import { useStepUpAuth } from '../../contexts/StepUpAuthContext';
+import { usePinSessions } from '../../contexts/PinSessionsContext';
 import DocumentsPanel from './DocumentsPanel';
 import InboxPanel from './InboxPanel';
 import ReservationsPanel from './ReservationsPanel';
 import PlanningPanel from './PlanningPanel';
 import TimeClockPanel from './TimeClockPanel';
 import FloorPlansPanel from './FloorPlansPanel';
+import { isPlanningUiDirty, setPlanningUiDirty } from './planningDraft';
 
 const LazyUserManagement = React.lazy(() => import('../Admin/UserManagement'));
 const LazyAuditTrailDashboard = React.lazy(() => import('../Admin/AuditTrailDashboard'));
@@ -51,51 +54,55 @@ type AdminSection =
   | 'audit';
 
 const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user, token }) => {
-  const sections = useMemo(() => {
-    const perms = user.permissions ?? [];
-    const isEstAdmin = user.role === 'establishment_admin';
-    const items: Array<{ key: AdminSection; label: string; icon: React.ReactElement }> = [];
-    if (isEstAdmin || perms.includes(PERMISSIONS.access_documents)) {
-      items.push({ key: 'documents', label: 'Documents', icon: <DocsIcon /> });
-    }
-    if (isEstAdmin || perms.includes(PERMISSIONS.access_inbox)) {
-      items.push({ key: 'inbox', label: 'Boîte mail', icon: <InboxIcon /> });
-    }
-    if (isEstAdmin || perms.includes(PERMISSIONS.access_reservations)) {
-      items.push({ key: 'reservations', label: 'Réservations', icon: <ResaIcon /> });
-    }
-    if (isEstAdmin || perms.includes(PERMISSIONS.access_planning)) {
-      items.push({ key: 'planning', label: 'Planning', icon: <PlanIcon /> });
-    }
-    // Shared terminal + hours report: any establishment member can open Pointage;
-    // report edit requires planning/admin (enforced in the panel / API).
-    if (user.role !== 'system_admin' && user.establishment_id) {
-      items.push({ key: 'time_clock', label: 'Pointage', icon: <ClockIcon /> });
-    }
-    if (isEstAdmin || perms.includes(PERMISSIONS.manage_floor_plan)) {
-      items.push({ key: 'floor', label: 'Plans de tables', icon: <FloorIcon /> });
-    }
-    if (isEstAdmin || perms.includes(PERMISSIONS.access_user_management)) {
-      items.push({ key: 'users', label: 'Utilisateurs', icon: <UsersIcon /> });
-    }
-    // Legal compliance dashboard: establishment admin only (moved from its own top-level tab).
-    if (isEstAdmin) {
-      items.push({ key: 'compliance', label: 'Conformité Légale', icon: <ComplianceIcon /> });
-    }
-    if (isEstAdmin) {
-      items.push({ key: 'audit', label: 'Journal de sécurité', icon: <AuditIcon /> });
-    }
-    return items;
-  }, [user]);
+  const { ensureAccess, hasAccess, releaseAccess } = useStepUpAuth();
+  const { activeSession } = usePinSessions();
+
+  /**
+   * Every section stays visible; opening one asks for a PIN when the acting identity lacks
+   * its permission. Pointage is basic — any member of the establishment may clock in.
+   */
+  const sections = useMemo(
+    () => [
+      { key: 'documents' as AdminSection, label: 'Documents', icon: <DocsIcon />, permission: PERMISSIONS.access_documents },
+      { key: 'inbox' as AdminSection, label: 'Boîte mail', icon: <InboxIcon />, permission: PERMISSIONS.access_inbox },
+      { key: 'reservations' as AdminSection, label: 'Réservations', icon: <ResaIcon />, permission: PERMISSIONS.access_reservations },
+      { key: 'planning' as AdminSection, label: 'Planning', icon: <PlanIcon />, permission: PERMISSIONS.access_planning },
+      { key: 'time_clock' as AdminSection, label: 'Pointage', icon: <ClockIcon />, permission: null },
+      { key: 'floor' as AdminSection, label: 'Plans de tables', icon: <FloorIcon />, permission: PERMISSIONS.manage_floor_plan },
+      { key: 'users' as AdminSection, label: 'Utilisateurs', icon: <UsersIcon />, permission: PERMISSIONS.access_user_management },
+      { key: 'compliance' as AdminSection, label: 'Conformité Légale', icon: <ComplianceIcon />, permission: PERMISSIONS.access_compliance },
+      { key: 'audit' as AdminSection, label: 'Journal de sécurité', icon: <AuditIcon />, permission: PERMISSIONS.access_compliance },
+    ],
+    []
+  );
 
   const [tab, setTab] = useState(0);
   const active = sections[Math.min(tab, Math.max(sections.length - 1, 0))]?.key;
 
-  if (sections.length === 0) {
+  const canOpen = useCallback(
+    (permission: PermissionName | null): boolean => {
+      if (!permission) return true;
+      if (activeSession) return hasAccess(permission);
+      return user.permissions?.includes(permission) ?? false;
+    },
+    [activeSession, hasAccess, user.permissions]
+  );
+
+  // Leaving a section ends the authorization its PIN granted.
+  useEffect(() => {
+    const keep = sections.find((s) => s.key === active)?.permission;
+    for (const section of sections) {
+      if (section.permission && section.permission !== keep) {
+        releaseAccess(section.permission);
+      }
+    }
+  }, [active, sections, releaseAccess]);
+
+  if (!user.establishment_id) {
     return (
       <Alert severity="info">
-        Vous n&apos;avez pas accès à l&apos;espace Administration. Demandez les permissions
-        nécessaires à un administrateur.
+        Vous n&apos;avez pas accès à l&apos;espace Administration : aucun établissement
+        n&apos;est associé à ce compte.
       </Alert>
     );
   }
@@ -110,7 +117,30 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
 
       <Tabs
         value={Math.min(tab, sections.length - 1)}
-        onChange={(_e, v) => setTab(v)}
+        onChange={(_e, v) => {
+          const next = sections[v];
+          if (!next) return;
+          if (active === 'planning' && next.key !== 'planning' && isPlanningUiDirty()) {
+            const ok = window.confirm(
+              'Des modifications du planning ne sont pas enregistrées. Quitter sans enregistrer ?'
+            );
+            if (!ok) return;
+            setPlanningUiDirty(false);
+          }
+          const required = next.permission;
+          if (!required || canOpen(required)) {
+            setTab(v);
+            return;
+          }
+          void ensureAccess(required, {
+            title: `Administration — ${next.label}`,
+            description: `PIN d’un profil autorisé pour ouvrir « ${next.label} ».`,
+          })
+            .then(() => setTab(v))
+            .catch(() => {
+              /* stay on current section */
+            });
+        }}
         variant="scrollable"
         allowScrollButtonsMobile
       >

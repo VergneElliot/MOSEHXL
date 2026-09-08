@@ -118,9 +118,9 @@ export class ApiService {
     tips?: number;
     change?: number;
     sub_bills?: Array<{ payment_method: 'cash' | 'card'; amount: number }>;
-    waiter_user_id?: number;
-    waiter_display_name?: string;
-    table_label?: string;
+    waiter_user_id?: number | null;
+    waiter_display_name?: string | null;
+    table_label?: string | null;
     pinActorToken?: string;
   }): Promise<Order> {
     return ordersApi.createOrder(order);
@@ -132,6 +132,14 @@ export class ApiService {
   async post<T>(endpoint: string, data?: unknown): Promise<{ data: T }> { const res = await this.request<T>(endpoint, { method: 'POST', body: data ? JSON.stringify(data) : undefined }); return { data: res }; }
 
   async put<T>(endpoint: string, data?: unknown): Promise<{ data: T }> { const res = await this.request<T>(endpoint, { method: 'PUT', body: data ? JSON.stringify(data) : undefined }); return { data: res }; }
+
+  async patch<T>(endpoint: string, data?: unknown): Promise<{ data: T }> {
+    const res = await this.request<T>(endpoint, {
+      method: 'PATCH',
+      body: data ? JSON.stringify(data) : undefined,
+    });
+    return { data: res };
+  }
 
   async delete<T>(endpoint: string): Promise<{ data: T }> { const res = await this.request<T>(endpoint, { method: 'DELETE' }); return { data: res }; }
 

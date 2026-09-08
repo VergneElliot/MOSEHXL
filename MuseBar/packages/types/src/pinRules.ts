@@ -1,24 +1,10 @@
-import { PERMISSIONS } from './permissions';
+import { SPECIFIC_PERMISSIONS } from './permissions';
 
-/** Permissions that require an elevated (4–8 digit) PIN. */
-export const ELEVATED_PIN_PERMISSIONS: readonly string[] = [
-  PERMISSIONS.pos_happyhour_manual,
-  PERMISSIONS.pos_apply_offert,
-  PERMISSIONS.pos_apply_perso,
-  PERMISSIONS.pos_reassign_waiter,
-  PERMISSIONS.pos_intervene_table,
-  PERMISSIONS.orders_cancel,
-  PERMISSIONS.access_menu,
-  PERMISSIONS.access_settings,
-  PERMISSIONS.access_closure,
-  PERMISSIONS.access_user_management,
-  PERMISSIONS.access_documents,
-  PERMISSIONS.access_inbox,
-  PERMISSIONS.access_reservations,
-  PERMISSIONS.access_planning,
-  PERMISSIONS.manage_floor_plan,
-  PERMISSIONS.access_compliance,
-];
+/**
+ * Permissions that require an elevated (4–8 digit) PIN. Derived from the tier table so a
+ * new specific permission can never silently stay reachable with a 2-digit PIN.
+ */
+export const ELEVATED_PIN_PERMISSIONS: readonly string[] = SPECIFIC_PERMISSIONS;
 
 export const PIN_BASIC_LENGTH = 2;
 export const PIN_ELEVATED_MIN_LENGTH = 4;

@@ -28,6 +28,7 @@ import {
   CANCEL_MIN_HOURS_BEFORE,
 } from '../../services/reservations/reservationRemindToken';
 import { Logger } from '../../utils/logger';
+import { formatDateOnly, formatDateTime } from '@mosehxl/types';
 
 const router = express.Router();
 
@@ -158,11 +159,7 @@ router.post(
         );
       }
 
-      const startsFormatted = new Date(r.starts_at).toLocaleString('fr-FR', {
-        timeZone: timezone,
-        dateStyle: 'short',
-        timeStyle: 'short',
-      });
+      const startsFormatted = formatDateTime(r.starts_at);
 
       await InboxModel.createMessage({
         establishment_id: est.id,
@@ -246,11 +243,7 @@ router.post(
       });
       if (!updated) throw new NotFoundError('Réservation introuvable');
 
-      const startsFormatted = new Date(updated.starts_at).toLocaleString('fr-FR', {
-        timeZone: timezone,
-        dateStyle: 'short',
-        timeStyle: 'short',
-      });
+      const startsFormatted = formatDateTime(updated.starts_at);
       await InboxModel.createMessage({
         establishment_id: est.id,
         from_address: updated.customer_email || 'annulation@mosehxl.com',
@@ -351,11 +344,7 @@ router.post(
     const reliability = await GuestNoShowFlagModel.lookup(customerEmail, customerPhone);
 
     const startsIso = startsAt.toISOString();
-    const startsFormatted = startsAt.toLocaleString('fr-FR', {
-      timeZone: timezone,
-      dateStyle: 'short',
-      timeStyle: 'short',
-    });
+    const startsFormatted = formatDateTime(startsAt);
 
     const { reservation, inboxMessageId } = await runWithTenantContext(
       { establishmentId: est.id },
@@ -368,7 +357,7 @@ router.post(
           text_body: [
             `Demande publique de réservation`,
             reliability.flagged
-              ? `⚠ ALERTE NO-SHOW : ce contact a déjà été signalé (${reliability.flag_count}×, dernier : ${reliability.last_flagged_at ? new Date(reliability.last_flagged_at).toLocaleDateString('fr-FR') : '—'})`
+              ? `⚠ ALERTE NO-SHOW : ce contact a déjà été signalé (${reliability.flag_count}×, dernier : ${reliability.last_flagged_at ? formatDateOnly(reliability.last_flagged_at) : '—'})`
               : null,
             `Client: ${customerName}`,
             `Email: ${customerEmail}`,

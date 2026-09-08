@@ -165,7 +165,14 @@ export async function setReservationDayClosed(date: string, closed: boolean) {
 
 export async function listPlanningStaff() {
   return request<{
-    staff: Array<{ id: number; email: string; first_name: string | null; last_name: string | null; role: string }>;
+    staff: Array<{
+      id: number;
+      email: string;
+      first_name: string | null;
+      last_name: string | null;
+      role: string;
+      calendar_color?: string;
+    }>;
   }>('/admin/planning/staff');
 }
 
@@ -194,15 +201,69 @@ export async function createShift(payload: {
   });
 }
 
-export async function updateShift(id: number, payload: Partial<StaffShiftDto>) {
-  return request<{ shift: StaffShiftDto }>(`/admin/planning/shifts/${id}`, {
+export async function updateShift(
+  id: number,
+  payload: Partial<StaffShiftDto> & { apply_to?: 'one' | 'series' }
+) {
+  return request<{
+    shift: StaffShiftDto;
+    updated_count?: number;
+    apply_to?: 'one' | 'series';
+    series_id?: string;
+  }>(`/admin/planning/shifts/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
   });
 }
 
-export async function deleteShift(id: number) {
-  return request(`/admin/planning/shifts/${id}`, { method: 'DELETE' });
+export async function deleteShift(id: number, applyTo: 'one' | 'series' = 'one') {
+  const qs = applyTo === 'series' ? '?apply_to=series' : '';
+  return request<{
+    success: boolean;
+    deleted?: number;
+    apply_to?: 'one' | 'series';
+    series_id?: string;
+  }>(`/admin/planning/shifts/${id}${qs}`, { method: 'DELETE' });
+}
+
+export async function commitPlanningShifts(payload: {
+  creates?: Array<{
+    user_id: number;
+    starts_at: string;
+    ends_at: string;
+    label?: string;
+    note?: string;
+    recurrence?: 'once' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+  }>;
+  updates?: Array<{
+    id: number;
+    apply_to?: 'one' | 'series';
+    user_id?: number;
+    starts_at?: string;
+    ends_at?: string;
+    label?: string | null;
+    note?: string | null;
+  }>;
+  deletes?: Array<{ id: number; apply_to?: 'one' | 'series' }>;
+}) {
+  return request<{
+    success: boolean;
+    created_count: number;
+    updated_count: number;
+    deleted_count: number;
+    emails_queued: number;
+    message?: string;
+  }>('/admin/planning/shifts/commit', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function resetAllShifts() {
+  return request<{ success: boolean; deleted: number }>('/admin/planning/shifts/reset', {
+    method: 'POST',
+    body: JSON.stringify({ confirm: true }),
+  });
 }
 
 export async function duplicatePlanningWeek(payload: {

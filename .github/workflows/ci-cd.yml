@@ -33,6 +33,9 @@ jobs:
       working-directory: MuseBar
       run: npm ci
 
+    - name: Check module sizes
+      run: node scripts/check-module-size.mjs
+
     - name: Run frontend linting
       working-directory: MuseBar
       run: npm run lint

@@ -5,6 +5,7 @@
 
 import express from 'express';
 import { OrderModel, OrderItemModel, SubBillModel } from '../../models';
+import { queryWaiterDayReport } from '../../models/database/orderWaiterDayReport';
 import { Logger } from '../../utils/logger';
 import { pool } from '../../db/pool';
 import { getEstablishmentId, requireAuth, requireEstablishmentAdmin } from '../auth';
@@ -13,6 +14,7 @@ import { assertPosOrderLinePermissions } from '../../middleware/orderPosLinePerm
 import { requirePosPinActor } from '../../middleware/pinActor';
 import { AppError, asyncHandler, ValidationError } from '../../middleware/errorHandler';
 import { createOrderWithCompliance } from '../../services/orders/orderCreationService';
+import { resolveActor } from '../../services/auth/actorContext';
 import { attachOptionsToOrderItems } from '../../services/orders/orderItemOptionsService';
 import { enrichOrdersForHistory } from '../../services/orders/orderHistoryEnrichment';
 
@@ -137,9 +139,11 @@ router.get('/waiter-day-report', asyncHandler(async (req, res) => {
   const cut = settings.daily_closure_time || '02:00';
   const tz = settings.timezone || DEFAULT_APP_TIMEZONE;
   const { start, end } = getBusinessDayPeriod(day, cut, tz);
-  const rows = await OrderModel.waiterDayReport(establishmentId, start.toDate(), end.toDate());
-  const total_amount = rows.reduce((sum, r) => sum + r.total_amount, 0);
-  const order_count = rows.reduce((sum, r) => sum + r.order_count, 0);
+  const report = await queryWaiterDayReport(establishmentId, start.toDate(), end.toDate());
+  const total_amount =
+    report.waiters.reduce((sum, r) => sum + r.total_amount, 0) + report.comptoir.total_amount;
+  const order_count =
+    report.waiters.reduce((sum, r) => sum + r.order_count, 0) + report.comptoir.order_count;
   res.json({
     date: start.format('YYYY-MM-DD'),
     period_start: start.toISOString(),
@@ -148,8 +152,9 @@ router.get('/waiter-day-report', asyncHandler(async (req, res) => {
     timezone: tz,
     order_count,
     total_amount,
-    waiters: rows,
-    note: 'Rapport informatif — ce n’est pas un bulletin de clôture fiscal.',
+    waiters: report.waiters,
+    comptoir: report.comptoir,
+    note: 'Rapport informatif — ce n’est pas un bulletin de clôture fiscal. Total comptoir = ventes sans table.',
   });
 }));
 
@@ -193,12 +198,24 @@ router.post(
     const establishmentId = getEstablishmentId(req, res);
     if (!establishmentId) return;
     try {
-      const pinActor = req.pinActor;
+      const rawLabel = req.body?.table_label;
+      const tableLabel =
+        typeof rawLabel === 'string' && rawLabel.trim().length > 0 ? rawLabel.trim() : null;
+      const isComptoir = tableLabel == null;
+      // Comptoir: never attribute to the cashier PIN (Total comptoir). Table: trust body owner snapshot.
       const body = {
         ...req.body,
-        // Table / floor attribution from client; PIN session only when not specified.
-        waiter_user_id: req.body?.waiter_user_id ?? pinActor?.id ?? null,
-        waiter_display_name: req.body?.waiter_display_name ?? pinActor?.display_name ?? null,
+        table_label: tableLabel,
+        waiter_user_id: isComptoir
+          ? null
+          : req.body?.waiter_user_id != null
+            ? Number(req.body.waiter_user_id)
+            : null,
+        waiter_display_name: isComptoir
+          ? null
+          : typeof req.body?.waiter_display_name === 'string'
+            ? req.body.waiter_display_name
+            : null,
       };
       const creationResult = await createOrderWithCompliance(
         body,
@@ -207,6 +224,7 @@ router.post(
           userId: req.user ? String(req.user.id) : undefined,
           ipAddress: req.ip,
           userAgent: req.headers['user-agent'],
+          actor: resolveActor(req),
         },
         logger
       );

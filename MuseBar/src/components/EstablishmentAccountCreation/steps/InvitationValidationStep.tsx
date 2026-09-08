@@ -18,6 +18,7 @@ import type { ChipProps } from '@mui/material/Chip';
 import { CheckCircle, Error, AccessTime } from '@mui/icons-material';
 import { establishmentAccountApi } from '../../../services/establishmentAccountApi';
 import { InvitationValidationResult } from '../types';
+import { formatDate } from '../../../utils/formatDate';
 
 interface InvitationValidationStepProps {
   token: string;
@@ -115,7 +116,7 @@ const InvitationValidationStep: React.FC<InvitationValidationStepProps> = ({
                 <strong>Email:</strong> {validationResult.invitation.email}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                <strong>Expires:</strong> {new Date(validationResult.invitation.expiresAt).toLocaleString()}
+                <strong>Expires:</strong> {formatDate(validationResult.invitation.expiresAt)}
               </Typography>
             </Box>
           )}

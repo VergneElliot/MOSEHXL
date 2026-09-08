@@ -94,18 +94,17 @@ export const OpenTicketModel = {
     return result.rows[0] as OpenTicket;
   },
 
-  async touchServer(
+  /** Heartbeat only — never changes `last_served_by_user_id` (ownership). */
+  async touchActivity(
     id: number,
-    establishmentId: string,
-    lastServedByUserId: number
+    establishmentId: string
   ): Promise<OpenTicket | null> {
     const result = await pool.query(
       `UPDATE open_tickets
-       SET last_served_by_user_id = $3,
-           updated_at = CURRENT_TIMESTAMP
+       SET updated_at = CURRENT_TIMESTAMP
        WHERE id = $1 AND establishment_id = $2 AND status = 'open'
        RETURNING *`,
-      [id, establishmentId, lastServedByUserId]
+      [id, establishmentId]
     );
     return (result.rows[0] as OpenTicket | undefined) ?? null;
   },
@@ -113,17 +112,16 @@ export const OpenTicketModel = {
   async abandon(
     id: number,
     establishmentId: string,
-    lastServedByUserId: number
+    _lastServedByUserId?: number
   ): Promise<OpenTicket | null> {
     const result = await pool.query(
       `UPDATE open_tickets
        SET status = 'cancelled',
-           last_served_by_user_id = $3,
            closed_at = CURRENT_TIMESTAMP,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $1 AND establishment_id = $2 AND status = 'open'
        RETURNING *`,
-      [id, establishmentId, lastServedByUserId]
+      [id, establishmentId]
     );
     return (result.rows[0] as OpenTicket | undefined) ?? null;
   },
@@ -540,14 +538,6 @@ export const OpenTicketModel = {
     } finally {
       client.release();
     }
-  },
-
-  async takeover(
-    ticketId: number,
-    establishmentId: string,
-    actorUserId: number
-  ): Promise<OpenTicket | null> {
-    return OpenTicketModel.assignWaiter(ticketId, establishmentId, actorUserId);
   },
 
   async assignWaiter(

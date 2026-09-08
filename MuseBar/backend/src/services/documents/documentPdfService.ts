@@ -1,3 +1,4 @@
+import { formatDateOnly, formatDateTime } from '@mosehxl/types';
 import PDFDocument from 'pdfkit';
 import type { ClosureBulletinData, ReceiptData } from '../printing/types';
 import {
@@ -14,15 +15,7 @@ function formatEuro(amount: number): string {
 }
 
 function formatDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-
-function formatDateTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString('fr-FR');
+  return formatDateOnly(iso);
 }
 
 async function renderToBuffer(render: (doc: PdfDoc) => void): Promise<Buffer> {

@@ -13,6 +13,7 @@ import { SchemaOperations } from './database/SchemaOperations';
 import { InvitationOperations } from './database/InvitationOperations';
 import { EmailService } from '../email/EmailService';
 import { EnvironmentConfig, getEnvironmentConfig } from '../../config/environment';
+import { formatDateOnly } from '@mosehxl/types';
 
 /**
  * Account Creation Result
@@ -178,7 +179,7 @@ export class AccountCreationOrchestrator {
                 loginUrl: `${frontendUrl}/login`,
                 supportUrl: `${frontendUrl}/support`,
                 dashboardUrl: `${frontendUrl}/dashboard`,
-                setupDate: new Date().toLocaleDateString('en-US'),
+                setupDate: formatDateOnly(new Date()),
               }
             );
             this.logger.info('Establishment setup completion email sent successfully', { 
