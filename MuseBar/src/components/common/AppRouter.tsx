@@ -1,4 +1,4 @@
-import React, { Suspense, useCallback, useMemo, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Box, Tabs, Tab, Paper, useTheme, useMediaQuery } from '@mui/material';
 import {
   PointOfSale as POSIcon,
@@ -23,7 +23,6 @@ import { Category, Product, User } from '../../types';
 import { PERMISSIONS, type PermissionName } from '@mosehxl/types';
 import { useStepUpAuth } from '../../contexts/StepUpAuthContext';
 import { usePinSessions } from '../../contexts/PinSessionsContext';
-import { pinActorHasPermission } from '../../utils/pinSessionPermissions';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -80,18 +79,39 @@ interface AppRouterProps {
   onHappyHourStatusUpdate: () => void;
 }
 
+/** Any one of these permissions opens the Administration space. */
+const ADMINISTRATION_PERMISSIONS: PermissionName[] = [
+  PERMISSIONS.access_documents,
+  PERMISSIONS.access_inbox,
+  PERMISSIONS.access_reservations,
+  PERMISSIONS.access_planning,
+  PERMISSIONS.access_user_management,
+  PERMISSIONS.manage_floor_plan,
+];
+
+/**
+ * Specific permissions gating each tab. Every tab stays visible: entering one whose permission
+ * the acting identity lacks asks for a PIN instead of being hidden or greyed out. An empty list
+ * means the tab is part of the basic tier — Paramètres is listed because its Profil tab is
+ * basic, while its other tabs are gated inside the page.
+ */
+const TAB_ENTRY_PERMISSIONS: Record<string, PermissionName[]> = {
+  pos: [],
+  floor_plan: [],
+  history: [],
+  settings: [],
+  closures: [PERMISSIONS.access_closure],
+  administration: ADMINISTRATION_PERMISSIONS,
+};
+
+const GATED_TAB_PERMISSIONS = Array.from(
+  new Set(Object.values(TAB_ENTRY_PERMISSIONS).flat())
+);
+
 interface TabConfig {
   label: string;
   icon?: React.ReactElement;
   value: string;
-  /** If set, user must have this permission (establishment admin always has all, server-side). */
-  permission?: PermissionName;
-  /** Only establishment_admin (e.g. security journal). */
-  adminOnly?: boolean;
-  /** Tab visible to any logged-in establishment user (e.g. Historique). */
-  establishmentWide?: boolean;
-  /** Visible to establishment_admin even without explicit permission (production explicit_only mode). */
-  establishmentAdminAlways?: boolean;
 }
 
 const AppRouter: React.FC<AppRouterProps> = ({
@@ -107,79 +127,20 @@ const AppRouter: React.FC<AppRouterProps> = ({
   const [tabValue, setTabValue] = useState(0);
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
-  const { ensurePermission, hasGrant } = useStepUpAuth();
+  const { ensureAccess, hasAccess, releaseAccess } = useStepUpAuth();
   const { activeSession } = usePinSessions();
 
-  const posLinePermissions = useMemo(
-    () => ({
-      happyHourManual: user.permissions?.includes(PERMISSIONS.pos_happyhour_manual) ?? false,
-      offert: user.permissions?.includes(PERMISSIONS.pos_apply_offert) ?? false,
-      perso: user.permissions?.includes(PERMISSIONS.pos_apply_perso) ?? false,
-      remise: user.permissions?.includes(PERMISSIONS.pos_happyhour_manual) ?? false,
-      reassignWaiter: user.permissions?.includes(PERMISSIONS.pos_reassign_waiter) ?? false,
-      interveneTable: user.permissions?.includes(PERMISSIONS.pos_intervene_table) ?? false,
-    }),
-    [user.permissions]
-  );
-
   const TABS: TabConfig[] = [
-    { label: 'Caisse', icon: <POSIcon />, value: 'pos', permission: PERMISSIONS.access_pos },
-    {
-      label: 'Plan de salle',
-      icon: <FloorIcon />,
-      value: 'floor_plan',
-      permission: PERMISSIONS.access_pos,
-    },
-    { label: 'Historique', icon: <HistoryIcon />, value: 'history', establishmentWide: true },
-    {
-      label: 'Paramètres',
-      icon: <SettingsIcon />,
-      value: 'settings',
-      permission: PERMISSIONS.access_settings,
-    },
-    {
-      label: 'Bulletins de Clôture',
-      icon: <GavelIcon />,
-      value: 'closures',
-      permission: PERMISSIONS.access_closure,
-    },
-    {
-      label: 'Administration',
-      icon: <AdminIcon />,
-      value: 'administration',
-      establishmentAdminAlways: true,
-    },
+    { label: 'Caisse', icon: <POSIcon />, value: 'pos' },
+    { label: 'Plan de salle', icon: <FloorIcon />, value: 'floor_plan' },
+    { label: 'Historique', icon: <HistoryIcon />, value: 'history' },
+    { label: 'Paramètres', icon: <SettingsIcon />, value: 'settings' },
+    { label: 'Bulletins de Clôture', icon: <GavelIcon />, value: 'closures' },
+    { label: 'Administration', icon: <AdminIcon />, value: 'administration' },
   ];
 
-  const filteredTabs = TABS.filter(tab => {
-    if (tab.establishmentWide) {
-      return !!user?.establishment_id;
-    }
-    if (tab.value === 'administration') {
-      const perms = user?.permissions ?? [];
-      return (
-        user?.role === 'establishment_admin' ||
-        Boolean(user?.establishment_id && user?.role !== 'system_admin') ||
-        perms.includes(PERMISSIONS.access_documents) ||
-        perms.includes(PERMISSIONS.access_inbox) ||
-        perms.includes(PERMISSIONS.access_reservations) ||
-        perms.includes(PERMISSIONS.access_planning) ||
-        perms.includes(PERMISSIONS.access_user_management)
-      );
-    }
-    if (tab.value === 'settings') {
-      const perms = user?.permissions ?? [];
-      return (
-        perms.includes(PERMISSIONS.access_settings) ||
-        perms.includes(PERMISSIONS.access_menu)
-      );
-    }
-    if (tab.establishmentAdminAlways && user?.role === 'establishment_admin') {
-      return true;
-    }
-    if (tab.permission) return user?.permissions?.includes(tab.permission) ?? false;
-    return true;
-  });
+  // Every tab is shown to every member: gated ones ask for a PIN on entry.
+  const filteredTabs = TABS.filter(() => Boolean(user?.establishment_id));
 
   const posTabIndex = useMemo(
     () => filteredTabs.findIndex((tab) => tab.value === 'pos'),
@@ -190,70 +151,49 @@ const AppRouter: React.FC<AppRouterProps> = ({
     if (posTabIndex >= 0) setTabValue(posTabIndex);
   }, [posTabIndex]);
 
-  const stepUpPermissionForTab = useCallback((tabValueKey: string): PermissionName | null => {
-    switch (tabValueKey) {
-      case 'settings': {
-        const perms = user?.permissions ?? [];
-        if (perms.includes(PERMISSIONS.access_settings)) return PERMISSIONS.access_settings;
-        if (perms.includes(PERMISSIONS.access_menu)) return PERMISSIONS.access_menu;
-        return PERMISSIONS.access_settings;
-      }
-      case 'closures':
-        return PERMISSIONS.access_closure;
-      case 'administration':
-        return PERMISSIONS.access_user_management;
-      default:
-        return null;
-    }
-  }, [user?.permissions]);
+  /**
+   * A PIN session is the acting identity when one is open, so its rights govern and the
+   * account's own grants are not enough. Without any session, the logged-in account acts
+   * for itself.
+   */
+  const canEnter = useCallback(
+    (permissions: PermissionName[]): boolean => {
+      if (permissions.length === 0) return true;
+      if (activeSession) return hasAccess(permissions);
+      return permissions.some((p) => user?.permissions?.includes(p) ?? false);
+    },
+    [activeSession, hasAccess, user?.permissions]
+  );
 
   const handleTabChange = useCallback(
     (_event: React.SyntheticEvent, newValue: number) => {
       const tab = filteredTabs[newValue];
       if (!tab) return;
-      const required = stepUpPermissionForTab(tab.value);
-      if (!required) {
+      const required = TAB_ENTRY_PERMISSIONS[tab.value] ?? [];
+      if (canEnter(required)) {
         setTabValue(newValue);
         return;
       }
-      const actor = activeSession?.actor;
-      if (
-        pinActorHasPermission(actor, required) ||
-        hasGrant(required) ||
-        (tab.value === 'settings' &&
-          (pinActorHasPermission(actor, PERMISSIONS.access_menu) ||
-            hasGrant(PERMISSIONS.access_menu) ||
-            pinActorHasPermission(actor, PERMISSIONS.access_settings) ||
-            hasGrant(PERMISSIONS.access_settings))) ||
-        (tab.value === 'administration' &&
-          actor &&
-          (actor.role === 'establishment_admin' ||
-            pinActorHasPermission(actor, PERMISSIONS.access_documents) ||
-            pinActorHasPermission(actor, PERMISSIONS.access_inbox) ||
-            pinActorHasPermission(actor, PERMISSIONS.access_reservations) ||
-            pinActorHasPermission(actor, PERMISSIONS.access_planning) ||
-            pinActorHasPermission(actor, PERMISSIONS.manage_floor_plan)))
-      ) {
-        setTabValue(newValue);
-        return;
-      }
-      void ensurePermission(required, {
+      void ensureAccess(required, {
         title: `Accès — ${tab.label}`,
-        description: `PIN d’un profil autorisé pour ouvrir « ${tab.label} » (autorisation ponctuelle).`,
+        description: `PIN d’un profil autorisé pour ouvrir « ${tab.label} ».`,
       })
         .then(() => setTabValue(newValue))
         .catch(() => {
           /* stay on current tab */
         });
     },
-    [
-      filteredTabs,
-      stepUpPermissionForTab,
-      activeSession?.actor,
-      hasGrant,
-      ensurePermission,
-    ]
+    [filteredTabs, canEnter, ensureAccess]
   );
+
+  // Leaving a gated page ends the authorization the PIN gave for it.
+  const activeTabKey = filteredTabs[tabValue]?.value ?? '';
+  useEffect(() => {
+    const keep = new Set(TAB_ENTRY_PERMISSIONS[activeTabKey] ?? []);
+    for (const permission of GATED_TAB_PERMISSIONS) {
+      if (!keep.has(permission)) releaseAccess(permission);
+    }
+  }, [activeTabKey, releaseAccess]);
 
   return (
     <Paper
@@ -330,7 +270,6 @@ const AppRouter: React.FC<AppRouterProps> = ({
                 products={products}
                 isHappyHourActive={isHappyHourActive}
                 onDataUpdate={onDataUpdate}
-                posLinePermissions={posLinePermissions}
               />
             )}
             {tab.value === 'floor_plan' && (
@@ -340,9 +279,8 @@ const AppRouter: React.FC<AppRouterProps> = ({
             )}
             {tab.value === 'history' && (
               <Suspense fallback={<TabPanelFallback />}>
-                <LazyHistoryContainer
-                  canCancelOrReturn={user?.permissions?.includes(PERMISSIONS.orders_cancel) ?? false}
-                />
+                {/* Cancellation is offered to everyone and asks for a PIN when needed. */}
+                <LazyHistoryContainer canCancelOrReturn />
               </Suspense>
             )}
             {tab.value === 'settings' && (
@@ -354,7 +292,6 @@ const AppRouter: React.FC<AppRouterProps> = ({
                   products={products}
                   categories={categories}
                   onDataUpdate={onDataUpdate}
-                  canManageMenu={user?.permissions?.includes(PERMISSIONS.access_menu) ?? false}
                 />
               </Suspense>
             )}

@@ -1,12 +1,17 @@
 import { OrderItemModel, OrderModel, SubBillModel } from '../../models';
 import type { Order } from '../../models/interfaces';
-import LegalJournalModel from '../../models/legalJournal';
-import { AuditTrailModel } from '../../models/auditTrail';
 import { Logger } from '../../utils/logger';
-import { AppError } from '../../middleware/errorHandler';
 import { pool } from '../../db/pool';
 import { attachOptionsToOrderItems } from './orderItemOptionsService';
 import { dispatchKitchenTicketsForCancellation } from '../kitchenPrinting/kitchenTicketDispatchService';
+import type { ActorContext } from '../auth/actorContext';
+import {
+  auditChangeCancellation,
+  auditOrderCancellation,
+  journalChangeCancellation,
+  journalOrderCancellation,
+  journalTipReversal,
+} from './cancellationActorWrites';
 
 type CancellationType = 'full' | 'partial' | 'items-only';
 
@@ -21,6 +26,8 @@ export type UnifiedCancellationRequest = {
   performedByDisplayName?: string;
   ipAddress?: string;
   userAgent?: string;
+  /** Account + PIN pair that authorised the cancellation. */
+  actor?: ActorContext | null;
 };
 
 export type UnifiedCancellationResponse = {
@@ -74,6 +81,7 @@ export class OrderCancellationService {
       performedByDisplayName,
       ipAddress,
       userAgent,
+      actor,
     } = input;
 
     const performedBy = { userId, displayName: performedByDisplayName };
@@ -156,35 +164,27 @@ export class OrderCancellationService {
       );
 
       try {
-        await LegalJournalModel.logChange(establishmentId, reversalOrder.id, -amount, userId);
-      } catch (journalError) {
-        logger.error(
-          `Legal journal error (change cancellation) for order ${reversalOrder.id}`,
-          journalError instanceof Error ? journalError : new Error(String(journalError)),
-          'LEGAL_JOURNAL'
-        );
+        await journalChangeCancellation({
+          establishmentId,
+          orderId: reversalOrder.id,
+          amount: -amount,
+          userId,
+          actor,
+        });
+      } catch (error) {
         await cleanupCompensatingOrders(establishmentId, [reversalOrder.id]);
-        throw new AppError(
-          'Failed to persist legal journal entry for change cancellation',
-          500,
-          'ORDER_CANCEL_CHANGE_JOURNAL_FAILED'
-        );
+        throw error;
       }
 
-      AuditTrailModel.logAction({
-        user_id: userId,
-        action_type: 'CASH_REGISTER_CHANGE_CANCELLED',
-        resource_type: 'ORDER',
-        resource_id: String(reversalOrder.id),
-        action_details: { original_order_id: orderId, amount, reason },
-        ip_address: ipAddress,
-        user_agent: userAgent,
-      }).catch((auditError: unknown) => {
-        logger.error(
-          `Audit log error (change cancellation) for order ${reversalOrder.id}`,
-          auditError instanceof Error ? auditError : new Error(String(auditError)),
-          'AUDIT_TRAIL'
-        );
+      auditChangeCancellation({
+        userId,
+        actor,
+        reversalOrderId: reversalOrder.id,
+        originalOrderId: orderId,
+        amount,
+        reason,
+        ipAddress,
+        userAgent,
       });
 
       return {
@@ -354,85 +354,52 @@ export class OrderCancellationService {
       createdOrderIds.push(tipReversalOrder.id);
 
       try {
-        await LegalJournalModel.logChange(establishmentId, tipReversalOrder.id, -tipAmountToReverse, userId);
-      } catch (journalError) {
-        logger.error(
-          `Legal journal error (tip reversal) for order ${tipReversalOrder.id}`,
-          journalError instanceof Error ? journalError : new Error(String(journalError)),
-          'LEGAL_JOURNAL'
-        );
+        await journalTipReversal({
+          establishmentId,
+          orderId: tipReversalOrder.id,
+          amount: -tipAmountToReverse,
+          userId,
+          actor,
+        });
+      } catch (error) {
         await cleanupCompensatingOrders(establishmentId, [...createdOrderIds].reverse());
-        throw new AppError(
-          'Failed to persist legal journal entry for tip reversal',
-          500,
-          'ORDER_CANCEL_TIP_REVERSAL_JOURNAL_FAILED'
-        );
+        throw error;
       }
     }
 
     try {
-      await LegalJournalModel.addEntry(
+      await journalOrderCancellation({
         establishmentId,
-        'REFUND',
-        cancellationOrder.id,
-        -cancellationAmount,
-        -cancellationTax,
-        originalOrder.payment_method,
-        {
-          type: 'ORDER_CANCELLATION',
-          cancellation_type: cancellationType,
-          reason,
-          original_order_id: orderId,
-          cancelled_items: cancelledItems.map((item) => ({
-            product_name: item.product_name,
-            quantity: item.quantity,
-            total_price: item.total_price,
-          })),
-          total_cancelled: -cancellationAmount,
-          tax_cancelled: -cancellationTax,
-        },
-        userId
-      );
-    } catch (journalError) {
-      logger.error(
-        `Legal journal error (cancellation) for order ${cancellationOrder.id}`,
-        journalError instanceof Error ? journalError : new Error(String(journalError)),
-        'LEGAL_JOURNAL'
-      );
+        cancellationOrderId: cancellationOrder.id,
+        originalOrderId: orderId,
+        cancellationType,
+        reason,
+        cancellationAmount,
+        cancellationTax,
+        paymentMethod: originalOrder.payment_method,
+        cancelledItems,
+        userId,
+        actor,
+      });
+    } catch (error) {
       await cleanupCompensatingOrders(establishmentId, [...createdOrderIds].reverse());
-      throw new AppError(
-        'Failed to persist legal journal entry for order cancellation',
-        500,
-        'ORDER_CANCEL_JOURNAL_FAILED'
-      );
+      throw error;
     }
 
-    try {
-      await AuditTrailModel.logAction({
-        user_id: userId,
-        action_type: 'CANCEL_ORDER',
-        resource_type: 'ORDER',
-        resource_id: String(cancellationOrder.id),
-        action_details: {
-          original_order_id: orderId,
-          cancellation_type: cancellationType,
-          reason,
-          cancelled_items: cancelledItems,
-          cancellation_amount: -cancellationAmount,
-          performed_by_user_id: userId ?? null,
-          performed_by_display_name: performedByDisplayName ?? null,
-          attributed_waiter_user_id: salesAttribution.waiter_user_id,
-        },
-        ip_address: ipAddress,
-        user_agent: userAgent,
-      });
-    } catch (auditError) {
-      logger.error(
-        `Audit log error (cancellation) for order ${cancellationOrder.id}`,
-        auditError instanceof Error ? auditError : new Error(String(auditError)),
-        'AUDIT_TRAIL'
-      );
-    }
+    await auditOrderCancellation({
+      userId,
+      actor,
+      cancellationOrderId: cancellationOrder.id,
+      originalOrderId: orderId,
+      cancellationType,
+      reason,
+      cancelledItems,
+      cancellationAmount,
+      performedByDisplayName,
+      attributedWaiterUserId: salesAttribution.waiter_user_id,
+      ipAddress,
+      userAgent,
+    });
 
     const cancelledItemsWithOptions = await attachOptionsToOrderItems(cancelledItems, establishmentId);
     void dispatchKitchenTicketsForCancellation(pool, {

@@ -5,6 +5,7 @@
 
 import { Logger } from '../../utils/logger';
 import { EmailService } from '../email';
+import { formatDateLong } from '@mosehxl/types';
 import { 
   EstablishmentInvitationData, 
   UserInvitationData, 
@@ -39,11 +40,7 @@ export class InvitationEmail {
           establishmentName: establishmentData.name,
           inviterName: establishmentData.inviterName,
           invitationUrl,
-          expirationDate: invitation.expires_at.toLocaleDateString('fr-FR', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-          })
+          expirationDate: formatDateLong(invitation.expires_at)
         }
       );
 
@@ -103,11 +100,7 @@ export class InvitationEmail {
           establishmentName: userData.establishmentName,
           inviterName: userData.inviterName,
           invitationUrl,
-          expirationDate: invitation.expires_at.toLocaleDateString('fr-FR', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-          })
+          expirationDate: formatDateLong(invitation.expires_at)
         }
       );
 
@@ -166,11 +159,7 @@ export class InvitationEmail {
           establishmentName: invitation.establishment_name,
           inviterName: invitation.inviter_name,
           invitationUrl,
-          expirationDate: invitation.expires_at.toLocaleDateString('fr-FR', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-          })
+          expirationDate: formatDateLong(invitation.expires_at)
         }
       );
 

@@ -14,6 +14,7 @@ import {
 import { apiCore, printingApi } from '../../services/api';
 import LegalReceiptContainer from '../Legal/LegalReceipt/LegalReceiptContainer';
 import type { InvoiceLegalInfo, Order as LegalReceiptOrder, ReceiptItem } from '../Legal/LegalReceipt/types';
+import { ParisDateField } from '../common/ParisDateTimeField';
 
 type BusinessInfo = {
   name: string;
@@ -525,18 +526,14 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
                   }}
                   sx={{ mb: 1 }}
                 />
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="date"
-                  label="Échéance paiement"
+                <ParisDateField
+                  label="Échéance paiement (jj/mm/aaaa)"
                   value={paymentDueDate}
-                  onChange={(e) => {
+                  onChange={(ymd) => {
                     resetAutoClose();
-                    setPaymentDueDate(e.target.value);
+                    setPaymentDueDate(ymd);
                   }}
-                  InputLabelProps={{ shrink: true }}
-                  sx={{ mb: 1 }}
+                  size="small"
                 />
                 <TextField
                   fullWidth

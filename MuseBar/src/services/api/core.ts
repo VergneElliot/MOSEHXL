@@ -1,5 +1,6 @@
 import { apiConfig } from '../../config/api';
 import { registerSetTokenFunction } from '../authHelper';
+import { resolvePinActorToken } from '../pinElevation';
 
 let authToken: string | null = null;
 const REFRESH_BOOTSTRAP_HINT_KEY = 'auth_refresh_bootstrap_hint';
@@ -100,6 +101,14 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
 
   if (options.headers && typeof options.headers === 'object' && !(options.headers instanceof Headers)) {
     Object.assign(headers, options.headers as Record<string, string>);
+  }
+
+  // Attach the acting PIN identity unless the caller passed one explicitly.
+  if (!headers['x-pin-actor-token']) {
+    const pinActorToken = resolvePinActorToken();
+    if (pinActorToken) {
+      headers['x-pin-actor-token'] = pinActorToken;
+    }
   }
 
   // Create timeout controller if no signal is provided

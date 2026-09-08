@@ -1,5 +1,11 @@
 // Authentication and user management types
 
+import {
+  BASIC_PERMISSIONS,
+  SPECIFIC_PERMISSIONS,
+  type PermissionName,
+} from '@mosehxl/types';
+
 /**
  * Roles assignable in "Gestion des utilisateurs" (establishment scope).
  * System-level accounts use `system_admin` elsewhere, not in this flow.
@@ -11,6 +17,7 @@ export interface EstablishmentMembershipSummary {
   establishment_id: string;
   name: string;
   role: EstablishmentAssignableRole | string;
+  calendar_color?: string;
 }
 
 /**
@@ -25,6 +32,9 @@ export interface User {
   establishment_id: string | null;
   first_name: string;
   last_name: string;
+  phone?: string;
+  date_of_birth?: string;
+  calendar_color?: string | null;
   permissions: string[];
   memberships?: EstablishmentMembershipSummary[];
   email_verified?: boolean;
@@ -43,6 +53,8 @@ export interface EstablishmentMember {
   role: string;
   establishment_id: string | null;
   permissions?: string[];
+  /** False for a deactivated membership: listed, but cannot log in or badge in. */
+  isActive?: boolean;
 }
 export interface LoginCredentials {
   email: string;
@@ -58,33 +70,73 @@ export interface AuthResponse {
 }
 
 export interface Permission {
-  key: string;
+  key: PermissionName;
   label: string;
+  group: string;
 }
 
 /**
- * All grantable permissions. The `key` matches the `name` column in the
- * database `permissions` table. The `label` is the French UI string shown
- * in the permission editor. Keep this list in sync with the DB seed and
- * with the `permission` fields on TABS in AppRouter.tsx.
+ * French UI metadata for every permission key. Typed as an exhaustive record, so adding a
+ * key to `@mosehxl/types` without a label is a compile error.
  */
-export const ALL_PERMISSIONS: Permission[] = [
-  { key: 'access_pos', label: 'Caisse' },
-  { key: 'access_menu', label: 'Gestion du menu' },
-  { key: 'access_settings', label: 'Paramètres' },
-  { key: 'access_closure', label: 'Clôtures' },
-  { key: 'access_user_management', label: 'Gestion des utilisateurs' },
-  { key: 'access_documents', label: 'Administration — Documents' },
-  { key: 'access_inbox', label: 'Administration — Boîte mail' },
-  { key: 'access_reservations', label: 'Administration — Réservations' },
-  { key: 'access_planning', label: 'Administration — Planning' },
-  { key: 'manage_floor_plan', label: 'Administration — Plans de tables' },
-  { key: 'pos_happyhour_manual', label: 'POS — Happy Hour (bouton manuel)' },
-  { key: 'pos_apply_offert', label: 'POS — Offert' },
-  { key: 'pos_apply_perso', label: 'POS — Perso' },
-  { key: 'pos_reassign_waiter', label: 'POS — Réassigner un serveur à une table' },
-  { key: 'pos_intervene_table', label: 'POS — Intervenir sur la table d’un autre serveur' },
-  { key: 'orders_cancel', label: 'Annulation / retour (historique)' },
-];
+const PERMISSION_META: Record<PermissionName, { label: string; group: string }> = {
+  access_pos: {
+    label: 'Caisse, plan de salle (lecture), historique, profil',
+    group: 'Base',
+  },
+  pos_happyhour_manual: {
+    label: 'Happy Hour manuel (panier + en-tête)',
+    group: 'Caisse',
+  },
+  pos_apply_offert: { label: 'Offert', group: 'Caisse' },
+  pos_apply_perso: { label: 'Perso', group: 'Caisse' },
+  pos_apply_remise: { label: 'Remise', group: 'Caisse' },
+  pos_reassign_waiter: {
+    label: 'Réassigner le serveur d’une commande / table',
+    group: 'Caisse',
+  },
+  pos_intervene_table: {
+    label: 'Intervenir sur la table d’un autre serveur',
+    group: 'Caisse',
+  },
+  orders_cancel: {
+    label: 'Annuler / retour (article validé ou vente encaissée)',
+    group: 'Caisse / Historique',
+  },
+  access_settings: { label: 'Paramètres (hors profil)', group: 'Paramètres' },
+  access_menu: { label: 'Gestion du menu', group: 'Paramètres' },
+  access_closure: { label: 'Bulletins de clôture', group: 'Clôtures' },
+  access_compliance: { label: 'Journal légal et conformité', group: 'Clôtures' },
+  access_user_management: { label: 'Gestion des utilisateurs', group: 'Administration' },
+  access_documents: { label: 'Documents', group: 'Administration' },
+  access_inbox: { label: 'Boîte mail', group: 'Administration' },
+  access_reservations: { label: 'Réservations', group: 'Administration' },
+  access_planning: { label: 'Planning', group: 'Administration' },
+  manage_floor_plan: { label: 'Plans de salle (édition)', group: 'Administration' },
+};
 
-export type PermissionKey = (typeof ALL_PERMISSIONS)[number]['key'];
+/** Order in which permission groups are displayed in the editor. */
+export const PERMISSION_GROUP_ORDER = [
+  'Caisse',
+  'Historique',
+  'Paramètres',
+  'Clôtures',
+  'Administration',
+] as const;
+
+/**
+ * Grantable permissions — the specific tier only. Basic-tier keys are held implicitly by
+ * every membership and are therefore not shown as checkboxes.
+ */
+export const ALL_PERMISSIONS: Permission[] = SPECIFIC_PERMISSIONS.map((key) => ({
+  key,
+  label: PERMISSION_META[key].label,
+  group: PERMISSION_META[key].group,
+}));
+
+/** Description of what every staff member can do without any grant. */
+export const BASIC_PERMISSION_SUMMARY = BASIC_PERMISSIONS.map(
+  (key) => PERMISSION_META[key].label
+);
+
+export type PermissionKey = PermissionName;

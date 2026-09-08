@@ -12,6 +12,7 @@
  */
 
 import type { ClosureBulletinData } from '../printing/types';
+import { formatParisDateTimeCompact, formatParisYmdCompact } from '@mosehxl/types';
 
 export type Flux103CategoryCode = 'TPS1' | 'TLB1' | 'TNT1' | 'TMA1';
 
@@ -40,16 +41,13 @@ function escapeXml(value: string): string {
     .replace(/'/g, '&apos;');
 }
 
-/** Format as AAAAMMJJ */
+/** Format as AAAAMMJJ in Europe/Paris */
 export function formatFlux103Date(isoOrDate: string | Date): string {
-  const d = typeof isoOrDate === 'string' ? new Date(isoOrDate) : isoOrDate;
-  if (Number.isNaN(d.getTime())) {
+  try {
+    return formatParisYmdCompact(isoOrDate);
+  } catch {
     throw new Error(`Invalid date for Flux 10.3: ${String(isoOrDate)}`);
   }
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  return `${y}${m}${day}`;
 }
 
 function formatAmount(amount: number): string {
@@ -57,13 +55,7 @@ function formatAmount(amount: number): string {
 }
 
 function formatDateTimeCompact(d = new Date()): string {
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  const hh = String(d.getUTCHours()).padStart(2, '0');
-  const mm = String(d.getUTCMinutes()).padStart(2, '0');
-  const ss = String(d.getUTCSeconds()).padStart(2, '0');
-  return `${y}${m}${day}${hh}${mm}${ss}`;
+  return formatParisDateTimeCompact(d);
 }
 
 function sirenFromBusiness(data: ClosureBulletinData): string {

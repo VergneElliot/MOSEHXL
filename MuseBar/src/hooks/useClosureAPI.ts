@@ -3,6 +3,7 @@ import { ApiService } from '../services/apiService';
 import { ClosureBulletin } from './useClosureState';
 import type { ClosureTodayStatus, LiveMonthlyStats } from '../types/api';
 import { logger } from '../utils/logger';
+import { parisTodayYmd } from '../utils/formatDate';
 
 export interface ClosureAPIActions {
   loadBulletins: (pagination?: { limit: number; offset: number; type?: CreateClosureData['type'] }) => Promise<void>;
@@ -146,7 +147,7 @@ export const useClosureAPI = (
         );
         addBulletin(result.closure ?? (result as unknown as ClosureBulletin));
         setShowCreateDialog(false);
-        setSelectedDate(new Date().toISOString().split('T')[0] ?? '');
+        setSelectedDate(parisTodayYmd());
         showSuccess('Bulletin de clôture créé avec succès');
 
         // Refresh today status

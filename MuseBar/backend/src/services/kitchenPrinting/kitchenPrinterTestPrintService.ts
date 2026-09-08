@@ -1,3 +1,4 @@
+import { formatDateTime } from '@mosehxl/types';
 import type { Pool } from 'pg';
 
 import { createBridgePrintJob } from '../../printing/bridgePrintJobRepo';
@@ -6,7 +7,7 @@ import { ESC_POS } from '../printing/types';
 import { kitchenTicketAlertSequence } from './kitchenTicketFooter';
 
 function buildKitchenTestTicket(printer: KitchenPrinter): string {
-  const now = new Date().toLocaleString('fr-FR');
+  const now = formatDateTime(new Date());
   const lines = [
     ESC_POS.INIT,
     kitchenTicketAlertSequence(),

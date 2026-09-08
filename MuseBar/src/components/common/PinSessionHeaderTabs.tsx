@@ -1,8 +1,10 @@
 import React, { Suspense, useState } from 'react';
 import {
+  Alert,
   Box,
   Button,
   IconButton,
+  Snackbar,
   Tab,
   Tabs,
   Tooltip,
@@ -12,6 +14,7 @@ import {
   Add as AddIcon,
   Close as CloseIcon,
   Badge as BadgeIcon,
+  ErrorOutline as ExpiredIcon,
 } from '@mui/icons-material';
 import { usePinSessions } from '../../contexts/PinSessionsContext';
 import { useAuth } from '../../hooks/useAuth';
@@ -20,6 +23,8 @@ import { resolvePinLengthRules } from '../../utils/pinRules';
 
 const LazyPinPadDialog = React.lazy(() => import('../POS/PinPadDialog'));
 
+const TOAST_MS = 3000;
+
 /**
  * Header session tabs: one tab per active PIN identity.
  */
@@ -27,6 +32,7 @@ export const PinSessionHeaderTabs: React.FC = () => {
   const {
     sessions,
     activeSessionId,
+    expiredSessionIds,
     setActiveSessionId,
     addOrFocusSession,
     dismissSession,
@@ -38,7 +44,16 @@ export const PinSessionHeaderTabs: React.FC = () => {
   });
   const [pinOpen, setPinOpen] = useState(false);
   const [pinMode, setPinMode] = useState<'verify' | 'set'>('verify');
-  const [info, setInfo] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [renewNotice, setRenewNotice] = useState<string | null>(null);
+
+  const isExpired = (id: string) => expiredSessionIds.includes(id);
+
+  const openPad = (notice: string | null) => {
+    setRenewNotice(notice);
+    setPinMode('verify');
+    setPinOpen(true);
+  };
 
   const handleVerify = async (pin: string) => {
     const result = await floorApi.verifyPin(pin);
@@ -51,13 +66,14 @@ export const PinSessionHeaderTabs: React.FC = () => {
       permissions: result.permissions,
     });
     setPinOpen(false);
-    setInfo(`Session : ${result.display_name}`);
+    setRenewNotice(null);
+    setToast(`Session ouverte : ${result.display_name}`);
   };
 
   const handleSetPin = async (pin: string) => {
     await floorApi.setPin(pin);
     setPinMode('verify');
-    setInfo('PIN enregistré — vous pouvez ouvrir une session');
+    setToast('PIN enregistré — vous pouvez ouvrir une session');
   };
 
   return (
@@ -78,7 +94,15 @@ export const PinSessionHeaderTabs: React.FC = () => {
       {sessions.length > 0 ? (
         <Tabs
           value={activeSessionId ?? false}
-          onChange={(_e, value: string) => setActiveSessionId(value)}
+          onChange={(_e, value: string) => {
+            setActiveSessionId(value);
+            if (isExpired(value)) {
+              const session = sessions.find((s) => s.id === value);
+              openPad(
+                `Session expirée — ressaisissez le PIN de ${session?.actor.displayName ?? 'ce profil'}.`
+              );
+            }
+          }}
           variant="scrollable"
           scrollButtons="auto"
           allowScrollButtonsMobile
@@ -104,37 +128,58 @@ export const PinSessionHeaderTabs: React.FC = () => {
             '& .MuiTabs-indicator': { display: 'none' },
           }}
         >
-          {sessions.map((s) => (
-            <Tab
-              key={s.id}
-              value={s.id}
-              label={
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <BadgeIcon sx={{ fontSize: 16 }} />
-                  <Typography variant="body2" noWrap sx={{ maxWidth: 120 }}>
-                    {s.actor.displayName}
-                  </Typography>
-                  {s.activeTable && (
-                    <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                      · {s.activeTable.label}
+          {sessions.map((s) => {
+            const expired = isExpired(s.id);
+            return (
+              <Tab
+                key={s.id}
+                value={s.id}
+                sx={expired ? { opacity: 0.65 } : undefined}
+                label={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    {expired ? (
+                      <ExpiredIcon sx={{ fontSize: 16, color: 'warning.light' }} />
+                    ) : (
+                      <BadgeIcon sx={{ fontSize: 16 }} />
+                    )}
+                    <Typography
+                      variant="body2"
+                      noWrap
+                      sx={{
+                        maxWidth: 120,
+                        textDecoration: expired ? 'line-through' : 'none',
+                      }}
+                    >
+                      {s.actor.displayName}
                     </Typography>
-                  )}
-                  <IconButton
-                    size="small"
-                    component="span"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      dismissSession(s.id);
-                    }}
-                    sx={{ color: 'inherit', p: 0.25, ml: 0.25 }}
-                    aria-label={`Fermer session ${s.actor.displayName}`}
-                  >
-                    <CloseIcon sx={{ fontSize: 14 }} />
-                  </IconButton>
-                </Box>
-              }
-            />
-          ))}
+                    {expired ? (
+                      <Typography variant="caption" sx={{ color: 'warning.light' }}>
+                        · expirée
+                      </Typography>
+                    ) : (
+                      s.activeTable && (
+                        <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                          · {s.activeTable.label}
+                        </Typography>
+                      )
+                    )}
+                    <IconButton
+                      size="small"
+                      component="span"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        dismissSession(s.id);
+                      }}
+                      sx={{ color: 'inherit', p: 0.25, ml: 0.25 }}
+                      aria-label={`Fermer session ${s.actor.displayName}`}
+                    >
+                      <CloseIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
+                  </Box>
+                }
+              />
+            );
+          })}
         </Tabs>
       ) : (
         <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mr: 1 }}>
@@ -147,10 +192,7 @@ export const PinSessionHeaderTabs: React.FC = () => {
           color="inherit"
           variant="outlined"
           startIcon={<AddIcon />}
-          onClick={() => {
-            setPinMode('verify');
-            setPinOpen(true);
-          }}
+          onClick={() => openPad(null)}
           sx={{
             textTransform: 'none',
             borderColor: 'rgba(255,255,255,0.4)',
@@ -161,20 +203,30 @@ export const PinSessionHeaderTabs: React.FC = () => {
           Session
         </Button>
       </Tooltip>
-      {info && (
-        <Typography
-          variant="caption"
-          sx={{ color: 'rgba(255,255,255,0.65)', display: { xs: 'none', md: 'block' } }}
-        >
-          {info}
-        </Typography>
-      )}
+      <Snackbar
+        open={toast != null}
+        autoHideDuration={TOAST_MS}
+        onClose={() => setToast(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="success" variant="filled" onClose={() => setToast(null)}>
+          {toast}
+        </Alert>
+      </Snackbar>
       <Suspense fallback={null}>
         <LazyPinPadDialog
           open={pinOpen}
           mode={pinMode}
           setRules={setRules}
-          onClose={() => setPinOpen(false)}
+          stepUp={
+            renewNotice
+              ? { title: 'Session expirée', description: renewNotice }
+              : undefined
+          }
+          onClose={() => {
+            setPinOpen(false);
+            setRenewNotice(null);
+          }}
           onVerify={handleVerify}
           onSetPin={handleSetPin}
           onSwitchToSet={() => setPinMode('set')}

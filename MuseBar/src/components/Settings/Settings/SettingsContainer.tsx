@@ -19,7 +19,6 @@ export const SettingsContainer: React.FC<SettingsProps> = ({
   products = [],
   categories = [],
   onDataUpdate = () => {},
-  canManageMenu = false,
 }) => {
   const settingsHook = useSettings();
 
@@ -43,7 +42,7 @@ export const SettingsContainer: React.FC<SettingsProps> = ({
   }
 
   return (
-    <Box sx={{ width: '100%', maxWidth: canManageMenu ? 1400 : 1200, mx: 'auto', p: 3 }}>
+    <Box sx={{ width: '100%', maxWidth: 1400, mx: 'auto', p: 3 }}>
       <SettingsTabs
         settingsHook={settingsHook}
         isHappyHourActive={isHappyHourActive}
@@ -52,7 +51,6 @@ export const SettingsContainer: React.FC<SettingsProps> = ({
         products={products}
         categories={categories}
         onDataUpdate={onDataUpdate}
-        canManageMenu={canManageMenu}
       />
     </Box>
   );

@@ -39,6 +39,14 @@ import AdminMonthCalendar, {
   toLocalDateInputValue,
   type AdminCalendarItem,
 } from './AdminMonthCalendar';
+import { ParisDateTimeField } from '../common/ParisDateTimeField';
+import {
+  formatDate,
+  formatDateLong,
+  formatTime,
+  parisDateTimeLocalToUtcIso,
+  utcToParisDateTimeLocal,
+} from '../../utils/formatDate';
 
 function localDateKey(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -128,7 +136,7 @@ const ReservationsPanel: React.FC = () => {
     () =>
       rows.map((r) => {
         const start = new Date(r.starts_at);
-        const time = start.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        const time = formatTime(r.starts_at);
         return {
           id: r.id,
           startsAt: start,
@@ -176,12 +184,11 @@ const ReservationsPanel: React.FC = () => {
   };
 
   const openEdit = (r: ReservationDto) => {
-    const start = new Date(r.starts_at);
     setDayContext(null);
     setDialogTab(0);
     setEdit({
       ...r,
-      starts_at: toLocalDateInputValue(start, start.getHours(), start.getMinutes()),
+      starts_at: utcToParisDateTimeLocal(r.starts_at),
     });
     setOpen(true);
   };
@@ -247,7 +254,7 @@ const ReservationsPanel: React.FC = () => {
   const saveEdit = async () => {
     if (!edit?.customer_name || !edit.starts_at || !edit.party_size) return;
     const startsAt = edit.starts_at.includes('T')
-      ? new Date(edit.starts_at).toISOString()
+      ? parisDateTimeLocalToUtcIso(edit.starts_at)
       : edit.starts_at;
     if (edit.id) {
       await updateReservation(edit.id, {
@@ -345,7 +352,7 @@ const ReservationsPanel: React.FC = () => {
         <TableBody>
           {upcomingRows.map((r) => (
             <TableRow key={r.id}>
-              <TableCell>{new Date(r.starts_at).toLocaleString('fr-FR')}</TableCell>
+              <TableCell>{formatDate(r.starts_at)}</TableCell>
               <TableCell>
                 <Typography fontWeight={600}>{r.customer_name}</Typography>
                 <Typography variant="caption" color="text.secondary">
@@ -465,12 +472,7 @@ const ReservationsPanel: React.FC = () => {
           {edit?.id
             ? 'Modifier la réservation'
             : dayContext
-              ? dayContext.toLocaleDateString('fr-FR', {
-                  weekday: 'long',
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
-                })
+              ? formatDateLong(dayContext)
               : 'Nouvelle réservation'}
         </DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
@@ -512,13 +514,9 @@ const ReservationsPanel: React.FC = () => {
                 onChange={(e) => setEdit({ ...edit, party_size: Number(e.target.value) })}
                 fullWidth
               />
-              <TextField
-                label="Date et heure"
-                type="datetime-local"
-                InputLabelProps={{ shrink: true }}
+              <ParisDateTimeField
                 value={edit?.starts_at || ''}
-                onChange={(e) => setEdit({ ...edit, starts_at: e.target.value })}
-                fullWidth
+                onChange={(next) => setEdit({ ...edit, starts_at: next })}
               />
               <TextField
                 select

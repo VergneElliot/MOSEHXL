@@ -14,9 +14,11 @@ import {
   Storefront as StorefrontIcon,
   Wifi as WifiIcon,
   RestaurantMenu as MenuIcon,
+  Person as PersonIcon,
 } from '@mui/icons-material';
 import { SettingsTab } from './types';
 import { EstablishmentSettings } from './EstablishmentSettings';
+import { ProfileSettings } from './ProfileSettings';
 import { OpeningHoursSettingsPanel } from './OpeningHoursSettings';
 import { EstablishmentOperatingHoursPanel } from './EstablishmentOperatingHoursSettings';
 import { TimeClockNetworkSettings } from './TimeClockNetworkSettings';
@@ -40,7 +42,6 @@ interface SettingsTabsProps {
   products?: Product[];
   categories?: Category[];
   onDataUpdate?: () => void;
-  canManageMenu?: boolean;
 }
 
 /**
@@ -91,13 +92,18 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
   products = [],
   categories = [],
   onDataUpdate = () => {},
-  canManageMenu = false,
 }) => {
   const [currentTab, setCurrentTab] = useState(0);
-  const { ensurePermission } = useStepUpAuth();
+  const { ensureAccess, hasAccess } = useStepUpAuth();
 
   const tabs: SettingsTab[] = useMemo(() => {
     const base: SettingsTab[] = [
+      {
+        id: 'profile',
+        label: 'Profil',
+        icon: <PersonIcon />,
+        component: <ProfileSettings />,
+      },
       {
         id: 'establishment',
         label: "Établissement",
@@ -170,23 +176,21 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
       },
     ];
 
-    if (canManageMenu) {
-      base.splice(1, 0, {
-        id: 'menu',
-        label: 'Menu',
-        icon: <MenuIcon />,
-        component: (
-          <Suspense fallback={<MenuPanelFallback />}>
-            <LazyMenuContainer
-              categories={categories}
-              products={products}
-              onDataUpdate={onDataUpdate}
-              embedded
-            />
-          </Suspense>
-        ),
-      });
-    }
+    base.splice(1, 0, {
+      id: 'menu',
+      label: 'Menu',
+      icon: <MenuIcon />,
+      component: (
+        <Suspense fallback={<MenuPanelFallback />}>
+          <LazyMenuContainer
+            categories={categories}
+            products={products}
+            onDataUpdate={onDataUpdate}
+            embedded
+          />
+        </Suspense>
+      ),
+    });
 
     return base;
   }, [
@@ -197,27 +201,36 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
     products,
     categories,
     onDataUpdate,
-    canManageMenu,
   ]);
 
   const handleTabChange = useCallback(
     (_event: React.SyntheticEvent, newValue: number) => {
       const tab = tabs[newValue];
       if (!tab) return;
-      if (tab.id !== 'menu') {
+      // Profil is a basic right; every other Paramètres tab is a specific one.
+      if (tab.id === 'profile') {
         setCurrentTab(newValue);
         return;
       }
-      void ensurePermission(PERMISSIONS.access_menu, {
-        title: 'Gestion du menu',
-        description: 'PIN d’un profil autorisé à modifier le catalogue (menu).',
+      const required =
+        tab.id === 'menu' ? PERMISSIONS.access_menu : PERMISSIONS.access_settings;
+      if (hasAccess(required)) {
+        setCurrentTab(newValue);
+        return;
+      }
+      void ensureAccess(required, {
+        title: tab.id === 'menu' ? 'Gestion du menu' : `Paramètres — ${tab.label}`,
+        description:
+          tab.id === 'menu'
+            ? 'PIN d’un profil autorisé à modifier le catalogue (menu).'
+            : `PIN d’un profil autorisé pour ouvrir « ${tab.label} ».`,
       })
         .then(() => setCurrentTab(newValue))
         .catch(() => {
           /* stay on current sub-tab */
         });
     },
-    [tabs, ensurePermission]
+    [tabs, ensureAccess, hasAccess]
   );
 
   return (

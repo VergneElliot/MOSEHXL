@@ -37,8 +37,9 @@ const sampleBulletin: ClosureBulletinData = {
 };
 
 describe('flux103Service', () => {
-  it('formats AAAAMMJJ dates in UTC', () => {
+  it('formats AAAAMMJJ dates in Europe/Paris', () => {
     expect(formatFlux103Date('2026-07-28T00:00:00.000Z')).toBe('20260728');
+    expect(formatFlux103Date('2026-07-27T22:30:00.000Z')).toBe('20260728');
   });
 
   it('builds Flux 10.3–shaped XML with TPS1 and VAT subtotals', () => {

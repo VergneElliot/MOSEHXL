@@ -1,28 +1,13 @@
 import React, { useMemo, useState } from 'react';
+import { useTheme, alpha } from '@mui/material/styles';
 import {
-  Card,
-  CardContent,
-  Typography,
-  Button,
-  Chip,
-  useTheme,
-  useMediaQuery,
-  Box,
-  IconButton,
-  TextField,
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Remove as RemoveIcon,
   Category as DiversIcon,
   VolunteerActivism as TipIcon,
-  Star as StarIcon,
 } from '@mui/icons-material';
-import { alpha } from '@mui/material/styles';
-import type { Theme } from '@mui/material/styles';
 import { Product, Category } from '../../types';
 import { POS_PRODUCT_DND_MIME } from './posProductDnD';
 import { setCompactDragGhost } from './posDragGhost';
+import './ProductGrid.css';
 
 interface ProductGridProps {
   products: Product[];
@@ -35,35 +20,20 @@ interface ProductGridProps {
   onPourboireClick?: () => void;
   /** Product ids in establishment top sellers (Favoris). */
   favoriteProductIds?: ReadonlySet<string>;
+  /** When false, hide the star badge (category filter / search). */
+  showFavoriteBadge?: boolean;
 }
 
-/**
- * Tall enough for Happy Hour cards (badge + strikethrough + price + qty/add).
- * Prefer minHeight over maxHeight/overflow:hidden so controls are never clipped.
- */
-const CARD_MIN_HEIGHT_MOBILE = 200;
-const CARD_MIN_HEIGHT_DESKTOP = 280;
+const ICON_ADD = 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z';
+const ICON_REMOVE = 'M19 13H5v-2h14v2z';
+const ICON_STAR =
+  'M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z';
 
-/** Skip paint for off-screen cards without unmounting (no Virtuoso recycle flicker). */
-function ProductGridCell({
-  minHeight,
-  children,
-}: {
-  minHeight: number;
-  children: React.ReactNode;
-}) {
+function Glyph({ path }: { path: string }) {
   return (
-    <Box
-      sx={{
-        contentVisibility: 'auto',
-        containIntrinsicSize: `${minHeight}px 200px`,
-        minHeight,
-        display: 'flex',
-        width: '100%',
-      }}
-    >
-      {children}
-    </Box>
+    <svg className="pos-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d={path} />
+    </svg>
   );
 }
 
@@ -77,260 +47,180 @@ const ProductGrid = React.memo(function ProductGrid({
   onDiversClick,
   onPourboireClick,
   favoriteProductIds,
+  showFavoriteBadge = false,
 }: ProductGridProps) {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-  const categoryColorMap = useMemo(() => {
-    const map: Record<string, string | undefined> = {};
+  const paletteStyle = useMemo(
+    () =>
+      ({
+        '--pos-paper': theme.palette.background.paper,
+        '--pos-divider': theme.palette.divider,
+        '--pos-primary': theme.palette.primary.main,
+        '--pos-primary-dark': theme.palette.primary.dark,
+        '--pos-primary-contrast': theme.palette.primary.contrastText,
+        '--pos-secondary': theme.palette.secondary.main,
+        '--pos-secondary-dark': theme.palette.secondary.dark,
+        '--pos-secondary-contrast': theme.palette.secondary.contrastText,
+        '--pos-text-primary': theme.palette.text.primary,
+        '--pos-text-secondary': theme.palette.text.secondary,
+        '--pos-warning-bg': alpha(theme.palette.warning.main, 0.18),
+        '--pos-warning-border': alpha(theme.palette.warning.dark, 0.45),
+        '--pos-warning-dark': theme.palette.warning.dark,
+        '--pos-action-active': theme.palette.action.active,
+        '--pos-action-hover': theme.palette.action.hover,
+        '--pos-shadow-1': theme.shadows[1],
+        '--pos-shadow-2': theme.shadows[2],
+      }) as React.CSSProperties,
+    [theme]
+  );
+
+  /**
+   * One style object per category, reused by every card in it — keeps the
+   * `cardStyle` prop referentially stable so React.memo actually holds.
+   */
+  const categoryStyleMap = useMemo(() => {
+    const map = new Map<string, React.CSSProperties>();
     categories.forEach(category => {
-      map[category.id] = category.color;
+      if (!category.color) return;
+      map.set(String(category.id), {
+        '--pos-card-bg': alpha(category.color, 0.2),
+        '--pos-card-border': alpha(category.color, 0.8),
+      } as React.CSSProperties);
     });
     return map;
   }, [categories]);
 
-  const hasDiversSlot = Boolean(onDiversClick);
-  const hasPourboireSlot = Boolean(onPourboireClick);
-  const cardMinHeight = isMobile ? CARD_MIN_HEIGHT_MOBILE : CARD_MIN_HEIGHT_DESKTOP;
-  const totalCount = products.length + (hasDiversSlot ? 1 : 0) + (hasPourboireSlot ? 1 : 0);
+  const totalCount =
+    products.length + (onDiversClick ? 1 : 0) + (onPourboireClick ? 1 : 0);
 
   if (totalCount === 0) {
     return (
-      <Box p={3} textAlign="center">
-        <Typography color="textSecondary">Aucun produit trouvé</Typography>
-      </Box>
+      <div className="pos-grid__empty" style={paletteStyle}>
+        Aucun produit trouvé
+      </div>
     );
   }
 
   return (
-    <Box
-      sx={{
-        display: 'grid',
-        gridTemplateColumns: {
-          xs: 'repeat(auto-fill, minmax(190px, 1fr))',
-          sm: 'repeat(auto-fill, minmax(210px, 1fr))',
-          md: 'repeat(auto-fill, minmax(220px, 1fr))',
-          lg: 'repeat(auto-fill, minmax(230px, 1fr))',
-        },
-        gap: 2,
-        alignItems: 'stretch',
-      }}
-    >
-      {onDiversClick && (
-        <ProductGridCell minHeight={cardMinHeight}>
-          <DiversCard onAdd={onDiversClick} isMobile={isMobile} theme={theme} />
-        </ProductGridCell>
-      )}
-      {onPourboireClick && (
-        <ProductGridCell minHeight={cardMinHeight}>
-          <PourboireCard onAdd={onPourboireClick} isMobile={isMobile} theme={theme} />
-        </ProductGridCell>
-      )}
-      {products.map(product => (
-        <ProductGridCell key={`product-${product.id}`} minHeight={cardMinHeight}>
-          <ProductCard
-            product={product}
-            categoryColor={categoryColorMap[product.categoryId]}
-            isHappyHourActive={isHappyHourActive}
-            isFavorite={favoriteProductIds?.has(String(product.id)) ?? false}
-            onRequestAddProduct={onRequestAddProduct}
-            calculateProductPrice={calculateProductPrice}
-            formatCurrency={formatCurrency}
-            isMobile={isMobile}
-          />
-        </ProductGridCell>
+    <div className="pos-grid" style={paletteStyle}>
+      {onDiversClick && <DiversCard onAdd={onDiversClick} />}
+      {onPourboireClick && <PourboireCard onAdd={onPourboireClick} />}
+      {products.map((product, index) => (
+        <ProductCard
+          // Tous view lists favorites then categories — same product.id can appear twice.
+          key={`${index}:${product.id}`}
+          product={product}
+          cardStyle={categoryStyleMap.get(String(product.categoryId))}
+          isHappyHourActive={isHappyHourActive}
+          isFavorite={
+            showFavoriteBadge && (favoriteProductIds?.has(String(product.id)) ?? false)
+          }
+          onRequestAddProduct={onRequestAddProduct}
+          calculateProductPrice={calculateProductPrice}
+          formatCurrency={formatCurrency}
+        />
       ))}
-    </Box>
+    </div>
   );
 });
 
-interface DiversCardProps {
-  onAdd: () => void;
-  isMobile: boolean;
-  theme: Theme;
+function startSpecialDrag(
+  event: React.DragEvent,
+  kind: 'divers' | 'pourboire',
+  label: string
+) {
+  const payload = JSON.stringify({ kind });
+  event.dataTransfer.setData(POS_PRODUCT_DND_MIME, payload);
+  event.dataTransfer.setData('text/plain', payload);
+  event.dataTransfer.effectAllowed = 'copy';
+  setCompactDragGhost(event, label);
 }
 
-const DiversCard: React.FC<DiversCardProps> = ({ onAdd, isMobile, theme }) => {
-  const border = theme.palette.divider;
-  const bg = alpha(theme.palette.primary.main, 0.08);
-
+const DiversCard = React.memo(function DiversCard({ onAdd }: { onAdd: () => void }) {
   return (
-    <Card
+    <div
+      className="pos-card pos-card--special"
       draggable
-      onDragStart={e => {
-        const payload = JSON.stringify({ kind: 'divers' });
-        e.dataTransfer.setData(POS_PRODUCT_DND_MIME, payload);
-        e.dataTransfer.setData('text/plain', payload);
-        e.dataTransfer.effectAllowed = 'copy';
-        setCompactDragGhost(e, 'Divers');
-      }}
-      sx={{
-        width: '100%',
-        height: '100%',
-        minHeight: isMobile ? CARD_MIN_HEIGHT_MOBILE : CARD_MIN_HEIGHT_DESKTOP,
-        display: 'flex',
-        flexDirection: 'column',
-        border: `1px solid ${border}`,
-        backgroundColor: bg,
-        transition: 'box-shadow 0.15s ease',
-        cursor: 'grab',
-        '&:active': { cursor: 'grabbing' },
-        '&:hover': {
-          boxShadow: 3,
-        },
-      }}
+      onDragStart={e => startSpecialDrag(e, 'divers', 'Divers')}
     >
-      <CardContent
-        sx={{
-          p: isMobile ? 1 : 2,
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100%',
-          justifyContent: 'space-between',
-        }}
-      >
-        <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-            <DiversIcon sx={{ fontSize: isMobile ? 20 : 24 }} color="primary" />
-            <Typography
-              variant={isMobile ? 'body2' : 'h6'}
-              component="h3"
-              sx={{ fontWeight: 'bold', fontSize: isMobile ? '1.3rem' : '2.3rem' }}
-            >
-              Divers
-            </Typography>
-          </Box>
-          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+      <div className="pos-card__content">
+        <div>
+          <div className="pos-card__special-header">
+            <DiversIcon color="primary" style={{ fontSize: 'inherit' }} />
+            <h3 className="pos-card__special-title">Divers</h3>
+          </div>
+          <p className="pos-card__special-description">
             Article personnalisé (prix, TVA, description)
-          </Typography>
-        </Box>
-        <Button
-          variant="contained"
-          size="small"
-          fullWidth
+          </p>
+        </div>
+        <button
+          type="button"
+          className="pos-add-button pos-add-button--block"
           onClick={e => {
             e.stopPropagation();
             onAdd();
           }}
-          sx={{
-            mt: 1,
-            minHeight: isMobile ? 34 : 42,
-            py: isMobile ? 0.5 : 0.75,
-            fontSize: isMobile ? '1rem' : '1.9rem',
-          }}
         >
           Ajouter
-        </Button>
-      </CardContent>
-    </Card>
+        </button>
+      </div>
+    </div>
   );
-};
+});
 
-interface PourboireCardProps {
-  onAdd: () => void;
-  isMobile: boolean;
-  theme: Theme;
-}
-
-const PourboireCard: React.FC<PourboireCardProps> = ({ onAdd, isMobile, theme }) => {
-  const border = theme.palette.divider;
-  const bg = alpha(theme.palette.secondary.main, 0.08);
-
+const PourboireCard = React.memo(function PourboireCard({ onAdd }: { onAdd: () => void }) {
   return (
-    <Card
+    <div
+      className="pos-card pos-card--special"
       draggable
-      onDragStart={e => {
-        const payload = JSON.stringify({ kind: 'pourboire' });
-        e.dataTransfer.setData(POS_PRODUCT_DND_MIME, payload);
-        e.dataTransfer.setData('text/plain', payload);
-        e.dataTransfer.effectAllowed = 'copy';
-        setCompactDragGhost(e, 'Pourboire');
-      }}
-      sx={{
-        width: '100%',
-        height: '100%',
-        minHeight: isMobile ? CARD_MIN_HEIGHT_MOBILE : CARD_MIN_HEIGHT_DESKTOP,
-        display: 'flex',
-        flexDirection: 'column',
-        border: `1px solid ${border}`,
-        backgroundColor: bg,
-        transition: 'box-shadow 0.15s ease',
-        cursor: 'grab',
-        '&:active': { cursor: 'grabbing' },
-        '&:hover': {
-          boxShadow: 3,
-        },
-      }}
+      onDragStart={e => startSpecialDrag(e, 'pourboire', 'Pourboire')}
     >
-      <CardContent
-        sx={{
-          p: isMobile ? 1 : 2,
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100%',
-          justifyContent: 'space-between',
-        }}
-      >
-        <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-            <TipIcon sx={{ fontSize: isMobile ? 20 : 24 }} color="secondary" />
-            <Typography
-              variant={isMobile ? 'body2' : 'h6'}
-              component="h3"
-              sx={{ fontWeight: 'bold', fontSize: isMobile ? '1.3rem' : '2.3rem' }}
-            >
-              Pourboire
-            </Typography>
-          </Box>
-          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+      <div className="pos-card__content">
+        <div>
+          <div className="pos-card__special-header">
+            <TipIcon color="secondary" style={{ fontSize: 'inherit' }} />
+            <h3 className="pos-card__special-title">Pourboire</h3>
+          </div>
+          <p className="pos-card__special-description">
             Pourboire carte (hors CA — +carte / −espèces)
-          </Typography>
-        </Box>
-        <Button
-          variant="contained"
-          color="secondary"
-          size="small"
-          fullWidth
+          </p>
+        </div>
+        <button
+          type="button"
+          className="pos-add-button pos-add-button--secondary pos-add-button--block"
           onClick={e => {
             e.stopPropagation();
             onAdd();
           }}
-          sx={{
-            mt: 1,
-            minHeight: isMobile ? 34 : 42,
-            py: isMobile ? 0.5 : 0.75,
-            fontSize: isMobile ? '1rem' : '1.9rem',
-          }}
         >
           Ajouter
-        </Button>
-      </CardContent>
-    </Card>
+        </button>
+      </div>
+    </div>
   );
-};
+});
 
 interface ProductCardProps {
   product: Product;
-  categoryColor?: string;
+  /** Category colour custom properties; shared reference across the category. */
+  cardStyle?: React.CSSProperties;
   isHappyHourActive: boolean;
   isFavorite?: boolean;
   onRequestAddProduct: (product: Product, quantity: number) => void;
   calculateProductPrice: (product: Product, isHappyHour: boolean) => number;
   formatCurrency: (amount: number) => string;
-  isMobile: boolean;
 }
 
 const ProductCard = React.memo(function ProductCard({
   product,
-  categoryColor,
+  cardStyle,
   isHappyHourActive,
   isFavorite = false,
   onRequestAddProduct,
   calculateProductPrice,
   formatCurrency,
-  isMobile,
 }: ProductCardProps) {
-  const theme = useTheme();
   const [quantity, setQuantity] = useState(1);
 
   const currentPrice = calculateProductPrice(product, isHappyHourActive);
@@ -343,12 +233,8 @@ const ProductCard = React.memo(function ProductCard({
       setQuantity(1);
       return;
     }
-    const v = parseInt(raw, 10);
-    if (!Number.isNaN(v)) setQuantity(Math.min(999, Math.max(1, v)));
-  };
-
-  const handleQuantityBlur = () => {
-    if (quantity < 1) setQuantity(1);
+    const parsed = parseInt(raw, 10);
+    if (!Number.isNaN(parsed)) setQuantity(Math.min(999, Math.max(1, parsed)));
   };
 
   const handleAdd = (e: React.MouseEvent) => {
@@ -357,221 +243,84 @@ const ProductCard = React.memo(function ProductCard({
     setQuantity(1);
   };
 
-  const resolvedBackground = categoryColor
-    ? alpha(categoryColor, 0.2)
-    : theme.palette.background.paper;
+  const handleDragStart = (e: React.DragEvent) => {
+    const payload = JSON.stringify({
+      kind: 'product',
+      productId: product.id,
+      quantity,
+    });
+    e.dataTransfer.setData(POS_PRODUCT_DND_MIME, payload);
+    e.dataTransfer.setData('text/plain', payload);
+    e.dataTransfer.effectAllowed = 'copy';
+    setCompactDragGhost(e, `${product.name}${quantity > 1 ? ` ×${quantity}` : ''}`);
+  };
 
-  const resolvedBorder = categoryColor
-    ? alpha(categoryColor, 0.8)
-    : theme.palette.divider;
+  const className =
+    'pos-card' +
+    (isFavorite ? ' pos-card--favorite' : '') +
+    (isDiscounted ? ' pos-card--discounted' : '');
 
   return (
-    <Card
-      draggable
-      onDragStart={e => {
-        e.dataTransfer.setData(
-          POS_PRODUCT_DND_MIME,
-          JSON.stringify({ kind: 'product', productId: product.id, quantity })
-        );
-        e.dataTransfer.setData(
-          'text/plain',
-          JSON.stringify({ kind: 'product', productId: product.id, quantity })
-        );
-        e.dataTransfer.effectAllowed = 'copy';
-        const qtyLabel = quantity > 1 ? ` ×${quantity}` : '';
-        setCompactDragGhost(e, `${product.name}${qtyLabel}`);
-      }}
-      sx={{
-        width: '100%',
-        height: '100%',
-        minHeight: isMobile ? CARD_MIN_HEIGHT_MOBILE : CARD_MIN_HEIGHT_DESKTOP,
-        position: 'relative',
-        display: 'flex',
-        flexDirection: 'column',
-        border: `1px solid ${resolvedBorder}`,
-        backgroundColor: resolvedBackground,
-        transition: 'box-shadow 0.15s ease',
-        cursor: 'grab',
-        '&:active': { cursor: 'grabbing' },
-        '&:hover': {
-          boxShadow: 3,
-        },
-      }}
-    >
+    <div className={className} style={cardStyle} draggable onDragStart={handleDragStart}>
       {isFavorite && (
-        <Box
-          aria-label="Favori"
-          title="Favori"
-          sx={{
-            position: 'absolute',
-            top: 8,
-            left: 8,
-            zIndex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: isMobile ? 28 : 34,
-            height: isMobile ? 28 : 34,
-            borderRadius: '50%',
-            bgcolor: alpha(theme.palette.warning.main, 0.18),
-            border: `1px solid ${alpha(theme.palette.warning.dark, 0.45)}`,
-          }}
-        >
-          <StarIcon
-            sx={{
-              fontSize: isMobile ? 18 : 22,
-              color: theme.palette.warning.dark,
-            }}
-          />
-        </Box>
+        <span className="pos-card__favorite" aria-label="Favori" title="Favori">
+          <Glyph path={ICON_STAR} />
+        </span>
       )}
 
-      {isDiscounted && (
-        <Chip
-          label="Happy Hour"
-          color="secondary"
-          size="small"
-          sx={{
-            position: 'absolute',
-            top: 8,
-            right: 8,
-            zIndex: 1,
-          }}
-        />
-      )}
+      {isDiscounted && <span className="pos-card__happy-hour">Happy Hour</span>}
 
-      <CardContent
-        sx={{
-          p: isMobile ? 1 : 2,
-          display: 'flex',
-          flexDirection: 'column',
-          flex: 1,
-          minHeight: 0,
-        }}
-      >
-        <Typography
-          variant={isMobile ? 'body2' : 'h6'}
-          component="h3"
-          sx={{
-            fontWeight: 'bold',
-            mb: 1,
-            fontSize: isMobile ? '1.3rem' : '2.4rem',
-            lineHeight: 1.2,
-            minHeight: '2.4em',
-            overflow: 'hidden',
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            flexShrink: 0,
-            pl: isFavorite ? (isMobile ? 4 : 5) : 0,
-            pr: isDiscounted ? 10 : 0,
-          }}
-        >
-          {product.name}
-        </Typography>
+      <div className="pos-card__content">
+        <h3 className="pos-card__name">{product.name}</h3>
 
-        <Box
-          display="flex"
-          flexDirection="column"
-          alignItems="stretch"
-          gap={1}
-          sx={{ flex: 1, minHeight: 0 }}
-        >
+        <div className="pos-card__body">
           {isDiscounted && (
-            <Typography
-              variant="body2"
-              sx={{
-                textDecoration: 'line-through',
-                color: 'text.secondary',
-                fontSize: isMobile ? '1rem' : '1.8rem',
-              }}
-            >
-              {formatCurrency(product.price)}
-            </Typography>
+            <p className="pos-card__price-original">{formatCurrency(product.price)}</p>
           )}
 
-          <Typography
-            variant={isMobile ? 'h6' : 'h5'}
-            color={isDiscounted ? 'secondary' : 'primary'}
-            sx={{
-              fontWeight: 'bold',
-              fontSize: isMobile ? '1.5rem' : '2.8rem',
-            }}
-          >
-            {formatCurrency(currentPrice)}
-          </Typography>
+          <p className="pos-card__price">{formatCurrency(currentPrice)}</p>
 
-          <Box
-            display="flex"
-            alignItems="center"
-            gap={0.5}
-            sx={{ width: '100%', mt: 'auto', pt: 0.5, flexShrink: 0 }}
-          >
-            <IconButton
-              size="small"
+          <div className="pos-card__actions">
+            <button
+              type="button"
+              className="pos-quantity-button"
+              aria-label="Diminuer la quantité"
               onClick={e => {
                 e.stopPropagation();
                 setQuantity(q => Math.max(1, q - 1));
               }}
-              aria-label="Diminuer la quantité"
             >
-              <RemoveIcon fontSize="small" />
-            </IconButton>
-            <TextField
+              <Glyph path={ICON_REMOVE} />
+            </button>
+            <input
+              className="pos-quantity-input"
               type="number"
-              variant="standard"
+              min={1}
+              max={999}
               value={quantity}
+              aria-label={`Quantité pour ${product.name}`}
               onChange={handleQuantityChange}
-              onBlur={handleQuantityBlur}
               onClick={e => e.stopPropagation()}
-              inputProps={{
-                min: 1,
-                max: 999,
-                onFocus: (e: React.FocusEvent<HTMLInputElement>) => e.target.select(),
-              }}
-              sx={{
-                width: 44,
-                '& .MuiInputBase-root': { fontSize: isMobile ? '1.2rem' : '2rem' },
-                '& .MuiInputBase-input': {
-                  textAlign: 'center',
-                  py: 0,
-                  fontWeight: 'bold',
-                  MozAppearance: 'textfield',
-                  '&::-webkit-outer-spin-button, &::-webkit-inner-spin-button': {
-                    WebkitAppearance: 'none',
-                    margin: 0,
-                  },
-                },
-              }}
-              size="small"
+              onFocus={e => e.currentTarget.select()}
             />
-            <IconButton
-              size="small"
+            <button
+              type="button"
+              className="pos-quantity-button"
+              aria-label="Augmenter la quantité"
               onClick={e => {
                 e.stopPropagation();
-                setQuantity(q => q + 1);
-              }}
-              aria-label="Augmenter la quantité"
-            >
-              <AddIcon fontSize="small" />
-            </IconButton>
-            <Button
-              variant="contained"
-              size="small"
-              fullWidth
-              onClick={handleAdd}
-              sx={{
-                minHeight: isMobile ? 34 : 42,
-                py: isMobile ? 0.5 : 0.75,
-                fontSize: isMobile ? '1rem' : '1.9rem',
+                setQuantity(q => Math.min(999, q + 1));
               }}
             >
+              <Glyph path={ICON_ADD} />
+            </button>
+            <button type="button" className="pos-add-button" onClick={handleAdd}>
               Ajouter
-            </Button>
-          </Box>
-        </Box>
-      </CardContent>
-    </Card>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 });
 

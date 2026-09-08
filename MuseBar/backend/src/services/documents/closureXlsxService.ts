@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import { formatDateOnly, formatDateTime, formatParisYmd } from '@mosehxl/types';
 import type { Pool } from 'pg';
 import type { ClosureBulletinData } from '../printing/types';
 
@@ -131,15 +132,19 @@ function buildVatBreakdownFromTtc(vat10Ttc: number, vat20Ttc: number): VatBreakd
 }
 
 function dateOnly(value: Date | string): string {
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
-  return date.toISOString().slice(0, 10);
+  const formatted = formatDateOnly(value);
+  if (formatted === 'N/A') return String(value).slice(0, 10);
+  return formatted;
 }
 
 function dateTime(value: Date | string): string {
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return date.toISOString().replace('T', ' ').slice(0, 19);
+  const formatted = formatDateTime(value);
+  if (formatted === 'N/A') return String(value);
+  return formatted;
+}
+
+function dateOnlyYmd(value: Date | string): string {
+  return formatParisYmd(value) || String(value).slice(0, 10);
 }
 
 function vatBand(vat: VatBreakdown, key: 'vat_10' | 'vat_20'): Required<VatBand> {
@@ -457,7 +462,7 @@ export function buildClosureAccountingRows(
 }
 
 function closureExportFilename(bulletin: ClosureBulletinData, extension: 'pdf' | 'xlsx'): string {
-  return `bilan-cloture-${bulletin.closure_type.toLowerCase()}-${dateOnly(bulletin.period_start)}-${dateOnly(bulletin.period_end)}.${extension}`;
+  return `bilan-cloture-${bulletin.closure_type.toLowerCase()}-${dateOnlyYmd(bulletin.period_start)}-${dateOnlyYmd(bulletin.period_end)}.${extension}`;
 }
 
 const headers = [

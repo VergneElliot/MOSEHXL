@@ -4,13 +4,17 @@ import { logError } from '../utils/logger';
 export interface AuditEntry {
   id: number;
   establishment_id?: string | null;
+  /** Account identity (logged-in user). */
   user_id?: string;
+  /** PIN identity that performed the action, when a badge was involved. */
+  pin_user_id?: number | null;
   action_type: string;
   resource_type?: string;
   resource_id?: string;
   action_details?: Record<string, unknown>;
   ip_address?: string;
   user_agent?: string;
+  /** staff_pin_sessions.id of the badge session. */
   session_id?: string;
   timestamp: Date;
 }
@@ -55,6 +59,7 @@ export class AuditTrailModel {
   static async logAction({
     establishment_id,
     user_id,
+    pin_user_id,
     action_type,
     resource_type,
     resource_id,
@@ -79,8 +84,9 @@ export class AuditTrailModel {
     const query = `
       INSERT INTO audit_trail (
         user_id, action_type, resource_type, resource_id,
-        action_details, ip_address, user_agent, session_id, establishment_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        action_details, ip_address, user_agent, session_id, establishment_id,
+        pin_user_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
     `;
     const values = [
@@ -92,7 +98,8 @@ export class AuditTrailModel {
       toInetOrNull(ip_address),
       user_agent || null,
       session_id || null,
-      est
+      est,
+      pin_user_id ?? null
     ];
 
     try {
@@ -120,7 +127,7 @@ export class AuditTrailModel {
 
   static async getOrderAuditEntries(establishmentId: string, orderId: number): Promise<AuditEntry[]> {
     const query = `
-      SELECT id, establishment_id, user_id, action_type, resource_type, resource_id,
+      SELECT id, establishment_id, user_id, pin_user_id, action_type, resource_type, resource_id,
              action_details, ip_address, user_agent, session_id, "timestamp"
       FROM audit_trail
       WHERE establishment_id = $1
@@ -181,7 +188,7 @@ export class AuditTrailModel {
     const pageValues = [...values, limit, offset];
 
     const result = await pool.query(
-      `SELECT id, establishment_id, user_id, action_type, resource_type, resource_id,
+      `SELECT id, establishment_id, user_id, pin_user_id, action_type, resource_type, resource_id,
               action_details, ip_address, user_agent, session_id, "timestamp"
        FROM audit_trail
        WHERE ${where}
@@ -260,7 +267,7 @@ export class AuditTrailModel {
       const pageValues = [...values, limit, offset];
 
       const result = await client.query(
-        `SELECT id, establishment_id, user_id, action_type, resource_type, resource_id,
+        `SELECT id, establishment_id, user_id, pin_user_id, action_type, resource_type, resource_id,
                 action_details, ip_address, user_agent, session_id, "timestamp"
          FROM audit_trail
          WHERE ${where}

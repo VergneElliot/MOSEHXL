@@ -65,8 +65,6 @@ export interface SettingsProps {
   products?: Product[];
   categories?: Category[];
   onDataUpdate?: () => void;
-  /** Login user may edit catalog (access_menu). */
-  canManageMenu?: boolean;
 }
 
 /** @deprecated General settings form removed; business identity is BusinessSettingsProps. */

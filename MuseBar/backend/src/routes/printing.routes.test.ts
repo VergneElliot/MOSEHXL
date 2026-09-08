@@ -227,6 +227,7 @@ describe('printing routes', () => {
       payload_base64: 'abc=',
       attempt_count: 1,
       metadata: { order_id: 7 },
+      created_at: new Date('2026-06-18T09:59:58.000Z'),
     });
 
     const res = await request(app)
@@ -241,7 +242,10 @@ describe('printing routes', () => {
       payload_base64: 'abc=',
       attempt_count: 1,
       metadata: { order_id: 7 },
+      created_at: '2026-06-18T09:59:58.000Z',
     });
+    expect(typeof res.body.queued_ms).toBe('number');
+    expect(res.body.queued_ms).toBeGreaterThanOrEqual(0);
   });
 
   it('rejects bridge poll with invalid bridge key', async () => {

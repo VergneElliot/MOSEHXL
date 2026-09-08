@@ -10,6 +10,7 @@ import { EstablishmentModel } from '../../models/establishment';
 import { AuditTrailModel } from '../../models/auditTrail';
 import { EmailService } from '../email';
 import { Logger } from '../../utils/logger';
+import { formatDateTime } from '@mosehxl/types';
 import { getEnvironmentConfig } from '../../config/environment';
 
 export interface CreateEstablishmentRequest {
@@ -271,14 +272,7 @@ export class EstablishmentService {
       );
 
       const setupUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/establishment-setup/${invitationToken}`;
-      const expirationDate = expiresAt.toLocaleDateString('fr-FR', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+      const expirationDate = formatDateTime(expiresAt);
 
       await emailService.sendTemplateEmail(
         'establishment_setup',

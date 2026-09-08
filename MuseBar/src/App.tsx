@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import { Box, Container, CircularProgress } from '@mui/material';
 import { apiConfig } from './config/api';
 import { useAuth } from './hooks/useAuth';
@@ -42,8 +42,20 @@ function RouteFallback() {
   );
 }
 
+/** Guest / setup URLs must never wait on login bootstrap or fall through to Login. */
+function isPublicAppPath(pathname: string): boolean {
+  return (
+    pathname.startsWith('/reserve/') ||
+    pathname.startsWith('/planning/confirm/') ||
+    pathname.startsWith('/setup/') ||
+    pathname.startsWith('/establishment-setup/')
+  );
+}
+
 function App() {
   const { t } = useTranslation('common');
+  const location = useLocation();
+  const publicPath = isPublicAppPath(location.pathname);
   const {
     user,
     token,
@@ -117,7 +129,7 @@ function App() {
     updateHappyHourStatus();
   };
 
-  if (!authReady) {
+  if (!authReady && !publicPath) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
         <CircularProgress />

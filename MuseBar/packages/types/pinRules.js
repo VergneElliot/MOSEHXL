@@ -9,25 +9,11 @@ exports.pinRulesErrorMessage = pinRulesErrorMessage;
 exports.pinLengthHelperText = pinLengthHelperText;
 exports.isPinLengthValid = isPinLengthValid;
 const permissions_1 = require("./permissions");
-/** Permissions that require an elevated (4–8 digit) PIN. */
-exports.ELEVATED_PIN_PERMISSIONS = [
-    permissions_1.PERMISSIONS.pos_happyhour_manual,
-    permissions_1.PERMISSIONS.pos_apply_offert,
-    permissions_1.PERMISSIONS.pos_apply_perso,
-    permissions_1.PERMISSIONS.pos_reassign_waiter,
-    permissions_1.PERMISSIONS.pos_intervene_table,
-    permissions_1.PERMISSIONS.orders_cancel,
-    permissions_1.PERMISSIONS.access_menu,
-    permissions_1.PERMISSIONS.access_settings,
-    permissions_1.PERMISSIONS.access_closure,
-    permissions_1.PERMISSIONS.access_user_management,
-    permissions_1.PERMISSIONS.access_documents,
-    permissions_1.PERMISSIONS.access_inbox,
-    permissions_1.PERMISSIONS.access_reservations,
-    permissions_1.PERMISSIONS.access_planning,
-    permissions_1.PERMISSIONS.manage_floor_plan,
-    permissions_1.PERMISSIONS.access_compliance,
-];
+/**
+ * Permissions that require an elevated (4–8 digit) PIN. Derived from the tier table so a
+ * new specific permission can never silently stay reachable with a 2-digit PIN.
+ */
+exports.ELEVATED_PIN_PERMISSIONS = permissions_1.SPECIFIC_PERMISSIONS;
 exports.PIN_BASIC_LENGTH = 2;
 exports.PIN_ELEVATED_MIN_LENGTH = 4;
 exports.PIN_ELEVATED_MAX_LENGTH = 8;

@@ -1,6 +1,7 @@
 import { pool } from '../db/pool';
 import bcrypt from 'bcrypt';
 import { validatePasswordWithBreachCheck } from '../utils/passwordValidation';
+import { resolveEffectivePermissions } from '../permissions/resolve';
 
 /**
  * Full database row from the `users` table.
@@ -54,15 +55,6 @@ export class UserModel {
         { statusCode: 400 }
       );
     }
-  }
-
-  private static getEstablishmentAdminPermissionMode(): 'implicit_all' | 'explicit_only' {
-    const raw = process.env.ESTABLISHMENT_ADMIN_PERMISSION_MODE?.trim().toLowerCase();
-    if (raw === 'explicit_only') return 'explicit_only';
-    if (raw === 'implicit_all') return 'implicit_all';
-    return process.env.NODE_ENV?.trim().toLowerCase() === 'production'
-      ? 'explicit_only'
-      : 'implicit_all';
   }
 
   static async createUser(email: string, password: string, is_admin: boolean = false): Promise<UserRow> {
@@ -294,15 +286,16 @@ export class UserModel {
       if (mem.rows[0]?.role) role = String(mem.rows[0].role);
     }
 
-    const establishmentAdminPermissionMode = this.getEstablishmentAdminPermissionMode();
-
-    if (role === 'establishment_admin' && establishmentAdminPermissionMode === 'implicit_all') {
-      const allPerms = await pool.query('SELECT name FROM permissions');
-      return allPerms.rows.map((row) => (row as { name: string }).name);
-    }
-
     if (!activeEstablishmentId) {
       return [];
+    }
+
+    if (role === 'establishment_admin') {
+      return resolveEffectivePermissions({
+        role,
+        grantedNames: [],
+        hasEstablishmentContext: true,
+      });
     }
 
     const result = await pool.query(
@@ -312,7 +305,11 @@ export class UserModel {
       [userId, activeEstablishmentId]
     );
 
-    return result.rows.map((row) => (row as { name: string }).name);
+    return resolveEffectivePermissions({
+      role,
+      grantedNames: result.rows.map((row) => (row as { name: string }).name),
+      hasEstablishmentContext: true,
+    });
   }
 
   /**
@@ -399,16 +396,82 @@ export class UserModel {
     first_name: string | null;
     last_name: string | null;
     email_verified: boolean;
+    phone: string | null;
+    date_of_birth: string | null;
   } | null> {
     const result = await pool.query(
-      'SELECT first_name, last_name, email_verified FROM users WHERE id = $1',
+      `SELECT first_name, last_name, email_verified, phone, date_of_birth
+       FROM users WHERE id = $1`,
       [userId]
     );
-    return result.rows[0] || null;
+    const row = result.rows[0];
+    if (!row) return null;
+    const dob = row.date_of_birth;
+    return {
+      first_name: row.first_name,
+      last_name: row.last_name,
+      email_verified: row.email_verified,
+      phone: row.phone ?? null,
+      date_of_birth:
+        dob instanceof Date
+          ? dob.toISOString().slice(0, 10)
+          : dob
+            ? String(dob).slice(0, 10)
+            : null,
+    };
+  }
+
+  static async updatePersonalProfile(
+    userId: number,
+    patch: Partial<{
+      first_name: string | null;
+      last_name: string | null;
+      phone: string | null;
+      date_of_birth: string | null;
+    }>
+  ): Promise<{
+    first_name: string | null;
+    last_name: string | null;
+    phone: string | null;
+    date_of_birth: string | null;
+  }> {
+    const existing = await this.getAuthMeProfile(userId);
+    if (!existing) {
+      throw Object.assign(new Error('User not found'), { statusCode: 404 });
+    }
+    const firstName =
+      patch.first_name !== undefined
+        ? patch.first_name?.trim() || null
+        : existing.first_name;
+    const lastName =
+      patch.last_name !== undefined ? patch.last_name?.trim() || null : existing.last_name;
+    const phone =
+      patch.phone !== undefined ? patch.phone?.trim() || null : existing.phone;
+    const dob =
+      patch.date_of_birth !== undefined
+        ? patch.date_of_birth?.trim() || null
+        : existing.date_of_birth;
+
+    await pool.query(
+      `UPDATE users
+       SET first_name = $2,
+           last_name = $3,
+           phone = $4,
+           date_of_birth = $5::date,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [userId, firstName, lastName, phone, dob]
+    );
+    return {
+      first_name: firstName,
+      last_name: lastName,
+      phone,
+      date_of_birth: dob,
+    };
   }
 
   /**
-   * List users for an establishment (membership-scoped admin view).
+   * List active users for an establishment (membership-scoped admin view).
    */
   static async listUsersByEstablishment(
     establishmentId: string
@@ -421,6 +484,9 @@ export class UserModel {
       establishment_id: string | null;
       first_name: string | null;
       last_name: string | null;
+      calendar_color?: string;
+      phone?: string | null;
+      date_of_birth?: string | null;
       created_at: Date;
     }>
   > {

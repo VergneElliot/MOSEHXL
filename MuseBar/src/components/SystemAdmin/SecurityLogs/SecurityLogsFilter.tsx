@@ -12,6 +12,7 @@ import {
   Typography,
 } from '@mui/material';
 import type { SecurityLogFilters } from '../../../types/system';
+import { ParisDateField } from '../../common/ParisDateTimeField';
 
 interface SecurityLogsFilterProps {
   filters: SecurityLogFilters;
@@ -56,14 +57,12 @@ export const SecurityLogsFilter: React.FC<SecurityLogsFilterProps> = ({ filters,
     onChange({ ...filters, actionType: newActionTypes });
   };
 
-  const handleDateChange = (field: 'start' | 'end') => (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleDateChange = (field: 'start' | 'end') => (ymd: string) => {
     onChange({
       ...filters,
       dateRange: {
         ...filters.dateRange,
-        [field]: event.target.value || null,
+        [field]: ymd || null,
       },
     });
   };
@@ -76,24 +75,18 @@ export const SecurityLogsFilter: React.FC<SecurityLogsFilterProps> = ({ filters,
 
       <Grid container spacing={3}>
         <Grid item xs={12} md={3}>
-          <TextField
-            fullWidth
-            label="Date de début"
-            type="date"
+          <ParisDateField
+            label="Date de début (jj/mm/aaaa)"
             value={filters.dateRange.start || ''}
             onChange={handleDateChange('start')}
-            InputLabelProps={{ shrink: true }}
           />
         </Grid>
 
         <Grid item xs={12} md={3}>
-          <TextField
-            fullWidth
-            label="Date de fin"
-            type="date"
+          <ParisDateField
+            label="Date de fin (jj/mm/aaaa)"
             value={filters.dateRange.end || ''}
             onChange={handleDateChange('end')}
-            InputLabelProps={{ shrink: true }}
           />
         </Grid>
 

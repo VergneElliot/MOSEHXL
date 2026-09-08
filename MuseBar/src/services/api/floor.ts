@@ -3,14 +3,17 @@ import type { OrderItem } from '../../types';
 import { mapOrderItemOptionsToApiPayload } from '../../utils/orderItemOptions';
 import { saleLines } from '../../hooks/usePOSOrderTotals';
 
-export interface PinVerifyResult {
-  user_id: number;
-  email: string;
-  role: string;
-  display_name: string;
-  permissions: string[];
-  pin_actor_token: string;
-}
+// PIN credentials and badge sessions moved to ./pin; re-exported for `floorApi.*` callers.
+export {
+  verifyPin,
+  setPin,
+  clearPin,
+  getPinStatus,
+  listActivePinSessions,
+  closePinSession,
+  type PinVerifyResult,
+  type ActivePinSessionDto,
+} from './pin';
 
 export interface FloorPlanDto {
   id: number;
@@ -81,34 +84,6 @@ export interface OpenTicketItemDto {
 
 function pinHeaders(pinActorToken: string): Record<string, string> {
   return { 'x-pin-actor-token': pinActorToken };
-}
-
-export async function verifyPin(pin: string): Promise<PinVerifyResult> {
-  return request<PinVerifyResult>('/auth/pin/verify', {
-    method: 'POST',
-    body: JSON.stringify({ pin }),
-  });
-}
-
-export async function setPin(pin: string, userId?: number): Promise<{ success: boolean; user_id: number }> {
-  return request('/auth/pin/set', {
-    method: 'POST',
-    body: JSON.stringify({ pin, ...(userId != null ? { user_id: userId } : {}) }),
-  });
-}
-
-export async function clearPin(userId: number): Promise<{ success: boolean; user_id: number }> {
-  return request(`/auth/pin/${userId}`, { method: 'DELETE' });
-}
-
-export async function getPinStatus(userId: number): Promise<{
-  user_id: number;
-  has_pin: boolean;
-  pin_kind?: 'basic' | 'elevated';
-  min_length?: number;
-  max_length?: number;
-}> {
-  return request(`/auth/pin/status/${userId}`);
 }
 
 export async function listFloorPlans(): Promise<FloorPlanDto[]> {
@@ -419,17 +394,6 @@ export async function transferTicket(
     method: 'POST',
     headers: pinHeaders(pinActorToken),
     body: JSON.stringify({ dining_table_id: diningTableId }),
-  });
-}
-
-export async function takeoverTicket(
-  ticketId: number,
-  pinActorToken: string
-): Promise<{ ticket: OpenTicketDto; served_by_display_name?: string | null }> {
-  return request(`/floor/tickets/${ticketId}/takeover`, {
-    method: 'POST',
-    headers: pinHeaders(pinActorToken),
-    body: JSON.stringify({}),
   });
 }
 

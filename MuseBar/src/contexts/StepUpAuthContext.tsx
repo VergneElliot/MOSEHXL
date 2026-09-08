@@ -15,6 +15,15 @@ import {
 } from './PinSessionsContext';
 import * as floorApi from '../services/api/floor';
 import { pinActorHasPermission } from '../utils/pinSessionPermissions';
+import {
+  clearElevationScopes,
+  clearTransientElevation,
+  closeElevationScope,
+  hasElevationScope,
+  openElevationScope,
+  registerSessionTokenProvider,
+  setTransientElevation,
+} from '../services/pinElevation';
 
 const LazyPinPadDialog = React.lazy(() => import('../components/POS/PinPadDialog'));
 
@@ -26,7 +35,9 @@ type SessionRequest = {
 
 type PermissionRequest = {
   kind: 'permission';
-  permission: string;
+  /** Any one of these authorizes the request. */
+  permissions: string[];
+  elevation: ElevationKind;
   title: string;
   description: string;
   resolve: (actor: PinActorState) => void;
@@ -35,19 +46,33 @@ type PermissionRequest = {
 
 type PendingRequest = SessionRequest | PermissionRequest;
 
+/** How long a step-up authorization survives: one request, or until the page is left. */
+type ElevationKind = 'action' | 'scope';
+
 interface StepUpAuthContextValue {
   /** Ensure an active PIN session exists (opens session pad if needed). */
   ensureSession: (opts?: { message?: string }) => Promise<PinActorState>;
   /**
-   * Mode A step-up: if active session has `permission`, return it;
-   * otherwise prompt for a PIN that holds the right (does not open a session tab).
+   * Single action step-up: if the active session holds `permission`, return its actor;
+   * otherwise prompt for a PIN that holds the right. The authorization applies to the next
+   * request only — the next click prompts again. Does not open a session tab.
    */
   ensurePermission: (
-    permission: string,
+    permission: string | string[],
     opts?: { title?: string; description?: string }
   ) => Promise<PinActorState>;
-  /** One-shot grants from step-up for the current active session (cleared on session switch). */
-  hasGrant: (permission: string) => boolean;
+  /**
+   * Page-scoped step-up: same prompt, but the authorization stays open so the page's own
+   * reads and writes keep working. Release it when leaving the page.
+   */
+  ensureAccess: (
+    permission: string | string[],
+    opts?: { title?: string; description?: string }
+  ) => Promise<PinActorState>;
+  /** True when the active session holds one of `permission` or a scope is open for it. */
+  hasAccess: (permission: string | string[]) => boolean;
+  releaseAccess: (permission: string) => void;
+  releaseAllAccess: () => void;
 }
 
 const StepUpAuthContext = createContext<StepUpAuthContextValue | null>(null);
@@ -66,15 +91,24 @@ function toActor(result: floorApi.PinVerifyResult): PinActorState {
 export function StepUpAuthProvider({ children }: { children: ReactNode }) {
   const { activeSession, activeSessionId, addOrFocusSession } = usePinSessions();
   const [pending, setPending] = useState<PendingRequest | null>(null);
-  const [grantByPermission, setGrantByPermission] = useState<Map<string, PinActorState>>(
-    () => new Map()
-  );
-  const grantsSessionRef = useRef<string | null>(null);
+  const [openScopes, setOpenScopes] = useState<string[]>([]);
+  const scopeActorsRef = useRef<Map<string, PinActorState>>(new Map());
+  const scopesSessionRef = useRef<string | null>(activeSessionId);
 
+  // The active session badge is the default identity on every API request.
   useEffect(() => {
-    if (grantsSessionRef.current !== activeSessionId) {
-      grantsSessionRef.current = activeSessionId;
-      setGrantByPermission(new Map());
+    registerSessionTokenProvider(() => activeSession?.actor.token ?? null);
+    return () => registerSessionTokenProvider(null);
+  }, [activeSession]);
+
+  // Switching badge drops every step-up authorization obtained under the previous one.
+  useEffect(() => {
+    if (scopesSessionRef.current !== activeSessionId) {
+      scopesSessionRef.current = activeSessionId;
+      clearElevationScopes();
+      clearTransientElevation();
+      scopeActorsRef.current.clear();
+      setOpenScopes([]);
     }
   }, [activeSessionId]);
 
@@ -102,30 +136,81 @@ export function StepUpAuthProvider({ children }: { children: ReactNode }) {
     [activeSession]
   );
 
-  const ensurePermission = useCallback(
-    (permission: string, opts?: { title?: string; description?: string }) => {
-      if (activeSession?.actor && pinActorHasPermission(activeSession.actor, permission)) {
+  const requestElevation = useCallback(
+    (
+      permission: string | string[],
+      elevation: ElevationKind,
+      opts?: { title?: string; description?: string }
+    ) => {
+      const permissions = Array.isArray(permission) ? permission : [permission];
+      if (
+        activeSession?.actor &&
+        permissions.some((p) => pinActorHasPermission(activeSession.actor, p))
+      ) {
         return Promise.resolve(activeSession.actor);
       }
-      const granted = grantByPermission.get(permission);
-      if (granted) {
-        return Promise.resolve(granted);
+      if (elevation === 'scope') {
+        for (const p of permissions) {
+          const openScopeActor = scopeActorsRef.current.get(p);
+          if (openScopeActor && hasElevationScope(p)) {
+            return Promise.resolve(openScopeActor);
+          }
+        }
       }
       return new Promise<PinActorState>((resolve, reject) => {
         setPending({
           kind: 'permission',
-          permission,
+          permissions,
+          elevation,
           title: opts?.title ?? 'Autorisation requise',
           description:
             opts?.description ??
-            'Un profil avec le droit nécessaire doit saisir son PIN (autorisation ponctuelle).',
+            (elevation === 'action'
+              ? 'Un profil disposant du droit doit saisir son PIN (autorisation ponctuelle).'
+              : 'Un profil disposant du droit doit saisir son PIN pour ouvrir cette page.'),
           resolve,
           reject,
         });
       });
     },
-    [activeSession, grantByPermission]
+    [activeSession]
   );
+
+  const ensurePermission = useCallback(
+    (permission: string | string[], opts?: { title?: string; description?: string }) =>
+      requestElevation(permission, 'action', opts),
+    [requestElevation]
+  );
+
+  const ensureAccess = useCallback(
+    (permission: string | string[], opts?: { title?: string; description?: string }) =>
+      requestElevation(permission, 'scope', opts),
+    [requestElevation]
+  );
+
+  const hasAccess = useCallback(
+    (permission: string | string[]) => {
+      const permissions = Array.isArray(permission) ? permission : [permission];
+      return permissions.some(
+        (p) =>
+          (activeSession?.actor != null && pinActorHasPermission(activeSession.actor, p)) ||
+          openScopes.includes(p)
+      );
+    },
+    [activeSession, openScopes]
+  );
+
+  const releaseAccess = useCallback((permission: string) => {
+    closeElevationScope(permission);
+    scopeActorsRef.current.delete(permission);
+    setOpenScopes((prev) => (prev.includes(permission) ? prev.filter((p) => p !== permission) : prev));
+  }, []);
+
+  const releaseAllAccess = useCallback(() => {
+    clearElevationScopes();
+    scopeActorsRef.current.clear();
+    setOpenScopes([]);
+  }, []);
 
   const handleVerify = useCallback(
     async (pin: string) => {
@@ -140,14 +225,21 @@ export function StepUpAuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (!pinActorHasPermission(actor, pending.permission)) {
+      const held = pending.permissions.filter((p) => pinActorHasPermission(actor, p));
+      if (held.length === 0) {
         throw new Error('Ce PIN n’a pas le droit requis pour cette action');
       }
-      setGrantByPermission((prev) => {
-        const next = new Map(prev);
-        next.set(pending.permission, actor);
-        return next;
-      });
+
+      if (pending.elevation === 'scope') {
+        for (const permission of held) {
+          openElevationScope(permission, actor.token);
+          scopeActorsRef.current.set(permission, actor);
+        }
+        setOpenScopes((prev) => Array.from(new Set([...prev, ...held])));
+      } else {
+        setTransientElevation(actor.token);
+      }
+
       pending.resolve(actor);
       setPending(null);
     },
@@ -158,9 +250,19 @@ export function StepUpAuthProvider({ children }: { children: ReactNode }) {
     () => ({
       ensureSession,
       ensurePermission,
-      hasGrant: (permission: string) => grantByPermission.has(permission),
+      ensureAccess,
+      hasAccess,
+      releaseAccess,
+      releaseAllAccess,
     }),
-    [ensureSession, ensurePermission, grantByPermission]
+    [
+      ensureSession,
+      ensurePermission,
+      ensureAccess,
+      hasAccess,
+      releaseAccess,
+      releaseAllAccess,
+    ]
   );
 
   const dialogOpen = pending != null;

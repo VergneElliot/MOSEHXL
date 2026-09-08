@@ -2,9 +2,10 @@ export type PaymentMethod = 'cash' | 'card' | 'split';
 export type OrderStatus = 'pending' | 'completed' | 'cancelled';
 export type SubBillStatus = 'pending' | 'paid';
 export type OperationType = 'sale' | 'change';
-export { PERMISSIONS, type PermissionName } from './permissions';
+export { PERMISSIONS, PERMISSION_TIERS, BASIC_PERMISSIONS, SPECIFIC_PERMISSIONS, isPermissionName, isBasicPermission, isSpecificPermission, type PermissionName, type PermissionTier, } from './permissions';
 export * from './pinRules';
 export * from './happyHourPricing';
+export * from './datetime';
 export interface Order {
     id: number;
     establishment_id: string | null;
@@ -20,6 +21,10 @@ export interface Order {
     waiter_user_id?: number | null;
     waiter_display_name?: string | null;
     table_label?: string | null;
+    /** Account the sale was rung up from (dual traceability with the PIN identity above). */
+    account_user_id?: number | null;
+    /** staff_pin_sessions.id of the badge that rang the sale. */
+    pin_session_id?: string | null;
     created_at: Date;
     updated_at: Date;
 }

@@ -24,6 +24,8 @@ import {
 } from '@mui/material';
 import { apiService } from '../../services/apiService';
 import type { AuditTrailEntry } from '../../types/system';
+import { formatDate } from '../../utils/formatDate';
+import { ParisDateField } from '../common/ParisDateTimeField';
 
 const ACTION_TYPES = [
   'LOGIN',
@@ -137,21 +139,19 @@ const AuditTrailDashboard: React.FC<{ token: string }> = ({ token }) => {
             onChange={e => setFilters(f => ({ ...f, resource_type: e.target.value }))}
             size="small"
           />
-          <TextField
-            label="Date début"
-            type="date"
-            InputLabelProps={{ shrink: true }}
+          <ParisDateField
+            label="Date début (jj/mm/aaaa)"
             value={filters.start}
-            onChange={e => setFilters(f => ({ ...f, start: e.target.value }))}
+            onChange={(ymd) => setFilters((f) => ({ ...f, start: ymd }))}
             size="small"
+            fullWidth={false}
           />
-          <TextField
-            label="Date fin"
-            type="date"
-            InputLabelProps={{ shrink: true }}
+          <ParisDateField
+            label="Date fin (jj/mm/aaaa)"
             value={filters.end}
-            onChange={e => setFilters(f => ({ ...f, end: e.target.value }))}
+            onChange={(ymd) => setFilters((f) => ({ ...f, end: ymd }))}
             size="small"
+            fullWidth={false}
           />
           <Button variant="contained" onClick={handleFilter}>
             Filtrer
@@ -181,7 +181,7 @@ const AuditTrailDashboard: React.FC<{ token: string }> = ({ token }) => {
                 onClick={() => setSelected(log)}
                 style={{ cursor: 'pointer' }}
               >
-                <TableCell>{new Date(log.timestamp).toLocaleString('fr-FR')}</TableCell>
+                <TableCell>{formatDate(log.timestamp)}</TableCell>
                 <TableCell>{log.user_id}</TableCell>
                 <TableCell>{log.action_type}</TableCell>
                 <TableCell>
@@ -217,7 +217,7 @@ const AuditTrailDashboard: React.FC<{ token: string }> = ({ token }) => {
           {selected && (
             <Box>
               <Typography>
-                <b>Date/Heure:</b> {new Date(selected.timestamp).toLocaleString('fr-FR')}
+                <b>Date/Heure:</b> {formatDate(selected.timestamp)}
               </Typography>
               <Typography>
                 <b>User ID:</b> {selected.user_id}

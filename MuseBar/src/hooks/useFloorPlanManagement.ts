@@ -6,28 +6,12 @@ import {
   type ActiveTableState,
   type PinActorState,
 } from '../contexts/PinSessionsContext';
+import { useTableInterventionGate } from './useTableInterventionGate';
+import { buildActiveTableState } from './floorActiveTable';
+import { abandonFloorTicket } from './floorTicketAbandon';
+import { useStepUpAuth } from '../contexts/StepUpAuthContext';
 
 export type FloorPlanMapMode = 'select' | 'transfer' | 'merge';
-
-function buildActiveTableState(
-  table: floorApi.DiningTableStatusDto,
-  ticketId: number,
-  waiterUserId: number | null | undefined,
-  waiterDisplayName: string | null | undefined,
-  pinActor: PinActorState
-): ActiveTableState {
-  const assignedWaiterUserId = waiterUserId ?? pinActor.userId;
-  const assignedWaiterDisplayName =
-    waiterDisplayName ?? (assignedWaiterUserId === pinActor.userId ? pinActor.displayName : null);
-  return {
-    id: table.id,
-    label: table.label,
-    floorPlanId: table.floor_plan_id,
-    ticketId,
-    assignedWaiterUserId,
-    assignedWaiterDisplayName,
-  };
-}
 
 async function syncTicketItemsToServer(
   ticketId: number,
@@ -50,6 +34,9 @@ export function useFloorPlanManagement(options: {
   const pinActor = activeSession?.actor ?? null;
   const activeTable = activeSession?.activeTable ?? null;
   const activeTicketId = activeTable?.ticketId ?? null;
+  const ensureTableIntervention = useTableInterventionGate(activeTable, pinActor);
+  const { ensurePermission } = useStepUpAuth();
+  const sessionCart = activeSession?.cart ?? [];
 
   const [loading, setLoading] = useState(false);
   const [tables, setTables] = useState<floorApi.DiningTableStatusDto[]>([]);
@@ -251,7 +238,13 @@ export function useFloorPlanManagement(options: {
       return;
     }
     try {
-      await floorApi.abandonTicket(activeTicketId, pinActor.token);
+      await abandonFloorTicket({
+        ticketId: activeTicketId,
+        pinToken: pinActor.token,
+        cart: sessionCart,
+        ensureIntervention: ensureTableIntervention,
+        ensureOrdersCancel: ensurePermission,
+      });
       updateActiveSession({ activeTable: null, cart: [] });
       onInfo('Addition abandonnée');
       void reload();
@@ -259,7 +252,17 @@ export function useFloorPlanManagement(options: {
       const e = err as { message?: string };
       onError(e.message || 'Abandon impossible');
     }
-  }, [pinActor, activeTicketId, onError, onInfo, reload, updateActiveSession]);
+  }, [
+    pinActor,
+    activeTicketId,
+    sessionCart,
+    onError,
+    onInfo,
+    reload,
+    updateActiveSession,
+    ensureTableIntervention,
+    ensurePermission,
+  ]);
 
   const detachFromTable = useCallback(async () => {
     if (!pinActor || !activeTable) {
@@ -267,6 +270,7 @@ export function useFloorPlanManagement(options: {
       return;
     }
     try {
+      await ensureTableIntervention();
       await floorApi.discardDraftTicketItems(activeTable.ticketId, pinActor.token);
       updateActiveSession({ activeTable: null, cart: [] });
       onInfo('Table laissée ouverte — retour mode comptoir');
@@ -275,32 +279,15 @@ export function useFloorPlanManagement(options: {
       const e = err as { message?: string };
       onError(e.message || 'Impossible de quitter la table');
     }
-  }, [pinActor, activeTable, onError, onInfo, reload, updateActiveSession]);
-
-  const takeoverActiveTicket = useCallback(async () => {
-    if (!pinActor || !activeTable) {
-      onError('Badge et table active requis');
-      return;
-    }
-    try {
-      const { served_by_display_name } = await floorApi.takeoverTicket(
-        activeTable.ticketId,
-        pinActor.token
-      );
-      updateActiveSession({
-        activeTable: {
-          ...activeTable,
-          assignedWaiterUserId: pinActor.userId,
-          assignedWaiterDisplayName: served_by_display_name ?? pinActor.displayName,
-        },
-      });
-      onInfo(`Prise en charge : ${pinActor.displayName}`);
-      void reload();
-    } catch (err: unknown) {
-      const e = err as { message?: string };
-      onError(e.message || 'Prise en charge impossible');
-    }
-  }, [pinActor, activeTable, onError, onInfo, reload, updateActiveSession]);
+  }, [
+    pinActor,
+    activeTable,
+    onError,
+    onInfo,
+    reload,
+    updateActiveSession,
+    ensureTableIntervention,
+  ]);
 
   const handleTableSelect = useCallback(
     (table: floorApi.DiningTableStatusDto) => {
@@ -344,6 +331,5 @@ export function useFloorPlanManagement(options: {
     handleTableSelect,
     abandonActiveTicket,
     detachFromTable,
-    takeoverActiveTicket,
   };
 }

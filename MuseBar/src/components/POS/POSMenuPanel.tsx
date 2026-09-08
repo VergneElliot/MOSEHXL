@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Box } from '@mui/material';
 import type { Category, Product } from '../../types';
-import { usePOSCatalogLogic } from '../../hooks/usePOSCatalogLogic';
+import { usePOSCatalogLogic, FAVORITES_CATEGORY_ID } from '../../hooks/usePOSCatalogLogic';
 import { useTopSellerProductIds } from '../../hooks/useTopSellerProductIds';
 import CategoryFilter from './CategoryFilter';
 import ProductGrid from './ProductGrid';
@@ -43,6 +43,15 @@ const POSMenuPanel = React.memo(function POSMenuPanel({
     topSellerProductIds
   );
 
+  const catalogView = searchQuery.trim()
+    ? 'search'
+    : selectedCategory === FAVORITES_CATEGORY_ID
+      ? 'favoris'
+      : selectedCategory || 'tous';
+
+  /** Star badge only on Tous and Favoris — not category filter or search. */
+  const showFavoriteBadge = catalogView === 'tous' || catalogView === 'favoris';
+
   return (
     <>
       <Box sx={{ flexShrink: 0 }}>
@@ -60,10 +69,10 @@ const POSMenuPanel = React.memo(function POSMenuPanel({
           flexDirection: 'column',
           overflow: 'auto',
           scrollbarGutter: 'stable',
-          overflowAnchor: 'auto',
         }}
       >
         <ProductGrid
+          key={catalogView}
           products={filteredProducts}
           categories={categories}
           isHappyHourActive={isHappyHourActive}
@@ -73,6 +82,7 @@ const POSMenuPanel = React.memo(function POSMenuPanel({
           onDiversClick={onDiversClick}
           onPourboireClick={onPourboireClick}
           favoriteProductIds={favoriteProductIds}
+          showFavoriteBadge={showFavoriteBadge}
         />
       </Box>
     </>

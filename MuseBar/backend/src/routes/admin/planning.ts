@@ -6,11 +6,35 @@ import { StaffShiftModel, isValidRecurrence } from '../../models/staffShift';
 import { UserModel } from '../../models/user';
 import { pool } from '../../db/pool';
 import { notifyEmployeeShiftConfirmation } from '../../services/planning/planningEmailService';
+import { commitPlanningChanges } from '../../services/planning/planningCommitService';
 import { StaffLeaveModel } from '../../models/staffLeave';
 import { shiftOverlapsApprovedLeave } from '../../services/labor/laborCompliance';
 
 const router = express.Router();
 router.use(requireAuth, requireEstablishmentAdminOrPermission(P.access_planning));
+
+router.post(
+  '/shifts/commit',
+  asyncHandler(async (req, res) => {
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
+    const result = await commitPlanningChanges({
+      establishmentId,
+      actorUserId: req.user?.id ?? null,
+      creates: Array.isArray(req.body.creates) ? req.body.creates : [],
+      updates: Array.isArray(req.body.updates) ? req.body.updates : [],
+      deletes: Array.isArray(req.body.deletes) ? req.body.deletes : [],
+    });
+    return res.json({
+      success: true,
+      ...result,
+      message:
+        result.emails_queued > 0
+          ? `${result.emails_queued} e-mail(s) de confirmation envoyé(s).`
+          : 'Modifications enregistrées.',
+    });
+  })
+);
 
 router.get(
   '/staff',
@@ -25,6 +49,7 @@ router.get(
         first_name: u.first_name,
         last_name: u.last_name,
         role: u.role,
+        calendar_color: u.calendar_color || '#1565C0',
       })),
     });
   })
@@ -122,7 +147,8 @@ router.post(
     const est = await pool.query(`SELECT name FROM establishments WHERE id = $1`, [
       establishmentId,
     ]);
-    if (employee?.email && created.confirmation_token) {
+    // Prefer /shifts/commit for batched emails; keep optional notify for legacy single creates.
+    if (req.body.notify === true && employee?.email && created.confirmation_token) {
       const employeeName =
         `${employee.first_name || ''} ${employee.last_name || ''}`.trim() || employee.email;
       void notifyEmployeeShiftConfirmation({
@@ -144,47 +170,11 @@ router.post(
   })
 );
 
-router.patch(
-  '/shifts/:id',
-  asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req, res);
-    if (!establishmentId) return;
-    const id = parseInt(req.params.id ?? '', 10);
-    if (!Number.isFinite(id)) throw new ValidationError('Identifiant invalide');
-    const updated = await StaffShiftModel.update(establishmentId, id, {
-      user_id: req.body.user_id != null ? Number(req.body.user_id) : undefined,
-      starts_at: req.body.starts_at != null ? String(req.body.starts_at) : undefined,
-      ends_at: req.body.ends_at != null ? String(req.body.ends_at) : undefined,
-      label:
-        req.body.label !== undefined
-          ? req.body.label != null
-            ? String(req.body.label)
-            : null
-          : undefined,
-      note:
-        req.body.note !== undefined
-          ? req.body.note != null
-            ? String(req.body.note)
-            : null
-          : undefined,
-    });
-    if (!updated) throw new NotFoundError('Vacation introuvable');
-    return res.json({ shift: updated });
-  })
-);
-
-router.delete(
-  '/shifts/:id',
-  asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req, res);
-    if (!establishmentId) return;
-    const id = parseInt(req.params.id ?? '', 10);
-    if (!Number.isFinite(id)) throw new ValidationError('Identifiant invalide');
-    const ok = await StaffShiftModel.delete(establishmentId, id);
-    if (!ok) throw new NotFoundError('Vacation introuvable');
-    return res.json({ success: true });
-  })
-);
+function parseApplyTo(raw: unknown): 'one' | 'series' {
+  const value = String(raw || 'one');
+  if (value === 'series' || value === 'all') return 'series';
+  return 'one';
+}
 
 router.post(
   '/shifts/duplicate-week',
@@ -205,6 +195,116 @@ router.post(
       req.user?.id ?? null
     );
     return res.json({ created });
+  })
+);
+
+/** Wipe every staff shift for this establishment (planning reset). */
+router.post(
+  '/shifts/reset',
+  asyncHandler(async (req, res) => {
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
+    if (req.body?.confirm !== true && req.body?.confirm !== 'true') {
+      throw new ValidationError(
+        'Confirmation requise : envoyez { "confirm": true } pour réinitialiser le planning.'
+      );
+    }
+    const deleted = await StaffShiftModel.deleteAll(establishmentId);
+    return res.json({ success: true, deleted });
+  })
+);
+
+router.patch(
+  '/shifts/:id',
+  asyncHandler(async (req, res) => {
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
+    const id = parseInt(req.params.id ?? '', 10);
+    if (!Number.isFinite(id)) throw new ValidationError('Identifiant invalide');
+
+    const patch = {
+      user_id: req.body.user_id != null ? Number(req.body.user_id) : undefined,
+      starts_at: req.body.starts_at != null ? String(req.body.starts_at) : undefined,
+      ends_at: req.body.ends_at != null ? String(req.body.ends_at) : undefined,
+      label:
+        req.body.label !== undefined
+          ? req.body.label != null
+            ? String(req.body.label)
+            : null
+          : undefined,
+      note:
+        req.body.note !== undefined
+          ? req.body.note != null
+            ? String(req.body.note)
+            : null
+          : undefined,
+    };
+
+    if (patch.starts_at && patch.ends_at && new Date(patch.ends_at) <= new Date(patch.starts_at)) {
+      throw new ValidationError('ends_at must be after starts_at');
+    }
+    if (patch.user_id != null) {
+      const belongs = await UserModel.userBelongsToEstablishment(patch.user_id, establishmentId);
+      if (!belongs) throw new ValidationError('Employé introuvable dans cet établissement');
+    }
+
+    const applyTo = parseApplyTo(req.body.apply_to);
+    const existing = await StaffShiftModel.getById(establishmentId, id);
+    if (!existing) throw new NotFoundError('Vacation introuvable');
+
+    if (applyTo === 'series' && existing.series_id) {
+      try {
+        const result = await StaffShiftModel.updateSeriesFromAnchor(
+          establishmentId,
+          id,
+          patch
+        );
+        const updated = result.updated.find((s) => s.id === id) ?? result.updated[0];
+        return res.json({
+          shift: updated,
+          updated_count: result.updated.length,
+          apply_to: 'series',
+          series_id: result.series_id,
+        });
+      } catch (error) {
+        if ((error as Error & { code?: string }).code === 'INVALID_RANGE') {
+          throw new ValidationError('ends_at must be after starts_at');
+        }
+        throw error;
+      }
+    }
+
+    const updated = await StaffShiftModel.update(establishmentId, id, patch);
+    if (!updated) throw new NotFoundError('Vacation introuvable');
+    return res.json({ shift: updated, updated_count: 1, apply_to: 'one' });
+  })
+);
+
+router.delete(
+  '/shifts/:id',
+  asyncHandler(async (req, res) => {
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
+    const id = parseInt(req.params.id ?? '', 10);
+    if (!Number.isFinite(id)) throw new ValidationError('Identifiant invalide');
+
+    const applyTo = parseApplyTo(req.query.apply_to ?? req.body?.apply_to);
+    const existing = await StaffShiftModel.getById(establishmentId, id);
+    if (!existing) throw new NotFoundError('Vacation introuvable');
+
+    if (applyTo === 'series' && existing.series_id) {
+      const deleted = await StaffShiftModel.deleteSeries(establishmentId, existing.series_id);
+      return res.json({
+        success: true,
+        deleted,
+        apply_to: 'series',
+        series_id: existing.series_id,
+      });
+    }
+
+    const ok = await StaffShiftModel.delete(establishmentId, id);
+    if (!ok) throw new NotFoundError('Vacation introuvable');
+    return res.json({ success: true, deleted: 1, apply_to: 'one' });
   })
 );
 

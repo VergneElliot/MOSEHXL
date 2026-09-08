@@ -30,6 +30,8 @@ import {
   type InboxMessageDto,
   type ReservationDto,
 } from '../../services/api/adminSpace';
+import { formatDate } from '../../utils/formatDate';
+import { ParisDateField } from '../common/ParisDateTimeField';
 
 const STATUS_LABEL: Record<string, string> = {
   requested: 'Demandée',
@@ -165,7 +167,7 @@ const InboxPanel: React.FC = () => {
                     </Typography>
                   </Box>
                 }
-                secondary={`${m.from_address} — ${new Date(m.received_at).toLocaleString('fr-FR')}`}
+                secondary={`${m.from_address} — ${formatDate(m.received_at)}`}
               />
             </ListItemButton>
           ))}
@@ -200,7 +202,7 @@ const InboxPanel: React.FC = () => {
                   Réservation liée :{' '}
                   <strong>{STATUS_LABEL[linkedReservation.status] || linkedReservation.status}</strong>
                   {' — '}
-                  {new Date(linkedReservation.starts_at).toLocaleString('fr-FR')}
+                  {formatDate(linkedReservation.starts_at)}
                   {' · '}
                   {linkedReservation.party_size} pers.
                   {linkedReservation.status_reason
@@ -372,13 +374,10 @@ const InboxPanel: React.FC = () => {
               </option>
             ))}
           </TextField>
-          <TextField
-            type="date"
-            label="Expiration"
-            InputLabelProps={{ shrink: true }}
+          <ParisDateField
+            label="Expiration (jj/mm/aaaa)"
             value={importExpires}
-            onChange={(e) => setImportExpires(e.target.value)}
-            fullWidth
+            onChange={setImportExpires}
           />
         </DialogContent>
         <DialogActions>

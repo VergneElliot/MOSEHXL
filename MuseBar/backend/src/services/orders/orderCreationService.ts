@@ -17,6 +17,7 @@ import {
   type KitchenPrinterLineSnapshot,
 } from '../kitchenPrinting/kitchenPrinterSnapshot';
 import { dispatchKitchenTicketsForCompletedOrder } from '../kitchenPrinting/kitchenTicketDispatchService';
+import { actorTrace, type ActorContext } from '../auth/actorContext';
 
 function snapshotsHaveAdHocLineNote(snapshots: OrderItemOptionSnapshotInput[]): boolean {
   return snapshots.some(
@@ -64,6 +65,8 @@ export interface OrderCreationRequestContext {
   userId?: string;
   ipAddress?: string;
   userAgent?: string;
+  /** Account + PIN identity behind the sale; recorded on the order, journal and audit row. */
+  actor?: ActorContext;
 }
 
 interface OrderCreationLoggerLike {
@@ -93,7 +96,8 @@ export async function createOrderWithCompliance(
   logger: OrderCreationLoggerLike
 ): Promise<OrderCreationResult> {
   const { payment_method, status, notes, items, sub_bills, tips, change } = body;
-  const { establishmentId, userId, ipAddress, userAgent } = context;
+  const { establishmentId, userId, ipAddress, userAgent, actor } = context;
+  const actorPayload = actor ? actorTrace(actor) : null;
 
   const productIds = items
     .map((item) => item.product_id)
@@ -136,6 +140,8 @@ export async function createOrderWithCompliance(
       waiter_user_id: body.waiter_user_id ?? null,
       waiter_display_name: body.waiter_display_name ?? null,
       table_label: body.table_label ?? null,
+      account_user_id: actor?.accountUserId ?? null,
+      pin_session_id: actor?.pinSessionId ?? null,
     },
     establishmentId
   );
@@ -211,7 +217,8 @@ export async function createOrderWithCompliance(
           }),
           created_at: order.created_at,
         },
-        userId
+        userId,
+        actorPayload
       );
     } catch (journalError: unknown) {
       logger.error(
@@ -243,6 +250,9 @@ export async function createOrderWithCompliance(
 
     AuditTrailModel.logAction({
       user_id: userId,
+      pin_user_id: actor?.pinUserId ?? null,
+      session_id: actor?.pinSessionId ?? undefined,
+      establishment_id: establishmentId,
       action_type: 'ORDER_CREATED',
       resource_type: 'ORDER',
       resource_id: String(order.id),
@@ -250,6 +260,7 @@ export async function createOrderWithCompliance(
         total_amount: order.total_amount,
         payment_method: order.payment_method,
         item_count: createdItems.length,
+        ...(actorPayload ? { actor: actorPayload } : {}),
       },
       ip_address: ipAddress,
       user_agent: userAgent,

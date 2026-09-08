@@ -3,6 +3,7 @@
  * Guest-facing mail is sent From / Reply-To {slug}@mosehxl.com so replies land in the venue inbox.
  */
 
+import { formatDateLong, formatTime } from '@mosehxl/types';
 import { EmailService } from '../email/EmailService';
 import { BuiltInTemplateId } from '../email/templates/types';
 import { getEnvironmentConfig } from '../../config/environment';
@@ -15,16 +16,8 @@ import {
 
 const INBOX_DOMAIN = 'mosehxl.com';
 
-function formatStartsAt(iso: string, timezone?: string): string {
-  try {
-    return new Date(iso).toLocaleString('fr-FR', {
-      timeZone: timezone || 'Europe/Paris',
-      dateStyle: 'full',
-      timeStyle: 'short',
-    });
-  } catch {
-    return new Date(iso).toLocaleString('fr-FR');
-  }
+function formatStartsAt(iso: string): string {
+  return `${formatDateLong(iso)} à ${formatTime(iso)}`;
 }
 
 function frontendBase(): string {
@@ -104,15 +97,11 @@ async function sendSafe(
   }
 }
 
-function commonPayload(
-  r: Reservation,
-  establishmentName: string,
-  timezone?: string
-): Record<string, unknown> {
+function commonPayload(r: Reservation, establishmentName: string): Record<string, unknown> {
   return {
     customerName: r.customer_name,
     establishmentName,
-    startsAtFormatted: formatStartsAt(r.starts_at, timezone),
+    startsAtFormatted: formatStartsAt(r.starts_at),
     partySize: String(r.party_size),
     customerEmail: r.customer_email || '—',
     customerPhone: r.customer_phone || '—',
@@ -127,9 +116,9 @@ export async function notifyReservationRequested(opts: {
   venueEmail: string | null;
   timezone?: string;
 }): Promise<void> {
-  const { reservation: r, establishmentName, establishmentSlug, venueEmail, timezone } = opts;
+  const { reservation: r, establishmentName, establishmentSlug, venueEmail } = opts;
   const common = {
-    ...commonPayload(r, establishmentName, timezone),
+    ...commonPayload(r, establishmentName),
     relanceUrl: buildRelanceUrl(establishmentSlug, r.id),
   };
   const mailOpts = { fromSlug: establishmentSlug, establishmentName };
@@ -144,8 +133,8 @@ export async function notifyReservationReminder(opts: {
   venueEmail: string | null;
   timezone?: string;
 }): Promise<void> {
-  const { reservation: r, establishmentName, establishmentSlug, venueEmail, timezone } = opts;
-  const common = commonPayload(r, establishmentName, timezone);
+  const { reservation: r, establishmentName, establishmentSlug, venueEmail } = opts;
+  const common = commonPayload(r, establishmentName);
   const mailOpts = { fromSlug: establishmentSlug, establishmentName };
   await sendSafe(BuiltInTemplateId.RESERVATION_REMINDER_VENUE, venueEmail, common, mailOpts);
 }
@@ -157,8 +146,8 @@ export async function notifyReservationCancelled(opts: {
   venueEmail: string | null;
   timezone?: string;
 }): Promise<void> {
-  const { reservation: r, establishmentName, establishmentSlug, venueEmail, timezone } = opts;
-  const common = commonPayload(r, establishmentName, timezone);
+  const { reservation: r, establishmentName, establishmentSlug, venueEmail } = opts;
+  const common = commonPayload(r, establishmentName);
   const mailOpts = { fromSlug: establishmentSlug, establishmentName };
   await sendSafe(BuiltInTemplateId.RESERVATION_CANCELLED_GUEST, r.customer_email, common, mailOpts);
   await sendSafe(BuiltInTemplateId.RESERVATION_CANCELLED_VENUE, venueEmail, common, mailOpts);
@@ -170,7 +159,7 @@ export async function notifyGuestReservationStatus(opts: {
   establishmentSlug: string;
   timezone?: string;
 }): Promise<void> {
-  const { reservation: r, establishmentName, establishmentSlug, timezone } = opts;
+  const { reservation: r, establishmentName, establishmentSlug } = opts;
   if (!r.customer_email) return;
 
   const mailOpts = { fromSlug: establishmentSlug, establishmentName };
@@ -180,7 +169,7 @@ export async function notifyGuestReservationStatus(opts: {
       BuiltInTemplateId.RESERVATION_REQUESTED_GUEST,
       r.customer_email,
       {
-        ...commonPayload(r, establishmentName, timezone),
+        ...commonPayload(r, establishmentName),
         relanceUrl: buildRelanceUrl(establishmentSlug, r.id),
       },
       mailOpts
@@ -191,7 +180,7 @@ export async function notifyGuestReservationStatus(opts: {
   const data = {
     customerName: r.customer_name,
     establishmentName,
-    startsAtFormatted: formatStartsAt(r.starts_at, timezone),
+    startsAtFormatted: formatStartsAt(r.starts_at),
     partySize: String(r.party_size),
     commentaire: r.status_reason || '—',
     cancelUrl: buildCancelUrl(establishmentSlug, r.id),
@@ -213,12 +202,11 @@ export async function notifyReservationStatusChange(opts: {
   establishmentSlug: string;
   timezone?: string;
 }): Promise<void> {
-  const { reservation: r, previousStatus, establishmentName, establishmentSlug, timezone } = opts;
+  const { reservation: r, previousStatus, establishmentName, establishmentSlug } = opts;
   if (r.status === previousStatus) return;
   await notifyGuestReservationStatus({
     reservation: r,
     establishmentName,
     establishmentSlug,
-    timezone,
   });
 }

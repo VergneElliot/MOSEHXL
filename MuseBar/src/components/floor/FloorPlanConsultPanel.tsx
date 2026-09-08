@@ -178,10 +178,7 @@ const FloorPlanConsultPanel: React.FC<FloorPlanConsultPanelProps> = ({ onSwitchT
       )}
 
       {floor.activeTicketId != null && (
-        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ pt: 1 }}>
-          <Button color="inherit" variant="outlined" onClick={() => void floor.takeoverActiveTicket()}>
-            Prendre en charge
-          </Button>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ pt: 1 }}>
           <Button color="inherit" variant="outlined" onClick={() => void floor.detachFromTable()}>
             Laisser ouverte
           </Button>

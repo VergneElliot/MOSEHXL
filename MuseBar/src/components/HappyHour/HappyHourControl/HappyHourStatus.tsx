@@ -22,6 +22,7 @@ import {
   Schedule as ScheduleIcon,
 } from '@mui/icons-material';
 import { HappyHourStatusProps } from './types';
+import { formatTime } from '../../../utils/formatDate';
 
 /**
  * Happy Hour Status Component
@@ -33,12 +34,7 @@ export const HappyHourStatus: React.FC<HappyHourStatusProps> = ({
   onManualToggle,
   loading = false,
 }) => {
-  const getCurrentTime = () => {
-    return new Date().toLocaleTimeString('fr-FR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  const getCurrentTime = () => formatTime(new Date());
 
   const getStatusMessage = () => {
     if (isActive) {

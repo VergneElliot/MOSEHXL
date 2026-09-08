@@ -18,6 +18,8 @@ import {
   Typography,
 } from '@mui/material';
 import { apiCore } from '../../services/api';
+import { formatDate, parisTodayYmd } from '../../utils/formatDate';
+import { ParisDateField } from '../common/ParisDateTimeField';
 
 export type ClosureType = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL';
 export type DailyClosureMode = 'business_day' | 'close_now';
@@ -32,14 +34,9 @@ type ClosurePreview =
     }
   | { ok: false; reason: string };
 
-const PARIS_DATETIME = new Intl.DateTimeFormat('fr-FR', {
-  dateStyle: 'short',
-  timeStyle: 'short',
-});
-
 function formatPeriodBound(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : PARIS_DATETIME.format(d);
+  const formatted = formatDate(iso);
+  return formatted === 'N/A' ? iso : formatted;
 }
 
 interface CreateClosureDialogProps {
@@ -74,7 +71,7 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
   disableForceCreation = true,
   defaultFondDeCaisse = null,
 }) => {
-  const todayISO = useMemo(() => new Date().toISOString().split('T')[0] ?? '', []);
+  const todayISO = useMemo(() => parisTodayYmd(), []);
   const [forceCreation, setForceCreation] = useState(false);
   const [fondDeCaisse, setFondDeCaisse] = useState<string>('');
   const [emailRecipients, setEmailRecipients] = useState('');
@@ -277,22 +274,21 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
           )}
 
           {needsDate && (
-            <TextField
-              label="Date de clôture"
-              type="date"
+            <ParisDateField
+              label="Date de clôture (jj/mm/aaaa)"
               value={selectedDate}
-              onChange={e => onDateChange(e.target.value)}
-              InputLabelProps={{ shrink: true }}
+              onChange={onDateChange}
               size="small"
-              fullWidth
-              helperText={
-                selectedClosureType === 'ANNUAL'
-                  ? 'Bulletin annuel : année glissante se terminant à cette date (ex. 01/08/2025 → 01/08/2026)'
-                  : isDaily
-                    ? `Journée du calendrier sélectionné, coupée à ${cutTime}`
-                    : undefined
-              }
             />
+          )}
+          {needsDate && (
+            <Typography variant="caption" color="text.secondary">
+              {selectedClosureType === 'ANNUAL'
+                ? 'Bulletin annuel : année glissante se terminant à cette date (ex. 01/08/2025 → 01/08/2026)'
+                : isDaily
+                  ? `Journée du calendrier sélectionné, coupée à ${cutTime}`
+                  : null}
+            </Typography>
           )}
 
           {isDaily && (

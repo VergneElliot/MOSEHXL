@@ -18,9 +18,7 @@ import {
   TableRow,
   Button,
   TextField,
-  Checkbox,
   FormControl,
-  FormControlLabel,
   InputLabel,
   Select,
   MenuItem,
@@ -40,6 +38,9 @@ import {
   useUserForm,
 } from './UserManagement/hooks';
 import * as floorApi from '../../services/api/floor';
+import ActivePinSessionsPanel from './UserManagement/ActivePinSessionsPanel';
+import PermissionsDialog from './UserManagement/PermissionsDialog';
+import UserRowActions from './UserManagement/UserRowActions';
 
 function formatEstablishmentRoleLabel(role: string): string {
   switch (role) {
@@ -140,15 +141,34 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
     }
   };
 
-  const handleDeleteUser = async (user: (typeof userState.users)[number]) => {
-    const confirmed = window.confirm(
-      `Supprimer définitivement le compte ${user.email} ?`
-    );
-    if (!confirmed) return;
+  const openPinDialog = (user: (typeof userState.users)[number]) => {
+    const status = pinStatusByUser[user.id];
+    setPinError(null);
+    setPinValue('');
+    setPinDialog({
+      userId: user.id,
+      email: user.email,
+      kind: status?.kind ?? 'basic',
+      min: status?.min ?? 2,
+      max: status?.max ?? 2,
+    });
+  };
 
-    const success = await userActions.deleteUser(user.id);
-    if (success) {
-      userActions.fetchUsers();
+  const handleDeactivateUser = async (user: (typeof userState.users)[number]) => {
+    if (await userActions.confirmDeactivate(user)) userActions.fetchUsers();
+  };
+
+  const handleReactivateUser = async (user: (typeof userState.users)[number]) => {
+    if (await userActions.reactivateUser(user.id)) userActions.fetchUsers();
+  };
+
+  const handlePurgeUser = async (user: (typeof userState.users)[number]) => {
+    if (await userActions.confirmPurge(user)) userActions.fetchUsers();
+  };
+
+  const handleUnlockUser = async (user: (typeof userState.users)[number]) => {
+    if (await userActions.unlockUser(user.id)) {
+      window.alert(`Compte ${user.email} déverrouillé — les tentatives échouées sont remises à zéro.`);
     }
   };
 
@@ -218,8 +238,13 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
           </TableHead>
           <TableBody>
             {userState.users.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell>{user.email}</TableCell>
+              <TableRow key={user.id} sx={user.isActive === false ? { opacity: 0.6 } : undefined}>
+                <TableCell>
+                  {user.email}
+                  {user.isActive === false && (
+                    <Chip size="small" label="Désactivé" sx={{ ml: 1 }} />
+                  )}
+                </TableCell>
                 <TableCell>{formatEstablishmentRoleLabel(user.role)}</TableCell>
                 <TableCell>
                   <Chip
@@ -234,58 +259,25 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
                   />
                 </TableCell>
                 <TableCell>
-                  <Button
-                    onClick={() => permissions.openPermDialog(user)}
-                    variant="outlined"
-                    size="small"
-                    sx={{ mr: 1 }}
-                  >
-                    Permissions
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      const st = pinStatusByUser[user.id];
-                      setPinError(null);
-                      setPinValue('');
-                      setPinDialog({
-                        userId: user.id,
-                        email: user.email,
-                        kind: st?.kind ?? 'basic',
-                        min: st?.min ?? 2,
-                        max: st?.max ?? 2,
-                      });
-                    }}
-                    variant="outlined"
-                    size="small"
-                    sx={{ mr: 1 }}
-                  >
-                    {pinStatusByUser[user.id]?.has_pin ? 'Changer PIN' : 'Définir PIN'}
-                  </Button>
-                  {pinStatusByUser[user.id]?.has_pin && (
-                    <Button
-                      onClick={() => void handleClearPin(user)}
-                      variant="outlined"
-                      color="warning"
-                      size="small"
-                      sx={{ mr: 1 }}
-                    >
-                      Effacer PIN
-                    </Button>
-                  )}
-                  <Button
-                    onClick={() => handleDeleteUser(user)}
-                    variant="outlined"
-                    color="error"
-                    size="small"
-                  >
-                    Supprimer
-                  </Button>
+                  <UserRowActions
+                    isActive={user.isActive !== false}
+                    hasPin={pinStatusByUser[user.id]?.has_pin === true}
+                    onPermissions={() => permissions.openPermDialog(user)}
+                    onSetPin={() => openPinDialog(user)}
+                    onClearPin={() => void handleClearPin(user)}
+                    onDeactivate={() => void handleDeactivateUser(user)}
+                    onReactivate={() => void handleReactivateUser(user)}
+                    onPurge={() => void handlePurgeUser(user)}
+                    onUnlock={() => void handleUnlockUser(user)}
+                  />
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </TableContainer>
+
+      <ActivePinSessionsPanel />
 
       <Dialog open={userForm.showAdd} onClose={userForm.closeAddDialog}>
         <DialogTitle>Ajouter un nouvel utilisateur</DialogTitle>
@@ -387,62 +379,19 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
         </DialogActions>
       </Dialog>
 
-      <Dialog
+      <PermissionsDialog
         open={permissions.permDialog.open}
+        userEmail={permissions.permDialog.user?.email}
+        error={permissions.permError}
+        saving={permissions.permSaving}
+        availablePermissions={permissions.availablePermissions}
+        enabledCount={permissions.getEnabledCount()}
+        hasPermission={permissions.hasPermission}
+        onTogglePermission={permissions.updatePermission}
+        onToggleAll={permissions.toggleAllPermissions}
         onClose={permissions.closePermDialog}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Permissions pour {permissions.permDialog.user?.email}</DialogTitle>
-        <DialogContent>
-          {permissions.permError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {permissions.permError}
-            </Alert>
-          )}
-
-          <Box sx={{ mb: 2 }}>
-            <Button
-              onClick={() => permissions.toggleAllPermissions(true)}
-              size="small"
-              sx={{ mr: 1 }}
-            >
-              Tout sélectionner
-            </Button>
-            <Button onClick={() => permissions.toggleAllPermissions(false)} size="small">
-              Tout désélectionner
-            </Button>
-          </Box>
-
-          {permissions.availablePermissions.map((perm) => (
-            <FormControlLabel
-              key={perm.key}
-              control={
-                <Checkbox
-                  checked={permissions.hasPermission(perm.key)}
-                  onChange={(e) => permissions.updatePermission(perm.key, e.target.checked)}
-                />
-              }
-              label={perm.label}
-              sx={{ display: 'block' }}
-            />
-          ))}
-
-          <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
-            {permissions.getEnabledCount()} permission(s) sélectionnée(s)
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={permissions.closePermDialog}>Annuler</Button>
-          <Button
-            onClick={handleSavePermissions}
-            disabled={permissions.permSaving}
-            variant="contained"
-          >
-            {permissions.permSaving ? 'Enregistrement...' : 'Enregistrer'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        onSave={handleSavePermissions}
+      />
     </Box>
   );
 };

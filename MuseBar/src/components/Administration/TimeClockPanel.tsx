@@ -43,6 +43,12 @@ import {
   updateTimeEntry,
   type PayrollSummaryDto,
 } from '../../services/api/adminSpace';
+import {
+  formatDate,
+  parisDateTimeLocalToUtcIso,
+  utcToParisDateTimeLocal,
+} from '../../utils/formatDate';
+import { ParisDateTimeField } from '../common/ParisDateTimeField';
 
 function msToDecimalHours(ms: number): number {
   return Math.round((ms / 3600000) * 100) / 100;
@@ -65,15 +71,11 @@ function formatDuration(ms: number): string {
 }
 
 function toLocalInputValue(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return utcToParisDateTimeLocal(iso);
 }
 
 function fromLocalInputValue(local: string): string {
-  return new Date(local).toISOString();
+  return parisDateTimeLocalToUtcIso(local);
 }
 
 function startOfWeekIso(): string {
@@ -265,21 +267,19 @@ const TimeClockPanel: React.FC<TimeClockPanelProps> = ({ user }) => {
       <Button size="small" variant="text" onClick={() => { setFrom(startOfMonthIso()); setTo(endOfMonthIso()); }}>
         Ce mois
       </Button>
-      <TextField
-        label="Du"
-        type="datetime-local"
+      <ParisDateTimeField
+        dateLabel="Du (jj/mm/aaaa)"
+        timeLabel="Heure"
         size="small"
         value={toLocalInputValue(from)}
-        onChange={(e) => setFrom(fromLocalInputValue(e.target.value))}
-        InputLabelProps={{ shrink: true }}
+        onChange={(next) => setFrom(fromLocalInputValue(next))}
       />
-      <TextField
-        label="Au"
-        type="datetime-local"
+      <ParisDateTimeField
+        dateLabel="Au (jj/mm/aaaa)"
+        timeLabel="Heure"
         size="small"
         value={toLocalInputValue(to)}
-        onChange={(e) => setTo(fromLocalInputValue(e.target.value))}
-        InputLabelProps={{ shrink: true }}
+        onChange={(next) => setTo(fromLocalInputValue(next))}
       />
       <Button
         variant="outlined"
@@ -464,9 +464,9 @@ const TimeClockPanel: React.FC<TimeClockPanelProps> = ({ user }) => {
                             email: e.email || '',
                           })}
                         </TableCell>
-                        <TableCell>{new Date(e.clock_in_at).toLocaleString('fr-FR')}</TableCell>
+                        <TableCell>{formatDate(e.clock_in_at)}</TableCell>
                         <TableCell>
-                          {e.clock_out_at ? new Date(e.clock_out_at).toLocaleString('fr-FR') : '—'}
+                          {e.clock_out_at ? formatDate(e.clock_out_at) : '—'}
                         </TableCell>
                         <TableCell>{formatDuration(Math.max(0, end - start))}</TableCell>
                         <TableCell>{e.source}</TableCell>
@@ -629,21 +629,17 @@ const TimeClockPanel: React.FC<TimeClockPanelProps> = ({ user }) => {
       <Dialog open={Boolean(editEntry)} onClose={() => setEditEntry(null)} maxWidth="sm" fullWidth>
         <DialogTitle>Corriger le pointage</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-          <TextField
-            label="Entrée"
-            type="datetime-local"
+          <ParisDateTimeField
+            dateLabel="Entrée — date"
+            timeLabel="Entrée — heure"
             value={editIn}
-            onChange={(e) => setEditIn(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            fullWidth
+            onChange={setEditIn}
           />
-          <TextField
-            label="Sortie (vide = ouvert)"
-            type="datetime-local"
+          <ParisDateTimeField
+            dateLabel="Sortie — date (vide = ouvert)"
+            timeLabel="Sortie — heure"
             value={editOut}
-            onChange={(e) => setEditOut(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            fullWidth
+            onChange={setEditOut}
           />
           <TextField
             label="Note"

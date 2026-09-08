@@ -74,7 +74,7 @@ export function enrichConfigurationRow(row: Record<string, unknown>, establishme
       'PRINTER_DRIVER=network-escpos',
       'PRINTER_HOST=192.168.0.95',
       'PRINTER_PORT=9100',
-      'POLL_INTERVAL_MS=2000',
+      'POLL_INTERVAL_MS=500',
     ].join('\n');
   }
   return {

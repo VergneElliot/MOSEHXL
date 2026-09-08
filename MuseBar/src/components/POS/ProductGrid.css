@@ -1,0 +1,365 @@
+/*
+ * POS catalog grid — static stylesheet.
+ *
+ * The cashier renders ~70 cards at once and re-renders the whole set on every
+ * category switch. MUI `sx` re-serializes through Emotion on each render, so the
+ * hot path uses plain DOM + these classes instead. Per-card values (category
+ * colour) come in as CSS custom properties, which cost nothing to apply.
+ *
+ * Breakpoints mirror the MUI theme: xs 0 / sm 600 / md 900 / lg 1200.
+ */
+
+.pos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
+@media (max-width: 1199.95px) {
+  .pos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+}
+
+@media (max-width: 899.95px) {
+  .pos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  }
+}
+
+@media (max-width: 599.95px) {
+  .pos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  }
+}
+
+.pos-grid__empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--pos-text-secondary);
+}
+
+/* ---------------------------------------------------------------- card ---- */
+
+.pos-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-height: 280px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--pos-card-border, var(--pos-divider));
+  border-radius: 4px;
+  background-color: var(--pos-card-bg, var(--pos-paper));
+  box-shadow: var(--pos-shadow-1);
+  color: var(--pos-text-primary);
+  cursor: grab;
+}
+
+.pos-card:active {
+  cursor: grabbing;
+}
+
+/*
+ * No hover elevation: scrolling drags cards under a stationary pointer, and the
+ * resulting shadow repaints were the original scroll tearing.
+ */
+
+@media (max-width: 899.95px) {
+  .pos-card {
+    min-height: 200px;
+  }
+}
+
+.pos-card__content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 16px;
+}
+
+@media (max-width: 899.95px) {
+  .pos-card__content {
+    padding: 8px;
+  }
+}
+
+.pos-card__name {
+  display: -webkit-box;
+  flex-shrink: 0;
+  min-height: 2.4em;
+  margin: 0 0 8px;
+  overflow: hidden;
+  font-size: 2.4rem;
+  font-weight: 700;
+  line-height: 1.2;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.pos-card--favorite .pos-card__name {
+  padding-left: 40px;
+}
+
+.pos-card--discounted .pos-card__name {
+  padding-right: 80px;
+}
+
+@media (max-width: 899.95px) {
+  .pos-card__name {
+    font-size: 1.3rem;
+  }
+
+  .pos-card--favorite .pos-card__name {
+    padding-left: 32px;
+  }
+}
+
+.pos-card__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  min-height: 0;
+}
+
+.pos-card__price-original {
+  margin: 0;
+  color: var(--pos-text-secondary);
+  font-size: 1.8rem;
+  text-decoration: line-through;
+}
+
+.pos-card__price {
+  margin: 0;
+  color: var(--pos-primary);
+  font-size: 2.8rem;
+  font-weight: 700;
+}
+
+.pos-card--discounted .pos-card__price {
+  color: var(--pos-secondary);
+}
+
+@media (max-width: 899.95px) {
+  .pos-card__price-original {
+    font-size: 1rem;
+  }
+
+  .pos-card__price {
+    font-size: 1.5rem;
+  }
+}
+
+/* -------------------------------------------------------------- badges ---- */
+
+.pos-card__favorite {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--pos-warning-border);
+  border-radius: 50%;
+  background-color: var(--pos-warning-bg);
+  color: var(--pos-warning-dark);
+  font-size: 22px;
+}
+
+.pos-card__happy-hour {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 12px;
+  background-color: var(--pos-secondary);
+  color: var(--pos-secondary-contrast);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+@media (max-width: 899.95px) {
+  .pos-card__favorite {
+    width: 28px;
+    height: 28px;
+    font-size: 18px;
+  }
+}
+
+/* ------------------------------------------------------------- controls ---- */
+
+.pos-card__actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.pos-quantity-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background-color: transparent;
+  color: var(--pos-action-active);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.pos-quantity-button:hover {
+  background-color: var(--pos-action-hover);
+}
+
+.pos-quantity-button:focus-visible {
+  outline: 2px solid var(--pos-primary);
+  outline-offset: 1px;
+}
+
+.pos-quantity-input {
+  flex: 0 0 44px;
+  box-sizing: border-box;
+  width: 44px;
+  padding: 0;
+  border: none;
+  border-bottom: 1px solid var(--pos-divider);
+  background-color: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: 2rem;
+  font-weight: 700;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.pos-quantity-input::-webkit-outer-spin-button,
+.pos-quantity-input::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+.pos-quantity-input:focus {
+  border-bottom: 2px solid var(--pos-primary);
+  outline: none;
+}
+
+.pos-add-button {
+  flex: 1 1 auto;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 42px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 4px;
+  background-color: var(--pos-primary);
+  box-shadow: var(--pos-shadow-2);
+  color: var(--pos-primary-contrast);
+  font-family: inherit;
+  font-size: 1.9rem;
+  font-weight: 500;
+  line-height: 1.75;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.pos-add-button:hover {
+  background-color: var(--pos-primary-dark);
+}
+
+.pos-add-button:focus-visible {
+  outline: 2px solid var(--pos-primary-dark);
+  outline-offset: 2px;
+}
+
+.pos-add-button--secondary {
+  background-color: var(--pos-secondary);
+  color: var(--pos-secondary-contrast);
+}
+
+.pos-add-button--secondary:hover {
+  background-color: var(--pos-secondary-dark);
+}
+
+.pos-add-button--block {
+  width: 100%;
+  margin-top: 8px;
+}
+
+@media (max-width: 899.95px) {
+  .pos-quantity-input {
+    font-size: 1.2rem;
+  }
+
+  .pos-add-button {
+    min-height: 34px;
+    padding: 4px 8px;
+    font-size: 1rem;
+  }
+}
+
+/* -------------------------------------------- Divers / Pourboire cards ---- */
+
+.pos-card--special .pos-card__content {
+  justify-content: space-between;
+}
+
+.pos-card__special-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+  /* Sizes the inherited icon; the title sets its own font-size. */
+  font-size: 24px;
+}
+
+.pos-card__special-title {
+  margin: 0;
+  font-size: 2.3rem;
+  font-weight: 700;
+}
+
+.pos-card__special-description {
+  margin: 0;
+  color: var(--pos-text-secondary);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 899.95px) {
+  .pos-card__special-header {
+    font-size: 20px;
+  }
+
+  .pos-card__special-title {
+    font-size: 1.3rem;
+  }
+}
+
+/* ---------------------------------------------------------------- icon ---- */
+
+.pos-icon {
+  display: block;
+  width: 1em;
+  height: 1em;
+  fill: currentColor;
+}

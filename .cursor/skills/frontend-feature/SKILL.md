@@ -18,6 +18,9 @@ components/MyFeature/
 
 Shared hooks live in `MuseBar/src/hooks/` when reused across features.
 
+Every file caps at 400 lines (target ≤ 250) and holds one component or concern — see
+`code-hygiene`. Split the container before it grows a second responsibility, not after.
+
 ## Hook split (canonical)
 
 | Hook | Responsibility |

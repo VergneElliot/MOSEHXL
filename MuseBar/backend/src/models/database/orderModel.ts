@@ -153,54 +153,6 @@ export const OrderModel = {
     return result.rows;
   },
 
-  /**
-   * Non-fiscal CA par serveur for a cut→cut business day window.
-   * Rows without waiter snapshot are grouped under waiter_user_id null.
-   */
-  async waiterDayReport(
-    establishmentId: string,
-    periodStart: Date,
-    periodEnd: Date
-  ): Promise<
-    Array<{
-      waiter_user_id: number | null;
-      waiter_display_name: string;
-      order_count: number;
-      total_amount: number;
-    }>
-  > {
-    const result = await pool.query(
-      `
-        SELECT
-          waiter_user_id,
-          COALESCE(MAX(waiter_display_name), 'Sans attribution') AS waiter_display_name,
-          COUNT(*)::int AS order_count,
-          COALESCE(SUM(total_amount), 0)::float AS total_amount
-        FROM orders
-        WHERE establishment_id = $1
-          AND status IN ('completed', 'paid')
-          AND created_at >= $2
-          AND created_at <= $3
-        GROUP BY waiter_user_id
-        ORDER BY total_amount DESC, waiter_display_name ASC NULLS LAST
-      `,
-      [establishmentId, periodStart, periodEnd]
-    );
-    return result.rows.map(
-      (row: {
-        waiter_user_id: number | null;
-        waiter_display_name: string;
-        order_count: number;
-        total_amount: number | string;
-      }) => ({
-        waiter_user_id: row.waiter_user_id == null ? null : Number(row.waiter_user_id),
-        waiter_display_name: String(row.waiter_display_name ?? 'Sans attribution'),
-        order_count: Number(row.order_count) || 0,
-        total_amount: typeof row.total_amount === 'number' ? row.total_amount : parseFloat(String(row.total_amount ?? 0)) || 0,
-      })
-    );
-  },
-
   async getById(id: number, establishmentId: string): Promise<Order | null> {
     const result = await pool.query(
       'SELECT * FROM orders WHERE id = $1 AND establishment_id = $2',
@@ -213,8 +165,9 @@ export const OrderModel = {
     const result = await pool.query(
       `INSERT INTO orders (
          total_amount, total_tax, payment_method, status, notes, tips, change, establishment_id,
-         operation_type, change_amount, waiter_user_id, waiter_display_name, table_label
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         operation_type, change_amount, waiter_user_id, waiter_display_name, table_label,
+         account_user_id, pin_session_id
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        RETURNING *`,
       [
         order.total_amount,
@@ -230,6 +183,8 @@ export const OrderModel = {
         order.waiter_user_id ?? null,
         order.waiter_display_name ?? null,
         order.table_label ?? null,
+        order.account_user_id ?? null,
+        order.pin_session_id ?? null,
       ]
     );
     return result.rows[0];

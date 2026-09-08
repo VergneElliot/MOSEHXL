@@ -27,6 +27,7 @@ import {
   Save as SaveIcon,
 } from '@mui/icons-material';
 import { HappyHourFormProps } from './types';
+import { ParisTimeField } from '../../common/ParisDateTimeField';
 
 /**
  * Happy Hour Form Component
@@ -48,6 +49,13 @@ export const HappyHourForm: React.FC<HappyHourFormProps> = ({
     onSettingsChange({
       ...settings,
       [field]: value,
+    });
+  };
+
+  const handleTimeChange = (field: 'startTime' | 'endTime') => (hm: string) => {
+    onSettingsChange({
+      ...settings,
+      [field]: hm,
     });
   };
 
@@ -105,28 +113,22 @@ export const HappyHourForm: React.FC<HappyHourFormProps> = ({
 
           {/* Time Settings */}
           <Grid item xs={6}>
-            <TextField
-              label="Heure de début"
-              type="time"
+            <ParisTimeField
+              label="Heure de début (HH:mm)"
               value={settings.startTime}
-              onChange={handleFieldChange('startTime')}
-              fullWidth
+              onChange={handleTimeChange('startTime')}
               disabled={loading || !settings.isEnabled}
-              InputLabelProps={{ shrink: true }}
               error={!timeValid && settings.isEnabled}
               helperText={!timeValid ? 'L\'heure de début doit être antérieure à l\'heure de fin' : ''}
             />
           </Grid>
           
           <Grid item xs={6}>
-            <TextField
-              label="Heure de fin"
-              type="time"
+            <ParisTimeField
+              label="Heure de fin (HH:mm)"
               value={settings.endTime}
-              onChange={handleFieldChange('endTime')}
-              fullWidth
+              onChange={handleTimeChange('endTime')}
               disabled={loading || !settings.isEnabled}
-              InputLabelProps={{ shrink: true }}
               error={!timeValid && settings.isEnabled}
               helperText={!timeValid ? 'L\'heure de fin doit être postérieure à l\'heure de début' : ''}
             />

@@ -7,6 +7,7 @@ import * as nodemailer from 'nodemailer';
 import { ReceiptData, ClosureBulletinData } from '../printing/types';
 import * as QRCode from 'qrcode';
 import { formatEuroAmount } from '../../utils/formatCurrency';
+import { formatDateOnly, formatDateTime } from '@mosehxl/types';
 
 interface EmailConfig {
   from: string;
@@ -258,7 +259,7 @@ export class EmailReceiptService {
           <div class="receipt-info">
             <h2>REÇU #${data.sequence_number}</h2>
             <p><strong>Commande:</strong> ${data.order_id}</p>
-            <p><strong>Date:</strong> ${new Date(data.created_at).toLocaleString('fr-FR')}</p>
+            <p><strong>Date:</strong> ${formatDateTime(data.created_at)}</p>
             <p><strong>Mode de paiement:</strong> ${this.formatPaymentMethod(data.payment_method)}</p>
           </div>
           
@@ -386,7 +387,7 @@ export class EmailReceiptService {
           <div class="bulletin-header">
             <h1>BULLETIN DE CLÔTURE</h1>
             <h3>Type: ${this.formatClosureType(data.closure_type)}</h3>
-            <p>Période: ${new Date(data.period_start).toLocaleDateString('fr-FR')} - ${new Date(data.period_end).toLocaleDateString('fr-FR')}</p>
+            <p>Période: ${formatDateOnly(data.period_start)} - ${formatDateOnly(data.period_end)}</p>
             <p>Bulletin #${data.id}</p>
           </div>
           
@@ -482,7 +483,7 @@ export class EmailReceiptService {
             <p>Réf. légale: Article 286-I-3 bis du CGI</p>
             ${data.compliance_info?.cash_register_id ? `<p>Registre: ${data.compliance_info.cash_register_id}</p>` : ''}
             <p>Hash de clôture: ${data.closure_hash.substring(0, 16)}...</p>
-            ${data.closed_at ? `<p>Clôturé le: ${new Date(data.closed_at).toLocaleString('fr-FR')}</p>` : ''}
+            ${data.closed_at ? `<p>Clôturé le: ${formatDateTime(data.closed_at)}</p>` : ''}
           </div>
         </div>
       </body>

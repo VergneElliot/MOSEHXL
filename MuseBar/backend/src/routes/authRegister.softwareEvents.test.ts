@@ -13,6 +13,12 @@ const mocks = vi.hoisted(() => ({
   membershipUpsert: vi.fn(),
   auditLogAction: vi.fn(),
   logSoftwareEventBestEffort: vi.fn(),
+  applyPermissionGrants: vi.fn(),
+  deactivateStaffAccount: vi.fn(),
+}));
+
+vi.mock('../services/auth/staffAccountLifecycle', () => ({
+  deactivateStaffAccount: mocks.deactivateStaffAccount,
 }));
 
 vi.mock('../middleware/auth', () => ({
@@ -55,6 +61,10 @@ vi.mock('../services/legal/softwareEventJournal', () => ({
   logSoftwareEventBestEffort: mocks.logSoftwareEventBestEffort,
 }));
 
+vi.mock('../services/auth/permissionGrantService', () => ({
+  applyPermissionGrants: mocks.applyPermissionGrants,
+}));
+
 vi.mock('../utils/logger', () => ({
   Logger: {
     getInstance: () => ({ error: vi.fn(), info: vi.fn(), warn: vi.fn() }),
@@ -95,6 +105,13 @@ describe('authRegister software-event journaling', () => {
     mocks.membershipUpsert.mockReset();
     mocks.auditLogAction.mockReset();
     mocks.logSoftwareEventBestEffort.mockReset();
+    mocks.applyPermissionGrants.mockReset();
+    mocks.deactivateStaffAccount.mockReset();
+    mocks.deactivateStaffAccount.mockResolvedValue({
+      deactivated: true,
+      pin_cleared: true,
+      sessions_closed: 1,
+    });
 
     mocks.userBelongsToEstablishment.mockResolvedValue(true);
     mocks.setUserPermissions.mockResolvedValue(undefined);
@@ -106,6 +123,11 @@ describe('authRegister software-event journaling', () => {
     mocks.membershipUpsert.mockResolvedValue({});
     mocks.auditLogAction.mockResolvedValue(undefined);
     mocks.logSoftwareEventBestEffort.mockResolvedValue(undefined);
+    mocks.applyPermissionGrants.mockResolvedValue({
+      granted: ['access_settings'],
+      permissions: ['access_pos', 'access_settings'],
+      pin_cleared: false,
+    });
   });
 
   it('logs software event after permissions update', async () => {
@@ -114,6 +136,7 @@ describe('authRegister software-event journaling', () => {
       .send({ permissions: ['access_pos', 'access_settings'] });
 
     expect(res.status).toBe(200);
+    // access_pos is basic and implicit, so only the specific grant is counted.
     expect(mocks.logSoftwareEventBestEffort).toHaveBeenCalledWith(
       expect.objectContaining({
         establishmentId: 'est-1',
@@ -121,7 +144,8 @@ describe('authRegister software-event journaling', () => {
         userId: '22',
         eventData: expect.objectContaining({
           target_user_id: 9,
-          permissions_count: 2,
+          permissions_count: 1,
+          pin_cleared: false,
           method: 'PUT',
         }),
       })
@@ -167,11 +191,13 @@ describe('authRegister software-event journaling', () => {
     );
   });
 
-  it('logs software event after establishment user deletion', async () => {
+  it('deactivates instead of deleting, and journals the software event', async () => {
     const res = await request(app)
       .delete('/auth/users/9');
 
     expect(res.status).toBe(200);
+    expect(mocks.deactivateStaffAccount).toHaveBeenCalledWith(9, 'est-1');
+    expect(mocks.deleteUserById).not.toHaveBeenCalled();
     expect(mocks.logSoftwareEventBestEffort).toHaveBeenCalledWith(
       expect.objectContaining({
         establishmentId: 'est-1',
@@ -179,6 +205,7 @@ describe('authRegister software-event journaling', () => {
         userId: '22',
         eventData: expect.objectContaining({
           target_user_id: 9,
+          deactivated: true,
         }),
       })
     );

@@ -12,6 +12,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { ParisTimeField } from '../../common/ParisDateTimeField';
 
 export type WeekdayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 
@@ -134,25 +135,21 @@ export const WeeklyHoursSettingsForm: React.FC<WeeklyHoursSettingsFormProps> = (
                   }
                   label={day.closed ? 'Fermé' : 'Ouvert'}
                 />
-                <TextField
+                <ParisTimeField
                   label="Ouverture"
-                  type="time"
                   size="small"
                   value={day.open}
-                  onChange={(e) => updateDay(key, { open: e.target.value })}
+                  onChange={(hm) => updateDay(key, { open: hm })}
                   disabled={loading || saving || day.closed}
-                  InputLabelProps={{ shrink: true }}
-                  sx={{ width: 140 }}
+                  fullWidth={false}
                 />
-                <TextField
+                <ParisTimeField
                   label="Fermeture"
-                  type="time"
                   size="small"
                   value={day.close}
-                  onChange={(e) => updateDay(key, { close: e.target.value })}
+                  onChange={(hm) => updateDay(key, { close: hm })}
                   disabled={loading || saving || day.closed}
-                  InputLabelProps={{ shrink: true }}
-                  sx={{ width: 140 }}
+                  fullWidth={false}
                 />
               </Box>
             </Grid>

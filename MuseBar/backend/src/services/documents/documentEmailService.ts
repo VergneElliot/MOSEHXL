@@ -1,3 +1,4 @@
+import { formatDateTime } from '@mosehxl/types';
 import { EmailService } from '../email/EmailService';
 import { getEnvironmentConfig } from '../../config/environment';
 import { Logger } from '../../utils/logger';
@@ -86,7 +87,7 @@ function receiptEmailHtml(data: ReceiptData): string {
   return `
     <p>Bonjour,</p>
     <p>Veuillez trouver ci-joint votre ${label} <strong>${docId}</strong> émis par <strong>${data.business_info.name}</strong>.</p>
-    <p>Date: ${new Date(data.created_at).toLocaleString('fr-FR')}</p>
+    <p>Date: ${formatDateTime(data.created_at)}</p>
     <p>Total TTC: ${data.total_amount.toFixed(2)} EUR</p>
     <p>Cordialement,<br/>${data.business_info.name}</p>
   `;

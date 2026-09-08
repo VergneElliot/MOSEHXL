@@ -1,3 +1,4 @@
 #!/usr/bin/env bash
 bash scripts/check-staged-files.sh
+node scripts/check-module-size.mjs --staged
 npx lint-staged

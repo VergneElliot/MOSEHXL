@@ -21,6 +21,7 @@ export interface StaffShift {
   recurrence: ShiftRecurrence;
   approval_status: ShiftApprovalStatus;
   confirmation_token: string | null;
+  decline_reason?: string | null;
   created_by: number | null;
   created_at: string;
   updated_at: string;
@@ -36,6 +37,30 @@ const OCCURRENCE_COUNTS: Record<ShiftRecurrence, number> = {
 
 export function isValidRecurrence(value: string): value is ShiftRecurrence {
   return ['once', 'daily', 'weekly', 'monthly', 'yearly'].includes(value);
+}
+
+/** Pure helper: apply anchor edit delta to one sibling occurrence. */
+export function applySeriesTimeDelta(opts: {
+  siblingStartsAt: string;
+  siblingEndsAt: string;
+  anchorOldStartsAt: string;
+  anchorOldEndsAt: string;
+  anchorNewStartsAt: string;
+  anchorNewEndsAt: string;
+}): { starts_at: string; ends_at: string } {
+  const oldStartMs = new Date(opts.anchorOldStartsAt).getTime();
+  const newStartMs = new Date(opts.anchorNewStartsAt).getTime();
+  const newEndMs = new Date(opts.anchorNewEndsAt).getTime();
+  if (!(newEndMs > newStartMs)) {
+    throw Object.assign(new Error('ends_at must be after starts_at'), {
+      code: 'INVALID_RANGE',
+    });
+  }
+  const deltaMs = newStartMs - oldStartMs;
+  const durationMs = newEndMs - newStartMs;
+  const starts = new Date(new Date(opts.siblingStartsAt).getTime() + deltaMs);
+  const ends = new Date(starts.getTime() + durationMs);
+  return { starts_at: starts.toISOString(), ends_at: ends.toISOString() };
 }
 
 function addOccurrence(base: Date, recurrence: ShiftRecurrence, index: number): Date {
@@ -219,6 +244,19 @@ export class StaffShiftModel {
     };
   }
 
+  static async listBySeries(
+    establishmentId: string,
+    seriesId: string
+  ): Promise<StaffShift[]> {
+    const result = await pool.query(
+      `SELECT * FROM staff_shifts
+       WHERE establishment_id = $1 AND series_id = $2::uuid
+       ORDER BY starts_at ASC`,
+      [establishmentId, seriesId]
+    );
+    return result.rows as StaffShift[];
+  }
+
   static async update(
     establishmentId: string,
     id: number,
@@ -229,6 +267,8 @@ export class StaffShiftModel {
       label: string | null;
       note: string | null;
       approval_status: ShiftApprovalStatus;
+      confirmation_token: string | null;
+      decline_reason: string | null;
     }>
   ): Promise<StaffShift | null> {
     const existing = await this.getById(establishmentId, id);
@@ -241,6 +281,8 @@ export class StaffShiftModel {
          label = $6,
          note = $7,
          approval_status = $8,
+         confirmation_token = $9,
+         decline_reason = $10,
          updated_at = CURRENT_TIMESTAMP
        WHERE establishment_id = $1 AND id = $2
        RETURNING *`,
@@ -253,9 +295,137 @@ export class StaffShiftModel {
         patch.label !== undefined ? patch.label : existing.label,
         patch.note !== undefined ? patch.note : existing.note,
         patch.approval_status ?? existing.approval_status,
+        patch.confirmation_token !== undefined
+          ? patch.confirmation_token
+          : existing.confirmation_token,
+        patch.decline_reason !== undefined
+          ? patch.decline_reason
+          : existing.decline_reason ?? null,
       ]
     );
     return (result.rows[0] as StaffShift) ?? null;
+  }
+
+  /**
+   * Apply an edit of one occurrence to every shift in the same series.
+   * Time changes are relative: siblings keep their calendar spacing.
+   */
+  static async updateSeriesFromAnchor(
+    establishmentId: string,
+    anchorId: number,
+    patch: Partial<{
+      user_id: number;
+      starts_at: string;
+      ends_at: string;
+      label: string | null;
+      note: string | null;
+    }>
+  ): Promise<{ updated: StaffShift[]; series_id: string }> {
+    const anchor = await this.getById(establishmentId, anchorId);
+    if (!anchor) {
+      throw Object.assign(new Error('Shift not found'), { code: 'NOT_FOUND' });
+    }
+    if (!anchor.series_id) {
+      const single = await this.update(establishmentId, anchorId, patch);
+      return { updated: single ? [single] : [], series_id: '' };
+    }
+
+    const siblings = await this.listBySeries(establishmentId, anchor.series_id);
+    const newStartsAt = patch.starts_at ?? anchor.starts_at;
+    const newEndsAt = patch.ends_at ?? anchor.ends_at;
+
+    const updated: StaffShift[] = [];
+    for (const shift of siblings) {
+      const times = applySeriesTimeDelta({
+        siblingStartsAt: shift.starts_at,
+        siblingEndsAt: shift.ends_at,
+        anchorOldStartsAt: anchor.starts_at,
+        anchorOldEndsAt: anchor.ends_at,
+        anchorNewStartsAt: newStartsAt,
+        anchorNewEndsAt: newEndsAt,
+      });
+      const row = await this.update(establishmentId, shift.id, {
+        user_id: patch.user_id,
+        starts_at: times.starts_at,
+        ends_at: times.ends_at,
+        label: patch.label,
+        note: patch.note,
+      });
+      if (row) updated.push(row);
+    }
+    return { updated, series_id: anchor.series_id };
+  }
+
+  static async deleteSeries(establishmentId: string, seriesId: string): Promise<number> {
+    const result = await pool.query(
+      `DELETE FROM staff_shifts
+       WHERE establishment_id = $1 AND series_id = $2::uuid`,
+      [establishmentId, seriesId]
+    );
+    return result.rowCount ?? 0;
+  }
+
+  static async deleteAll(establishmentId: string): Promise<number> {
+    const result = await pool.query(
+      `DELETE FROM staff_shifts WHERE establishment_id = $1`,
+      [establishmentId]
+    );
+    return result.rowCount ?? 0;
+  }
+
+  static async updateWithBypass(
+    establishmentId: string,
+    id: number,
+    patch: Partial<{
+      user_id: number;
+      starts_at: string;
+      ends_at: string;
+      label: string | null;
+      note: string | null;
+      approval_status: ShiftApprovalStatus;
+      confirmation_token: string | null;
+      decline_reason: string | null;
+    }>
+  ): Promise<StaffShift | null> {
+    return withRlsBypass(async (client) => {
+      const existingRes = await client.query(
+        `SELECT * FROM staff_shifts WHERE establishment_id = $1 AND id = $2`,
+        [establishmentId, id]
+      );
+      const existing = existingRes.rows[0] as StaffShift | undefined;
+      if (!existing) return null;
+      const result = await client.query(
+        `UPDATE staff_shifts SET
+           user_id = $3,
+           starts_at = $4,
+           ends_at = $5,
+           label = $6,
+           note = $7,
+           approval_status = $8,
+           confirmation_token = $9,
+           decline_reason = $10,
+           updated_at = CURRENT_TIMESTAMP
+         WHERE establishment_id = $1 AND id = $2
+         RETURNING *`,
+        [
+          establishmentId,
+          id,
+          patch.user_id ?? existing.user_id,
+          patch.starts_at ?? existing.starts_at,
+          patch.ends_at ?? existing.ends_at,
+          patch.label !== undefined ? patch.label : existing.label,
+          patch.note !== undefined ? patch.note : existing.note,
+          patch.approval_status ?? existing.approval_status,
+          patch.confirmation_token !== undefined
+            ? patch.confirmation_token
+            : existing.confirmation_token,
+          patch.decline_reason !== undefined
+            ? patch.decline_reason
+            : existing.decline_reason ?? null,
+        ]
+      );
+      return (result.rows[0] as StaffShift) ?? null;
+    });
   }
 
   static async setApprovalByToken(

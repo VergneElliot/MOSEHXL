@@ -91,6 +91,8 @@ describe('auth sessionRoutes profile and metrics endpoints', () => {
       first_name: 'Ada',
       last_name: 'Lovelace',
       email_verified: true,
+      phone: null,
+      date_of_birth: null,
     });
     mocks.getUserPermissions.mockResolvedValue(['legal:read', 'orders:write']);
     mocks.listForUser.mockResolvedValue([]);
@@ -113,6 +115,9 @@ describe('auth sessionRoutes profile and metrics endpoints', () => {
       first_name: 'Ada',
       last_name: 'Lovelace',
       email_verified: true,
+      phone: '',
+      date_of_birth: '',
+      calendar_color: null,
       permissions: ['legal:read', 'orders:write'],
       memberships: [],
       support_impersonation: null,

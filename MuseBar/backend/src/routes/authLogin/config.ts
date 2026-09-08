@@ -1,9 +1,11 @@
 import { CanonicalAuthRole } from '../../auth/roleVocabulary';
 
 export const MAX_SUPPORT_IMPERSONATION_MINUTES = 120;
-export const MAX_FAILED_LOGIN_ATTEMPTS = Number(process.env.AUTH_LOCKOUT_MAX_FAILED_ATTEMPTS ?? 5);
-export const BASE_LOCKOUT_MINUTES = Number(process.env.AUTH_LOCKOUT_BASE_MINUTES ?? 15);
-export const MAX_LOCKOUT_MINUTES = Number(process.env.AUTH_LOCKOUT_MAX_MINUTES ?? 240);
+export const MAX_FAILED_LOGIN_ATTEMPTS = Number(process.env.AUTH_LOCKOUT_MAX_FAILED_ATTEMPTS ?? 8);
+/** First lockout length (minutes). Soft default for small venues — was 15. */
+export const BASE_LOCKOUT_MINUTES = Number(process.env.AUTH_LOCKOUT_BASE_MINUTES ?? 2);
+/** Cap on progressive lockouts (minutes). Soft default — was 240. */
+export const MAX_LOCKOUT_MINUTES = Number(process.env.AUTH_LOCKOUT_MAX_MINUTES ?? 15);
 export const ACCESS_TOKEN_EXPIRES_IN = process.env.AUTH_ACCESS_TOKEN_EXPIRES_IN || '12h';
 export const REFRESH_SESSION_DAYS = Number(process.env.AUTH_REFRESH_SESSION_DAYS ?? 1);
 export const REMEMBER_REFRESH_SESSION_DAYS = Number(process.env.AUTH_REFRESH_REMEMBER_DAYS ?? 30);
@@ -36,8 +38,8 @@ export function computeRefreshExpiry(
 }
 
 export function computeLockoutDurationMinutes(lockoutCount: number): number {
-  const base = toPositiveFiniteNumber(BASE_LOCKOUT_MINUTES, 15);
-  const max = toPositiveFiniteNumber(MAX_LOCKOUT_MINUTES, 240);
+  const base = toPositiveFiniteNumber(BASE_LOCKOUT_MINUTES, 2);
+  const max = toPositiveFiniteNumber(MAX_LOCKOUT_MINUTES, 15);
   const exponent = Math.max(0, lockoutCount - 1);
   return Math.min(max, base * (2 ** exponent));
 }

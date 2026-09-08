@@ -10,7 +10,10 @@ import { useFloorService } from '../../hooks/useFloorService';
 import { useAuth } from '../../hooks/useAuth';
 import { usePinSessions } from '../../contexts/PinSessionsContext';
 import { useStepUpAuth } from '../../contexts/StepUpAuthContext';
-import { setFloorOrderAttribution } from '../../services/floorOrderAttribution';
+import {
+  useFloorOrderAttributionSync,
+  useTableInterventionGate,
+} from '../../hooks/useTableInterventionGate';
 import POSLayout from './POSLayout';
 import POSMenuPanel from './POSMenuPanel';
 import POSOrderPanel from './POSOrderPanel';
@@ -25,7 +28,6 @@ import { formatCurrency } from '../../utils/formatCurrency';
 import { saleLines, tipsFromOrder } from '../../hooks/usePOSOrderTotals';
 import { resolveTargetOrderItems } from '../../utils/posCartSelection';
 import { resolvePinLengthRules } from '../../utils/pinRules';
-import { pinActorHasPermission } from '../../utils/pinSessionPermissions';
 import { PERMISSIONS } from '@mosehxl/types';
 
 const LazyPaymentDialog = React.lazy(() => import('./PaymentDialog'));
@@ -41,14 +43,6 @@ interface POSContainerProps {
   products: Product[];
   isHappyHourActive: boolean;
   onDataUpdate: () => void;
-  posLinePermissions?: {
-    happyHourManual: boolean;
-    offert: boolean;
-    perso: boolean;
-    remise: boolean;
-    reassignWaiter: boolean;
-    interveneTable: boolean;
-  };
 }
 
 const POSContainer: React.FC<POSContainerProps> = ({
@@ -56,19 +50,12 @@ const POSContainer: React.FC<POSContainerProps> = ({
   products,
   isHappyHourActive,
   onDataUpdate,
-  posLinePermissions = {
-    happyHourManual: true,
-    offert: true,
-    perso: true,
-    remise: true,
-    reassignWaiter: false,
-    interveneTable: false,
-  },
 }) => {
   const [state, actions] = usePOSState();
   const { activeSessionId, sessions, updateActiveSession } = usePinSessions();
   const { ensureSession, ensurePermission } = useStepUpAuth();
   const sessionSyncRef = React.useRef<string | null>(null);
+  const skipNextCartPersistRef = React.useRef(false);
   const [diversDialogOpen, setDiversDialogOpen] = useState(false);
   const [pourboireDialogOpen, setPourboireDialogOpen] = useState(false);
   const [optionDialogOpen, setOptionDialogOpen] = useState(false);
@@ -107,53 +94,35 @@ const POSContainer: React.FC<POSContainerProps> = ({
     user?.role === 'establishment_admin' ||
     permissions.includes('manage_floor_plan');
 
-  const canReassignWaiter =
-    pinActorHasPermission(floor.pinActor, PERMISSIONS.pos_reassign_waiter) ||
-    posLinePermissions.reassignWaiter;
+  // Offered to everyone: the click asks for a PIN when the acting profile lacks the right.
+  const canReassignWaiter = true;
 
-  const ensureTableIntervention = useCallback(async () => {
-    const table = floor.activeTable;
-    const actor = floor.pinActor;
-    if (!table || !actor) return;
-    const assignedId = table.assignedWaiterUserId;
-    if (assignedId == null || actor.userId === assignedId) return;
-    if (actor.role === 'establishment_admin') return;
-    await ensurePermission(PERMISSIONS.pos_intervene_table, {
-      title: 'Intervention sur une autre table',
-      description:
-        'PIN autorisé pour modifier une table assignée à un autre serveur. L’addition reste sur son Z.',
-    });
-  }, [floor.activeTable, floor.pinActor, ensurePermission]);
+  const ensureTableIntervention = useTableInterventionGate(
+    floor.activeTable,
+    floor.pinActor
+  );
+  useFloorOrderAttributionSync(floor.pinActor, floor.activeTable);
 
   // Load cart when switching PIN session tabs
   useEffect(() => {
     if (activeSessionId === sessionSyncRef.current) return;
     sessionSyncRef.current = activeSessionId;
     const session = sessions.find((s) => s.id === activeSessionId);
+    // The persist effect below runs in this same commit, still holding the
+    // previous session's cart — skip it so it cannot bleed into the new tab.
+    skipNextCartPersistRef.current = true;
     actions.setCurrentOrder(session?.cart ?? []);
   }, [activeSessionId, sessions, actions]);
 
   // Persist cart into active session
   useEffect(() => {
     if (!activeSessionId || sessionSyncRef.current !== activeSessionId) return;
+    if (skipNextCartPersistRef.current) {
+      skipNextCartPersistRef.current = false;
+      return;
+    }
     updateActiveSession({ cart: state.currentOrder });
   }, [state.currentOrder, activeSessionId, updateActiveSession]);
-
-  useEffect(() => {
-    if (floor.pinActor) {
-      const waiterUserId =
-        floor.activeTable?.assignedWaiterUserId ?? floor.pinActor.userId;
-      const waiterDisplayName =
-        floor.activeTable?.assignedWaiterDisplayName ?? floor.pinActor.displayName;
-      setFloorOrderAttribution({
-        waiterUserId,
-        waiterDisplayName,
-        tableLabel: floor.activeTable?.label ?? null,
-      });
-    } else {
-      setFloorOrderAttribution(null);
-    }
-  }, [floor.pinActor, floor.activeTable]);
 
   const { orderTotal, orderTax, orderSubtotal } = usePOSOrderTotals(state.currentOrder);
   const { calculateProductPrice } = usePOSCatalogLogic(
@@ -320,10 +289,9 @@ const POSContainer: React.FC<POSContainerProps> = ({
 
   const handleRequestRemise = useCallback(
     async (indices: number[]) => {
-      if (!posLinePermissions.remise) return;
       try {
         if (floor.activeTable) await ensureTableIntervention();
-        await ensurePermission(PERMISSIONS.pos_happyhour_manual, {
+        await ensurePermission(PERMISSIONS.pos_apply_remise, {
           title: 'Remise',
           description: 'PIN d’un profil autorisé à appliquer une remise.',
         });
@@ -333,7 +301,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
         /* cancelled */
       }
     },
-    [ensurePermission, posLinePermissions.remise, floor.activeTable, ensureTableIntervention]
+    [ensurePermission, floor.activeTable, ensureTableIntervention]
   );
 
   const handleConfirmRemise = useCallback(
@@ -574,8 +542,8 @@ const POSContainer: React.FC<POSContainerProps> = ({
         try {
           await ensureTableIntervention();
           await ensurePermission(PERMISSIONS.orders_cancel, {
-            title: 'Retour article',
-            description: 'PIN d’un profil autorisé à annuler un article validé (ticket cuisine).',
+            title: 'Retour article validé',
+            description: 'PIN autorisé pour un article déjà validé (cuisine).',
           });
           await floor.cancelValidatedTicketLine(line.ticketLineId);
         } catch {
@@ -724,6 +692,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
             />
           }
           orderContent={
+            // Line actions are always offered: a profile without the right is asked for a PIN.
             <POSOrderPanel
               currentOrder={state.currentOrder}
               onRemoveItem={handleRemoveItem}
@@ -731,24 +700,10 @@ const POSContainer: React.FC<POSContainerProps> = ({
               onCheckout={handleCheckout}
               onQuickCard={handleQuickCard}
               onQuickCash={handleQuickCash}
-              onApplyHappyHour={
-                posLinePermissions.happyHourManual
-                  ? (index: number) => void gatedApplyHappyHour(index)
-                  : undefined
-              }
-              onApplyOffert={
-                posLinePermissions.offert
-                  ? (index: number) => void gatedApplyOffert(index)
-                  : undefined
-              }
-              onApplyPerso={
-                posLinePermissions.perso
-                  ? (index: number) => void gatedApplyPerso(index)
-                  : undefined
-              }
-              onApplyRemise={
-                posLinePermissions.remise ? (indices) => void handleRequestRemise(indices) : undefined
-              }
+              onApplyHappyHour={(index: number) => void gatedApplyHappyHour(index)}
+              onApplyOffert={(index: number) => void gatedApplyOffert(index)}
+              onApplyPerso={(index: number) => void gatedApplyPerso(index)}
+              onApplyRemise={(indices) => void handleRequestRemise(indices)}
               onUpdateLineNote={handleUpdateLineNote}
               onDropProduct={handleDropProduct}
               onSelectTable={floor.requestMap}

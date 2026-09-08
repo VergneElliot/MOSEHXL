@@ -25,6 +25,7 @@ import {
   PlayArrow as TriggerIcon,
 } from '@mui/icons-material';
 import { ClosureSettingsProps } from './types';
+import { ParisTimeField } from '../../common/ParisDateTimeField';
 
 /**
  * Timezone options
@@ -153,17 +154,17 @@ export const ClosureSettings: React.FC<ClosureSettingsProps> = ({
               manual "journée commerciale" closures and live day stats use it too, so it
               must stay editable when the scheduler is off. */}
           <Grid item xs={12} md={6}>
-            <TextField
-              label="Heure de coupure de la journée commerciale"
-              type="time"
-              fullWidth
+            <ParisTimeField
+              label="Heure de coupure de la journée commerciale (HH:mm)"
               value={closureSettings.daily_closure_time}
-              onChange={handleFieldChange('daily_closure_time')}
+              onChange={(hm) =>
+                onUpdate({
+                  ...closureSettings,
+                  daily_closure_time: hm,
+                })
+              }
               disabled={loading}
               helperText="Fin de journée commerciale (ex. 04:00 = la nuit compte pour la veille). Sert aussi aux clôtures manuelles."
-              InputLabelProps={{
-                shrink: true,
-              }}
             />
           </Grid>
 
