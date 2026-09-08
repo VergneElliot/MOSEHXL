@@ -40,7 +40,6 @@
     "MuseBar/backend/src/models/timeEntry.ts": 410,
     "MuseBar/backend/src/models/database/productOptionGroupModel.ts": 408,
     "MuseBar/src/components/floor/FloorCanvasView.tsx": 408,
-    "MuseBar/src/components/Administration/InboxPanel.tsx": 406,
-    "MuseBar/src/components/Admin/UserManagement.tsx": 402
+    "MuseBar/src/components/Administration/InboxPanel.tsx": 406
   }
 }
