@@ -236,6 +236,7 @@ export const DiningTableModel = {
         opened_by_user_id: number | null;
         last_served_by_user_id: number | null;
         has_validated_items: boolean;
+        has_active_items: boolean;
       }
     >
   > {
@@ -253,7 +254,16 @@ export const DiningTableModel = {
                     AND oti.establishment_id = t.establishment_id
                     AND oti.line_status = 'validated'
                 )
-              END AS has_validated_items
+              END AS has_validated_items,
+              CASE
+                WHEN ot.id IS NULL THEN FALSE
+                ELSE EXISTS (
+                  SELECT 1 FROM open_ticket_items oti
+                  WHERE oti.open_ticket_id = ot.id
+                    AND oti.establishment_id = t.establishment_id
+                    AND oti.line_status IN ('draft', 'validated')
+                )
+              END AS has_active_items
        FROM dining_tables t
        LEFT JOIN open_tickets ot
          ON ot.dining_table_id = t.id AND ot.status = 'open'
@@ -264,6 +274,7 @@ export const DiningTableModel = {
     return result.rows.map((row) => ({
       ...row,
       has_validated_items: row.has_validated_items === true,
+      has_active_items: row.has_active_items === true,
     }));
   },
 };

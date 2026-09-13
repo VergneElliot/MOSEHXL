@@ -2,6 +2,12 @@ import type { Response as ExpressResponse } from 'express';
 
 import { getLogger } from '../../utils/logger';
 import { AppError, NotFoundError, ValidationError } from '../../middleware/errorHandler';
+import { parseOptionalSubBillId } from '../../services/orders/createLegalInvoiceFromOrder';
+
+/** Parse optional `sub_bill_id` query param for receipt preview/print/export. */
+export function parseSubBillIdQuery(raw: unknown): number | null {
+  return parseOptionalSubBillId(raw);
+}
 
 export function sendPdfDownload(res: ExpressResponse, buffer: Buffer, filename: string): void {
   res.setHeader('Content-Type', 'application/pdf');

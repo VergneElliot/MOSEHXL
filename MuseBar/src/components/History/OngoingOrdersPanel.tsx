@@ -1,57 +1,24 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, Box, CircularProgress, Paper, Typography } from '@mui/material';
 import {
-  Box,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Typography,
-  Chip,
-  CircularProgress,
-  Alert,
-} from '@mui/material';
-import { listOngoingOrders, type OngoingOrderDto } from '../../services/api/floor';
-import { formatCurrency } from '../../utils/formatCurrency';
-import { formatDate } from '../../utils/formatDate';
-
-function fulfillmentLabel(status: OngoingOrderDto['items'][0]['fulfillment_status']): string {
-  switch (status) {
-    case 'pending_validation':
-      return 'En attente validation';
-    case 'kitchen_sent':
-      return 'Envoyé cuisine';
-    case 'validated':
-      return 'Validé';
-    default:
-      return status;
-  }
-}
-
-function fulfillmentColor(
-  status: OngoingOrderDto['items'][0]['fulfillment_status']
-): 'default' | 'warning' | 'info' | 'success' {
-  switch (status) {
-    case 'pending_validation':
-      return 'warning';
-    case 'kitchen_sent':
-      return 'info';
-    case 'validated':
-      return 'success';
-    default:
-      return 'default';
-  }
-}
+  listOngoingOrders,
+  setTicketItemFulfillment,
+  type OngoingOrderDto,
+} from '../../services/api/floorOngoingOrders';
+import { useStepUpAuth } from '../../contexts/StepUpAuthContext';
+import { useVisibleInterval } from '../../hooks/useVisibleInterval';
+import OngoingOrderTableCard from './OngoingOrderTableCard';
 
 const OngoingOrdersPanel: React.FC = () => {
+  const { ensureSession } = useStepUpAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [orders, setOrders] = useState<OngoingOrderDto[]>([]);
+  const [advancingKey, setAdvancingKey] = useState<string | null>(null);
 
-  const reload = useCallback(async () => {
-    setLoading(true);
+  const reload = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     setError(null);
     try {
       const data = await listOngoingOrders();
@@ -60,15 +27,42 @@ const OngoingOrdersPanel: React.FC = () => {
       const e = err as { message?: string };
       setError(e.message || 'Impossible de charger les commandes en cours');
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     void reload();
-    const t = window.setInterval(() => void reload(), 15000);
-    return () => window.clearInterval(t);
   }, [reload]);
+  useVisibleInterval(() => void reload({ silent: true }), 15000);
+
+  const onAdvance = useCallback(
+    async (
+      ticketId: number,
+      itemIds: number[],
+      status: 'sent' | 'served',
+      busyKey: string
+    ) => {
+      setAdvancingKey(busyKey);
+      setActionError(null);
+      try {
+        const actor = await ensureSession({
+          message: 'Saisissez votre PIN pour mettre à jour le statut de service.',
+        });
+        for (const itemId of itemIds) {
+          await setTicketItemFulfillment(ticketId, itemId, status, actor.token);
+        }
+        await reload({ silent: true });
+      } catch (err: unknown) {
+        const e = err as { message?: string };
+        if (e.message && /annul/i.test(e.message)) return;
+        setActionError(e.message || 'Impossible de mettre à jour le statut');
+      } finally {
+        setAdvancingKey(null);
+      }
+    },
+    [ensureSession, reload]
+  );
 
   if (loading && orders.length === 0) {
     return (
@@ -90,7 +84,7 @@ const OngoingOrdersPanel: React.FC = () => {
     return (
       <Paper sx={{ p: 3, textAlign: 'center' }}>
         <Typography color="text.secondary">
-          Aucune commande en cours (tables sans articles validés ou en attente).
+          Aucune commande en cours (tables sans articles validés).
         </Typography>
       </Paper>
     );
@@ -99,82 +93,21 @@ const OngoingOrdersPanel: React.FC = () => {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Typography variant="body2" color="text.secondary">
-        Tables avec articles en attente de validation ou déjà validés (service en cours). Les statuts
-        « Envoyé » / « Servi » seront affinés avec le plan de salle.
+        Suivi table par table après validation : Validé → Envoyé → Servi. Les chronos indiquent le
+        temps passé dans le statut actuel.
       </Typography>
+      {actionError && (
+        <Alert severity="error" onClose={() => setActionError(null)}>
+          {actionError}
+        </Alert>
+      )}
       {orders.map((order) => (
-        <Paper key={order.ticket_id} variant="outlined" sx={{ overflow: 'hidden' }}>
-          <Box
-            sx={{
-              px: 2,
-              py: 1.25,
-              bgcolor: 'action.hover',
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 1,
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <Box>
-              <Typography variant="subtitle1" fontWeight={700}>
-                Table {order.table_label}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Ticket #{order.ticket_id} · MAJ {formatDate(order.updated_at)}
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
-              {order.waiter_display_name && (
-                <Chip size="small" label={`Serveur : ${order.waiter_display_name}`} />
-              )}
-              <Chip
-                size="small"
-                color="warning"
-                variant="outlined"
-                label={`${order.draft_line_count} en attente`}
-              />
-              <Chip
-                size="small"
-                color="success"
-                variant="outlined"
-                label={`${order.validated_line_count} validé(s)`}
-              />
-              <Typography variant="body2" fontWeight={700}>
-                {formatCurrency(order.total_amount)}
-              </Typography>
-            </Box>
-          </Box>
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Article</TableCell>
-                  <TableCell align="right">Qté</TableCell>
-                  <TableCell align="right">Total</TableCell>
-                  <TableCell>Statut</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {order.items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>{item.product_name}</TableCell>
-                    <TableCell align="right">{item.quantity}</TableCell>
-                    <TableCell align="right">{formatCurrency(item.total_price)}</TableCell>
-                    <TableCell>
-                      <Chip
-                        size="small"
-                        label={fulfillmentLabel(item.fulfillment_status)}
-                        color={fulfillmentColor(item.fulfillment_status)}
-                        variant="outlined"
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
+        <OngoingOrderTableCard
+          key={order.ticket_id}
+          order={order}
+          advancingKey={advancingKey}
+          onAdvance={onAdvance}
+        />
       ))}
     </Box>
   );

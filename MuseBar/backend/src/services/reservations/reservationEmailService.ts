@@ -1,6 +1,6 @@
 /**
  * Best-effort reservation notification emails (guest + venue).
- * Guest-facing mail is sent From / Reply-To {slug}@mosehxl.com so replies land in the venue inbox.
+ * Guest mail: From slug@mosehxl.com, Reply-To slug+r{id}@ so replies attach to that booking.
  */
 
 import { formatDateLong, formatTime } from '@mosehxl/types';
@@ -13,8 +13,18 @@ import {
   createReservationActionToken,
   createReservationRemindToken,
 } from './reservationRemindToken';
+import { recordOutboundReservationEmail } from './recordOutboundReservationEmail';
+import {
+  venueInboxEmail,
+  venueInboxFromAddress,
+  venueInboxReservationReplyTo,
+} from './venueInboxAddress';
 
-const INBOX_DOMAIN = 'mosehxl.com';
+export {
+  venueInboxEmail,
+  venueInboxFromAddress,
+  venueInboxReservationReplyTo,
+} from './venueInboxAddress';
 
 function formatStartsAt(iso: string): string {
   return `${formatDateLong(iso)} à ${formatTime(iso)}`;
@@ -49,24 +59,22 @@ function getEmailService(): EmailService | null {
   }
 }
 
-export function venueInboxFromAddress(slug: string, establishmentName: string): string {
-  const email = `${slug}@${INBOX_DOMAIN}`;
-  const safeName = String(establishmentName || slug)
-    .replace(/[<>\r\n"]/g, '')
-    .trim()
-    .slice(0, 80);
-  return safeName ? `${safeName} <${email}>` : email;
-}
-
-export function venueInboxEmail(slug: string): string {
-  return `${slug}@${INBOX_DOMAIN}`;
-}
+type SendOpts = {
+  fromSlug: string;
+  establishmentName: string;
+  establishmentId?: string;
+  reservationId?: number | null;
+  /** Store a Boîte mail copy (guest-facing reservation mails). */
+  storeOutboundCopy?: boolean;
+  outboundSubject?: string;
+  outboundText?: string;
+};
 
 async function sendSafe(
   templateId: BuiltInTemplateId,
   to: string | null | undefined,
   data: Record<string, unknown>,
-  opts: { fromSlug: string; establishmentName: string }
+  opts: SendOpts
 ): Promise<void> {
   if (!to || !to.includes('@')) return;
   if (!opts.fromSlug) {
@@ -80,9 +88,27 @@ async function sendSafe(
   const service = getEmailService();
   if (!service) return;
   const from = venueInboxFromAddress(opts.fromSlug, opts.establishmentName);
-  const replyTo = venueInboxEmail(opts.fromSlug);
+  const replyTo =
+    opts.reservationId != null && opts.reservationId > 0
+      ? venueInboxReservationReplyTo(opts.fromSlug, opts.reservationId)
+      : venueInboxEmail(opts.fromSlug);
   try {
     await service.sendTemplateEmail(templateId, to, data, { from, replyTo });
+    if (
+      opts.storeOutboundCopy &&
+      opts.establishmentId &&
+      opts.reservationId != null &&
+      opts.reservationId > 0
+    ) {
+      await recordOutboundReservationEmail({
+        establishmentId: opts.establishmentId,
+        establishmentSlug: opts.fromSlug,
+        reservationId: opts.reservationId,
+        toAddress: to,
+        subject: opts.outboundSubject || String(templateId),
+        textBody: opts.outboundText || opts.outboundSubject || String(templateId),
+      });
+    }
   } catch (error) {
     Logger.getInstance().warn(
       'Reservation email failed',
@@ -90,6 +116,7 @@ async function sendSafe(
         templateId,
         to,
         from,
+        replyTo,
         error: error instanceof Error ? error.message : String(error),
       },
       'RESERVATION_EMAIL'
@@ -109,6 +136,24 @@ function commonPayload(r: Reservation, establishmentName: string): Record<string
   };
 }
 
+function guestMailOpts(
+  r: Reservation,
+  establishmentName: string,
+  establishmentSlug: string,
+  subject: string,
+  text: string
+): SendOpts {
+  return {
+    fromSlug: establishmentSlug,
+    establishmentName,
+    establishmentId: r.establishment_id,
+    reservationId: r.id,
+    storeOutboundCopy: true,
+    outboundSubject: subject,
+    outboundText: text,
+  };
+}
+
 export async function notifyReservationRequested(opts: {
   reservation: Reservation;
   establishmentName: string;
@@ -121,9 +166,22 @@ export async function notifyReservationRequested(opts: {
     ...commonPayload(r, establishmentName),
     relanceUrl: buildRelanceUrl(establishmentSlug, r.id),
   };
-  const mailOpts = { fromSlug: establishmentSlug, establishmentName };
-  await sendSafe(BuiltInTemplateId.RESERVATION_REQUESTED_GUEST, r.customer_email, common, mailOpts);
-  await sendSafe(BuiltInTemplateId.RESERVATION_REQUESTED_VENUE, venueEmail, common, mailOpts);
+  await sendSafe(
+    BuiltInTemplateId.RESERVATION_REQUESTED_GUEST,
+    r.customer_email,
+    common,
+    guestMailOpts(
+      r,
+      establishmentName,
+      establishmentSlug,
+      `Demande de réservation reçue — ${establishmentName}`,
+      `Demande enregistrée pour ${formatStartsAt(r.starts_at)} (${r.party_size} pers.).`
+    )
+  );
+  await sendSafe(BuiltInTemplateId.RESERVATION_REQUESTED_VENUE, venueEmail, common, {
+    fromSlug: establishmentSlug,
+    establishmentName,
+  });
 }
 
 export async function notifyReservationReminder(opts: {
@@ -135,8 +193,10 @@ export async function notifyReservationReminder(opts: {
 }): Promise<void> {
   const { reservation: r, establishmentName, establishmentSlug, venueEmail } = opts;
   const common = commonPayload(r, establishmentName);
-  const mailOpts = { fromSlug: establishmentSlug, establishmentName };
-  await sendSafe(BuiltInTemplateId.RESERVATION_REMINDER_VENUE, venueEmail, common, mailOpts);
+  await sendSafe(BuiltInTemplateId.RESERVATION_REMINDER_VENUE, venueEmail, common, {
+    fromSlug: establishmentSlug,
+    establishmentName,
+  });
 }
 
 export async function notifyReservationCancelled(opts: {
@@ -148,9 +208,22 @@ export async function notifyReservationCancelled(opts: {
 }): Promise<void> {
   const { reservation: r, establishmentName, establishmentSlug, venueEmail } = opts;
   const common = commonPayload(r, establishmentName);
-  const mailOpts = { fromSlug: establishmentSlug, establishmentName };
-  await sendSafe(BuiltInTemplateId.RESERVATION_CANCELLED_GUEST, r.customer_email, common, mailOpts);
-  await sendSafe(BuiltInTemplateId.RESERVATION_CANCELLED_VENUE, venueEmail, common, mailOpts);
+  await sendSafe(
+    BuiltInTemplateId.RESERVATION_CANCELLED_GUEST,
+    r.customer_email,
+    common,
+    guestMailOpts(
+      r,
+      establishmentName,
+      establishmentSlug,
+      `Réservation annulée — ${establishmentName}`,
+      `Annulation pour ${formatStartsAt(r.starts_at)}.`
+    )
+  );
+  await sendSafe(BuiltInTemplateId.RESERVATION_CANCELLED_VENUE, venueEmail, common, {
+    fromSlug: establishmentSlug,
+    establishmentName,
+  });
 }
 
 export async function notifyGuestReservationStatus(opts: {
@@ -162,8 +235,6 @@ export async function notifyGuestReservationStatus(opts: {
   const { reservation: r, establishmentName, establishmentSlug } = opts;
   if (!r.customer_email) return;
 
-  const mailOpts = { fromSlug: establishmentSlug, establishmentName };
-
   if (r.status === 'requested') {
     await sendSafe(
       BuiltInTemplateId.RESERVATION_REQUESTED_GUEST,
@@ -172,7 +243,13 @@ export async function notifyGuestReservationStatus(opts: {
         ...commonPayload(r, establishmentName),
         relanceUrl: buildRelanceUrl(establishmentSlug, r.id),
       },
-      mailOpts
+      guestMailOpts(
+        r,
+        establishmentName,
+        establishmentSlug,
+        `Demande de réservation reçue — ${establishmentName}`,
+        `Demande enregistrée pour ${formatStartsAt(r.starts_at)} (${r.party_size} pers.).`
+      )
     );
     return;
   }
@@ -186,12 +263,47 @@ export async function notifyGuestReservationStatus(opts: {
     cancelUrl: buildCancelUrl(establishmentSlug, r.id),
   };
 
+  const commentLine = r.status_reason ? `Commentaire : ${r.status_reason}` : 'Sans commentaire.';
+
   if (r.status === 'confirmed') {
-    await sendSafe(BuiltInTemplateId.RESERVATION_CONFIRMED, r.customer_email, data, mailOpts);
+    await sendSafe(
+      BuiltInTemplateId.RESERVATION_CONFIRMED,
+      r.customer_email,
+      data,
+      guestMailOpts(
+        r,
+        establishmentName,
+        establishmentSlug,
+        `Réservation confirmée — ${establishmentName}`,
+        `Statut : confirmée.\n${commentLine}`
+      )
+    );
   } else if (r.status === 'refused') {
-    await sendSafe(BuiltInTemplateId.RESERVATION_REFUSED, r.customer_email, data, mailOpts);
+    await sendSafe(
+      BuiltInTemplateId.RESERVATION_REFUSED,
+      r.customer_email,
+      data,
+      guestMailOpts(
+        r,
+        establishmentName,
+        establishmentSlug,
+        `Réservation refusée — ${establishmentName}`,
+        `Statut : refusée.\n${commentLine}`
+      )
+    );
   } else if (r.status === 'on_hold') {
-    await sendSafe(BuiltInTemplateId.RESERVATION_ON_HOLD, r.customer_email, data, mailOpts);
+    await sendSafe(
+      BuiltInTemplateId.RESERVATION_ON_HOLD,
+      r.customer_email,
+      data,
+      guestMailOpts(
+        r,
+        establishmentName,
+        establishmentSlug,
+        `Réservation en attente — ${establishmentName}`,
+        `Statut : en attente.\n${commentLine}`
+      )
+    );
   }
 }
 

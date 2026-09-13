@@ -18,6 +18,9 @@ import { useFloorPlanManagement } from '../../hooks/useFloorPlanManagement';
 import { resolvePinLengthRules } from '../../utils/pinRules';
 import FloorCanvasView, { type FloorCanvasTable } from './FloorCanvasView';
 import { SIZE_PRESETS, normalizeTableGeometry } from './floorGeometry';
+import TableResumeDialog from './TableResumeDialog';
+import { TableDropActionDialog } from './TableDropActionDialog';
+import { tableHasActiveOrder } from './tableOccupancy';
 
 const LazyPinPadDialog = React.lazy(() => import('../POS/PinPadDialog'));
 
@@ -46,15 +49,13 @@ const FloorPlanConsultPanel: React.FC<FloorPlanConsultPanelProps> = ({ onSwitchT
   const canvasTables: FloorCanvasTable[] = useMemo(
     () =>
       floor.planTables.map((t) => {
-        const occupied = t.has_validated_items === true;
-        const hasOpenTicket = t.open_ticket_id != null;
-        const isActive =
-          floor.activeTicketId != null && t.open_ticket_id === floor.activeTicketId;
+        const occupied = tableHasActiveOrder(t);
+        const isActive = floor.focusTableId === t.id;
         const disabled =
           floor.mode === 'transfer'
-            ? hasOpenTicket
+            ? occupied
             : floor.mode === 'merge'
-              ? !occupied || isActive
+              ? !occupied || t.open_ticket_id === floor.activeTicketId
               : false;
         return {
           id: t.id,
@@ -69,8 +70,10 @@ const FloorPlanConsultPanel: React.FC<FloorPlanConsultPanelProps> = ({ onSwitchT
           height: t.height || SIZE_PRESETS.M.height,
         };
       }),
-    [floor.planTables, floor.activeTicketId, floor.mode]
+    [floor.planTables, floor.focusTableId, floor.activeTicketId, floor.mode]
   );
+
+  const bannerTable = floor.focusTable ?? floor.activeTable;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, height: '100%', minHeight: 0 }}>
@@ -78,7 +81,7 @@ const FloorPlanConsultPanel: React.FC<FloorPlanConsultPanelProps> = ({ onSwitchT
         <Typography variant="h5">Plan de salle</Typography>
         <Typography variant="body2" color="text.secondary">
           Gestion des tables : ouvrir, transférer, fusionner ou abandonner une addition. Une session
-          PIN est requise.
+          PIN est requise. Glissez une table sur une autre pour transférer ou fusionner.
         </Typography>
       </Box>
 
@@ -96,21 +99,23 @@ const FloorPlanConsultPanel: React.FC<FloorPlanConsultPanelProps> = ({ onSwitchT
       ) : (
         <Alert severity="success" sx={{ py: 0.5 }}>
           Session : <strong>{floor.pinActor.displayName}</strong>
-          {floor.activeTable ? (
+          {bannerTable ? (
             <>
               {' '}
-              — table active : <strong>{floor.activeTable.label}</strong>
-              {floor.activeTable.assignedWaiterDisplayName && (
-                <> (serveur : {floor.activeTable.assignedWaiterDisplayName})</>
-              )}
+              — table active : <strong>{bannerTable.label}</strong>
+              {floor.activeTable?.id === floor.focusTableId &&
+                floor.activeTable.assignedWaiterDisplayName && (
+                  <> (serveur : {floor.activeTable.assignedWaiterDisplayName})</>
+                )}
+              {floor.focusTable && !tableHasActiveOrder(floor.focusTable) && <> (libre)</>}
             </>
           ) : (
-            <> — aucune table active (mode Ouvrir / charger pour en sélectionner une)</>
+            <> — aucune table active (touchez une table pour la sélectionner)</>
           )}
         </Alert>
       )}
 
-      {floor.activeTicketId != null && (
+      {floor.showTransferMergeModes && (
         <Box>
           <ToggleButtonGroup
             exclusive
@@ -128,7 +133,7 @@ const FloorPlanConsultPanel: React.FC<FloorPlanConsultPanelProps> = ({ onSwitchT
             {floor.mode === 'transfer' && 'Choisissez une table libre (destination).'}
             {floor.mode === 'merge' && 'Choisissez une autre table occupée (cible).'}
             {floor.mode === 'select' &&
-              'Touchez une table pour l’ouvrir dans la Caisse (session active).'}
+              'Touchez une table pour le résumé, ou glissez-la sur une autre pour déplacer l’addition.'}
           </Typography>
         </Box>
       )}
@@ -168,17 +173,19 @@ const FloorPlanConsultPanel: React.FC<FloorPlanConsultPanelProps> = ({ onSwitchT
                 const table = floor.planTables.find((t) => t.id === id);
                 if (table) floor.handleTableSelect(table);
               }}
+              onTableDrop={floor.handleTableDrop}
             />
           </Box>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             <Chip size="small" color="success" variant="outlined" label="Libre" />
             <Chip size="small" color="warning" variant="outlined" label="Occupée" />
+            <Chip size="small" color="primary" variant="outlined" label="Sélectionnée" />
           </Stack>
         </>
       )}
 
       {floor.activeTicketId != null && (
-          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ pt: 1 }}>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ pt: 1 }}>
           <Button color="inherit" variant="outlined" onClick={() => void floor.detachFromTable()}>
             Laisser ouverte
           </Button>
@@ -213,6 +220,21 @@ const FloorPlanConsultPanel: React.FC<FloorPlanConsultPanelProps> = ({ onSwitchT
           />
         </Suspense>
       )}
+
+      <TableResumeDialog
+        open={floor.resumeTable != null}
+        table={floor.resumeTable}
+        onClose={floor.clearResumeTable}
+        onOpenInPos={(table) => void floor.openTableInSession(table)}
+      />
+
+      <TableDropActionDialog
+        open={floor.dropPrompt != null}
+        prompt={floor.dropPrompt?.prompt ?? null}
+        onClose={floor.clearDropPrompt}
+        onTransfer={() => void floor.confirmDropTransfer()}
+        onMerge={() => void floor.confirmDropMerge()}
+      />
 
       <Snackbar
         open={snackbar.open}

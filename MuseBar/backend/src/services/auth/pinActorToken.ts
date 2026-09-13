@@ -1,9 +1,23 @@
 import { signJwtToken, verifyJwtToken } from '../../security/jwtConfig';
+import type { SignOptions } from 'jsonwebtoken';
 
 export const PIN_ACTOR_TOKEN_USE = 'pin_actor';
-/** Hard cap on a badge, whatever the activity: one long service, never a second day. */
-export const PIN_ACTOR_EXPIRES_IN = '12h';
-export const PIN_ACTOR_TTL_MS = 12 * 60 * 60 * 1000;
+
+/**
+ * Hard cap on a badge JWT / staff_pin_sessions.expires_at.
+ * Defaults to the remember-me refresh window (30 days). Override with AUTH_PIN_ACTOR_TTL_DAYS
+ * or AUTH_REFRESH_REMEMBER_DAYS.
+ */
+function resolvePinActorTtlDays(): number {
+  const raw = Number(
+    process.env.AUTH_PIN_ACTOR_TTL_DAYS ?? process.env.AUTH_REFRESH_REMEMBER_DAYS ?? 30
+  );
+  return Number.isFinite(raw) && raw > 0 ? raw : 30;
+}
+
+export const PIN_ACTOR_TTL_DAYS = resolvePinActorTtlDays();
+export const PIN_ACTOR_EXPIRES_IN = `${PIN_ACTOR_TTL_DAYS}d` as SignOptions['expiresIn'];
+export const PIN_ACTOR_TTL_MS = PIN_ACTOR_TTL_DAYS * 24 * 60 * 60 * 1000;
 
 export interface PinActorPayload {
   token_use: typeof PIN_ACTOR_TOKEN_USE;

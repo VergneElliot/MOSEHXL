@@ -90,8 +90,8 @@ const WaiterDayReportPanel: React.FC = () => {
         />
       </Box>
       <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-        Rapport informatif (pas un bulletin fiscal). Ventes à table par serveur ; ventes
-        directes dans Total comptoir.
+        Rapport informatif (pas un bulletin fiscal). Z individuels = ventes attribuées
+        (table ou comptoir avec session PIN). Total comptoir = caisse sans session PIN.
       </Typography>
       {error && (
         <Alert severity="error" sx={{ mb: 1 }}>

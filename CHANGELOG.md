@@ -18,11 +18,44 @@ Fiscal sequence counters are never reset across versions.
 
 ## [Unreleased]
 
-**Fiscal impact:** PATCH (no ISCA parameter change). Date/time unify is PATCH; planning series tools are MINOR capability (non-ISCA).
+**Fiscal impact:** PATCH (reservation inbox/inbound harden + prior En cours / cancel-reopen). Prior
+Unreleased items remain MINOR / PATCH as noted below.
+
+### Fixed
+
+- Copies venue « Nouvelle demande… » : l’email de contact Paramètres (`business_settings`)
+  est maintenant utilisé et synchronisé — plus le legacy `establishments.email`
+  (ex. `contact@musebar.fr` sans MX → Blocked SendGrid).
 
 ### Added
 
-- Historique « CA par serveur » : ligne **Total comptoir** (ventes sans table), séparée des Z individuels.
+- Réservations / Boîte mail : fil de conversation (copies sortantes) + Reply-To
+  `slug+r{id}@mosehxl.com` pour rattacher les réponses à la bonne réservation.
+- Réservations manuelles (agenda) : seed Boîte mail + lien `inbox_message_id` comme les
+  demandes publiques ; webhook inbound exempt du rate-limit / plafond 1 Mo.
+- Historique : annulation complète d’une vente **à table** avec option **Rouvrir la table**
+  (nouvel open ticket + articles restaurés en validés) — cas d’encaissement par erreur.
+- Historique « En cours » : pipeline de service **Validé → Envoyé → Servi** (horodatage
+  par étape, actions PIN depuis la liste table par table).
+- Historique / impression : facture en **un clic** (client défaut « Client », adresse
+  optionnelle, mentions paiement préremplies) ; infos B2B en panneau optionnel.
+  Commandes **partagées** : ticket ou facture pour **une partie** de paiement.
+- Caisse comptoir : encaissement possible **sans session PIN** (compte connecté suffit) ;
+  avec badge PIN, la vente alimente le **Z individuel** ; sans PIN → **Total comptoir**.
+  Les ventes à table exigent toujours une session PIN.
+- Plan de salle : glisser une table sur une autre → dialogue **Transférer** /
+  **Fusionner** ; la table active de la page suit le **dernier clic** (y compris
+  libre) pour le bandeau et les modes transfert/fusion.
+- Plan de salle : dialogue de reprise avant Caisse (lignes, statuts En attente / Validée,
+  chronos ticket et lignes, CTA « Ouvrir en caisse »). Transfert / fusion inchangés.
+- Plan de salle / Caisse : une table est **libre** dès qu’aucune ligne d’addition
+  (brouillon ou validée) n’y vit — les tickets ouverts vides ne bloquent plus le
+  transfert et le résumé affiche « Table libre ».
+- Options de paiement → Partage : trois colonnes (articles | Actions | paiements) ;
+  glisser un article d’un paiement à un autre (ou vers le pool) ; Actions = Parts
+  égales, → Paiement N, Répartir….
+- Historique « CA par serveur » : ligne **Total comptoir** (ventes sans attribution
+  serveur / caisse sans PIN), séparée des Z individuels (table + comptoir avec PIN).
 - Caisse : permission spécifique **Remise** (`pos_apply_remise`), distincte du Happy Hour
   manuel — case à cocher dans Gestion des utilisateurs.
 - Settings → **Profil** : prénom, nom, date de naissance, téléphone (optionnels) et **couleur
@@ -47,12 +80,20 @@ Fiscal sequence counters are never reset across versions.
 
 ### Changed
 
+- Historique « En cours » : articles identiques regroupés (même statut) ; actions Envoyé /
+  Servi sur le groupe.
+- Plan de salle — reprise table : statuts **Validé / Envoyé / Servi** alignés sur
+  Historique « En cours » ; quantités en unités (`1×`) ; articles identiques regroupés
+  (même produit + même statut).
+- Historique « En cours » / validation table : le statut après validation est **Validé**
+  (plus « Envoyé cuisine ») ; « En attente » n’est plus un statut de service (brouillons
+  sans pastille en caisse ; reprise table = « Non validé »).
 - Annulation / retour : les articles **brouillon** (comptoir ou table non validée) restent
   retirables par tout badge ; articles **validés** (cuisine) et ventes **encaissées** exigent
   la permission spécifique `orders_cancel`. Abandon de table avec lignes validées aussi.
 - Tables / Z : le propriétaire est le PIN qui **ouvre** la table (`last_served_by_user_id`) ;
-  l’intervention n’en vole plus la propriété ni le Z ; seul « Assigner à » transfère. Les ventes
-  comptoir n’alimentent plus un Z individuel (bucket **Total comptoir**).
+  l’intervention n’en vole plus la propriété ni le Z ; seul « Assigner à » transfère. Comptoir
+  **avec** session PIN → Z individuel ; comptoir **sans** PIN → **Total comptoir**.
 - Caisse : Happy Hour (panier + puce d’en-tête), Offert, Perso, Remise et réaffectation
   serveur sont des permissions **spécifiques** (session PIN ou invite ponctuelle). Affecter
   une commande à une **table** reste basique.
@@ -78,8 +119,10 @@ Fiscal sequence counters are never reset across versions.
 - Sessions PIN : fermer un badge le révoque immédiatement côté serveur au lieu d'attendre
   l'expiration du jeton. Un badge est également fermé automatiquement lorsque son PIN ou
   ses permissions changent.
-- Sessions PIN : durée de vie bornée par trois limites — **12 h** maximum, **60 min** d'inactivité,
-  et **fermeture de toutes les sessions à la clôture journalière** (le service est terminé).
+- Sessions PIN : durée de vie alignée sur « se souvenir de moi » — **30 jours** par défaut
+  (plus de timeout d'inactivité 60 min, plus de fermeture automatique à la clôture
+  journalière). Fermeture explicite / changement de PIN ou de droits / désactivation
+  de compte restent actifs.
 - Gestion des utilisateurs : « Supprimer » devient **« Désactiver »**. Le compte est conservé
   (adhésion désactivée, PIN effacé, badges fermés, sessions de connexion révoquées) afin que ses
   commandes, entrées de journal et pointages restent attribuables. Un compte désactivé peut être
@@ -88,6 +131,9 @@ Fiscal sequence counters are never reset across versions.
 
 ### Fixed
 
+- Caisse / Options de paiement : glisser-déposer tactile unifié — maintien idle **500 ms**
+  (tolérance 10 px pour garder le scroll) sur cartes produit et partage ; menu contextuel
+  partage à **800 ms**.
 - Auth : verrouillage après échecs de login beaucoup plus court (défaut 2→15 min au lieu de
   15→240) ; bouton **Déverrouiller** en Gestion des utilisateurs ; pages publiques
   (`/reserve/…`) n’attendent plus le bootstrap de session.

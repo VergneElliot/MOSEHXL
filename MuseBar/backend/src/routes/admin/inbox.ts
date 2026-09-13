@@ -14,6 +14,9 @@ import {
 } from '../../services/storage/objectStorage';
 import { ReservationModel } from '../../models/reservation';
 import { GuestNoShowFlagModel } from '../../models/guestNoShowFlag';
+import { venueInboxReservationReplyTo } from '../../services/reservations/venueInboxAddress';
+import { recordOutboundReservationEmail } from '../../services/reservations/recordOutboundReservationEmail';
+import { resolveVenueContactEmail } from '../../services/establishment/venueContactEmail';
 
 const router = express.Router();
 router.use(requireAuth, requireEstablishmentAdminOrPermission(P.access_inbox));
@@ -32,14 +35,16 @@ router.get(
       offset: Number.isFinite(offset) ? offset : 0,
     });
     const est = await pool.query(
-      `SELECT slug, email, admin_inbox_autoforward FROM establishments WHERE id = $1`,
+      `SELECT slug, admin_inbox_autoforward FROM establishments WHERE id = $1`,
       [establishmentId]
     );
+    const contactEmail = await resolveVenueContactEmail(establishmentId);
     return res.json({
       ...data,
       inbox_address: est.rows[0]?.slug ? `${est.rows[0].slug}@mosehxl.com` : null,
       autoforward: est.rows[0]?.admin_inbox_autoforward ?? true,
-      owner_email: est.rows[0]?.email ?? null,
+      owner_email: contactEmail,
+      contact_email: contactEmail,
     });
   })
 );
@@ -50,14 +55,16 @@ router.get(
     const establishmentId = getEstablishmentId(req, res);
     if (!establishmentId) return;
     const est = await pool.query(
-      `SELECT slug, email, admin_inbox_autoforward FROM establishments WHERE id = $1`,
+      `SELECT slug, admin_inbox_autoforward FROM establishments WHERE id = $1`,
       [establishmentId]
     );
     if (!est.rows[0]) throw new NotFoundError('Établissement introuvable');
+    const contactEmail = await resolveVenueContactEmail(establishmentId);
     return res.json({
       inbox_address: est.rows[0].slug ? `${est.rows[0].slug}@mosehxl.com` : null,
       autoforward: est.rows[0].admin_inbox_autoforward,
-      owner_email: est.rows[0].email,
+      owner_email: contactEmail,
+      contact_email: contactEmail,
     });
   })
 );
@@ -73,13 +80,15 @@ router.put(
     const result = await pool.query(
       `UPDATE establishments SET admin_inbox_autoforward = $2, updated_at = CURRENT_TIMESTAMP
        WHERE id = $1
-       RETURNING slug, email, admin_inbox_autoforward`,
+       RETURNING slug, admin_inbox_autoforward`,
       [establishmentId, req.body.autoforward]
     );
+    const contactEmail = await resolveVenueContactEmail(establishmentId);
     return res.json({
       inbox_address: result.rows[0]?.slug ? `${result.rows[0].slug}@mosehxl.com` : null,
       autoforward: result.rows[0]?.admin_inbox_autoforward,
-      owner_email: result.rows[0]?.email,
+      owner_email: contactEmail,
+      contact_email: contactEmail,
     });
   })
 );
@@ -94,7 +103,13 @@ router.get(
     const message = await InboxModel.getMessage(establishmentId, id);
     if (!message) throw new NotFoundError('Message introuvable');
     await InboxModel.markRead(establishmentId, id, true);
-    let reservation = await ReservationModel.findByInboxMessageId(establishmentId, id);
+    let reservation =
+      message.reservation_id != null
+        ? await ReservationModel.getById(establishmentId, message.reservation_id)
+        : null;
+    if (!reservation) {
+      reservation = await ReservationModel.findByInboxMessageId(establishmentId, id);
+    }
     if (!reservation) {
       const emailMatch = String(message.from_address || '').match(/[\w.+-]+@[\w.-]+\.\w+/);
       if (emailMatch) {
@@ -234,12 +249,23 @@ router.post(
       throw new ValidationError('Adresse destinataire introuvable dans le message');
     }
 
+    let reservationId = message.reservation_id;
+    if (reservationId == null) {
+      const bySeed = await ReservationModel.findByInboxMessageId(establishmentId, id);
+      reservationId = bySeed?.id ?? null;
+    }
+
+    const replyTo =
+      reservationId != null
+        ? venueInboxReservationReplyTo(slug, reservationId)
+        : fromAddress;
+
     const emailService = EmailService.getInstance(getEnvironmentConfig(), Logger.getInstance());
     try {
       await emailService.sendEmail({
         to: toAddress,
         from: fromAddress,
-        replyTo: fromAddress,
+        replyTo,
         subject: message.subject.startsWith('Re:') ? message.subject : `Re: ${message.subject}`,
         text: body,
         html: `<pre style="font-family:sans-serif;white-space:pre-wrap">${body
@@ -255,7 +281,27 @@ router.post(
       );
     }
 
-    return res.json({ success: true, from: fromAddress });
+    if (reservationId != null) {
+      await recordOutboundReservationEmail({
+        establishmentId,
+        establishmentSlug: slug,
+        reservationId,
+        toAddress,
+        subject: message.subject.startsWith('Re:') ? message.subject : `Re: ${message.subject}`,
+        textBody: body,
+      });
+    } else {
+      await InboxModel.createMessage({
+        establishment_id: establishmentId,
+        from_address: fromAddress,
+        to_address: toAddress,
+        subject: message.subject.startsWith('Re:') ? message.subject : `Re: ${message.subject}`,
+        text_body: body,
+        direction: 'outbound',
+      });
+    }
+
+    return res.json({ success: true, from: fromAddress, reply_to: replyTo });
   })
 );
 

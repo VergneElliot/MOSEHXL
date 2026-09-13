@@ -170,12 +170,12 @@ export function moveItemsToBill(
   orderTotal?: number
 ): LocalSubBill[] {
   if (!bills[billIndex] || items.length === 0) return bills;
-  const sourceIds = items.map(i => i.id);
+  const sourceIds = items.map(i => sourceItemId(i.id));
   const next = clearItemsFromBills(bills, sourceIds);
   const target = next[billIndex]!;
   const merged = [...target.items];
   for (const item of items) {
-    merged.push({ ...item });
+    merged.push({ ...item, id: sourceItemId(item.id) });
   }
   next[billIndex] = syncBillItems(target, merged);
   return orderTotal != null ? recomputeBillTotals(next, orderTotal) : next;

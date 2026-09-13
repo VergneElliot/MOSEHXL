@@ -29,6 +29,8 @@ interface ReturnDialogProps {
   onSelectedItemIdsChange: (ids: string[]) => void;
   selectedTip: boolean;
   onSelectedTipChange: (value: boolean) => void;
+  reopenTable: boolean;
+  onReopenTableChange: (value: boolean) => void;
   onConfirm: () => void;
   onClose: () => void;
   loading: boolean;
@@ -47,6 +49,8 @@ const ReturnDialog: React.FC<ReturnDialogProps> = ({
   onSelectedItemIdsChange,
   selectedTip,
   onSelectedTipChange,
+  reopenTable,
+  onReopenTableChange,
   onConfirm,
   onClose,
   loading,
@@ -64,6 +68,7 @@ const ReturnDialog: React.FC<ReturnDialogProps> = ({
   };
 
   const hasTip = order.tips != null && order.tips > 0;
+  const canReopenTable = Boolean(order.tableLabel) && order.operationType !== 'change';
   const canConfirm =
     reason.trim().length > 0 &&
     (!isPartial || selectedItemIds.length > 0 || selectedTip);
@@ -76,6 +81,7 @@ const ReturnDialog: React.FC<ReturnDialogProps> = ({
           <Typography variant="body2" color="textSecondary">
             Commande #{String(order.id).slice(0, 8)}… — {formatDateTime(order.createdAt)} —{' '}
             {formatCurrency(order.totalAmount)}
+            {order.tableLabel ? ` — Table ${order.tableLabel}` : ''}
           </Typography>
 
           <TextField
@@ -93,7 +99,11 @@ const ReturnDialog: React.FC<ReturnDialogProps> = ({
             control={
               <Checkbox
                 checked={isPartial}
-                onChange={e => onPartialChange(e.target.checked)}
+                onChange={e => {
+                  const next = e.target.checked;
+                  onPartialChange(next);
+                  if (next) onReopenTableChange(false);
+                }}
                 disabled={order.operationType === 'change' || order.items.length === 0}
               />
             }
@@ -139,6 +149,25 @@ const ReturnDialog: React.FC<ReturnDialogProps> = ({
             />
           )}
 
+          {canReopenTable && !isPartial && (
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={reopenTable}
+                  onChange={e => onReopenTableChange(e.target.checked)}
+                />
+              }
+              label={`Rouvrir la table ${order.tableLabel} avec la même commande`}
+            />
+          )}
+
+          {reopenTable && canReopenTable && (
+            <Alert severity="info">
+              L’annulation fiscale est enregistrée, puis la table est rouverte avec les articles
+              validés pour pouvoir continuer le service (ex. encaissement par erreur).
+            </Alert>
+          )}
+
           {errorMessage && (
             <Alert severity="error" onClose={() => {}}>
               {errorMessage}
@@ -148,7 +177,7 @@ const ReturnDialog: React.FC<ReturnDialogProps> = ({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={loading}>
-          Annuler
+          Fermer
         </Button>
         <Button
           variant="contained"
@@ -157,7 +186,11 @@ const ReturnDialog: React.FC<ReturnDialogProps> = ({
           disabled={loading || !canConfirm}
           startIcon={loading ? <CircularProgress size={16} color="inherit" /> : undefined}
         >
-          {loading ? 'Traitement…' : 'Confirmer le retour'}
+          {loading
+            ? 'Traitement…'
+            : reopenTable && canReopenTable
+              ? 'Annuler et rouvrir la table'
+              : 'Confirmer le retour'}
         </Button>
       </DialogActions>
     </Dialog>

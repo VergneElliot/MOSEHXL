@@ -58,18 +58,6 @@ export async function getDocumentDownloadUrl(id: number) {
   return request<{ url: string; file_name: string }>(`/admin/documents/${id}/download-url`);
 }
 
-export async function listInbox(params?: { archived?: boolean }) {
-  const qs = new URLSearchParams();
-  if (params?.archived) qs.set('archived', 'true');
-  const suffix = qs.toString() ? `?${qs}` : '';
-  return request<{
-    messages: InboxMessageDto[];
-    total: number;
-    inbox_address: string | null;
-    autoforward: boolean;
-  }>(`/admin/inbox${suffix}`);
-}
-
 export async function getInboxMessage(id: number) {
   return request<{
     message: InboxMessageDto & { attachments: InboxAttachmentDto[] };

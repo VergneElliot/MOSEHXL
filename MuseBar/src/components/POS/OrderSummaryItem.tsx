@@ -75,11 +75,11 @@ const OrderSummaryItem = React.memo(function OrderSummaryItem({
                 >
                   {item.productName}
                 </Typography>
-                {showTableLineStatus && !item.isTip && (
+                {showTableLineStatus && !item.isTip && isValidatedTableLine && (
                   <Chip
-                    label={isValidatedTableLine ? 'Validé' : 'En attente'}
+                    label="Validé"
                     size="small"
-                    color={isValidatedTableLine ? 'success' : 'warning'}
+                    color="success"
                     variant="outlined"
                     sx={{ mt: 0.35, height: 22, fontSize: '0.68rem', fontWeight: 700 }}
                   />

@@ -4,7 +4,7 @@
  * - Tab Faire de la monnaie: card→cash change
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -68,6 +68,10 @@ export const PaymentDialogContainer: React.FC<PaymentDialogProps> = ({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const tipsTotal = tipsFromOrder(currentOrder);
+  const cartHasSaleItems = useMemo(
+    () => currentOrder.some((item) => !item.isTip),
+    [currentOrder]
+  );
 
   const paymentLogic = usePaymentLogic(
     currentOrder,
@@ -79,6 +83,14 @@ export const PaymentDialogContainer: React.FC<PaymentDialogProps> = ({
     onClearOrder,
     onClose
   );
+
+  // Empty cart → monnaie tab (Partage needs lines). Re-select when dialog opens.
+  useEffect(() => {
+    if (!open) return;
+    paymentLogic.setTabValue(cartHasSaleItems ? 0 : 1);
+    // Only when opening / cart emptiness changes — not every paymentLogic identity churn.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, cartHasSaleItems]);
 
   const taxParts = useMemo(() => taxBreakdownByRate(currentOrder), [currentOrder]);
   const splitValid = useMemo(() => {
@@ -128,6 +140,7 @@ export const PaymentDialogContainer: React.FC<PaymentDialogProps> = ({
               label="Partage"
               id="payment-tab-0"
               aria-controls="payment-tabpanel-0"
+              disabled={!cartHasSaleItems}
             />
             <Tab
               icon={<ChangeTabIcon />}
@@ -141,17 +154,23 @@ export const PaymentDialogContainer: React.FC<PaymentDialogProps> = ({
         </Box>
 
         <TabPanel value={paymentLogic.state.tabValue} index={0}>
-          <SplitBoard
-            orderTotal={orderTotal}
-            currentOrder={currentOrder}
-            splitCount={paymentLogic.state.splitCount}
-            subBills={paymentLogic.state.subBills}
-            onSplitCountChange={paymentLogic.setSplitCount}
-            onSubBillsChange={paymentLogic.setSubBills}
-            onSubBillPaymentMethodChange={paymentLogic.updateSubBillPaymentMethod}
-            loading={paymentLogic.state.loading}
-            onConfirm={paymentLogic.handleSplitPayment}
-          />
+          {cartHasSaleItems ? (
+            <SplitBoard
+              orderTotal={orderTotal}
+              currentOrder={currentOrder}
+              splitCount={paymentLogic.state.splitCount}
+              subBills={paymentLogic.state.subBills}
+              onSplitCountChange={paymentLogic.setSplitCount}
+              onSubBillsChange={paymentLogic.setSubBills}
+              onSubBillPaymentMethodChange={paymentLogic.updateSubBillPaymentMethod}
+              loading={paymentLogic.state.loading}
+              onConfirm={paymentLogic.handleSplitPayment}
+            />
+          ) : (
+            <Alert severity="info">
+              Ajoutez des articles à la commande pour utiliser le partage de paiement.
+            </Alert>
+          )}
         </TabPanel>
 
         <TabPanel value={paymentLogic.state.tabValue} index={1}>

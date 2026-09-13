@@ -41,8 +41,12 @@ export class RateLimitMiddleware {
   }
 
   private async run(req: Request, res: Response, next: NextFunction): Promise<void> {
-    // Skip rate limiting for health checks so probes do not consume the budget (fixes 429 on login)
+    // Skip rate limiting for health checks and SendGrid Inbound Parse webhooks
+    // (shared SendGrid egress IPs must not burn the global IP budget).
     if (req.method === 'GET' && req.originalUrl === '/api/health') {
+      return next();
+    }
+    if (req.originalUrl.startsWith('/api/inbound-email')) {
       return next();
     }
 

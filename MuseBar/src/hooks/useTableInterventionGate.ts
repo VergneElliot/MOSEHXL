@@ -27,29 +27,37 @@ export function useTableInterventionGate(
   }, [activeTable, pinActor, ensurePermission]);
 }
 
-/** Keep createOrder attribution in sync: table → owner Z; comptoir → Total comptoir (null waiter). */
+/** Keep createOrder attribution in sync with PIN + table context. */
 export function useFloorOrderAttributionSync(
   pinActor: PinActorState | null | undefined,
   activeTable: ActiveTableState | null | undefined
 ): void {
   useEffect(() => {
-    if (!pinActor) {
-      setFloorOrderAttribution(null);
-      return;
-    }
     if (activeTable) {
+      if (!pinActor) {
+        setFloorOrderAttribution(null);
+        return;
+      }
       setFloorOrderAttribution({
         waiterUserId: activeTable.assignedWaiterUserId ?? pinActor.userId,
         waiterDisplayName:
           activeTable.assignedWaiterDisplayName ?? pinActor.displayName,
         tableLabel: activeTable.label ?? null,
       });
-    } else {
+      return;
+    }
+    if (pinActor) {
       setFloorOrderAttribution({
-        waiterUserId: null,
-        waiterDisplayName: null,
+        waiterUserId: pinActor.userId,
+        waiterDisplayName: pinActor.displayName,
         tableLabel: null,
       });
+      return;
     }
+    setFloorOrderAttribution({
+      waiterUserId: null,
+      waiterDisplayName: null,
+      tableLabel: null,
+    });
   }, [pinActor, activeTable]);
 }

@@ -1,0 +1,5 @@
+.pos-drop-active {
+  outline: 2px solid var(--pos-primary, #1976d2) !important;
+  outline-offset: 0;
+  background-color: rgba(25, 118, 210, 0.08) !important;
+}

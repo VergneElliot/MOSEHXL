@@ -8,6 +8,7 @@ import {
   buildReceiptDataForOrder,
   logPrintingHistory,
 } from '../../printing/printDataRepo';
+import { buildReceiptDataForSubBill } from '../../printing/printDataSubBill';
 import {
   renderClosureBulletinPdf,
   renderReceiptOrInvoicePdf,
@@ -27,7 +28,13 @@ import type { AuthenticatedRequest } from '../userManagement/types';
 import { asyncHandler, ValidationError } from '../../middleware/errorHandler';
 import { ensureEstablishment, getPrintingUser } from './context';
 import { buildFlux103Attachment } from '../../services/documents/flux103Service';
-import { mapDocumentRouteError, sendPdfDownload, sendXlsxDownload, sendXmlDownload } from './documentHelpers';
+import {
+  mapDocumentRouteError,
+  parseSubBillIdQuery,
+  sendPdfDownload,
+  sendXlsxDownload,
+  sendXmlDownload,
+} from './documentHelpers';
 
 const router = Router();
 
@@ -38,7 +45,11 @@ router.get('/receipt/:orderId/export-pdf', authenticateToken, ensureEstablishmen
     const orderId = parseInt(req.params.orderId ?? '', 10);
     if (!Number.isFinite(orderId) || orderId <= 0) throw new ValidationError('Invalid order id');
     const type = typeof req.query.type === 'string' ? req.query.type : 'detailed';
-    const receiptData = await buildReceiptDataForOrder(pool, user.establishment_id, user, orderId, type);
+    const subBillId = parseSubBillIdQuery(req.query.sub_bill_id);
+    const receiptData =
+      subBillId != null
+        ? await buildReceiptDataForSubBill(pool, user.establishment_id, user, orderId, subBillId, type)
+        : await buildReceiptDataForOrder(pool, user.establishment_id, user, orderId, type);
     const pdf = await renderReceiptOrInvoicePdf(receiptData);
     sendPdfDownload(res, pdf, `ticket-${receiptData.document_number ?? orderId}.pdf`);
   } catch (error) {
@@ -53,7 +64,11 @@ router.post('/receipt/:orderId/email', authenticateToken, ensureEstablishment, a
     const orderId = parseInt(req.params.orderId ?? '', 10);
     if (!Number.isFinite(orderId) || orderId <= 0) throw new ValidationError('Invalid order id');
     const type = typeof req.query.type === 'string' ? req.query.type : 'detailed';
-    const receiptData = await buildReceiptDataForOrder(pool, user.establishment_id, user, orderId, type);
+    const subBillId = parseSubBillIdQuery(req.query.sub_bill_id);
+    const receiptData =
+      subBillId != null
+        ? await buildReceiptDataForSubBill(pool, user.establishment_id, user, orderId, subBillId, type)
+        : await buildReceiptDataForOrder(pool, user.establishment_id, user, orderId, type);
     const to = validateRecipientEmail(req.body?.to);
     const result = await emailReceiptDocument(receiptData, to);
     await logPrintingHistory(pool, user.establishment_id, 'receipt', { success: true, message: result.message }, {
@@ -61,6 +76,7 @@ router.post('/receipt/:orderId/email', authenticateToken, ensureEstablishment, a
       action: 'email',
       recipient: to,
       tracking_id: result.trackingId,
+      ...(subBillId != null ? { sub_bill_id: subBillId } : {}),
     });
     res.json({ success: true, ...result });
   } catch (error) {

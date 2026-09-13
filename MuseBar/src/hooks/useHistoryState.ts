@@ -34,6 +34,7 @@ export interface HistoryState {
   selectedItemsToReturn: string[];
   selectedTipToReturn: boolean;
   isPartialReturn: boolean;
+  reopenTableAfterCancel: boolean;
   returnLoading: boolean;
   returnSuccess: string;
   returnError: string;
@@ -60,6 +61,7 @@ export interface HistoryActions {
   setSelectedItemsToReturn: (items: string[]) => void;
   setSelectedTipToReturn: (selected: boolean) => void;
   setIsPartialReturn: (partial: boolean) => void;
+  setReopenTableAfterCancel: (reopen: boolean) => void;
   setReturnLoading: (loading: boolean) => void;
   setReturnSuccess: (message: string) => void;
   setReturnError: (error: string) => void;
@@ -96,6 +98,7 @@ export const useHistoryState = (): [HistoryState, HistoryActions] => {
   const [selectedItemsToReturn, setSelectedItemsToReturn] = useState<string[]>([]);
   const [selectedTipToReturn, setSelectedTipToReturn] = useState<boolean>(false);
   const [isPartialReturn, setIsPartialReturn] = useState(false);
+  const [reopenTableAfterCancel, setReopenTableAfterCancel] = useState(false);
   const [returnLoading, setReturnLoading] = useState(false);
   const [returnSuccess, setReturnSuccess] = useState('');
   const [returnError, setReturnError] = useState('');
@@ -123,6 +126,7 @@ export const useHistoryState = (): [HistoryState, HistoryActions] => {
     setSelectedItemsToReturn([]);
     setSelectedTipToReturn(false);
     setIsPartialReturn(false);
+    setReopenTableAfterCancel(false);
     setReturnError('');
     setReturnSuccess('');
   };
@@ -134,6 +138,7 @@ export const useHistoryState = (): [HistoryState, HistoryActions] => {
     setSelectedItemsToReturn([]);
     setSelectedTipToReturn(false);
     setIsPartialReturn(false);
+    setReopenTableAfterCancel(false);
     setReturnLoading(false);
     setReturnError('');
     setReturnSuccess('');
@@ -158,6 +163,7 @@ export const useHistoryState = (): [HistoryState, HistoryActions] => {
     selectedItemsToReturn,
     selectedTipToReturn,
     isPartialReturn,
+    reopenTableAfterCancel,
     returnLoading,
     returnSuccess,
     returnError,
@@ -179,6 +185,7 @@ export const useHistoryState = (): [HistoryState, HistoryActions] => {
     setSelectedItemsToReturn,
     setSelectedTipToReturn,
     setIsPartialReturn,
+    setReopenTableAfterCancel,
     setReturnLoading,
     setReturnSuccess,
     setReturnError,

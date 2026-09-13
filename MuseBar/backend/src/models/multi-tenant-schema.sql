@@ -12,12 +12,19 @@ CREATE TABLE IF NOT EXISTS establishments (
     schema_name VARCHAR(50) NOT NULL UNIQUE,
     subscription_plan VARCHAR(50) DEFAULT 'basic',
     subscription_status VARCHAR(20) DEFAULT 'active',
+    status VARCHAR(30) NOT NULL DEFAULT 'active',
+    tva_number VARCHAR(50),
+    siret_number VARCHAR(20),
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     
     CONSTRAINT valid_subscription_plan CHECK (subscription_plan IN ('basic', 'premium', 'enterprise')),
     CONSTRAINT valid_subscription_status CHECK (subscription_status IN ('active', 'suspended', 'cancelled'))
 );
+
+ALTER TABLE establishments ADD COLUMN IF NOT EXISTS status VARCHAR(30) NOT NULL DEFAULT 'active';
+ALTER TABLE establishments ADD COLUMN IF NOT EXISTS tva_number VARCHAR(50);
+ALTER TABLE establishments ADD COLUMN IF NOT EXISTS siret_number VARCHAR(20);
 
 -- Enhanced users table with establishment linking
 ALTER TABLE users 

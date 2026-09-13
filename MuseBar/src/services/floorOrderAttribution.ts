@@ -1,9 +1,11 @@
-/** Station-local attribution applied to the next createOrder when a PIN session is active. */
+/** Station-local attribution applied to the next createOrder. */
 
 export interface FloorOrderAttribution {
   /**
-   * Table owner for Z / CA. Null for comptoir (direct sale) — those sales go to Total comptoir,
-   * not an individual waiter Z. Traceability still uses account + PIN session on the order.
+   * Waiter for Z / CA.
+   * - Table: assigned owner
+   * - Comptoir + PIN: PIN identity → individual Z
+   * - Comptoir without PIN: null → Total comptoir
    */
   waiterUserId: number | null;
   waiterDisplayName: string | null;

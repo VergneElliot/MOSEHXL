@@ -63,7 +63,7 @@ Shared canvas: `components/floor/FloorCanvasView.tsx`, `floorGeometry.ts`.
 | Feature | Service | Runbook |
 |---------|---------|---------|
 | Document uploads | DigitalOcean Spaces | `docs/runbooks/ADMIN-SPACE-INBOUND-AND-STORAGE.md` §1 |
-| Inbound mail `slug@mosehxl.com` | SendGrid Inbound Parse | same runbook §2 |
+| Inbound mail `slug@mosehxl.com` | SendGrid Inbound Parse | same runbook §2 + §6 (reply incidents) |
 | Outbound mail (reservations, etc.) | SendGrid domain auth | same runbook §0 |
 | Multi-venue switching | memberships | `docs/runbooks/MULTI-ESTABLISHMENT-MEMBERSHIPS.md` |
 

@@ -49,6 +49,41 @@ vi.mock('../../middleware/pinActor', () => ({
   },
   requirePinActor: () => (_req: express.Request, _res: express.Response, next: express.NextFunction) => next(),
   parsePinBody: (pin: unknown) => String(pin),
+  readOptionalPinActor: () => null,
+}));
+
+vi.mock('../../middleware/requirePosPinActorForTableOrders', () => ({
+  requirePosPinActorForTableOrders: (
+    req: express.Request,
+    _res: express.Response,
+    next: express.NextFunction
+  ) => {
+    req.pinActor = {
+      token_use: 'pin_actor',
+      id: 42,
+      email: 'waiter@test.local',
+      role: 'staff',
+      establishment_id: '11111111-1111-1111-1111-111111111111',
+      display_name: 'Waiter Test',
+      permissions: ['access_pos'],
+    };
+    next();
+  },
+}));
+
+vi.mock('../../middleware/auth', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../middleware/auth')>();
+  return {
+    ...actual,
+    requirePermission: () => (_req: express.Request, _res: express.Response, next: express.NextFunction) =>
+      next(),
+  };
+});
+
+vi.mock('../../models/database/productModel', () => ({
+  ProductModel: {
+    getPrintPickupSlipFlags: vi.fn().mockResolvedValue(new Map()),
+  },
 }));
 
 vi.mock('../../models', () => ({
@@ -99,6 +134,7 @@ vi.mock('../../models/database/productOptionGroupModel', () => ({
 vi.mock('../../models/database/kitchenPrinterModel', () => ({
   KitchenPrinterModel: {
     getAssignmentsForProducts: vi.fn().mockResolvedValue(new Map()),
+    getAllActive: vi.fn().mockResolvedValue([]),
   },
 }));
 

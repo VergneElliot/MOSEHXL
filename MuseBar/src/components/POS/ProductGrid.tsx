@@ -7,6 +7,7 @@ import {
 import { Product, Category } from '../../types';
 import { POS_PRODUCT_DND_MIME } from './posProductDnD';
 import { setCompactDragGhost } from './posDragGhost';
+import { PosTouchDraggable } from './PosTouchDraggable';
 import './ProductGrid.css';
 
 interface ProductGridProps {
@@ -139,10 +140,14 @@ function startSpecialDrag(
 
 const DiversCard = React.memo(function DiversCard({ onAdd }: { onAdd: () => void }) {
   return (
-    <div
+    <PosTouchDraggable
       className="pos-card pos-card--special"
-      draggable
       onDragStart={e => startSpecialDrag(e, 'divers', 'Divers')}
+      getPayload={() => ({
+        mime: POS_PRODUCT_DND_MIME,
+        data: JSON.stringify({ kind: 'divers' }),
+        label: 'Divers',
+      })}
     >
       <div className="pos-card__content">
         <div>
@@ -165,16 +170,20 @@ const DiversCard = React.memo(function DiversCard({ onAdd }: { onAdd: () => void
           Ajouter
         </button>
       </div>
-    </div>
+    </PosTouchDraggable>
   );
 });
 
 const PourboireCard = React.memo(function PourboireCard({ onAdd }: { onAdd: () => void }) {
   return (
-    <div
+    <PosTouchDraggable
       className="pos-card pos-card--special"
-      draggable
       onDragStart={e => startSpecialDrag(e, 'pourboire', 'Pourboire')}
+      getPayload={() => ({
+        mime: POS_PRODUCT_DND_MIME,
+        data: JSON.stringify({ kind: 'pourboire' }),
+        label: 'Pourboire',
+      })}
     >
       <div className="pos-card__content">
         <div>
@@ -197,7 +206,7 @@ const PourboireCard = React.memo(function PourboireCard({ onAdd }: { onAdd: () =
           Ajouter
         </button>
       </div>
-    </div>
+    </PosTouchDraggable>
   );
 });
 
@@ -261,7 +270,20 @@ const ProductCard = React.memo(function ProductCard({
     (isDiscounted ? ' pos-card--discounted' : '');
 
   return (
-    <div className={className} style={cardStyle} draggable onDragStart={handleDragStart}>
+    <PosTouchDraggable
+      className={className}
+      style={cardStyle}
+      onDragStart={handleDragStart}
+      getPayload={() => ({
+        mime: POS_PRODUCT_DND_MIME,
+        data: JSON.stringify({
+          kind: 'product',
+          productId: product.id,
+          quantity,
+        }),
+        label: `${product.name}${quantity > 1 ? ` ×${quantity}` : ''}`,
+      })}
+    >
       {isFavorite && (
         <span className="pos-card__favorite" aria-label="Favori" title="Favori">
           <Glyph path={ICON_STAR} />
@@ -281,46 +303,48 @@ const ProductCard = React.memo(function ProductCard({
           <p className="pos-card__price">{formatCurrency(currentPrice)}</p>
 
           <div className="pos-card__actions">
-            <button
-              type="button"
-              className="pos-quantity-button"
-              aria-label="Diminuer la quantité"
-              onClick={e => {
-                e.stopPropagation();
-                setQuantity(q => Math.max(1, q - 1));
-              }}
-            >
-              <Glyph path={ICON_REMOVE} />
-            </button>
-            <input
-              className="pos-quantity-input"
-              type="number"
-              min={1}
-              max={999}
-              value={quantity}
-              aria-label={`Quantité pour ${product.name}`}
-              onChange={handleQuantityChange}
-              onClick={e => e.stopPropagation()}
-              onFocus={e => e.currentTarget.select()}
-            />
-            <button
-              type="button"
-              className="pos-quantity-button"
-              aria-label="Augmenter la quantité"
-              onClick={e => {
-                e.stopPropagation();
-                setQuantity(q => Math.min(999, q + 1));
-              }}
-            >
-              <Glyph path={ICON_ADD} />
-            </button>
-            <button type="button" className="pos-add-button" onClick={handleAdd}>
+            <div className="pos-card__qty">
+              <button
+                type="button"
+                className="pos-quantity-button"
+                aria-label="Diminuer la quantité"
+                onClick={e => {
+                  e.stopPropagation();
+                  setQuantity(q => Math.max(1, q - 1));
+                }}
+              >
+                <Glyph path={ICON_REMOVE} />
+              </button>
+              <input
+                className="pos-quantity-input"
+                type="number"
+                min={1}
+                max={999}
+                value={quantity}
+                aria-label={`Quantité pour ${product.name}`}
+                onChange={handleQuantityChange}
+                onClick={e => e.stopPropagation()}
+                onFocus={e => e.currentTarget.select()}
+              />
+              <button
+                type="button"
+                className="pos-quantity-button"
+                aria-label="Augmenter la quantité"
+                onClick={e => {
+                  e.stopPropagation();
+                  setQuantity(q => Math.min(999, q + 1));
+                }}
+              >
+                <Glyph path={ICON_ADD} />
+              </button>
+            </div>
+            <button type="button" className="pos-add-button pos-add-button--block" onClick={handleAdd}>
               Ajouter
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </PosTouchDraggable>
   );
 });
 
