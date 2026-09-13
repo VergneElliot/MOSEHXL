@@ -22,7 +22,6 @@ import {
   getDocumentCategories,
   getInboxMessage,
   importInboxAttachment,
-  listInbox,
   replyInboxMessage,
   updateInboxSettings,
   updateReservation,
@@ -30,24 +29,14 @@ import {
   type InboxMessageDto,
   type ReservationDto,
 } from '../../services/api/adminSpace';
+import { listInbox } from '../../services/api/adminInboxApi';
 import { formatDate } from '../../utils/formatDate';
 import { ParisDateField } from '../common/ParisDateTimeField';
-
-const STATUS_LABEL: Record<string, string> = {
-  requested: 'Demandée',
-  on_hold: 'En attente',
-  confirmed: 'Confirmée',
-  refused: 'Refusée',
-  cancelled: 'Annulée',
-  seated: 'Installée',
-  no_show: 'No-show',
-};
-
-const ACTION_LABEL: Record<'confirmed' | 'on_hold' | 'refused', string> = {
-  confirmed: 'valider',
-  on_hold: 'mettre en attente',
-  refused: 'refuser',
-};
+import InboxAddressBanner from './InboxAddressBanner';
+import {
+  INBOX_RESERVATION_ACTION_LABEL as ACTION_LABEL,
+  INBOX_RESERVATION_STATUS_LABEL as STATUS_LABEL,
+} from './inboxReservationLabels';
 
 const InboxPanel: React.FC = () => {
   const [messages, setMessages] = useState<InboxMessageDto[]>([]);
@@ -56,6 +45,7 @@ const InboxPanel: React.FC = () => {
   >(null);
   const [linkedReservation, setLinkedReservation] = useState<ReservationDto | null>(null);
   const [inboxAddress, setInboxAddress] = useState<string | null>(null);
+  const [contactEmail, setContactEmail] = useState<string | null>(null);
   const [autoforward, setAutoforward] = useState(true);
   const [archived, setArchived] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +66,7 @@ const InboxPanel: React.FC = () => {
       const data = await listInbox({ archived });
       setMessages(data.messages);
       setInboxAddress(data.inbox_address);
+      setContactEmail(data.contact_email ?? data.owner_email ?? null);
       setAutoforward(data.autoforward);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Chargement impossible');
@@ -131,9 +122,7 @@ const InboxPanel: React.FC = () => {
           {error}
         </Alert>
       )}
-      <Alert severity="info" sx={{ mb: 2 }}>
-        Adresse établissement : <strong>{inboxAddress || 'slug non provisionné'}</strong>
-      </Alert>
+      <InboxAddressBanner inboxAddress={inboxAddress} contactEmail={contactEmail} />
       <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2, flexWrap: 'wrap' }}>
         <FormControlLabel
           control={
@@ -146,7 +135,7 @@ const InboxPanel: React.FC = () => {
               }}
             />
           }
-          label="Transférer une copie vers l'email du propriétaire"
+          label="Transférer une copie vers l'email de contact"
         />
         <FormControlLabel
           control={<Switch checked={archived} onChange={(e) => setArchived(e.target.checked)} />}

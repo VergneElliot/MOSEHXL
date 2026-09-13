@@ -40,8 +40,17 @@ async function downloadAuthenticatedFile(endpoint: string, fallbackFilename: str
   window.URL.revokeObjectURL(objectUrl);
 }
 
-export async function exportReceiptPdf(orderId: number, type: 'detailed' | 'summary' = 'detailed'): Promise<void> {
-  await downloadAuthenticatedFile(`/printing/receipt/${orderId}/export-pdf?type=${type}`, `ticket-${orderId}.pdf`);
+export async function exportReceiptPdf(
+  orderId: number,
+  type: 'detailed' | 'summary' = 'detailed',
+  subBillId?: number
+): Promise<void> {
+  const qs = new URLSearchParams({ type });
+  if (subBillId != null) qs.set('sub_bill_id', String(subBillId));
+  await downloadAuthenticatedFile(
+    `/printing/receipt/${orderId}/export-pdf?${qs.toString()}`,
+    `ticket-${orderId}${subBillId != null ? `-part-${subBillId}` : ''}.pdf`
+  );
 }
 
 export async function exportInvoicePdf(invoiceId: number): Promise<void> {
@@ -66,11 +75,14 @@ export async function exportClosureBulletinFlux103(bulletinId: number): Promise<
 export async function emailReceipt(
   orderId: number,
   to: string,
-  type: 'detailed' | 'summary' = 'detailed'
+  type: 'detailed' | 'summary' = 'detailed',
+  subBillId?: number
 ): Promise<{ trackingId: string; message: string }> {
   const { request } = await import('./core');
+  const qs = new URLSearchParams({ type });
+  if (subBillId != null) qs.set('sub_bill_id', String(subBillId));
   return request<{ success: boolean; trackingId: string; message: string }>(
-    `/printing/receipt/${orderId}/email?type=${type}`,
+    `/printing/receipt/${orderId}/email?${qs.toString()}`,
     { method: 'POST', body: JSON.stringify({ to }) }
   );
 }

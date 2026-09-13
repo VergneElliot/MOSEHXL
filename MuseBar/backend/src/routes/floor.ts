@@ -18,9 +18,15 @@ import { OpenTicketModel, type OpenTicketItemInput } from '../models/database/op
 import { MembershipModel } from '../models/membership';
 import { AuditTrailModel } from '../models/auditTrail';
 import { requireOpenTicketForActor, assertCanAbandonTicket } from '../services/floor/floorTicketAuth';
+import { openOrReuseEmptyTicket } from '../services/floor/openTicketOpenService';
+import { discardDraftsClosingIfEmpty } from '../services/floor/openTicketDiscardService';
+import { transferOpenTicketToTable } from '../services/floor/openTicketTransferService';
+import { abandonOpenTicketIfEmpty } from '../services/floor/openTicketEmptyCleanup';
 import { requirePosPinActor, requirePinActor } from '../middleware/pinActor';
 import { pool } from '../db/pool';
+import floorOngoingFulfillment from './floorOngoingFulfillment';
 const router = express.Router();
+router.use(floorOngoingFulfillment);
 function formatUserDisplayName(input: {
   first_name: string | null;
   last_name: string | null;
@@ -202,46 +208,6 @@ router.get(
   })
 );
 
-router.get(
-  '/ongoing-orders',
-  requireAuth,
-  requirePermission(P.access_pos),
-  asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req, res);
-    if (!establishmentId) return;
-    const summaries = await OpenTicketModel.listOngoingSummaries(establishmentId);
-    const orders = await Promise.all(
-      summaries.map(async (row) => {
-        const waiter_display_name = await resolveWaiterDisplayName(row.waiter_user_id);
-        const validatedCount = row.items.filter((i) => i.line_status === 'validated').length;
-        const draftCount = row.items.filter((i) => i.line_status === 'draft').length;
-        const totalAmount = row.items.reduce((sum, i) => sum + Number(i.total_price), 0);
-        return {
-          ticket_id: row.ticket_id,
-          table_id: row.table_id,
-          table_label: row.table_label,
-          waiter_user_id: row.waiter_user_id,
-          waiter_display_name,
-          updated_at: row.ticket_updated_at,
-          validated_line_count: validatedCount,
-          draft_line_count: draftCount,
-          total_amount: totalAmount,
-          items: row.items.map((item) => ({
-            ...item,
-            fulfillment_status:
-              item.line_status === 'draft'
-                ? 'pending_validation'
-                : item.kitchen_sent_at != null
-                  ? 'kitchen_sent'
-                  : 'validated',
-          })),
-        };
-      })
-    );
-    return res.json({ orders });
-  })
-);
-
 router.post(
   '/tables',
   requireAuth,
@@ -361,25 +327,13 @@ router.post(
     }
     const table = await DiningTableModel.get(dining_table_id, establishmentId);
     if (!table || !table.is_active) throw new NotFoundError('Dining table not found');
-    const existing = await OpenTicketModel.getOpenForTable(dining_table_id, establishmentId);
-    if (existing) {
-      throw new ConflictError('Table already has an open ticket');
-    }
-    try {
-      const ticket = await OpenTicketModel.create(establishmentId, {
-        dining_table_id,
-        opened_by_user_id: actor.id,
-        covers: req.body?.covers != null ? Number(req.body.covers) : null,
-        notes: typeof req.body?.notes === 'string' ? req.body.notes : null,
-      });
-      return res.status(201).json({ ticket, items: [] });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '';
-      if (message.includes('idx_open_tickets_one_open_per_table')) {
-        throw new ConflictError('Table already has an open ticket');
-      }
-      throw error;
-    }
+    const { ticket, items, created } = await openOrReuseEmptyTicket(establishmentId, {
+      dining_table_id,
+      opened_by_user_id: actor.id,
+      covers: req.body?.covers != null ? Number(req.body.covers) : null,
+      notes: typeof req.body?.notes === 'string' ? req.body.notes : null,
+    });
+    return res.status(created ? 201 : 200).json({ ticket, items });
   })
 );
 
@@ -497,10 +451,9 @@ router.post(
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) throw new ValidationError('Invalid ticket id');
     try {
-      const ticket = await requireOpenTicketForActor(id, establishmentId, actor);
-      const items = await OpenTicketModel.discardDraftItems(id, establishmentId);
-      const updatedTicket = await OpenTicketModel.get(id, establishmentId);
-      return res.json({ ticket: updatedTicket, items });
+      await requireOpenTicketForActor(id, establishmentId, actor);
+      const { ticket, items } = await discardDraftsClosingIfEmpty(id, establishmentId);
+      return res.json({ ticket, items });
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
       if (message === 'OPEN_TICKET_NOT_FOUND_OR_CLOSED') {
@@ -570,6 +523,9 @@ router.post(
       });
 
       const items = await OpenTicketModel.listActiveItems(id, establishmentId);
+      if (items.length === 0) {
+        await abandonOpenTicketIfEmpty(id, establishmentId);
+      }
       return res.json({ ticket, items, cancelled, print: printResult });
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
@@ -699,9 +655,9 @@ router.post(
     const diningTableId = Number(req.body?.dining_table_id);
     if (!Number.isInteger(id)) throw new ValidationError('Invalid ticket id');
     if (!Number.isInteger(diningTableId)) throw new ValidationError('dining_table_id is required');
-    const existing = await requireOpenTicketForActor(id, establishmentId, actor);
+    await requireOpenTicketForActor(id, establishmentId, actor);
     try {
-      const ticket = await OpenTicketModel.transferTable(id, establishmentId, diningTableId, actor.id);
+      const ticket = await transferOpenTicketToTable(id, establishmentId, diningTableId);
       return res.json({ ticket });
     } catch (error) {
       const message = error instanceof Error ? error.message : '';

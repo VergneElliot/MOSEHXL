@@ -171,14 +171,14 @@ const POSContainer: React.FC<POSContainerProps> = ({
   const handleAddToOrder = useCallback(
     async (item: OrderItem, quantity: number = 1) => {
       try {
-        await ensureSession();
         if (floor.activeTable) {
+          await ensureSession();
           await ensureTableIntervention();
         }
       } catch {
         actions.setSnackbar({
           open: true,
-          message: 'Session PIN requise pour ajouter des articles',
+          message: 'Session PIN requise pour une table',
           severity: 'error',
         });
         return;
@@ -480,12 +480,12 @@ const POSContainer: React.FC<POSContainerProps> = ({
 
   const handleCheckout = useCallback(async () => {
     try {
-      await ensureSession();
+      if (floor.activeTable) await ensureSession();
       actions.setPaymentDialogOpen(true);
     } catch {
       actions.setSnackbar({
         open: true,
-        message: 'Session PIN requise pour encaisser',
+        message: 'Session PIN requise pour encaisser une table',
         severity: 'error',
       });
     }
@@ -495,7 +495,7 @@ const POSContainer: React.FC<POSContainerProps> = ({
     async (method: 'cash' | 'card') => {
       if (state.currentOrder.length === 0) return;
       try {
-        await ensureSession();
+        if (floor.activeTable) await ensureSession();
         const created = await createOrder({
           paymentMethod: method,
           totalAmount: orderTotal,

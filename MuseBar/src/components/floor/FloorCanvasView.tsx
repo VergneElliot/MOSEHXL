@@ -7,8 +7,13 @@ import {
   clampTableRect,
   normalizeTableGeometry,
   snap,
-  type TableShape,
 } from './floorGeometry';
+import { FloorCanvasTableNode } from './FloorCanvasTableNode';
+import {
+  clientToCanvasPoint,
+  hitTestFloorTable,
+  selectDropMovedEnough,
+} from './floorSelectDropHit';
 
 export interface FloorCanvasTable {
   id: number;
@@ -29,6 +34,8 @@ interface FloorCanvasViewProps {
   mode: 'edit' | 'select';
   selectedId?: number | null;
   onSelect?: (id: number | null) => void;
+  /** Select mode: drag one table onto another (source → target). */
+  onTableDrop?: (sourceId: number, targetId: number) => void;
   onGeometryCommit?: (
     id: number,
     geometry: { pos_x: number; pos_y: number; width: number; height: number }
@@ -38,17 +45,19 @@ interface FloorCanvasViewProps {
   onLocalTablesChange?: (tables: FloorCanvasTable[]) => void;
 }
 
-type DragKind = 'move' | 'resize' | 'pan';
+type DragKind = 'move' | 'resize' | 'pan' | 'select-drop';
 
 /**
- * Absolute-positioned floor canvas. Edit: drag + corner resize. Select: click only.
- * Pan: drag empty space (touch-friendly). Zoom: Ctrl/Cmd + wheel.
+ * Absolute-positioned floor canvas. Edit: drag + corner resize.
+ * Select: click, or drag table onto another (onTableDrop).
+ * Pan: drag empty space. Zoom: Ctrl/Cmd + wheel.
  */
 const FloorCanvasView: React.FC<FloorCanvasViewProps> = ({
   tables,
   mode,
   selectedId = null,
   onSelect,
+  onTableDrop,
   onGeometryCommit,
   snapEnabled = true,
   localTables,
@@ -58,6 +67,7 @@ const FloorCanvasView: React.FC<FloorCanvasViewProps> = ({
   const [zoom, setZoom] = useState(0.7);
   const [pan, setPan] = useState({ x: 24, y: 24 });
   const [isPanning, setIsPanning] = useState(false);
+  const [dropHoverId, setDropHoverId] = useState<number | null>(null);
   const dragRef = useRef<{
     kind: DragKind;
     tableId: number | null;
@@ -78,18 +88,22 @@ const FloorCanvasView: React.FC<FloorCanvasViewProps> = ({
   const onLocalTablesChangeRef = useRef(onLocalTablesChange);
   const onGeometryCommitRef = useRef(onGeometryCommit);
   const onSelectRef = useRef(onSelect);
+  const onTableDropRef = useRef(onTableDrop);
   const snapEnabledRef = useRef(snapEnabled);
   const modeRef = useRef(mode);
   const zoomRef = useRef(zoom);
+  const panRef = useRef(pan);
 
   localTablesRef.current = localTables;
   tablesRef.current = tables;
   onLocalTablesChangeRef.current = onLocalTablesChange;
   onGeometryCommitRef.current = onGeometryCommit;
   onSelectRef.current = onSelect;
+  onTableDropRef.current = onTableDrop;
   snapEnabledRef.current = snapEnabled;
   modeRef.current = mode;
   zoomRef.current = zoom;
+  panRef.current = pan;
 
   const displayTables = (localTables ?? tables).map((t) => ({
     ...t,
@@ -103,10 +117,11 @@ const FloorCanvasView: React.FC<FloorCanvasViewProps> = ({
     onChange(current.map((t) => (t.id === id ? { ...t, ...normalizeTableGeometry(t), ...patch } : t)));
   }, []);
 
-  const finishDrag = useCallback(() => {
+  const finishDrag = useCallback((clientX?: number, clientY?: number) => {
     const drag = dragRef.current;
     dragRef.current = null;
     setIsPanning(false);
+    setDropHoverId(null);
     if (!drag) return;
 
     if (drag.kind === 'pan') {
@@ -116,12 +131,31 @@ const FloorCanvasView: React.FC<FloorCanvasViewProps> = ({
       return;
     }
 
+    if (drag.kind === 'select-drop' && drag.tableId != null) {
+      if (!drag.moved) {
+        onSelectRef.current?.(drag.tableId);
+        return;
+      }
+      const viewport = viewportRef.current?.getBoundingClientRect();
+      if (!viewport || clientX == null || clientY == null) return;
+      const pt = clientToCanvasPoint(clientX, clientY, viewport, panRef.current, zoomRef.current);
+      const target = hitTestFloorTable(tablesRef.current, pt.x, pt.y, drag.tableId);
+      if (target) onTableDropRef.current?.(drag.tableId, target.id);
+      else onSelectRef.current?.(drag.tableId);
+      return;
+    }
+
     if (drag.tableId == null || modeRef.current !== 'edit') return;
     const current = localTablesRef.current ?? tablesRef.current;
     const table = current.find((t) => t.id === drag.tableId);
-    if (!table || !onGeometryCommitRef.current) return;
+    if (!table) return;
     const geo = normalizeTableGeometry(table);
-    onGeometryCommitRef.current(table.id, geo);
+    onGeometryCommitRef.current?.(drag.tableId, {
+      pos_x: geo.pos_x,
+      pos_y: geo.pos_y,
+      width: geo.width,
+      height: geo.height,
+    });
   }, []);
 
   useEffect(() => {
@@ -142,35 +176,43 @@ const FloorCanvasView: React.FC<FloorCanvasViewProps> = ({
         return;
       }
 
+      if (drag.kind === 'select-drop' && drag.tableId != null) {
+        if (!selectDropMovedEnough(drag.startClientX, drag.startClientY, e.clientX, e.clientY)) {
+          return;
+        }
+        drag.moved = true;
+        const viewport = viewportRef.current?.getBoundingClientRect();
+        if (!viewport) return;
+        const pt = clientToCanvasPoint(e.clientX, e.clientY, viewport, panRef.current, zoomRef.current);
+        const target = hitTestFloorTable(tablesRef.current, pt.x, pt.y, drag.tableId);
+        setDropHoverId(target?.id ?? null);
+        return;
+      }
+
       if (modeRef.current !== 'edit' || drag.tableId == null) return;
-      const current = (localTablesRef.current ?? tablesRef.current).map((t) => ({
-        ...t,
-        ...normalizeTableGeometry(t),
-      }));
+
+      const z = zoomRef.current;
+      const doSnap = snapEnabledRef.current;
+      const current = localTablesRef.current ?? tablesRef.current;
       const table = current.find((t) => t.id === drag.tableId);
       if (!table) return;
-      const z = zoomRef.current || 1;
+
       const dx = (e.clientX - drag.startClientX) / z;
       const dy = (e.clientY - drag.startClientY) / z;
-      const doSnap = snapEnabledRef.current;
 
       if (drag.kind === 'move') {
         const rect = clampTableRect(
           snap(drag.origX + dx, doSnap),
           snap(drag.origY + dy, doSnap),
-          table.width,
-          table.height
+          drag.origW,
+          drag.origH
         );
         updateLocal(drag.tableId, { pos_x: rect.pos_x, pos_y: rect.pos_y });
       } else if (drag.kind === 'resize') {
-        const shape = (table.shape || 'rectangle') as TableShape;
         let w = snap(drag.origW + dx, doSnap);
         let h = snap(drag.origH + dy, doSnap);
-        if (shape === 'square' || shape === 'circle') {
-          const s = Math.max(40, Math.max(w, h));
-          w = s;
-          h = s;
-        }
+        w = Math.max(40, w);
+        h = Math.max(40, h);
         const rect = clampTableRect(drag.origX, drag.origY, w, h);
         updateLocal(drag.tableId, { width: rect.width, height: rect.height });
       }
@@ -179,7 +221,7 @@ const FloorCanvasView: React.FC<FloorCanvasViewProps> = ({
     const onUp = (e: PointerEvent) => {
       const drag = dragRef.current;
       if (!drag || e.pointerId !== drag.pointerId) return;
-      finishDrag();
+      finishDrag(e.clientX, e.clientY);
     };
 
     window.addEventListener('pointermove', onMove);
@@ -198,7 +240,24 @@ const FloorCanvasView: React.FC<FloorCanvasViewProps> = ({
     kind: 'move' | 'resize'
   ) => {
     if (mode === 'select') {
-      if (!table.disabled) onSelect?.(table.id);
+      if (table.disabled) return;
+      e.stopPropagation();
+      e.preventDefault();
+      dragRef.current = {
+        kind: 'select-drop',
+        tableId: table.id,
+        pointerId: e.pointerId,
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        origX: 0,
+        origY: 0,
+        origW: 0,
+        origH: 0,
+        panX: pan.x,
+        panY: pan.y,
+        moved: false,
+        clearSelectionOnTap: false,
+      };
       return;
     }
     e.stopPropagation();
@@ -242,22 +301,18 @@ const FloorCanvasView: React.FC<FloorCanvasViewProps> = ({
     };
   };
 
-  const onWheel = (e: React.WheelEvent) => {
-    if (!e.ctrlKey && !e.metaKey) return;
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.08 : 0.08;
-    setZoom((z) => Math.min(2, Math.max(0.35, z + delta)));
-  };
-
   return (
     <Box
       ref={viewportRef}
-      onWheel={onWheel}
+      onWheel={(e) => {
+        if (!e.ctrlKey && !e.metaKey) return;
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.08 : 0.08;
+        setZoom((z) => Math.min(2, Math.max(0.35, z + delta)));
+      }}
       onContextMenu={(e) => e.preventDefault()}
       onPointerDown={(e) => {
-        if (e.target === e.currentTarget) {
-          beginPan(e, mode === 'edit');
-        }
+        if (e.target === e.currentTarget) beginPan(e, mode === 'edit');
       }}
       sx={{
         position: 'relative',
@@ -293,99 +348,23 @@ const FloorCanvasView: React.FC<FloorCanvasViewProps> = ({
           cursor: isPanning ? 'grabbing' : 'grab',
         }}
         onPointerDown={(e) => {
-          if (e.target === e.currentTarget) {
-            beginPan(e, mode === 'edit');
-          }
+          if (e.target === e.currentTarget) beginPan(e, mode === 'edit');
         }}
       >
-        {displayTables.map((table) => {
-          const selected = selectedId === table.id;
-          const occupied = table.occupied === true;
-          const isCircle = table.shape === 'circle';
-          const borderRadius = isCircle ? '50%' : table.shape === 'square' ? 2 : 1;
-          const bg =
-            mode === 'select'
-              ? occupied
-                ? 'warning.light'
-                : table.isActive
-                  ? 'primary.light'
-                  : 'success.light'
-              : selected
-                ? 'primary.light'
-                : 'grey.200';
-          const borderColor =
-            selected
-              ? 'primary.main'
-              : mode === 'select'
-                ? occupied
-                  ? 'warning.dark'
-                  : 'success.dark'
-                : 'grey.500';
-
-          return (
-            <Box
-              key={table.id}
-              onPointerDown={(e) => beginTableDrag(e, table, 'move')}
-              sx={{
-                position: 'absolute',
-                left: table.pos_x,
-                top: table.pos_y,
-                width: table.width,
-                height: table.height,
-                borderRadius,
-                bgcolor: bg,
-                border: '2px solid',
-                borderColor,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: mode === 'edit' ? 'grab' : table.disabled ? 'not-allowed' : 'pointer',
-                opacity: table.disabled ? 0.45 : 1,
-                boxShadow: selected ? 3 : 1,
-                px: 0.5,
-                zIndex: selected ? 2 : 1,
-              }}
-            >
-              <Typography
-                fontWeight={700}
-                sx={{ fontSize: Math.min(18, Math.max(12, table.width / 4)), lineHeight: 1.1 }}
-              >
-                {table.label}
-              </Typography>
-              {table.capacity != null && Number(table.capacity) > 0 && (
-                <Typography variant="caption" sx={{ opacity: 0.8, lineHeight: 1 }}>
-                  {table.capacity} p.
-                </Typography>
-              )}
-              {mode === 'select' && (
-                <Typography variant="caption" sx={{ lineHeight: 1, mt: 0.25 }}>
-                  {occupied ? 'Occupée' : 'Libre'}
-                </Typography>
-              )}
-              {mode === 'edit' && selected && (
-                <Box
-                  onPointerDown={(e) => {
-                    e.stopPropagation();
-                    beginTableDrag(e, table, 'resize');
-                  }}
-                  sx={{
-                    position: 'absolute',
-                    right: -8,
-                    bottom: -8,
-                    width: 18,
-                    height: 18,
-                    bgcolor: 'primary.main',
-                    borderRadius: '3px',
-                    cursor: 'nwse-resize',
-                    border: '2px solid white',
-                    zIndex: 3,
-                  }}
-                />
-              )}
-            </Box>
-          );
-        })}
+        {displayTables.map((table) => (
+          <FloorCanvasTableNode
+            key={table.id}
+            table={table}
+            mode={mode}
+            selected={selectedId === table.id}
+            dropHighlight={dropHoverId === table.id}
+            onPointerDownMove={(e) => beginTableDrag(e, table, 'move')}
+            onPointerDownResize={(e) => {
+              e.stopPropagation();
+              beginTableDrag(e, table, 'resize');
+            }}
+          />
+        ))}
       </Box>
       <Typography
         variant="caption"
@@ -399,7 +378,8 @@ const FloorCanvasView: React.FC<FloorCanvasViewProps> = ({
           pointerEvents: 'none',
         }}
       >
-        Zoom {Math.round(zoom * 100)}% · Ctrl+molette · Glisser le fond pour déplacer le plan
+        Zoom {Math.round(zoom * 100)}% · Ctrl+molette
+        {onTableDrop ? ' · Glisser table→table pour transférer/fusionner' : ''}
       </Typography>
     </Box>
   );

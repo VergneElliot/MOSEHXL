@@ -13,6 +13,8 @@ export interface InboxMessage {
   is_read: boolean;
   is_archived: boolean;
   created_at: string;
+  reservation_id: number | null;
+  direction: 'inbound' | 'outbound';
 }
 
 export interface InboxAttachment {
@@ -80,11 +82,14 @@ export class InboxModel {
     subject: string;
     text_body?: string | null;
     html_body?: string | null;
+    reservation_id?: number | null;
+    direction?: 'inbound' | 'outbound';
   }): Promise<InboxMessage> {
     const result = await pool.query(
       `INSERT INTO inbox_messages (
-         establishment_id, message_id, from_address, to_address, subject, text_body, html_body
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7)
+         establishment_id, message_id, from_address, to_address, subject, text_body, html_body,
+         reservation_id, direction
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        RETURNING *`,
       [
         input.establishment_id,
@@ -94,9 +99,38 @@ export class InboxModel {
         input.subject || '(sans objet)',
         input.text_body ?? null,
         input.html_body ?? null,
+        input.reservation_id ?? null,
+        input.direction ?? 'inbound',
       ]
     );
     return result.rows[0] as InboxMessage;
+  }
+
+  static async linkReservation(
+    establishmentId: string,
+    messageId: number,
+    reservationId: number
+  ): Promise<boolean> {
+    const result = await pool.query(
+      `UPDATE inbox_messages
+       SET reservation_id = $3
+       WHERE establishment_id = $1 AND id = $2`,
+      [establishmentId, messageId, reservationId]
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  static async listByReservation(
+    establishmentId: string,
+    reservationId: number
+  ): Promise<InboxMessage[]> {
+    const result = await pool.query(
+      `SELECT * FROM inbox_messages
+       WHERE establishment_id = $1 AND reservation_id = $2
+       ORDER BY received_at ASC, id ASC`,
+      [establishmentId, reservationId]
+    );
+    return result.rows as InboxMessage[];
   }
 
   static async addAttachment(input: {

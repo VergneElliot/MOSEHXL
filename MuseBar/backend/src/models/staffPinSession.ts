@@ -27,12 +27,6 @@ export interface ActivePinSessionSummary {
   expires_at: Date;
 }
 
-/**
- * A badge with no activity for this long is treated as abandoned on the terminal. The liveness
- * touch is throttled to 5 minutes, so the effective window is this value plus up to 5 minutes.
- */
-export const PIN_SESSION_IDLE_TIMEOUT_MS = 60 * 60 * 1000;
-
 const IPV4 = /^(\d{1,3}\.){3}\d{1,3}$/;
 
 /** `ip_address` is an inet column: anything that is not an address must be NULL. */
@@ -72,7 +66,7 @@ export class StaffPinSessionModel {
     return result.rows[0] as StaffPinSessionRow;
   }
 
-  /** Null when the session is unknown, closed, expired, idle or from another establishment. */
+  /** Null when the session is unknown, closed, expired, or from another establishment. */
   static async findActive(
     sessionId: string,
     establishmentId: string
@@ -81,38 +75,31 @@ export class StaffPinSessionModel {
       `SELECT * FROM staff_pin_sessions
        WHERE id = $1 AND establishment_id = $2
          AND closed_at IS NULL
-         AND expires_at > CURRENT_TIMESTAMP
-         AND last_seen_at > CURRENT_TIMESTAMP - ($3::bigint * interval '1 millisecond')`,
-      [sessionId, establishmentId, PIN_SESSION_IDLE_TIMEOUT_MS]
+         AND expires_at > CURRENT_TIMESTAMP`,
+      [sessionId, establishmentId]
     );
     return (result.rows[0] as StaffPinSessionRow | undefined) ?? null;
   }
 
   /**
-   * Marks idle and time-expired badges closed. Access control does not depend on this (the
-   * queries already exclude them); it keeps the sessions list and the audit reason honest.
+   * Marks time-expired badges closed. Access control does not depend on this (the queries
+   * already exclude them); it keeps the sessions list and the audit reason honest.
    */
   static async closeStale(establishmentId?: string): Promise<number> {
     const scoped = establishmentId != null;
     const result = await pool.query(
       `UPDATE staff_pin_sessions
        SET closed_at = CURRENT_TIMESTAMP,
-           close_reason = CASE
-             WHEN expires_at <= CURRENT_TIMESTAMP THEN 'expired'
-             ELSE 'idle_timeout'
-           END
+           close_reason = 'expired'
        WHERE closed_at IS NULL
-         AND (
-           expires_at <= CURRENT_TIMESTAMP
-           OR last_seen_at <= CURRENT_TIMESTAMP - ($1::bigint * interval '1 millisecond')
-         )
-         ${scoped ? 'AND establishment_id = $2' : ''}`,
-      scoped ? [PIN_SESSION_IDLE_TIMEOUT_MS, establishmentId] : [PIN_SESSION_IDLE_TIMEOUT_MS]
+         AND expires_at <= CURRENT_TIMESTAMP
+         ${scoped ? 'AND establishment_id = $1' : ''}`,
+      scoped ? [establishmentId] : []
     );
     return result.rowCount ?? 0;
   }
 
-  /** Closes every open badge of one establishment, e.g. at the daily closure. */
+  /** Closes every open badge of one establishment (e.g. admin wipe). Not used on daily closure. */
   static async closeAllForEstablishment(
     establishmentId: string,
     reason: string
@@ -181,9 +168,8 @@ export class StaffPinSessionModel {
        WHERE s.establishment_id = $1
          AND s.closed_at IS NULL
          AND s.expires_at > CURRENT_TIMESTAMP
-         AND s.last_seen_at > CURRENT_TIMESTAMP - ($2::bigint * interval '1 millisecond')
        ORDER BY s.last_seen_at DESC`,
-      [establishmentId, PIN_SESSION_IDLE_TIMEOUT_MS]
+      [establishmentId]
     );
 
     return result.rows.map((row) => {

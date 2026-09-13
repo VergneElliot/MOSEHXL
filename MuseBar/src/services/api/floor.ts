@@ -42,6 +42,8 @@ export interface DiningTableStatusDto {
   last_served_by_user_id: number | null;
   /** True when the open ticket has at least one validated line (service en cours). */
   has_validated_items: boolean;
+  /** Draft or validated lines — not free for transfer. */
+  has_active_items?: boolean;
 }
 
 export interface OpenTicketDto {
@@ -80,6 +82,7 @@ export interface OpenTicketItemDto {
   line_status?: 'draft' | 'validated' | 'cancelled';
   validated_at?: string | null;
   kitchen_sent_at?: string | null;
+  served_at?: string | null;
 }
 
 function pinHeaders(pinActorToken: string): Record<string, string> {
@@ -195,50 +198,7 @@ export async function deleteDiningTable(id: number): Promise<void> {
   await request(`/floor/tables/${id}`, { method: 'DELETE' });
 }
 
-export async function getFloorStatus(): Promise<DiningTableStatusDto[]> {
-  const res = await request<{ tables: DiningTableStatusDto[] }>('/floor/status');
-  return res.tables.map(
-    (t) =>
-      ({
-        ...normalizeDiningTable(t),
-        open_ticket_id: t.open_ticket_id ?? null,
-        open_ticket_updated_at: t.open_ticket_updated_at ?? null,
-        opened_by_user_id: t.opened_by_user_id ?? null,
-        last_served_by_user_id: t.last_served_by_user_id ?? null,
-        has_validated_items: t.has_validated_items === true,
-      }) as DiningTableStatusDto
-  );
-}
-
-export interface OngoingOrderItemDto {
-  id: number;
-  product_name: string;
-  quantity: number;
-  unit_price: number;
-  total_price: number;
-  line_status: 'draft' | 'validated';
-  kitchen_sent_at: string | null;
-  validated_at: string | null;
-  fulfillment_status: 'pending_validation' | 'validated' | 'kitchen_sent';
-}
-
-export interface OngoingOrderDto {
-  ticket_id: number;
-  table_id: number;
-  table_label: string;
-  waiter_user_id: number | null;
-  waiter_display_name: string | null;
-  updated_at: string;
-  validated_line_count: number;
-  draft_line_count: number;
-  total_amount: number;
-  items: OngoingOrderItemDto[];
-}
-
-export async function listOngoingOrders(): Promise<OngoingOrderDto[]> {
-  const res = await request<{ orders: OngoingOrderDto[] }>('/floor/ongoing-orders');
-  return res.orders ?? [];
-}
+export { getFloorStatus } from './floorStatusApi';
 
 export async function openTicket(
   diningTableId: number,

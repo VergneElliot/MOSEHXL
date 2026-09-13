@@ -1,4 +1,5 @@
 import { pool } from '../../db/pool';
+import { syncEstablishmentContactEmail } from '../../services/establishment/venueContactEmail';
 
 export interface BusinessInfoRow {
   name: string;
@@ -57,7 +58,9 @@ export class BusinessInfoModel {
       [establishmentId, name, address, phone, email, siret, tax_identification]
     );
 
+    // Keep establishments.email in sync — used by reservation venue notify + autoforward.
+    await syncEstablishmentContactEmail(establishmentId, result.rows[0]?.email);
+
     return result.rows[0] as BusinessInfoRow;
   }
 }
-

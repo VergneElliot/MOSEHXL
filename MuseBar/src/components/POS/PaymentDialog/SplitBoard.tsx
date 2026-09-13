@@ -1,7 +1,7 @@
 /**
- * Two-column custom split board:
- * left = unassigned order lines (checkboxes), right = payment carts.
- * Assign via drag-and-drop, context menu, or action buttons.
+ * Three-column custom split board:
+ * left = unassigned pool, middle = actions, right = payment carts.
+ * Assign via drag-and-drop (pool↔bill and bill↔bill), context menu, or actions.
  * Part total = items + manual top-up; last unlocked part gets the residual.
  */
 
@@ -17,12 +17,7 @@ import {
   DialogContent,
   DialogTitle,
   FormControlLabel,
-  IconButton,
   List,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
   Menu,
   MenuItem,
   Paper,
@@ -34,9 +29,7 @@ import {
   useTheme,
 } from '@mui/material';
 import {
-  CallSplit as SplitIcon,
   CreditCard as CardIcon,
-  Delete as DeleteIcon,
   LocalAtm as CashIcon,
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
@@ -62,8 +55,12 @@ import {
   unassignedItems,
 } from './splitAssignment';
 import { setCompactDragGhost } from '../posDragGhost';
-
-const DND_MIME = 'application/x-mosehxl-split-items';
+import { SplitPoolItemRow } from './SplitPoolItemRow';
+import { SplitBillDropPaper } from './SplitBillDropPaper';
+import { SplitBillItemRow } from './SplitBillItemRow';
+import { SplitActionPanel } from './SplitActionPanel';
+import { SplitPoolDropPaper } from './SplitPoolDropPaper';
+import { SPLIT_DND_MIME } from './splitDnD';
 
 function selectOnFocus(e: React.FocusEvent<HTMLInputElement>) {
   e.target.select();
@@ -237,7 +234,7 @@ export const SplitBoard: React.FC<SplitBoardProps> = ({
     // Multi-drag only when this item is already checked; otherwise drag just this one.
     const ids =
       selectedIds.has(itemId) && selectedIds.size > 1 ? [...selectedIds] : [itemId];
-    event.dataTransfer.setData(DND_MIME, JSON.stringify(ids));
+    event.dataTransfer.setData(SPLIT_DND_MIME, JSON.stringify(ids));
     event.dataTransfer.effectAllowed = 'move';
     if (ids.length === 1) {
       const item = saleOrder.find(i => i.id === ids[0]);
@@ -250,7 +247,7 @@ export const SplitBoard: React.FC<SplitBoardProps> = ({
   const handleDropOnBill = (event: React.DragEvent, billIndex: number) => {
     event.preventDefault();
     setDropTarget(null);
-    const raw = event.dataTransfer.getData(DND_MIME);
+    const raw = event.dataTransfer.getData(SPLIT_DND_MIME);
     if (!raw) return;
     try {
       const ids = JSON.parse(raw) as string[];
@@ -262,6 +259,12 @@ export const SplitBoard: React.FC<SplitBoardProps> = ({
 
   const returnItemToPool = (sourceId: string) => {
     onSubBillsChange(clearItemsFromBills(subBills, [sourceId], orderTotal));
+  };
+
+  const returnIdsToPool = (ids: string[]) => {
+    const sourceIds = [...new Set(ids.map(id => sourceItemId(id)))];
+    if (sourceIds.length === 0) return;
+    onSubBillsChange(clearItemsFromBills(subBills, sourceIds, orderTotal));
   };
 
   const resetBills = () => {
@@ -298,20 +301,24 @@ export const SplitBoard: React.FC<SplitBoardProps> = ({
         <Button variant="outlined" startIcon={<RefreshIcon />} onClick={resetBills}>
           Réinitialiser
         </Button>
-        <Button variant="outlined" startIcon={<SplitIcon />} onClick={applyEqualAmounts}>
-          Parts égales (montants)
-        </Button>
       </Box>
 
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: isNarrow ? '1fr' : '1fr 1fr',
+          gridTemplateColumns: isNarrow
+            ? '1fr'
+            : 'minmax(0, 1.15fr) minmax(148px, 0.42fr) minmax(0, 1.15fr)',
           gap: 2,
           minHeight: 320,
+          alignItems: 'stretch',
         }}
       >
-        <Paper variant="outlined" sx={{ p: 1.5, display: 'flex', flexDirection: 'column', minHeight: 280 }}>
+        <SplitPoolDropPaper
+          variant="outlined"
+          onReturnIds={returnIdsToPool}
+          sx={{ p: 1.5, display: 'flex', flexDirection: 'column', minHeight: 280 }}
+        >
           <Typography variant="subtitle1" fontWeight={700} gutterBottom>
             Articles de la commande
           </Typography>
@@ -328,50 +335,56 @@ export const SplitBoard: React.FC<SplitBoardProps> = ({
           />
           {pool.length === 0 ? (
             <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', mt: 1 }}>
-              Tous les articles sont assignés.
+              Tous les articles sont assignés — déposez ici pour les retirer d’un paiement.
             </Typography>
           ) : (
             <List dense sx={{ overflow: 'auto', flex: 1 }}>
-              {pool.map(item => (
-                <PoolItemRow
-                  key={item.id}
-                  item={item}
-                  selected={selectedIds.has(item.id)}
-                  onToggle={() => toggleOne(item.id)}
-                  onDragStart={e => handleDragStart(e, item.id)}
-                  onContextMenu={e => {
-                    const ids = selectedIds.has(item.id) ? [...selectedIds] : [item.id];
-                    openContextMenu(e, ids);
-                  }}
-                  formatCurrency={formatCurrency}
-                />
-              ))}
+              {pool.map(item => {
+                const dragIds =
+                  selectedIds.has(item.id) && selectedIds.size > 1
+                    ? [...selectedIds]
+                    : [item.id];
+                const dragLabel =
+                  dragIds.length === 1
+                    ? item.productName
+                    : `${dragIds.length} articles`;
+                return (
+                  <SplitPoolItemRow
+                    key={item.id}
+                    item={item}
+                    selected={selectedIds.has(item.id)}
+                    dragIds={dragIds}
+                    dragLabel={dragLabel}
+                    onToggle={() => toggleOne(item.id)}
+                    onDragStart={e => handleDragStart(e, item.id)}
+                    onContextMenu={e => {
+                      const ids = selectedIds.has(item.id) ? [...selectedIds] : [item.id];
+                      openContextMenu(e, ids);
+                    }}
+                    formatCurrency={formatCurrency}
+                  />
+                );
+              })}
             </List>
           )}
-          {selectedIds.size > 0 && (
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-              {subBills.map((_, index) => (
-                <Button
-                  key={index}
-                  size="small"
-                  variant="contained"
-                  onClick={() => assignToBill([...selectedIds], index)}
-                >
-                  → Paiement {index + 1}
-                </Button>
-              ))}
-              <Button size="small" variant="outlined" onClick={() => openRepartirDialog([...selectedIds])}>
-                Répartir…
-              </Button>
-            </Box>
-          )}
           <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-            Astuce : glisser un article sans le cocher ; cochez pour en déplacer plusieurs. Clic
-            droit / appui long pour le menu.
+            Glisser vers un paiement (ou d’un paiement à un autre). Clic droit / appui long pour le
+            menu.
           </Typography>
-        </Paper>
+        </SplitPoolDropPaper>
 
-        <Paper variant="outlined" sx={{ p: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'auto' }}>
+        <SplitActionPanel
+          billCount={subBills.length}
+          hasSelection={selectedIds.size > 0}
+          onEqualAmounts={applyEqualAmounts}
+          onAssignToBill={index => assignToBill([...selectedIds], index)}
+          onRepartir={() => openRepartirDialog([...selectedIds])}
+        />
+
+        <Paper
+          variant="outlined"
+          sx={{ p: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'auto' }}
+        >
           <Typography variant="subtitle1" fontWeight={700}>
             Paiements
           </Typography>
@@ -387,8 +400,10 @@ export const SplitBoard: React.FC<SplitBoardProps> = ({
                 : '';
 
             return (
-              <Paper
+              <SplitBillDropPaper
                 key={bill.id}
+                billIndex={index}
+                onAssignIds={(ids, billIndex) => assignToBill(ids, billIndex)}
                 variant="outlined"
                 onDragOver={e => {
                   e.preventDefault();
@@ -488,26 +503,12 @@ export const SplitBoard: React.FC<SplitBoardProps> = ({
                 ) : (
                   <List dense disablePadding>
                     {bill.items.map(item => (
-                      <ListItem
+                      <SplitBillItemRow
                         key={item.id}
-                        disablePadding
-                        secondaryAction={
-                          <IconButton
-                            edge="end"
-                            size="small"
-                            aria-label="Retirer"
-                            onClick={() => returnItemToPool(sourceItemId(item.id))}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        }
-                      >
-                        <ListItemText
-                          primary={item.productName}
-                          secondary={formatCurrency(item.totalPrice)}
-                          primaryTypographyProps={{ variant: 'body2' }}
-                        />
-                      </ListItem>
+                        item={item}
+                        formatCurrency={formatCurrency}
+                        onReturnToPool={() => returnItemToPool(sourceItemId(item.id))}
+                      />
                     ))}
                   </List>
                 )}
@@ -530,13 +531,8 @@ export const SplitBoard: React.FC<SplitBoardProps> = ({
                         : 'Complément manuel (optionnel)'}
                   </Typography>
                   <Chip size="small" label={formatCurrency(bill.total)} color="primary" />
-                  {selectedIds.size > 0 && (
-                    <Button size="small" onClick={() => assignToBill([...selectedIds], index)}>
-                      Ajouter sélection
-                    </Button>
-                  )}
                 </Box>
-              </Paper>
+              </SplitBillDropPaper>
             );
           })}
         </Paper>
@@ -729,99 +725,3 @@ export const SplitBoard: React.FC<SplitBoardProps> = ({
 };
 
 export default SplitBoard;
-
-/** Pool row: checkbox for multi-select; drag works without checking. */
-function PoolItemRow({
-  item,
-  selected,
-  onToggle,
-  onDragStart,
-  onContextMenu,
-  formatCurrency,
-}: {
-  item: OrderItem;
-  selected: boolean;
-  onToggle: () => void;
-  onDragStart: (e: React.DragEvent) => void;
-  onContextMenu: (e: React.MouseEvent) => void;
-  formatCurrency: (n: number) => string;
-}) {
-  const longPressRef = React.useRef<number | null>(null);
-  const dragStarted = React.useRef(false);
-
-  const clearLongPress = () => {
-    if (longPressRef.current != null) {
-      window.clearTimeout(longPressRef.current);
-      longPressRef.current = null;
-    }
-  };
-
-  return (
-    <ListItem
-      disablePadding
-      draggable
-      onDragStart={e => {
-        dragStarted.current = true;
-        clearLongPress();
-        onDragStart(e);
-      }}
-      onDragEnd={() => {
-        dragStarted.current = false;
-      }}
-      onContextMenu={onContextMenu}
-      onTouchStart={e => {
-        const touch = e.touches[0];
-        if (!touch) return;
-        clearLongPress();
-        const x = touch.clientX;
-        const y = touch.clientY;
-        longPressRef.current = window.setTimeout(() => {
-          onContextMenu({
-            preventDefault() {},
-            clientX: x,
-            clientY: y,
-          } as React.MouseEvent);
-        }, 450);
-      }}
-      onTouchEnd={clearLongPress}
-      onTouchMove={clearLongPress}
-      sx={{
-        mb: 0.5,
-        border: '1px solid',
-        borderColor: selected ? 'primary.main' : 'divider',
-        borderRadius: 1,
-        bgcolor: selected ? 'action.selected' : 'background.paper',
-        cursor: 'grab',
-        '&:active': { cursor: 'grabbing' },
-      }}
-    >
-      <ListItemIcon sx={{ minWidth: 36, pl: 1 }} onClick={e => e.stopPropagation()}>
-        <Checkbox
-          edge="start"
-          checked={selected}
-          tabIndex={-1}
-          disableRipple
-          onChange={onToggle}
-          onClick={e => e.stopPropagation()}
-        />
-      </ListItemIcon>
-      <ListItemButton
-        onClick={() => {
-          // Ignore click that follows a drag
-          if (dragStarted.current) {
-            dragStarted.current = false;
-            return;
-          }
-          onToggle();
-        }}
-        sx={{ pr: 1, cursor: 'grab' }}
-      >
-        <ListItemText
-          primary={item.productName}
-          secondary={formatCurrency(item.totalPrice)}
-          primaryTypographyProps={{ fontWeight: 600 }}
-        />
-      </ListItemButton>
-    </ListItem>
-  );
-}

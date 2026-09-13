@@ -121,5 +121,33 @@ Subscribe from Google Calendar / Apple Calendar / Outlook using the URL shown in
 4. Send a test email to `<slug>@mosehxl.com` (after MX/Inbound Parse are live); confirm it appears in **Boîte mail** and autoforward arrives.
 5. Reply from the inbox UI; guest should receive From `slug@mosehxl.com`.
 6. Create a public reservation; guest mail From should be `Name <slug@mosehxl.com>`; reply should land in Boîte mail.
-7. Import an attachment into Documents.
-8. Create a reservation and a staff shift; open the ICS URLs in a calendar app.
+7. Create a **manual** reservation on the agenda (with customer email); confirm a seed row in Boîte mail and that a guest reply still lands as a new inbox message.
+8. Import an attachment into Documents.
+9. Create a reservation and a staff shift; open the ICS URLs in a calendar app.
+
+## 6. Incident: “customer replied, I see nothing”
+
+Guest reservation emails use Reply-To `slug+r{reservationId}@mosehxl.com` so inbound
+can attach to that booking. Plain mail still uses `slug@mosehxl.com`.
+Optional autoforward copies to `establishments.email` (personal mailbox).
+
+**Renaming the establishment display name does not change `slug` or the inbox
+address.** `musebar@mosehxl.com` stays until `establishments.slug` is changed deliberately.
+
+Checklist:
+
+1. Confirm you looked in **Boîte mail**, not only personal Gmail (autoforward may be off).
+2. `GET /api/admin/email-status` → `inbound_webhook_token_set` + SendGrid configured.
+3. **DNS MX** for `mosehxl.com` → `mx.sendgrid.net` (if missing, Gmail replies never hit SendGrid Activity).
+4. SendGrid → **Inbound Parse** host `mosehxl.com` URL =
+   `https://<api>/api/inbound-email/<INBOUND_EMAIL_WEBHOOK_TOKEN>`.
+5. SendGrid → **Activity** for the guest’s reply (accepted / bounced / dropped).
+6. Backend logs `INBOUND_EMAIL` (`ignored`, unknown slug, autoforward fail).
+7. Venue copy to `contact@…` blocked with `error dialing remote address` = **their** MX/host unreachable — unrelated to guest inbox.
+
+### Self-hosted SMTP / leave SendGrid (later)
+
+Inbound today **depends** on SendGrid Inbound Parse + MX. Replacing it means swapping
+outbound (`EmailSender`) and inbound (IMAP or provider webhook) plus SPF/DKIM/DMARC.
+**Recommendation:** fix MX/Parse first (required for any stack), keep plus-address
+threading, then plan SES/Mailgun/Postfix as a separate project.

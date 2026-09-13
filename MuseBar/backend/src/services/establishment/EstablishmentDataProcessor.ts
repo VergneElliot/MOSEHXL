@@ -153,7 +153,7 @@ export class EstablishmentDataProcessor {
     const statsQuery = `
       SELECT 
         COUNT(*) as total_establishments,
-        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_setup,
+        COUNT(CASE WHEN status IN ('pending', 'pending_setup', 'setup_required', 'setup_in_progress') THEN 1 END) as pending_setup,
         COUNT(CASE WHEN status = 'active' THEN 1 END) as active,
         COUNT(CASE WHEN status = 'suspended' THEN 1 END) as suspended,
         COUNT(CASE WHEN created_at >= DATE_TRUNC('month', CURRENT_DATE) THEN 1 END) as this_month

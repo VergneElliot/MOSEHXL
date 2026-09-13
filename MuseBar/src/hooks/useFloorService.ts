@@ -13,6 +13,7 @@ import {
 } from '../contexts/PinSessionsContext';
 import { useTableInterventionGate } from './useTableInterventionGate';
 import { buildActiveTableState, withTableDraftStatus } from './floorActiveTable';
+import { runFloorMoveToTable } from './floorMoveToTable';
 
 export type { ActiveTableState, PinActorState };
 
@@ -505,59 +506,21 @@ export function useFloorService(options: {
 
   const moveToTable = useCallback(
     async (table: floorApi.DiningTableStatusDto) => {
-      if (!activeTable || !pinActor) {
-        onError('Table active requise pour déplacer des articles');
-        return;
-      }
-      const sale = getActionItems();
-      if (sale.length === 0) {
-        onError('Aucun article à déplacer');
-        return;
-      }
-      const fullMove = isFullCartSelection(currentOrder, getSelectedIds());
-      try {
-        const { items: saved } = await floorApi.replaceTicketItems(
-          activeTable.ticketId,
-          currentOrder,
-          pinActor.token
-        );
-        const synced = floorApi.mapTicketItemsToOrderItems(saved);
-        const tips = currentOrder.filter((line) => line.isTip);
-        const syncedOrder = [...synced, ...tips];
-        const targets = resolveTargetOrderItems(syncedOrder, getSelectedIds());
-        const lineIds = ticketLineIdsFromItems(targets);
-
-        if (!fullMove && lineIds.length > 0) {
-          const result = await floorApi.moveTicketLines(
-            activeTable.ticketId,
-            table.id,
-            lineIds,
-            pinActor.token
-          );
-          applyTicketItemsToCart(result.source_items);
-          setMapPurpose('default');
-          setMapDialogOpen(false);
-          onInfo(
-            `${lineIds.length} article(s) déplacé(s) vers la table ${
-              result.target_table_label ?? table.label
-            }`
-          );
-          return;
-        }
-
-        if (table.open_ticket_id && table.open_ticket_id !== activeTable.ticketId) {
-          await mergeActiveIntoTable(table);
-          return;
-        }
-        if (!table.open_ticket_id) {
-          await transferActiveToTable(table.id, table.label, table.floor_plan_id);
-          return;
-        }
-        onError('Choisissez une autre table');
-      } catch (error: unknown) {
-        const err = error as { message?: string };
-        onError(err.message || 'Déplacement impossible');
-      }
+      await runFloorMoveToTable({
+        table,
+        activeTable,
+        pinActor,
+        currentOrder,
+        getActionItems,
+        getSelectedIds,
+        applyTicketItemsToCart,
+        setMapPurpose,
+        setMapDialogOpen,
+        mergeActiveIntoTable,
+        transferActiveToTable,
+        onError,
+        onInfo,
+      });
     },
     [
       activeTable,

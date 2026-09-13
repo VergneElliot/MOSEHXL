@@ -17,6 +17,7 @@ import { TableRestaurant as TableIcon } from '@mui/icons-material';
 import * as floorApi from '../../services/api/floor';
 import FloorCanvasView, { type FloorCanvasTable } from '../floor/FloorCanvasView';
 import { SIZE_PRESETS, gridPlacement, normalizeTableGeometry } from '../floor/floorGeometry';
+import { tableHasActiveOrder } from '../floor/tableOccupancy';
 
 interface FloorMapDialogProps {
   open: boolean;
@@ -92,7 +93,7 @@ export const FloorMapDialog: React.FC<FloorMapDialogProps> = ({
   const canvasTables: FloorCanvasTable[] = useMemo(
     () =>
       planTables.map((t) => {
-        const occupied = t.has_validated_items === true;
+        const occupied = tableHasActiveOrder(t);
         const isActive = activeTicketId != null && t.open_ticket_id === activeTicketId;
         return {
           id: t.id,
@@ -140,14 +141,14 @@ export const FloorMapDialog: React.FC<FloorMapDialogProps> = ({
     if (id == null) return;
     const table = planTables.find((t) => t.id === id);
     if (!table) return;
-    const hasOpenTicket = table.open_ticket_id != null;
+    const occupied = tableHasActiveOrder(table);
     if (mapPurpose === 'move-table') {
       if (table.open_ticket_id === activeTicketId) return;
-      if (hasOpenTicket) onMergeInto?.(table);
+      if (occupied) onMergeInto?.(table);
       else onTransferTo?.(table);
       return;
     }
-    if (hasOpenTicket) onSelectOccupied(table);
+    if (occupied) onSelectOccupied(table);
     else onSelectFree(table);
   };
 

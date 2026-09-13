@@ -40,6 +40,8 @@ import LineNoteDialog from './LineNoteDialog';
 import { getLineNoteFromOptions } from '../../utils/lineItemNote';
 import { canUseVirtualization } from '../../utils/canUseVirtualization';
 import { POS_PRODUCT_DND_MIME, type PosProductDragPayload } from './posProductDnD';
+import { posActionButtonSx } from './posActionButtonSx';
+import { useOrderSummaryProductDrop } from './useOrderSummaryProductDrop';
 
 export type { PosProductDragPayload } from './posProductDnD';
 export { POS_PRODUCT_DND_MIME } from './posProductDnD';
@@ -127,7 +129,8 @@ const OrderSummary = React.memo(function OrderSummary({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const useVirtualization = canUseVirtualization();
-  const [dropActive, setDropActive] = useState(false);
+  const { dropRef, dropActive, handleDragOver, handleDragLeave, handleDrop } =
+    useOrderSummaryProductDrop(onDropProduct);
   const [lineNoteDialog, setLineNoteDialog] = useState<{
     targetIds: string[];
     productName: string;
@@ -185,16 +188,7 @@ const OrderSummary = React.memo(function OrderSummary({
     lineHeight: 1.1,
   } as const;
 
-  const actionBtnSx = {
-    py: isMobile ? 0.9 : 1.05,
-    minHeight: isMobile ? 40 : 44,
-    fontSize: { xs: '0.75rem', sm: '0.82rem', md: '0.88rem' },
-    fontWeight: 800,
-    whiteSpace: 'nowrap',
-    lineHeight: 1.1,
-    justifyContent: 'flex-start',
-    '& .MuiButton-startIcon': { mr: 0.75 },
-  } as const;
+  const actionBtnSx = posActionButtonSx(isMobile);
 
   const toggleSelect = useCallback(
     (id: string) => {
@@ -253,55 +247,6 @@ const OrderSummary = React.memo(function OrderSummary({
     ? 'Quitter la table — retour mode comptoir'
     : 'Vider la commande';
   const clearActionDisabled = !activeTableLabel && currentOrder.length === 0;
-
-  const handleDragOver = (e: React.DragEvent) => {
-    const types = [...e.dataTransfer.types];
-    if (!types.includes(POS_PRODUCT_DND_MIME) && !types.includes('text/plain')) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
-    setDropActive(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-    setDropActive(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDropActive(false);
-    if (!onDropProduct) return;
-    const raw =
-      e.dataTransfer.getData(POS_PRODUCT_DND_MIME) || e.dataTransfer.getData('text/plain');
-    if (!raw) return;
-    try {
-      const payload = JSON.parse(raw) as PosProductDragPayload;
-      if (!payload || typeof payload !== 'object') return;
-      if (payload.kind === 'divers' || payload.kind === 'pourboire') {
-        onDropProduct(payload);
-        return;
-      }
-      if (payload.kind === 'product' && payload.productId) {
-        onDropProduct({
-          kind: 'product',
-          productId: String(payload.productId),
-          quantity: Math.max(1, Math.min(999, Number(payload.quantity) || 1)),
-        });
-        return;
-      }
-      // Legacy payloads without kind
-      const legacy = payload as unknown as { productId?: string; quantity?: number };
-      if (legacy.productId) {
-        onDropProduct({
-          kind: 'product',
-          productId: String(legacy.productId),
-          quantity: Math.max(1, Math.min(999, Number(legacy.quantity) || 1)),
-        });
-      }
-    } catch {
-      // ignore bad payload
-    }
-  };
 
   const renderOrderLine = useCallback(
     (index: number) => {
@@ -455,7 +400,6 @@ const OrderSummary = React.memo(function OrderSummary({
       <Button
         variant="outlined"
         fullWidth
-        disabled={!canProcessPayment}
         startIcon={<OptionsIcon />}
         onClick={onCheckout}
         sx={{ ...actionBtnSx, justifyContent: 'center' }}
@@ -535,6 +479,7 @@ const OrderSummary = React.memo(function OrderSummary({
 
   return (
     <Card
+      ref={dropRef as React.RefObject<HTMLDivElement>}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}

@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   get: vi.fn(),
   createTicket: vi.fn(),
   getOpenForTable: vi.fn(),
+  listActiveItems: vi.fn(async () => []),
 }));
 
 vi.mock('../models/database/floorModel', () => ({
@@ -35,6 +36,7 @@ vi.mock('../models/database/openTicketModel', () => ({
     getOpenForTable: mocks.getOpenForTable,
     get: vi.fn(),
     listItems: vi.fn(async () => []),
+    listActiveItems: mocks.listActiveItems,
     replaceItems: vi.fn(),
     abandon: vi.fn(),
     closeWithOrder: vi.fn(),
@@ -54,6 +56,10 @@ vi.mock('./auth', () => ({
   },
   requirePermission: () => (_req: express.Request, _res: express.Response, next: express.NextFunction) =>
     next(),
+  requireAnyPermission: () => (_req: express.Request, _res: express.Response, next: express.NextFunction) =>
+    next(),
+  requireEstablishmentAdminOrPermission: () =>
+    (_req: express.Request, _res: express.Response, next: express.NextFunction) => next(),
   getEstablishmentId: () => '11111111-1111-1111-1111-111111111111',
 }));
 
@@ -120,7 +126,17 @@ describe('floor routes Phase A', () => {
   it('rejects second open ticket on same table', async () => {
     mocks.get.mockResolvedValueOnce({ id: 3, is_active: true });
     mocks.getOpenForTable.mockResolvedValueOnce({ id: 50, status: 'open' });
+    mocks.listActiveItems.mockResolvedValueOnce([{ id: 1, line_status: 'draft' }]);
     const res = await request(buildApp()).post('/api/floor/tickets').send({ dining_table_id: 3 });
     expect(res.status).toBe(409);
+  });
+
+  it('reuses an empty open ticket shell', async () => {
+    mocks.get.mockResolvedValueOnce({ id: 3, is_active: true });
+    mocks.getOpenForTable.mockResolvedValueOnce({ id: 50, status: 'open', dining_table_id: 3 });
+    mocks.listActiveItems.mockResolvedValueOnce([]);
+    const res = await request(buildApp()).post('/api/floor/tickets').send({ dining_table_id: 3 });
+    expect(res.status).toBe(200);
+    expect(res.body.ticket.id).toBe(50);
   });
 });

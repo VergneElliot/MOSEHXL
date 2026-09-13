@@ -168,6 +168,11 @@ export class RequestSizeLimitService {
    */
   public static createMiddleware(maxSizeKB: number, logger?: Logger): SecurityMiddlewareFunction {
     return (req: Request, res: Response, next: NextFunction) => {
+      // Inbound Parse can exceed the global 1MB JSON limit (multipart + attachments).
+      if (req.originalUrl.startsWith('/api/inbound-email')) {
+        return next();
+      }
+
       const contentLength = parseInt(req.headers['content-length'] || '0');
       const maxSizeBytes = maxSizeKB * 1024;
 

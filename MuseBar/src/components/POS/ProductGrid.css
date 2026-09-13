@@ -93,9 +93,11 @@
   min-height: 2.4em;
   margin: 0 0 8px;
   overflow: hidden;
-  font-size: 2.4rem;
+  font-size: clamp(1.15rem, 2.1vw, 1.85rem);
   font-weight: 700;
   line-height: 1.2;
+  word-break: break-word;
+  overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
@@ -105,12 +107,12 @@
 }
 
 .pos-card--discounted .pos-card__name {
-  padding-right: 80px;
+  padding-right: 72px;
 }
 
 @media (max-width: 899.95px) {
   .pos-card__name {
-    font-size: 1.3rem;
+    font-size: 1.2rem;
   }
 
   .pos-card--favorite .pos-card__name {
@@ -130,14 +132,14 @@
 .pos-card__price-original {
   margin: 0;
   color: var(--pos-text-secondary);
-  font-size: 1.8rem;
+  font-size: clamp(0.95rem, 1.6vw, 1.35rem);
   text-decoration: line-through;
 }
 
 .pos-card__price {
   margin: 0;
   color: var(--pos-primary);
-  font-size: 2.8rem;
+  font-size: clamp(1.35rem, 2.4vw, 2.1rem);
   font-weight: 700;
 }
 
@@ -151,7 +153,7 @@
   }
 
   .pos-card__price {
-    font-size: 1.5rem;
+    font-size: 1.4rem;
   }
 }
 
@@ -204,12 +206,21 @@
 
 .pos-card__actions {
   display: flex;
+  flex-direction: column;
   flex-shrink: 0;
-  align-items: center;
-  gap: 4px;
+  align-items: stretch;
+  gap: 8px;
   width: 100%;
   margin-top: auto;
   padding-top: 4px;
+}
+
+.pos-card__qty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
 }
 
 .pos-quantity-button {
@@ -247,7 +258,7 @@
   background-color: transparent;
   color: inherit;
   font-family: inherit;
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 700;
   text-align: center;
   -moz-appearance: textfield;
@@ -265,21 +276,26 @@
 }
 
 .pos-add-button {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   box-sizing: border-box;
+  width: 100%;
   min-width: 0;
-  min-height: 42px;
-  padding: 6px 8px;
+  min-height: 40px;
+  padding: 8px 12px;
   border: none;
   border-radius: 4px;
   background-color: var(--pos-primary);
   box-shadow: var(--pos-shadow-2);
   color: var(--pos-primary-contrast);
   font-family: inherit;
-  font-size: 1.9rem;
-  font-weight: 500;
-  line-height: 1.75;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
 }
 
@@ -303,7 +319,7 @@
 
 .pos-add-button--block {
   width: 100%;
-  margin-top: 8px;
+  margin-top: 0;
 }
 
 @media (max-width: 899.95px) {
@@ -313,8 +329,8 @@
 
   .pos-add-button {
     min-height: 34px;
-    padding: 4px 8px;
-    font-size: 1rem;
+    padding: 6px 10px;
+    font-size: 0.9rem;
   }
 }
 
@@ -335,14 +351,20 @@
 
 .pos-card__special-title {
   margin: 0;
-  font-size: 2.3rem;
+  font-size: clamp(1.2rem, 2vw, 1.75rem);
   font-weight: 700;
+  line-height: 1.2;
 }
 
 .pos-card__special-description {
-  margin: 0;
+  display: -webkit-box;
+  margin: 0 0 8px;
+  overflow: hidden;
   color: var(--pos-text-secondary);
-  font-size: 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }
 
 @media (max-width: 899.95px) {
@@ -351,7 +373,7 @@
   }
 
   .pos-card__special-title {
-    font-size: 1.3rem;
+    font-size: 1.25rem;
   }
 }
 

@@ -7,6 +7,7 @@ import { PoolClient } from 'pg';
 import { Logger } from '../../utils/logger';
 import { randomUUID } from 'crypto';
 import { InvitationQueries } from '../../utils/database';
+import { resolveFrontendBaseUrl } from '../../utils/frontendBaseUrl';
 
 /**
  * Invitation data interface
@@ -48,8 +49,7 @@ export class EstablishmentInvitationManager {
       expiresAt
     });
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const link = `${frontendUrl}/establishment-setup/${token}`;
+    const link = `${resolveFrontendBaseUrl()}/establishment-setup/${token}`;
 
     const setup_instructions = this.generateSetupInstructions();
 

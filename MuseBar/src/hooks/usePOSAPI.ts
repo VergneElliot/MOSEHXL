@@ -47,9 +47,13 @@ export const usePOSAPI = (
     async (orderData: CreateOrderData) => {
       try {
         const attribution = getFloorOrderAttribution();
+        const tableLabel =
+          orderData.tableLabel !== undefined
+            ? orderData.tableLabel
+            : (attribution?.tableLabel ?? null);
         const pinActorToken = activeSession?.actor.token;
-        if (!pinActorToken) {
-          throw new Error('Session PIN requise pour créer une commande');
+        if (tableLabel && !pinActorToken) {
+          throw new Error('Session PIN requise pour une commande à table');
         }
         const created = await apiService.createOrder({
           totalAmount: orderData.totalAmount,
@@ -74,10 +78,7 @@ export const usePOSAPI = (
             orderData.waiterDisplayName !== undefined
               ? orderData.waiterDisplayName
               : (attribution?.waiterDisplayName ?? null),
-          table_label:
-            orderData.tableLabel !== undefined
-              ? orderData.tableLabel
-              : (attribution?.tableLabel ?? null),
+          table_label: tableLabel,
           pinActorToken,
         });
         onSuccess('Commande créée avec succès', created);

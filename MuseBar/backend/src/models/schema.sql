@@ -161,6 +161,8 @@ CREATE INDEX IF NOT EXISTS idx_products_establishment_id ON products(establishme
 CREATE INDEX IF NOT EXISTS idx_orders_establishment_id ON orders(establishment_id);
 CREATE INDEX IF NOT EXISTS idx_sub_bills_establishment_id ON sub_bills(establishment_id);
 CREATE INDEX IF NOT EXISTS idx_business_settings_establishment_id ON business_settings(establishment_id);
+ALTER TABLE business_settings ALTER COLUMN establishment_id SET NOT NULL;
+ALTER TABLE business_settings ADD CONSTRAINT business_settings_establishment_id_key UNIQUE (establishment_id);
 
 CREATE TABLE IF NOT EXISTS rate_limit_store (
   key         TEXT PRIMARY KEY,

@@ -128,6 +128,7 @@ const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn =
           selectedItems: state.selectedItemsToReturn,
           selectedTip: state.selectedTipToReturn,
           isPartial: state.isPartialReturn,
+          reopenTable: state.reopenTableAfterCancel,
         });
       })
       .catch(() => {
@@ -264,6 +265,8 @@ const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn =
         onSelectedItemIdsChange={actions.setSelectedItemsToReturn}
         selectedTip={state.selectedTipToReturn}
         onSelectedTipChange={actions.setSelectedTipToReturn}
+        reopenTable={state.reopenTableAfterCancel}
+        onReopenTableChange={actions.setReopenTableAfterCancel}
         onConfirm={handleConfirmReturn}
         onClose={actions.closeReturnDialog}
         loading={state.returnLoading}

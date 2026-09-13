@@ -1,3 +1,8 @@
+/**
+ * Non-fiscal CA for a cut→cut business day.
+ * Attributed sales (`waiter_user_id` set) group by waiter — includes PIN comptoir + table.
+ * Total comptoir = unattributed sales (`waiter_user_id` null) — typically no-PIN bar caisse.
+ */
 import { pool } from '../../db/pool';
 
 export type WaiterDayReportRow = {
@@ -29,16 +34,12 @@ function mapWaiterRow(row: {
   };
 }
 
-/**
- * Non-fiscal CA for a cut→cut business day.
- * Table sales (`table_label` set) group by waiter; comptoir (`table_label` null) is one bucket.
- */
 export async function queryWaiterDayReport(
   establishmentId: string,
   periodStart: Date,
   periodEnd: Date
 ): Promise<WaiterDayReportResult> {
-  const tableResult = await pool.query(
+  const waiterResult = await pool.query(
     `
       SELECT
         waiter_user_id,
@@ -50,7 +51,7 @@ export async function queryWaiterDayReport(
         AND status IN ('completed', 'paid')
         AND created_at >= $2
         AND created_at <= $3
-        AND table_label IS NOT NULL
+        AND waiter_user_id IS NOT NULL
       GROUP BY waiter_user_id
       ORDER BY total_amount DESC, waiter_display_name ASC NULLS LAST
     `,
@@ -67,7 +68,7 @@ export async function queryWaiterDayReport(
         AND status IN ('completed', 'paid')
         AND created_at >= $2
         AND created_at <= $3
-        AND table_label IS NULL
+        AND waiter_user_id IS NULL
     `,
     [establishmentId, periodStart, periodEnd]
   );
@@ -76,7 +77,7 @@ export async function queryWaiterDayReport(
     | undefined;
 
   return {
-    waiters: tableResult.rows.map(mapWaiterRow),
+    waiters: waiterResult.rows.map(mapWaiterRow),
     comptoir: {
       order_count: Number(c?.order_count) || 0,
       total_amount:

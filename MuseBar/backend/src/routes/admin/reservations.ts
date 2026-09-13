@@ -9,6 +9,8 @@ import { GuestNoShowFlagModel } from '../../models/guestNoShowFlag';
 import { pool } from '../../db/pool';
 import { randomUUID } from 'crypto';
 import { notifyReservationStatusChange, notifyGuestReservationStatus } from '../../services/reservations/reservationEmailService';
+import { seedReservationInboxMessage } from '../../services/reservations/seedReservationInboxMessage';
+import { InboxModel } from '../../models/inbox';
 
 const router = express.Router();
 router.use(requireAuth, requireEstablishmentAdminOrPermission(P.access_reservations));
@@ -115,35 +117,62 @@ router.post(
           ? String(req.body.commentaire).trim() || null
           : null;
 
+    const customerEmail = req.body.customer_email ? String(req.body.customer_email) : null;
+    const customerPhone = req.body.customer_phone ? String(req.body.customer_phone) : null;
+    const notes = req.body.notes != null ? String(req.body.notes) : null;
+    const source = req.body.source ? String(req.body.source) : 'manual';
+
+    let inboxMessageId = req.body.inbox_message_id ? Number(req.body.inbox_message_id) : null;
+    const estRow = await pool.query(
+      `SELECT name, slug, timezone FROM establishments WHERE id = $1`,
+      [establishmentId]
+    );
+    const slug = estRow.rows[0]?.slug as string | undefined;
+    const establishmentName = String(estRow.rows[0]?.name || '');
+    const timezone = (estRow.rows[0]?.timezone as string) || undefined;
+
+    if (!inboxMessageId && slug) {
+      const inbox = await seedReservationInboxMessage({
+        establishmentId,
+        establishmentSlug: slug,
+        customerName,
+        customerEmail,
+        customerPhone,
+        partySize,
+        startsAtIso: startsAt,
+        notes,
+        source: source === 'public' ? 'public' : 'manual',
+      });
+      inboxMessageId = inbox.id;
+    }
+
     const reservation = await ReservationModel.create({
       establishment_id: establishmentId,
       customer_name: customerName,
-      customer_email: req.body.customer_email ? String(req.body.customer_email) : null,
-      customer_phone: req.body.customer_phone ? String(req.body.customer_phone) : null,
+      customer_email: customerEmail,
+      customer_phone: customerPhone,
       party_size: partySize,
       starts_at: startsAt,
       ends_at: req.body.ends_at ? String(req.body.ends_at) : null,
       status,
       status_reason: statusReason,
-      notes: req.body.notes != null ? String(req.body.notes) : null,
-      source: req.body.source ? String(req.body.source) : 'manual',
-      inbox_message_id: req.body.inbox_message_id ? Number(req.body.inbox_message_id) : null,
+      notes,
+      source,
+      inbox_message_id: inboxMessageId,
       created_by: req.user?.id ?? null,
     });
 
-    if (reservation.customer_email) {
-      const est = await pool.query(`SELECT name, slug, timezone FROM establishments WHERE id = $1`, [
-        establishmentId,
-      ]);
-      const slug = est.rows[0]?.slug as string | undefined;
-      if (slug) {
-        void notifyGuestReservationStatus({
-          reservation,
-          establishmentName: String(est.rows[0]?.name || ''),
-          establishmentSlug: slug,
-          timezone: (est.rows[0]?.timezone as string) || undefined,
-        });
-      }
+    if (inboxMessageId) {
+      await InboxModel.linkReservation(establishmentId, inboxMessageId, reservation.id);
+    }
+
+    if (reservation.customer_email && slug) {
+      void notifyGuestReservationStatus({
+        reservation,
+        establishmentName,
+        establishmentSlug: slug,
+        timezone,
+      });
     }
 
     const guest_reliability = await GuestNoShowFlagModel.lookup(

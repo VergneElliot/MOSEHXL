@@ -13,89 +13,20 @@ import {
 } from '@mui/material';
 import { apiCore, printingApi } from '../../services/api';
 import LegalReceiptContainer from '../Legal/LegalReceipt/LegalReceiptContainer';
-import type { InvoiceLegalInfo, Order as LegalReceiptOrder, ReceiptItem } from '../Legal/LegalReceipt/types';
-import { ParisDateField } from '../common/ParisDateTimeField';
-
-type BusinessInfo = {
-  name: string;
-  address: string;
-  phone: string;
-  email: string;
-  siret?: string;
-  taxIdentification?: string;
-};
-
-type PreviewReceiptOrder = LegalReceiptOrder;
-
-type PreviewPayload = {
-  order: PreviewReceiptOrder;
-  businessInfo: BusinessInfo;
-};
+import type { InvoiceLegalInfo, Order as LegalReceiptOrder } from '../Legal/LegalReceipt/types';
+import {
+  buildInvoiceCreateBody,
+  initialInvoiceFormState,
+  type InvoiceFormState,
+} from './printAfterSaleInvoice';
+import { PrintAfterSaleInvoiceExtras } from './PrintAfterSaleInvoiceExtras';
+import {
+  PrintAfterSaleSplitPicker,
+  type SplitPartOption,
+} from './PrintAfterSaleSplitPicker';
+import { normalizeReceiptForPreview, type BusinessInfo } from './printAfterSalePreview';
 
 type DocumentSelection = 'ticket' | 'invoice_detailed' | 'invoice_summary';
-
-function normalizeReceiptForPreview(raw: unknown): PreviewPayload | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const rawRecord = raw as Record<string, unknown>;
-
-  const toNumber = (v: unknown) => {
-    const n = typeof v === 'number' ? v : typeof v === 'string' ? parseFloat(v) : NaN;
-    return Number.isFinite(n) ? n : 0;
-  };
-
-  const items = Array.isArray(rawRecord.items) ? rawRecord.items : [];
-  const normalizedItems: ReceiptItem[] = items.map((it) => {
-    const item = typeof it === 'object' && it !== null ? (it as Record<string, unknown>) : {};
-    const unit = toNumber(item.unit_price);
-    const total = toNumber(item.total_price);
-
-    // Backend tax_rate might be 0.2 or 20 depending on source. UI expects percent number like 20.
-    const rateRaw = toNumber(item.tax_rate);
-    const ratePercent = rateRaw > 0 && rateRaw <= 1 ? rateRaw * 100 : rateRaw;
-    const rate = ratePercent / 100;
-
-    const taxAmount = toNumber(item.tax_amount) || (total * rate) / (1 + rate);
-
-    return {
-      ...item,
-      name: String(item.name ?? item.product_name ?? ''),
-      product_name: String(item.product_name ?? item.name ?? ''),
-      quantity: toNumber(item.quantity) || 1,
-      unit_price: unit,
-      total_price: total,
-      tax_rate: ratePercent,
-      tax_amount: taxAmount,
-      happy_hour_applied: Boolean(item.happy_hour_applied) || false,
-      happy_hour_discount_amount: toNumber(item.happy_hour_discount_amount),
-    };
-  });
-
-  const businessInfoRaw =
-    typeof rawRecord.business_info === 'object' && rawRecord.business_info !== null
-      ? (rawRecord.business_info as Record<string, unknown>)
-      : {};
-
-  return {
-    order: {
-      id: toNumber(rawRecord.order_id ?? rawRecord.id),
-      sequence_number: toNumber(rawRecord.sequence_number ?? 0),
-      total_amount: toNumber(rawRecord.total_amount),
-      total_tax: toNumber(rawRecord.total_tax),
-      payment_method: String(rawRecord.payment_method ?? ''),
-      created_at: String(rawRecord.created_at ?? new Date().toISOString()),
-      items: normalizedItems,
-      vat_breakdown: Array.isArray(rawRecord.vat_breakdown) ? rawRecord.vat_breakdown : [],
-    },
-    businessInfo: {
-      name: String(businessInfoRaw.name ?? ''),
-      address: String(businessInfoRaw.address ?? ''),
-      phone: String(businessInfoRaw.phone ?? ''),
-      email: String(businessInfoRaw.email ?? ''),
-      siret: String(businessInfoRaw.siret ?? ''),
-      taxIdentification: String(businessInfoRaw.tax_identification ?? businessInfoRaw.taxIdentification ?? ''),
-    },
-  };
-}
 
 export interface PrintAfterSaleDialogProps {
   open: boolean;
@@ -103,6 +34,15 @@ export interface PrintAfterSaleDialogProps {
   autoCloseEnabled?: boolean;
   autoCloseMs?: number;
   onClose: () => void;
+}
+
+function parseOrderId(orderId: number | string | null): number | null {
+  if (typeof orderId === 'number' && Number.isFinite(orderId) && orderId > 0) return orderId;
+  if (typeof orderId === 'string' && /^\d+$/.test(orderId.trim())) {
+    const parsed = parseInt(orderId.trim(), 10);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return null;
 }
 
 export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
@@ -113,80 +53,46 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
   onClose,
 }) => {
   const [loading, setLoading] = useState(false);
-  const [preview, setPreview] = useState<PreviewReceiptOrder | null>(null);
+  const [preview, setPreview] = useState<LegalReceiptOrder | null>(null);
   const [businessInfo, setBusinessInfo] = useState<BusinessInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [email, setEmail] = useState('');
-  const [customerName, setCustomerName] = useState('');
-  const [customerAddress, setCustomerAddress] = useState('');
-  const [customerTaxId, setCustomerTaxId] = useState('');
-  const [paymentDueDate, setPaymentDueDate] = useState('');
-  const [paymentTerms, setPaymentTerms] = useState('Paiement à 30 jours');
-  const [latePenaltyTerms, setLatePenaltyTerms] = useState('Pénalités de retard exigibles selon la loi');
-  const [recoveryFeeNote, setRecoveryFeeNote] = useState('Indemnité forfaitaire de recouvrement: 40 EUR (C. com. art. L441-10)');
-  const [sellerLegalForm, setSellerLegalForm] = useState('');
-  const [sellerShareCapitalEur, setSellerShareCapitalEur] = useState('');
-  const [invoiceMode, setInvoiceMode] = useState<'detailed' | 'summary'>('detailed');
+  const [form, setForm] = useState<InvoiceFormState>(initialInvoiceFormState);
+  const [extrasOpen, setExtrasOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<DocumentSelection>('ticket');
   const [lastInvoiceNumber, setLastInvoiceNumber] = useState<string | null>(null);
   const [creatingInvoice, setCreatingInvoice] = useState(false);
   const [emailing, setEmailing] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
+  const [splitParts, setSplitParts] = useState<SplitPartOption[]>([]);
+  const [selectedSubBillId, setSelectedSubBillId] = useState<number | null>(null);
   const autoCloseTimerRef = useRef<number | null>(null);
 
-  const normalizedOrderId = useMemo<number | null>(() => {
-    if (typeof orderId === 'number' && Number.isFinite(orderId) && orderId > 0) {
-      return orderId;
-    }
-    if (typeof orderId === 'string') {
-      const trimmed = orderId.trim();
-      if (!/^\d+$/.test(trimmed)) {
-        return null;
-      }
-      const parsed = parseInt(trimmed, 10);
-      if (Number.isFinite(parsed) && parsed > 0) {
-        return parsed;
-      }
-    }
-    return null;
-  }, [orderId]);
+  const normalizedOrderId = useMemo(() => parseOrderId(orderId), [orderId]);
+  const hasValidOrderId = normalizedOrderId != null;
+  const invoiceMode = selectedDocument === 'invoice_summary' ? 'summary' : 'detailed';
+  const receiptType = invoiceMode;
+  const isInvoiceDocument = selectedDocument !== 'ticket';
+  const documentKind = isInvoiceDocument ? 'invoice' : 'ticket';
 
-  const hasValidOrderId = useMemo(() => normalizedOrderId !== null, [normalizedOrderId]);
-
-  const isInvoiceExportUnavailable = false;
-  const receiptType = selectedDocument === 'invoice_summary' ? 'summary' : 'detailed';
-  const documentKind = selectedDocument === 'ticket' ? 'ticket' : 'invoice';
-  const isInvoiceDocument = documentKind === 'invoice';
   const invoiceLegalInfo: InvoiceLegalInfo | undefined = isInvoiceDocument
     ? {
-        paymentDueDate: paymentDueDate || undefined,
-        paymentTerms: paymentTerms || undefined,
-        latePenaltyTerms: latePenaltyTerms || undefined,
-        recoveryFeeNote: recoveryFeeNote || undefined,
-        sellerLegalForm: sellerLegalForm || undefined,
-        sellerShareCapitalEur: sellerShareCapitalEur || undefined,
+        paymentDueDate: form.paymentDueDate || undefined,
+        paymentTerms: form.paymentTerms || undefined,
+        latePenaltyTerms: form.latePenaltyTerms || undefined,
+        recoveryFeeNote: form.recoveryFeeNote || undefined,
+        sellerLegalForm: form.sellerLegalForm || undefined,
+        sellerShareCapitalEur: form.sellerShareCapitalEur || undefined,
       }
     : undefined;
 
-  useEffect(() => {
-    if (selectedDocument === 'invoice_detailed') setInvoiceMode('detailed');
-    if (selectedDocument === 'invoice_summary') setInvoiceMode('summary');
-  }, [selectedDocument]);
-
-  useEffect(() => {
-    if (!open) return;
-    if (paymentDueDate) return;
-    const due = new Date();
-    due.setDate(due.getDate() + 30);
-    setPaymentDueDate(due.toISOString().slice(0, 10));
-  }, [open, paymentDueDate]);
+  const patchForm = useCallback((patch: Partial<InvoiceFormState>) => {
+    setForm((prev) => ({ ...prev, ...patch }));
+  }, []);
 
   const resetAutoClose = useCallback(() => {
     if (!open || !autoCloseEnabled) return;
-    if (autoCloseTimerRef.current != null) {
-      window.clearTimeout(autoCloseTimerRef.current);
-    }
+    if (autoCloseTimerRef.current != null) window.clearTimeout(autoCloseTimerRef.current);
     autoCloseTimerRef.current = window.setTimeout(() => onClose(), autoCloseMs);
   }, [open, autoCloseEnabled, autoCloseMs, onClose]);
 
@@ -194,9 +100,7 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
     if (!open || !autoCloseEnabled) return;
     resetAutoClose();
     return () => {
-      if (autoCloseTimerRef.current != null) {
-        window.clearTimeout(autoCloseTimerRef.current);
-      }
+      if (autoCloseTimerRef.current != null) window.clearTimeout(autoCloseTimerRef.current);
       autoCloseTimerRef.current = null;
     };
   }, [open, autoCloseEnabled, resetAutoClose]);
@@ -204,23 +108,58 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
   useEffect(() => {
     if (!open) return;
     setLastInvoiceNumber(null);
-    if (!hasValidOrderId) {
+    setForm(initialInvoiceFormState());
+    setExtrasOpen(false);
+    setSelectedSubBillId(null);
+    setEmailSuccess(null);
+  }, [open, normalizedOrderId]);
+
+  useEffect(() => {
+    if (!open || !hasValidOrderId || normalizedOrderId == null) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const order = await apiCore.request<{
+          payment_method?: string;
+          sub_bills?: Array<{ id: number; payment_method: string; amount: number | string }>;
+        }>(`/orders/${normalizedOrderId}`, { method: 'GET' });
+        if (cancelled) return;
+        const parts =
+          order.payment_method === 'split' && Array.isArray(order.sub_bills)
+            ? order.sub_bills.map((b) => ({
+                id: Number(b.id),
+                payment_method: String(b.payment_method),
+                amount: typeof b.amount === 'number' ? b.amount : parseFloat(String(b.amount)),
+              }))
+            : [];
+        setSplitParts(parts.filter((p) => Number.isFinite(p.id) && p.id > 0));
+      } catch {
+        if (!cancelled) setSplitParts([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, hasValidOrderId, normalizedOrderId]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!hasValidOrderId || normalizedOrderId == null) {
       setPreview(null);
       setBusinessInfo(null);
       setLoading(false);
       setError('Identifiant de commande invalide: aperçu impossible.');
       return;
     }
-
     setError(null);
     setLoading(true);
     setPreview(null);
-
+    const qs = new URLSearchParams({ type: receiptType });
+    if (selectedSubBillId != null) qs.set('sub_bill_id', String(selectedSubBillId));
     (async () => {
       try {
-        // Preview-only: does not queue a print job.
         const data = await apiCore.request<{ receipt_data: unknown }>(
-          `/printing/receipt/${normalizedOrderId}/preview?type=${receiptType}`,
+          `/printing/receipt/${normalizedOrderId}/preview?${qs.toString()}`,
           { method: 'GET' }
         );
         const normalized = normalizeReceiptForPreview(data.receipt_data);
@@ -233,52 +172,17 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
         setLoading(false);
       }
     })();
-  }, [open, hasValidOrderId, normalizedOrderId, receiptType]);
+  }, [open, hasValidOrderId, normalizedOrderId, receiptType, selectedSubBillId]);
 
   const createOrFetchInvoice = async () => {
-    if (!hasValidOrderId || normalizedOrderId === null) {
-      throw new Error('Identifiant de commande invalide: facture impossible.');
-    }
-    if (!customerName.trim()) {
-      throw new Error('Nom client requis pour créer une facture.');
-    }
-    if (!customerAddress.trim()) {
-      throw new Error('Adresse client requise pour créer une facture.');
-    }
-    if (!paymentDueDate.trim()) {
-      throw new Error('Échéance paiement requise pour créer une facture.');
-    }
-    if (!paymentTerms.trim()) {
-      throw new Error('Conditions paiement requises pour créer une facture.');
-    }
-    if (!latePenaltyTerms.trim()) {
-      throw new Error('Pénalités retard requises pour créer une facture.');
-    }
-
+    if (normalizedOrderId == null) throw new Error('Identifiant de commande invalide');
     const result = await apiCore.request<{ invoice: Record<string, unknown>; already_exists?: boolean }>(
       `/legal/invoices/from-order/${normalizedOrderId}`,
       {
         method: 'POST',
-        body: JSON.stringify({
-          mode: invoiceMode,
-          customer: {
-            name: customerName,
-            address: customerAddress,
-            email,
-            tax_identification: customerTaxId,
-          },
-          legal: {
-            payment_due_date: paymentDueDate,
-            payment_terms: paymentTerms,
-            late_penalty_terms: latePenaltyTerms,
-            recovery_fee_note: recoveryFeeNote,
-            seller_legal_form: sellerLegalForm,
-            seller_share_capital_eur: sellerShareCapitalEur,
-          },
-        }),
+        body: JSON.stringify(buildInvoiceCreateBody(form, invoiceMode, selectedSubBillId)),
       }
     );
-
     const invoice = result.invoice;
     const invoiceId = Number(invoice.id ?? 0);
     if (!Number.isFinite(invoiceId) || invoiceId <= 0) {
@@ -286,28 +190,14 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
     }
     const invoiceNumber = String(invoice.invoice_number ?? '');
     if (invoiceNumber) setLastInvoiceNumber(invoiceNumber);
-    const invoicePaymentDueDate = String(invoice.payment_due_date ?? '').trim();
-    if (invoicePaymentDueDate) setPaymentDueDate(invoicePaymentDueDate);
-    const invoicePaymentTerms = String(invoice.payment_terms ?? '').trim();
-    if (invoicePaymentTerms) setPaymentTerms(invoicePaymentTerms);
-    const invoiceLatePenaltyTerms = String(invoice.late_penalty_terms ?? '').trim();
-    if (invoiceLatePenaltyTerms) setLatePenaltyTerms(invoiceLatePenaltyTerms);
-    const invoiceRecoveryFee = String(invoice.recovery_fee_note ?? '').trim();
-    if (invoiceRecoveryFee) setRecoveryFeeNote(invoiceRecoveryFee);
-    const invoiceSellerLegalForm = String(invoice.seller_legal_form ?? '').trim();
-    setSellerLegalForm(invoiceSellerLegalForm);
-    const invoiceCapital = invoice.seller_share_capital_eur;
-    if (invoiceCapital != null && String(invoiceCapital).trim() !== '') {
-      setSellerShareCapitalEur(String(invoiceCapital));
-    }
     return { invoiceId, invoice, alreadyExists: Boolean(result.already_exists) };
   };
 
+  const subBillQuery =
+    selectedSubBillId != null ? `?type=${receiptType}&sub_bill_id=${selectedSubBillId}` : `?type=${receiptType}`;
+
   const handleQueuePrint = async () => {
-    if (!hasValidOrderId || normalizedOrderId === null) {
-      setError(`Identifiant de commande invalide: impression ${isInvoiceDocument ? 'facture' : 'ticket'} impossible.`);
-      return;
-    }
+    if (normalizedOrderId == null) return;
     try {
       setLoading(true);
       setError(null);
@@ -315,34 +205,32 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
         const { invoiceId } = await createOrFetchInvoice();
         await apiCore.request(`/printing/invoice/${invoiceId}`, { method: 'POST' });
       } else {
-        await apiCore.request(
-          `/printing/receipt/${normalizedOrderId}?type=${receiptType}`,
-          { method: 'POST' }
-        );
+        await apiCore.request(`/printing/receipt/${normalizedOrderId}${subBillQuery}`, {
+          method: 'POST',
+        });
       }
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : `Échec d'impression ${isInvoiceDocument ? 'facture' : 'ticket'}`);
+      setError(e instanceof Error ? e.message : 'Échec impression');
     } finally {
       setLoading(false);
     }
   };
 
   const handleExportPdf = async () => {
-    if (!hasValidOrderId || normalizedOrderId === null) {
-      setError('Identifiant de commande invalide: export PDF impossible.');
-      return;
-    }
-
+    if (normalizedOrderId == null) return;
     try {
       setExportingPdf(true);
       setError(null);
-      setEmailSuccess(null);
       if (isInvoiceDocument) {
         const { invoiceId } = await createOrFetchInvoice();
         await printingApi.exportInvoicePdf(invoiceId);
       } else {
-        await printingApi.exportReceiptPdf(normalizedOrderId, receiptType);
+        await printingApi.exportReceiptPdf(
+          normalizedOrderId,
+          receiptType,
+          selectedSubBillId ?? undefined
+        );
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Échec export PDF');
@@ -352,25 +240,26 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
   };
 
   const handleSendEmail = async () => {
-    if (!hasValidOrderId || normalizedOrderId === null) {
-      setError('Identifiant de commande invalide: envoi email impossible.');
-      return;
-    }
-    if (!email.trim()) {
+    if (normalizedOrderId == null) return;
+    if (!form.email.trim()) {
       setError('Adresse email destinataire requise.');
       return;
     }
-
     try {
       setEmailing(true);
       setError(null);
       setEmailSuccess(null);
       if (isInvoiceDocument) {
         const { invoiceId } = await createOrFetchInvoice();
-        const result = await printingApi.emailInvoice(invoiceId, email.trim());
+        const result = await printingApi.emailInvoice(invoiceId, form.email.trim());
         setEmailSuccess(result.message);
       } else {
-        const result = await printingApi.emailReceipt(normalizedOrderId, email.trim(), receiptType);
+        const result = await printingApi.emailReceipt(
+          normalizedOrderId,
+          form.email.trim(),
+          receiptType,
+          selectedSubBillId ?? undefined
+        );
         setEmailSuccess(result.message);
       }
     } catch (e) {
@@ -381,26 +270,15 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
   };
 
   const handleCreateInvoiceExport = async () => {
-    if (!hasValidOrderId || normalizedOrderId === null) {
-      setError('Identifiant de commande invalide: facture impossible.');
-      return;
-    }
-    if (!customerName.trim()) {
-      setError('Nom client requis pour créer une facture.');
-      return;
-    }
-    if (!customerAddress.trim()) {
-      setError('Adresse client requise pour créer une facture.');
-      return;
-    }
-
+    if (normalizedOrderId == null) return;
     try {
       setCreatingInvoice(true);
       setError(null);
       const { invoice, alreadyExists } = await createOrFetchInvoice();
       const invoiceNumber = String(invoice.invoice_number ?? `invoice-${normalizedOrderId}`);
-      const payload = JSON.stringify(invoice, null, 2);
-      const blob = new Blob([payload], { type: 'application/json;charset=utf-8' });
+      const blob = new Blob([JSON.stringify(invoice, null, 2)], {
+        type: 'application/json;charset=utf-8',
+      });
       const url = window.URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
@@ -410,14 +288,16 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
       document.body.removeChild(anchor);
       window.URL.revokeObjectURL(url);
       if (alreadyExists) {
-        setError('Facture existante retrouvée et exportée (aucune nouvelle numérotation générée).');
+        setError('Facture existante retrouvée et exportée.');
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Échec de création/export facture');
+      setError(e instanceof Error ? e.message : 'Échec export facture');
     } finally {
       setCreatingInvoice(false);
     }
   };
+
+  const busy = loading || creatingInvoice || emailing || exportingPdf;
 
   return (
     <Dialog
@@ -438,170 +318,72 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
               Choisir un document
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-              <Button
-                size="small"
-                variant={selectedDocument === 'ticket' ? 'contained' : 'outlined'}
-                onClick={() => {
-                  resetAutoClose();
-                  setSelectedDocument('ticket');
-                }}
-              >
-                Ticket détaillé
-              </Button>
-              <Button
-                size="small"
-                variant={selectedDocument === 'invoice_detailed' ? 'contained' : 'outlined'}
-                onClick={() => {
-                  resetAutoClose();
-                  setSelectedDocument('invoice_detailed');
-                }}
-              >
-                Facture avec détail
-              </Button>
-              <Button
-                size="small"
-                variant={selectedDocument === 'invoice_summary' ? 'contained' : 'outlined'}
-                onClick={() => {
-                  resetAutoClose();
-                  setSelectedDocument('invoice_summary');
-                }}
-              >
-                Facture sans détail
-              </Button>
+              {(
+                [
+                  ['ticket', 'Ticket détaillé'],
+                  ['invoice_detailed', 'Facture avec détail'],
+                  ['invoice_summary', 'Facture sans détail'],
+                ] as const
+              ).map(([value, label]) => (
+                <Button
+                  key={value}
+                  size="small"
+                  variant={selectedDocument === value ? 'contained' : 'outlined'}
+                  onClick={() => {
+                    resetAutoClose();
+                    setSelectedDocument(value);
+                  }}
+                >
+                  {label}
+                </Button>
+              ))}
             </Box>
 
+            <PrintAfterSaleSplitPicker
+              parts={splitParts}
+              selectedId={selectedSubBillId}
+              onSelect={(id) => {
+                resetAutoClose();
+                setSelectedSubBillId(id);
+                setLastInvoiceNumber(null);
+              }}
+            />
+
             <Alert severity="info" sx={{ mb: 2 }}>
-              La prévisualisation n’imprime rien. Cliquez sur “Imprimer” pour lancer
-              {isInvoiceDocument ? ' la facture thermique.' : ' le ticket thermique.'}
+              {isInvoiceDocument
+                ? 'Un clic sur Imprimer crée la facture (client « Client » par défaut) puis lance l’impression.'
+                : 'La prévisualisation n’imprime rien. Cliquez sur Imprimer pour le ticket thermique.'}
             </Alert>
 
             <TextField
               fullWidth
               size="small"
               label="Email destinataire"
-              value={email}
+              value={form.email}
               onChange={(e) => {
                 resetAutoClose();
-                setEmail(e.target.value);
+                patchForm({ email: e.target.value });
               }}
               placeholder="client@exemple.com"
               sx={{ mb: 2 }}
             />
 
             {isInvoiceDocument && (
-              <>
-                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                  Facture (système dédié)
-                </Typography>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Nom client"
-                  value={customerName}
-                  onChange={(e) => {
-                    resetAutoClose();
-                    setCustomerName(e.target.value);
-                  }}
-                  sx={{ mb: 1 }}
-                />
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Adresse client"
-                  value={customerAddress}
-                  onChange={(e) => {
-                    resetAutoClose();
-                    setCustomerAddress(e.target.value);
-                  }}
-                  sx={{ mb: 1 }}
-                />
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="N TVA client (optionnel)"
-                  value={customerTaxId}
-                  onChange={(e) => {
-                    resetAutoClose();
-                    setCustomerTaxId(e.target.value);
-                  }}
-                  sx={{ mb: 1 }}
-                />
-                <ParisDateField
-                  label="Échéance paiement (jj/mm/aaaa)"
-                  value={paymentDueDate}
-                  onChange={(ymd) => {
-                    resetAutoClose();
-                    setPaymentDueDate(ymd);
-                  }}
-                  size="small"
-                />
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Conditions paiement"
-                  value={paymentTerms}
-                  onChange={(e) => {
-                    resetAutoClose();
-                    setPaymentTerms(e.target.value);
-                  }}
-                  sx={{ mb: 1 }}
-                />
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Pénalités retard"
-                  value={latePenaltyTerms}
-                  onChange={(e) => {
-                    resetAutoClose();
-                    setLatePenaltyTerms(e.target.value);
-                  }}
-                  sx={{ mb: 1 }}
-                />
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Mention indemnité 40 EUR"
-                  value={recoveryFeeNote}
-                  onChange={(e) => {
-                    resetAutoClose();
-                    setRecoveryFeeNote(e.target.value);
-                  }}
-                  sx={{ mb: 1 }}
-                />
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Forme juridique vendeur (optionnel)"
-                  value={sellerLegalForm}
-                  onChange={(e) => {
-                    resetAutoClose();
-                    setSellerLegalForm(e.target.value);
-                  }}
-                  sx={{ mb: 1 }}
-                />
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="number"
-                  label="Capital social EUR (optionnel)"
-                  value={sellerShareCapitalEur}
-                  onChange={(e) => {
-                    resetAutoClose();
-                    setSellerShareCapitalEur(e.target.value);
-                  }}
-                />
-                <Button
-                  sx={{ mt: 1 }}
-                  variant="contained"
-                  fullWidth
-                  disabled={isInvoiceExportUnavailable || creatingInvoice}
-                  onClick={handleCreateInvoiceExport}
-                >
-                  {creatingInvoice
-                    ? 'Création...'
-                    : `Créer et exporter facture ${invoiceMode === 'detailed' ? '(avec détail)' : '(sans détail)'}`}
-                </Button>
-              </>
+              <PrintAfterSaleInvoiceExtras
+                open={extrasOpen}
+                onToggle={() => {
+                  resetAutoClose();
+                  setExtrasOpen((v) => !v);
+                }}
+                form={form}
+                onChange={(patch) => {
+                  resetAutoClose();
+                  patchForm(patch);
+                }}
+                invoiceMode={invoiceMode}
+                creatingInvoice={creatingInvoice}
+                onExportJson={() => void handleCreateInvoiceExport()}
+              />
             )}
           </Box>
 
@@ -616,7 +398,7 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
             )}
             {error && <Alert severity="error">{error}</Alert>}
             {emailSuccess && <Alert severity="success">{emailSuccess}</Alert>}
-            {!loading && !error && preview && businessInfo && (
+            {!loading && preview && businessInfo && (
               <LegalReceiptContainer
                 order={preview}
                 businessInfo={{
@@ -638,24 +420,20 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Fermer</Button>
-        <Button
-          onClick={handleExportPdf}
-          variant="outlined"
-          disabled={!hasValidOrderId || loading || creatingInvoice || exportingPdf || emailing}
-        >
+        <Button onClick={() => void handleExportPdf()} variant="outlined" disabled={!hasValidOrderId || busy}>
           {exportingPdf ? 'Export PDF...' : 'Exporter PDF'}
         </Button>
         <Button
-          onClick={handleSendEmail}
+          onClick={() => void handleSendEmail()}
           variant="outlined"
-          disabled={!hasValidOrderId || !email.trim() || loading || creatingInvoice || emailing || exportingPdf}
+          disabled={!hasValidOrderId || !form.email.trim() || busy}
         >
           {emailing ? 'Envoi...' : 'Envoyer par email'}
         </Button>
         <Button
-          onClick={handleQueuePrint}
+          onClick={() => void handleQueuePrint()}
           variant="contained"
-          disabled={!hasValidOrderId || loading || creatingInvoice || emailing || exportingPdf}
+          disabled={!hasValidOrderId || busy}
         >
           {isInvoiceDocument ? 'Créer et imprimer facture' : 'Imprimer ticket'}
         </Button>
@@ -665,4 +443,3 @@ export const PrintAfterSaleDialog: React.FC<PrintAfterSaleDialogProps> = ({
 };
 
 export default PrintAfterSaleDialog;
-

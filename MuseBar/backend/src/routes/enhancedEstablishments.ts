@@ -43,7 +43,9 @@ router.get('/stats', requireAuth, requireAdmin, asyncHandler(async (req, res) =>
     const result = await pool.query(`
       SELECT
         COUNT(*)::text                                                          AS total_establishments,
-        COUNT(*) FILTER (WHERE status = 'pending_setup')::text                  AS pending_setup,
+        COUNT(*) FILTER (
+          WHERE status IN ('pending', 'pending_setup', 'setup_required', 'setup_in_progress')
+        )::text                                                                 AS pending_setup,
         COUNT(*) FILTER (WHERE status = 'active')::text                         AS active,
         COUNT(*) FILTER (WHERE status = 'suspended')::text                      AS suspended,
         COUNT(*) FILTER (WHERE created_at >= date_trunc('month', NOW()))::text   AS this_month

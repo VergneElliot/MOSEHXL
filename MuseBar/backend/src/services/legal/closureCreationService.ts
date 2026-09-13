@@ -1,5 +1,4 @@
 import LegalJournalModel from '../../models/legalJournal';
-import { StaffPinSessionModel } from '../../models/staffPinSession';
 import { AppError } from '../../middleware/errorHandler';
 import { Logger } from '../../utils/logger';
 
@@ -58,25 +57,6 @@ async function appendClosureJournalEntry(
   );
 }
 
-/** The service day is over: no badge stays open across a daily closure. Never fails the closure. */
-async function closeBadgesAfterDailyClosure(establishmentId: string): Promise<void> {
-  try {
-    const closed = await StaffPinSessionModel.closeAllForEstablishment(
-      establishmentId,
-      'daily_closure'
-    );
-    if (closed > 0) {
-      logger.info(`Closed ${closed} PIN session(s) after daily closure`, { establishmentId });
-    }
-  } catch (error) {
-    logger.error(
-      'Failed to close PIN sessions after daily closure',
-      error instanceof Error ? error : new Error(String(error)),
-      'PIN_SESSION'
-    );
-  }
-}
-
 /**
  * Creates a closure bulletin whose journal entry is fail-closed: if the CLOSURE entry cannot be
  * appended, the open bulletin is rolled back and the request fails, so a bulletin can never
@@ -131,10 +111,6 @@ export async function createClosureWithFailClosedJournal(
   const finalized = await LegalJournalModel.closeOpenClosureBulletin(closureId, establishmentId);
   if (!finalized) {
     throw new AppError('Failed to finalize closure bulletin', 500, 'LEGAL_CLOSURE_FINALIZE_FAILED');
-  }
-
-  if (closureType === 'DAILY') {
-    await closeBadgesAfterDailyClosure(establishmentId);
   }
 
   // Best-effort accounting email — must not fail fiscal create.

@@ -7,21 +7,20 @@ import {
   type PinActorState,
 } from '../contexts/PinSessionsContext';
 import { useTableInterventionGate } from './useTableInterventionGate';
-import { buildActiveTableState } from './floorActiveTable';
 import { abandonFloorTicket } from './floorTicketAbandon';
+import { tableHasActiveOrder } from '../components/floor/tableOccupancy';
 import { useStepUpAuth } from '../contexts/StepUpAuthContext';
+import type { TableDropPrompt } from '../components/floor/TableDropActionDialog';
+import {
+  buildTableDropPrompt,
+  mergeActiveIntoDiningTable,
+  openDiningTableInSession,
+  primeDiningTableInSession,
+  transferActiveToDiningTable,
+} from './floorPlanTableOps';
+import { useVisibleInterval } from './useVisibleInterval';
 
 export type FloorPlanMapMode = 'select' | 'transfer' | 'merge';
-
-async function syncTicketItemsToServer(
-  ticketId: number,
-  token: string
-): Promise<OrderItem[]> {
-  const { items } = await floorApi.getTicket(ticketId);
-  const orderItems = floorApi.mapTicketItemsToOrderItems(items);
-  await floorApi.replaceTicketItems(ticketId, orderItems, token);
-  return orderItems;
-}
 
 export function useFloorPlanManagement(options: {
   onInfo: (message: string) => void;
@@ -45,6 +44,13 @@ export function useFloorPlanManagement(options: {
   const [mode, setMode] = useState<FloorPlanMapMode>('select');
   const [pinDialogOpen, setPinDialogOpen] = useState(false);
   const [pinDialogMode, setPinDialogMode] = useState<'verify' | 'set'>('verify');
+  const [resumeTable, setResumeTable] = useState<floorApi.DiningTableStatusDto | null>(null);
+  const [focusTableId, setFocusTableId] = useState<number | null>(null);
+  const [dropPrompt, setDropPrompt] = useState<{
+    source: floorApi.DiningTableStatusDto;
+    target: floorApi.DiningTableStatusDto;
+    prompt: TableDropPrompt;
+  } | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -70,14 +76,17 @@ export function useFloorPlanManagement(options: {
 
   useEffect(() => {
     void reload();
-    const t = window.setInterval(() => void reload(), 15000);
-    return () => window.clearInterval(t);
   }, [reload]);
+  useVisibleInterval(() => void reload(), 15000);
 
   const activePlans = useMemo(() => plans.filter((p) => p.is_active), [plans]);
   const planTables = useMemo(
     () => (selectedPlanId != null ? tables.filter((t) => t.floor_plan_id === selectedPlanId) : []),
     [tables, selectedPlanId]
+  );
+  const focusTable = useMemo(
+    () => (focusTableId != null ? planTables.find((t) => t.id === focusTableId) ?? null : null),
+    [focusTableId, planTables]
   );
 
   const requirePin = useCallback(() => {
@@ -110,6 +119,32 @@ export function useFloorPlanManagement(options: {
     [updateActiveSession]
   );
 
+  const clearActiveTable = useCallback(() => {
+    updateActiveSession({ activeTable: null, cart: [] });
+  }, [updateActiveSession]);
+
+  const primeTableInSession = useCallback(
+    async (table: floorApi.DiningTableStatusDto): Promise<ActiveTableState | null> => {
+      if (!pinActor) {
+        requirePin();
+        return null;
+      }
+      try {
+        return await primeDiningTableInSession({
+          table,
+          pinActor,
+          bindTable,
+          clearActiveTable,
+        });
+      } catch (err: unknown) {
+        const e = err as { message?: string };
+        onError(e.message || 'Impossible de sélectionner la table');
+        return null;
+      }
+    },
+    [pinActor, requirePin, bindTable, clearActiveTable, onError]
+  );
+
   const openTableInSession = useCallback(
     async (table: floorApi.DiningTableStatusDto) => {
       if (!pinActor) {
@@ -117,36 +152,11 @@ export function useFloorPlanManagement(options: {
         return;
       }
       try {
-        if (table.open_ticket_id != null) {
-          const { ticket, items, served_by_display_name } = await floorApi.getTicket(
-            table.open_ticket_id
-          );
-          bindTable(
-            buildActiveTableState(
-              table,
-              ticket.id,
-              ticket.last_served_by_user_id,
-              served_by_display_name ?? null,
-              pinActor
-            ),
-            floorApi.mapTicketItemsToOrderItems(items)
-          );
-          onInfo(`Table ${table.label} chargée`);
-        } else {
-          const { ticket } = await floorApi.openTicket(table.id, pinActor.token);
-          bindTable(
-            buildActiveTableState(
-              table,
-              ticket.id,
-              ticket.last_served_by_user_id ?? pinActor.userId,
-              pinActor.displayName,
-              pinActor
-            ),
-            []
-          );
-          onInfo(`Table ${table.label} ouverte`);
-        }
+        const result = await openDiningTableInSession({ table, pinActor, bindTable });
+        onInfo(result === 'loaded' ? `Table ${table.label} chargée` : `Table ${table.label} ouverte`);
+        setFocusTableId(table.id);
         setMode('select');
+        setResumeTable(null);
         onSwitchToPos?.();
       } catch (err: unknown) {
         const e = err as { message?: string };
@@ -157,31 +167,28 @@ export function useFloorPlanManagement(options: {
   );
 
   const transferToTable = useCallback(
-    async (target: floorApi.DiningTableStatusDto) => {
-      if (!pinActor || !activeTable) {
-        onError('Sélectionnez d’abord une table source (mode Ouvrir / charger)');
-        return;
-      }
-      if (target.open_ticket_id != null) {
-        onError('Choisissez une table libre pour un transfert');
+    async (target: floorApi.DiningTableStatusDto, source?: ActiveTableState | null) => {
+      const from = source ?? activeTable;
+      if (!pinActor || !from) {
+        onError('Sélectionnez d’abord une table source');
         return;
       }
       try {
-        await syncTicketItemsToServer(activeTable.ticketId, pinActor.token);
-        const { ticket } = await floorApi.transferTicket(
-          activeTable.ticketId,
-          target.id,
-          pinActor.token
-        );
+        const { ticketId } = await transferActiveToDiningTable({
+          pinActor,
+          activeTable: from,
+          target,
+        });
         updateActiveSession({
           activeTable: {
-            ...activeTable,
+            ...from,
             id: target.id,
             label: target.label,
             floorPlanId: target.floor_plan_id,
-            ticketId: ticket.id,
+            ticketId,
           },
         });
+        setFocusTableId(target.id);
         setMode('select');
         onInfo(`Transféré vers table ${target.label}`);
         void reload();
@@ -194,33 +201,20 @@ export function useFloorPlanManagement(options: {
   );
 
   const mergeIntoTable = useCallback(
-    async (target: floorApi.DiningTableStatusDto) => {
-      if (!pinActor || !activeTable || !target.open_ticket_id) {
+    async (target: floorApi.DiningTableStatusDto, source?: ActiveTableState | null) => {
+      const from = source ?? activeTable;
+      if (!pinActor || !from) {
         onError('Fusion impossible');
         return;
       }
-      if (target.open_ticket_id === activeTable.ticketId) {
-        onError('Choisissez une autre table');
-        return;
-      }
       try {
-        await syncTicketItemsToServer(activeTable.ticketId, pinActor.token);
-        const { target: merged } = await floorApi.mergeTickets(
-          activeTable.ticketId,
-          target.open_ticket_id,
-          pinActor.token
-        );
-        const { items, served_by_display_name } = await floorApi.getTicket(merged.id);
-        bindTable(
-          buildActiveTableState(
-            target,
-            merged.id,
-            merged.last_served_by_user_id,
-            served_by_display_name ?? null,
-            pinActor
-          ),
-          floorApi.mapTicketItemsToOrderItems(items)
-        );
+        await mergeActiveIntoDiningTable({
+          pinActor,
+          activeTable: from,
+          target,
+          bindTable,
+        });
+        setFocusTableId(target.id);
         setMode('select');
         onInfo(`Fusionné sur table ${target.label}`);
         void reload();
@@ -291,10 +285,9 @@ export function useFloorPlanManagement(options: {
 
   const handleTableSelect = useCallback(
     (table: floorApi.DiningTableStatusDto) => {
-      const hasOpenTicket = table.open_ticket_id != null;
-      const occupied = table.has_validated_items === true;
+      const occupied = tableHasActiveOrder(table);
       if (mode === 'transfer') {
-        if (hasOpenTicket) return;
+        if (occupied) return;
         void transferToTable(table);
         return;
       }
@@ -303,10 +296,50 @@ export function useFloorPlanManagement(options: {
         void mergeIntoTable(table);
         return;
       }
-      void openTableInSession(table);
+      setFocusTableId(table.id);
+      void primeTableInSession(table);
+      setResumeTable(table);
     },
-    [mode, activeTicketId, transferToTable, mergeIntoTable, openTableInSession]
+    [mode, activeTicketId, transferToTable, mergeIntoTable, primeTableInSession]
   );
+
+  const handleTableDrop = useCallback(
+    (sourceId: number, targetId: number) => {
+      const source = planTables.find((t) => t.id === sourceId);
+      const target = planTables.find((t) => t.id === targetId);
+      if (!source || !target) return;
+      setFocusTableId(sourceId);
+      void primeTableInSession(source);
+      setDropPrompt({
+        source,
+        target,
+        prompt: buildTableDropPrompt(source, target),
+      });
+    },
+    [planTables, primeTableInSession]
+  );
+
+  const clearDropPrompt = useCallback(() => setDropPrompt(null), []);
+
+  const confirmDropTransfer = useCallback(async () => {
+    if (!dropPrompt) return;
+    const { source, target } = dropPrompt;
+    setDropPrompt(null);
+    const primed = await primeTableInSession(source);
+    if (!primed) return;
+    await transferToTable(target, primed);
+  }, [dropPrompt, primeTableInSession, transferToTable]);
+
+  const confirmDropMerge = useCallback(async () => {
+    if (!dropPrompt) return;
+    const { source, target } = dropPrompt;
+    setDropPrompt(null);
+    const primed = await primeTableInSession(source);
+    if (!primed) return;
+    await mergeIntoTable(target, primed);
+  }, [dropPrompt, primeTableInSession, mergeIntoTable]);
+
+  const clearResumeTable = useCallback(() => setResumeTable(null), []);
 
   return {
     loading,
@@ -321,6 +354,9 @@ export function useFloorPlanManagement(options: {
     pinActor,
     activeTable,
     activeTicketId,
+    focusTableId,
+    focusTable,
+    showTransferMergeModes: focusTableId != null || activeTicketId != null,
     pinDialogOpen,
     pinDialogMode,
     setPinDialogOpen,
@@ -329,6 +365,14 @@ export function useFloorPlanManagement(options: {
     badgeIn,
     reload,
     handleTableSelect,
+    handleTableDrop,
+    dropPrompt,
+    clearDropPrompt,
+    confirmDropTransfer,
+    confirmDropMerge,
+    resumeTable,
+    clearResumeTable,
+    openTableInSession,
     abandonActiveTicket,
     detachFromTable,
   };

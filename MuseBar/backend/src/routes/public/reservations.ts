@@ -21,12 +21,14 @@ import {
   notifyReservationReminder,
   notifyReservationCancelled,
 } from '../../services/reservations/reservationEmailService';
+import { seedReservationInboxMessage } from '../../services/reservations/seedReservationInboxMessage';
 import {
   parseReservationRemindToken,
   parseReservationActionToken,
   canGuestCancelReservation,
   CANCEL_MIN_HOURS_BEFORE,
 } from '../../services/reservations/reservationRemindToken';
+import { resolveVenueContactEmail } from '../../services/establishment/venueContactEmail';
 import { Logger } from '../../utils/logger';
 import { formatDateOnly, formatDateTime } from '@mosehxl/types';
 
@@ -85,10 +87,12 @@ async function resolveEstablishment(slug: string): Promise<{
     [slug]
   );
   if (!result.rows[0]) throw new NotFoundError('Établissement introuvable');
+  const id = String(result.rows[0].id);
+  const contactEmail = await resolveVenueContactEmail(id);
   return {
-    id: String(result.rows[0].id),
+    id,
     name: String(result.rows[0].name),
-    email: (result.rows[0].email as string) || null,
+    email: contactEmail,
     timezone: (result.rows[0].timezone as string) || null,
     slug: String(result.rows[0].slug),
   };
@@ -344,30 +348,23 @@ router.post(
     const reliability = await GuestNoShowFlagModel.lookup(customerEmail, customerPhone);
 
     const startsIso = startsAt.toISOString();
-    const startsFormatted = formatDateTime(startsAt);
 
     const { reservation, inboxMessageId } = await runWithTenantContext(
       { establishmentId: est.id },
       async () => {
-        const inbox = await InboxModel.createMessage({
-          establishment_id: est.id,
-          from_address: customerEmail,
-          to_address: `${est.slug}@mosehxl.com`,
-          subject: `Nouvelle demande de réservation — ${customerName} — ${startsFormatted}`,
-          text_body: [
-            `Demande publique de réservation`,
-            reliability.flagged
-              ? `⚠ ALERTE NO-SHOW : ce contact a déjà été signalé (${reliability.flag_count}×, dernier : ${reliability.last_flagged_at ? formatDateOnly(reliability.last_flagged_at) : '—'})`
-              : null,
-            `Client: ${customerName}`,
-            `Email: ${customerEmail}`,
-            `Téléphone: ${customerPhone}`,
-            `Personnes: ${partySize}`,
-            `Date: ${startsFormatted}`,
-            notes ? `Notes: ${notes}` : null,
-          ]
-            .filter(Boolean)
-            .join('\n'),
+        const inbox = await seedReservationInboxMessage({
+          establishmentId: est.id,
+          establishmentSlug: est.slug,
+          customerName,
+          customerEmail,
+          customerPhone,
+          partySize,
+          startsAtIso: startsIso,
+          notes,
+          source: 'public',
+          reliabilityLine: reliability.flagged
+            ? `⚠ ALERTE NO-SHOW : ce contact a déjà été signalé (${reliability.flag_count}×, dernier : ${reliability.last_flagged_at ? formatDateOnly(reliability.last_flagged_at) : '—'})`
+            : null,
         });
 
         const reservation = await ReservationModel.create({
@@ -382,6 +379,8 @@ router.post(
           source: 'public',
           inbox_message_id: inbox.id,
         });
+
+        await InboxModel.linkReservation(est.id, inbox.id, reservation.id);
 
         return { reservation, inboxMessageId: inbox.id };
       }

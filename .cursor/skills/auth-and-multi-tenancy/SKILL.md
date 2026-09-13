@@ -32,12 +32,14 @@ Two session layers: **account JWT** (email/password login) and **PIN actor JWT**
 | Layer | Location |
 |-------|----------|
 | Verify PIN | `POST /api/auth/pin/verify` → opens `staff_pin_sessions` + returns token with `sid` |
-| Actor token | `pinActorToken.ts` (`token_use: 'pin_actor'`, **12h** hard cap) |
-| Server record | `models/staffPinSession.ts` — idle **60 min**, closed at daily closure |
+| Actor token | `pinActorToken.ts` (`token_use: 'pin_actor'`, **30d** hard cap by default) |
+| Server record | `models/staffPinSession.ts` — same hard expiry; **no idle kill**; not closed on daily Z |
 | Enforcement | `middleware/pinActor.ts` + `pinSessionGuard.ts` — `x-pin-actor-token` |
 | Frontend | `PinSessionsContext.tsx`, `pinElevation.ts`, `StepUpAuthContext.tsx` |
 
-Lifetime: **12h OR 60 min idle OR daily closure** — whichever comes first.
+Lifetime: **30 days** (match remember-me refresh; override with `AUTH_PIN_ACTOR_TTL_DAYS`), or
+explicit close / PIN-or-permission change / account deactivate. Daily closure does **not**
+close badges.
 
 `requirePermission` accepts the **account or the PIN identity** on the request (step-up).
 `requirePinActor` is strict and checks the session row is still active.

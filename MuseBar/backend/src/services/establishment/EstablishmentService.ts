@@ -12,6 +12,7 @@ import { EmailService } from '../email';
 import { Logger } from '../../utils/logger';
 import { formatDateTime } from '@mosehxl/types';
 import { getEnvironmentConfig } from '../../config/environment';
+import { resolveFrontendBaseUrl } from '../../utils/frontendBaseUrl';
 
 export interface CreateEstablishmentRequest {
   name: string;
@@ -271,7 +272,7 @@ export class EstablishmentService {
         this.logger
       );
 
-      const setupUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/establishment-setup/${invitationToken}`;
+      const setupUrl = `${resolveFrontendBaseUrl()}/establishment-setup/${invitationToken}`;
       const expirationDate = formatDateTime(expiresAt);
 
       await emailService.sendTemplateEmail(

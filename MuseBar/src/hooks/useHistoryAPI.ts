@@ -17,6 +17,7 @@ export interface ProcessReturnData {
   selectedItems: string[];
   selectedTip: boolean;
   isPartial: boolean;
+  reopenTable: boolean;
 }
 
 export const useHistoryAPI = (
@@ -87,7 +88,7 @@ export const useHistoryAPI = (
 
   const processReturn = useCallback(
     async (returnData: ProcessReturnData) => {
-      const { order, reason, selectedItems, selectedTip, isPartial } = returnData;
+      const { order, reason, selectedItems, selectedTip, isPartial, reopenTable } = returnData;
 
       try {
         setReturnLoading(true);
@@ -99,9 +100,6 @@ export const useHistoryAPI = (
             return;
           }
 
-          // Resolve selected item IDs to DB-level numeric IDs.
-          // order.items[].id is a string from the frontend; the cancel-unified endpoint
-          // expects numeric IDs that match order_items.id in the database.
           const numericItemIds = selectedItems
             .map(itemId => {
               const item = order.items.find(i => i.id === itemId);
@@ -109,8 +107,6 @@ export const useHistoryAPI = (
             })
             .filter((id): id is number => id !== null);
 
-          // Use cancel-unified: it creates the cancellation order, writes the
-          // legal journal REFUND entry, and logs the audit trail in one shot.
           await apiService.post('/orders/payment/cancel-unified', {
             orderId: Number(order.id),
             reason,
@@ -121,18 +117,35 @@ export const useHistoryAPI = (
 
           setReturnSuccess('Retour partiel traité avec succès');
         } else {
-          // Full return — cancel-unified handles the entire order
-          await apiService.post('/orders/payment/cancel-unified', {
+          const res = await apiService.post<{
+            reopened_table?: { table_label: string; item_count: number };
+            reopen_error?: string;
+          }>('/orders/payment/cancel-unified', {
             orderId: Number(order.id),
             reason,
             cancellationType: 'full',
             includeTipReversal: !!(order.tips && order.tips > 0),
+            reopen_table: reopenTable && Boolean(order.tableLabel),
           });
+          const body = res.data;
 
-          setReturnSuccess('Retour complet traité avec succès');
+          if (reopenTable && order.tableLabel) {
+            if (body.reopened_table) {
+              setReturnSuccess(
+                `Annulation enregistrée — table ${body.reopened_table.table_label} rouverte (${body.reopened_table.item_count} article(s)).`
+              );
+            } else if (body.reopen_error) {
+              setReturnSuccess(
+                `Annulation enregistrée, mais la table n’a pas pu être rouverte : ${body.reopen_error}`
+              );
+            } else {
+              setReturnSuccess('Retour complet traité avec succès');
+            }
+          } else {
+            setReturnSuccess('Retour complet traité avec succès');
+          }
         }
 
-        // Refresh data and close dialog
         setTimeout(() => {
           closeReturnDialog();
           loadOrders();

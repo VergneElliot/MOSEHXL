@@ -21,8 +21,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const establishmentId = getEstablishmentId(req, res);
     if (!establishmentId) return;
-    // Access control already ignores idle/expired badges; settle their rows so the list and the
-    // close_reason match what actually happened, without needing a background sweep.
+    // Settle expired badge rows so the list and close_reason stay honest.
     await StaffPinSessionModel.closeStale(establishmentId);
     const sessions = await StaffPinSessionModel.listActive(establishmentId);
     res.json({ success: true, data: sessions });

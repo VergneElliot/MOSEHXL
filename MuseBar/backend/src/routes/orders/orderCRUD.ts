@@ -8,15 +8,17 @@ import { OrderModel, OrderItemModel, SubBillModel } from '../../models';
 import { queryWaiterDayReport } from '../../models/database/orderWaiterDayReport';
 import { Logger } from '../../utils/logger';
 import { pool } from '../../db/pool';
-import { getEstablishmentId, requireAuth, requireEstablishmentAdmin } from '../auth';
+import { getEstablishmentId, requireAuth, requireEstablishmentAdmin, requirePermission } from '../auth';
 import { validateBody, validateParams, commonValidations, paramValidations } from '../../middleware/validation';
 import { assertPosOrderLinePermissions } from '../../middleware/orderPosLinePermissions';
-import { requirePosPinActor } from '../../middleware/pinActor';
+import { requirePosPinActorForTableOrders } from '../../middleware/requirePosPinActorForTableOrders';
 import { AppError, asyncHandler, ValidationError } from '../../middleware/errorHandler';
 import { createOrderWithCompliance } from '../../services/orders/orderCreationService';
+import { resolveOrderSalesAttribution } from '../../services/orders/resolveOrderSalesAttribution';
 import { resolveActor } from '../../services/auth/actorContext';
 import { attachOptionsToOrderItems } from '../../services/orders/orderItemOptionsService';
 import { enrichOrdersForHistory } from '../../services/orders/orderHistoryEnrichment';
+import { P } from '../../permissions/registry';
 
 const router = express.Router();
 const logger = Logger.getInstance();
@@ -154,7 +156,7 @@ router.get('/waiter-day-report', asyncHandler(async (req, res) => {
     total_amount,
     waiters: report.waiters,
     comptoir: report.comptoir,
-    note: 'Rapport informatif — ce n’est pas un bulletin de clôture fiscal. Total comptoir = ventes sans table.',
+    note: 'Rapport informatif — ce n’est pas un bulletin de clôture fiscal. Total comptoir = ventes sans attribution serveur (caisse sans session PIN).',
   });
 }));
 
@@ -191,7 +193,8 @@ router.get('/:id', validateParams([paramValidations.id]), asyncHandler(async (re
  */
 router.post(
   '/',
-  requirePosPinActor,
+  requirePermission(P.access_pos),
+  requirePosPinActorForTableOrders,
   validateBody(commonValidations.orderCreate),
   assertPosOrderLinePermissions(),
   asyncHandler(async (req, res) => {
@@ -201,21 +204,15 @@ router.post(
       const rawLabel = req.body?.table_label;
       const tableLabel =
         typeof rawLabel === 'string' && rawLabel.trim().length > 0 ? rawLabel.trim() : null;
-      const isComptoir = tableLabel == null;
-      // Comptoir: never attribute to the cashier PIN (Total comptoir). Table: trust body owner snapshot.
+      const attribution = resolveOrderSalesAttribution({
+        tableLabel,
+        bodyWaiterUserId: req.body?.waiter_user_id,
+        bodyWaiterDisplayName: req.body?.waiter_display_name,
+        pinActor: req.pinActor ?? null,
+      });
       const body = {
         ...req.body,
-        table_label: tableLabel,
-        waiter_user_id: isComptoir
-          ? null
-          : req.body?.waiter_user_id != null
-            ? Number(req.body.waiter_user_id)
-            : null,
-        waiter_display_name: isComptoir
-          ? null
-          : typeof req.body?.waiter_display_name === 'string'
-            ? req.body.waiter_display_name
-            : null,
+        ...attribution,
       };
       const creationResult = await createOrderWithCompliance(
         body,

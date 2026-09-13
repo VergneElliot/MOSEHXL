@@ -7,10 +7,12 @@ import {
   buildReceiptDataForInvoice,
   buildReceiptDataForOrder,
 } from '../../printing/printDataRepo';
+import { buildReceiptDataForSubBill } from '../../printing/printDataSubBill';
 import { getLogger } from '../../utils/logger';
 import type { AuthenticatedRequest } from '../userManagement/types';
 import { AppError, asyncHandler, NotFoundError, ValidationError } from '../../middleware/errorHandler';
 import { ensureEstablishment, getPrintingUser } from './context';
+import { parseSubBillIdQuery } from './documentHelpers';
 import {
   printClosureBulletinResponse,
   printInvoiceResponse,
@@ -28,7 +30,11 @@ router.get('/receipt/:orderId/preview', authenticateToken, ensureEstablishment, 
       throw new ValidationError('Invalid order id');
     }
     const type = typeof req.query.type === 'string' ? req.query.type : 'detailed';
-    const receiptData = await buildReceiptDataForOrder(pool, user.establishment_id, user, orderId, type);
+    const subBillId = parseSubBillIdQuery(req.query.sub_bill_id);
+    const receiptData =
+      subBillId != null
+        ? await buildReceiptDataForSubBill(pool, user.establishment_id, user, orderId, subBillId, type)
+        : await buildReceiptDataForOrder(pool, user.establishment_id, user, orderId, type);
     res.json({ receipt_data: receiptData });
   } catch (error: unknown) {
     if (error instanceof AppError) throw error;
@@ -54,7 +60,8 @@ router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, asyncHa
       throw new ValidationError('Invalid order id');
     }
     const type = typeof req.query.type === 'string' ? req.query.type : 'detailed';
-    const { result, receiptData } = await printReceiptResponse(user, orderId, type);
+    const subBillId = parseSubBillIdQuery(req.query.sub_bill_id);
+    const { result, receiptData } = await printReceiptResponse(user, orderId, type, subBillId);
     res.json({ ...result, receipt_data: receiptData });
   } catch (error: unknown) {
     if (error instanceof AppError) throw error;

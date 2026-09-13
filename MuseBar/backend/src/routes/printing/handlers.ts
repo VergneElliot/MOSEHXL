@@ -8,6 +8,7 @@ import {
   logPrintingHistory,
   type PrintingUser,
 } from '../../printing/printDataRepo';
+import { buildReceiptDataForSubBill } from '../../printing/printDataSubBill';
 import { getPrintingService } from './context';
 
 /** In-process handler: get status and printers. Used by routes and by printingCompat. */
@@ -35,15 +36,20 @@ export async function testPrintResponse(user: PrintingUser, printerId?: string) 
 export async function printReceiptResponse(
   user: PrintingUser,
   orderId: number,
-  type: string = 'detailed'
+  type: string = 'detailed',
+  subBillId?: number | null
 ): Promise<{ result: PrintResult; receiptData: PrintingReceiptData }> {
   const establishmentId = user.establishment_id;
-  const receiptData = await buildReceiptDataForOrder(pool, establishmentId, user, orderId, type);
+  const receiptData =
+    subBillId != null
+      ? await buildReceiptDataForSubBill(pool, establishmentId, user, orderId, subBillId, type)
+      : await buildReceiptDataForOrder(pool, establishmentId, user, orderId, type);
   const service = await getPrintingService(user.establishment_id);
   const result = await service.printReceipt(receiptData);
   await logPrintingHistory(pool, user.establishment_id, 'receipt', result, {
     order_id: orderId,
     receipt_number: receiptData.sequence_number,
+    ...(subBillId != null ? { sub_bill_id: subBillId } : {}),
   });
   return { result, receiptData };
 }
