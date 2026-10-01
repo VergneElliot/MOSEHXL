@@ -24,6 +24,7 @@ vi.mock('../middleware/auth', () => ({
       id: 42,
       email: 'admin@example.com',
       role: 'system_admin',
+      is_admin: true,
       establishment_id: null,
     };
     next();
@@ -101,8 +102,13 @@ describe('auth supportRoutes logout endpoint', () => {
       action_type: 'LOGOUT',
     }));
 
-    const setCookieHeader = res.headers['set-cookie'] ?? [];
-    expect(setCookieHeader.some((value: string) => value.startsWith('musebar_refresh_token=;'))).toBe(true);
-    expect(setCookieHeader.some((value: string) => value.startsWith('musebar_csrf_token=;'))).toBe(true);
+    const rawSetCookie = res.headers['set-cookie'];
+    const setCookieHeader = Array.isArray(rawSetCookie)
+      ? rawSetCookie
+      : typeof rawSetCookie === 'string'
+        ? [rawSetCookie]
+        : [];
+    expect(setCookieHeader.some((value) => value.startsWith('musebar_refresh_token=;'))).toBe(true);
+    expect(setCookieHeader.some((value) => value.startsWith('musebar_csrf_token=;'))).toBe(true);
   });
 });

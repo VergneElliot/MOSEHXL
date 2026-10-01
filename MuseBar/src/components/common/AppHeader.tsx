@@ -1,5 +1,6 @@
 /**
- * Header bar with venue switcher (owner PIN challenge) and PIN session tabs.
+ * Header bar with venue switcher (owner PIN challenge), clock, and happy hour.
+ * PIN session tabs live in AppMainNav so top-bar zoom does not hide them.
  */
 
 import React from 'react';
@@ -28,7 +29,6 @@ import {
 import { User } from '../../types/auth';
 import { useTranslation } from 'react-i18next';
 import { TimeClockHeaderControl } from './TimeClockHeaderControl';
-import { PinSessionHeaderTabs } from './PinSessionHeaderTabs';
 import { DisplayScaleControl } from './DisplayScaleControl';
 import { HappyHourHeaderChip } from './HappyHourHeaderChip';
 import { PwaInstallControl } from './PwaInstallControl';
@@ -122,15 +122,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     <AppBar position="static" sx={{ backgroundColor: '#1a1a1a' }}>
       <Toolbar sx={{ gap: 1, minHeight: { xs: 56, sm: 64 } }}>
         <RestaurantIcon sx={{ mr: 1, flexShrink: 0 }} />
-        <Typography variant="h6" component="div" sx={{ flexShrink: 0, mr: 1 }} noWrap>
+        <Typography variant="h6" component="div" sx={{ flexGrow: 1, mr: 1 }} noWrap>
           {posTitle}
         </Typography>
 
-        {showPinSessions && <PinSessionHeaderTabs />}
-
-        {!showPinSessions && <Box sx={{ flexGrow: 1 }} />}
-
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, ml: 'auto', flexShrink: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0 }}>
           <PwaInstallControl />
           {showPinSessions && <DisplayScaleControl />}
           {user && user.role !== 'system_admin' && user.establishment_id && (

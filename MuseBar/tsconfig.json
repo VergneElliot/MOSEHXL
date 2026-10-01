@@ -12,9 +12,8 @@
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "module": "ESNext",
-    "baseUrl": ".",
     "paths": {
-      "@mosehxl/types": ["packages/types/src/index.ts"]
+      "@mosehxl/types": ["./packages/types/src/index.ts"]
     },
     "moduleResolution": "bundler",
     "resolveJsonModule": true,

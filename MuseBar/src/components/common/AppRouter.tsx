@@ -24,6 +24,7 @@ import { Category, Product, User } from '../../types';
 import { PERMISSIONS, type PermissionName } from '@mosehxl/types';
 import { useStepUpAuth } from '../../contexts/StepUpAuthContext';
 import { usePinSessions } from '../../contexts/PinSessionsContext';
+import { canEnterWithoutStepUpPin } from '../../contexts/stepUpPageEntryPolicy';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -128,7 +129,7 @@ const AppRouter: React.FC<AppRouterProps> = ({
 }) => {
   const [tabValue, setTabValue] = useState(0);
   const [navOpen, setNavOpen] = useState(false);
-  const { ensureAccess, ensureSession, hasAccess, releaseAccess, releaseAllAccess } = useStepUpAuth();
+  const { ensureAccess, ensureSession, releaseAccess, releaseAllAccess } = useStepUpAuth();
   const { activeSession, activeSessionId } = usePinSessions();
 
   const TABS: TabConfig[] = [
@@ -153,29 +154,22 @@ const AppRouter: React.FC<AppRouterProps> = ({
   }, [posTabIndex]);
 
   /**
-   * Feature tabs require an active PIN session. Empty permission lists are still
-   * PIN-gated (basic POS/history/settings). Account JWT grants never open tabs.
+   * Feature tabs require an active PIN session. Empty permission lists are basic
+   * (session enough). Specific lists always step-up via ensureAccess — never skip
+   * because the focused badge already holds the right (see canEnterWithoutStepUpPin).
    */
-  const canEnter = useCallback(
-    (permissions: PermissionName[]): boolean => {
-      if (!activeSession) return false;
-      if (permissions.length === 0) return true;
-      return hasAccess(permissions);
-    },
-    [activeSession, hasAccess]
-  );
-
   const selectTab = useCallback(
     (newValue: number) => {
       const tab = filteredTabs[newValue];
       if (!tab) return;
       const required = TAB_ENTRY_PERMISSIONS[tab.value] ?? [];
-      if (canEnter(required)) {
-        setTabValue(newValue);
-        return;
-      }
-      if (!activeSession) {
-        void ensureAccess(required.length ? required : [PERMISSIONS.access_pos], {
+
+      if (canEnterWithoutStepUpPin(required)) {
+        if (activeSession) {
+          setTabValue(newValue);
+          return;
+        }
+        void ensureAccess([PERMISSIONS.access_pos], {
           title: 'Ouvrir une session PIN',
           description:
             'Connectez un badge PIN pour accéder aux fonctionnalités. Le compte email n’accorde aucun droit seul.',
@@ -184,6 +178,7 @@ const AppRouter: React.FC<AppRouterProps> = ({
           .catch(() => undefined);
         return;
       }
+
       void ensureAccess(required, {
         title: `Accès — ${tab.label}`,
         description: `PIN d’un profil autorisé pour ouvrir « ${tab.label} ».`,
@@ -193,7 +188,7 @@ const AppRouter: React.FC<AppRouterProps> = ({
           /* stay on current tab */
         });
     },
-    [filteredTabs, canEnter, ensureAccess, activeSession]
+    [filteredTabs, ensureAccess, activeSession]
   );
 
   // Leaving a gated page ends the authorization the PIN gave for it.
@@ -274,16 +269,34 @@ const AppRouter: React.FC<AppRouterProps> = ({
           flex: 1,
           minHeight: 0,
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          p: 4,
+          flexDirection: 'column',
+          overflow: 'hidden',
         }}
       >
-        <Box sx={{ maxWidth: 480, textAlign: 'center' }}>
-          <Box sx={{ typography: 'h5', mb: 1, fontWeight: 600 }}>Ouvrez une session PIN</Box>
-          <Box sx={{ typography: 'body1', color: 'text.secondary', mb: 2 }}>
-            Le compte email ne donne aucun droit. Utilisez le pavé PIN pour ouvrir un badge, ou
-            déconnectez-vous (en-tête) si ce n’est pas votre poste.
+        <AppMainNav
+          tabs={filteredTabs}
+          activeIndex={Math.max(0, posTabIndex)}
+          open={navOpen}
+          onOpen={() => setNavOpen(true)}
+          onClose={() => setNavOpen(false)}
+          onSelect={selectTab}
+          showPinSessions
+        />
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            p: 4,
+          }}
+        >
+          <Box sx={{ maxWidth: 480, textAlign: 'center' }}>
+            <Box sx={{ typography: 'h5', mb: 1, fontWeight: 600 }}>Ouvrez une session PIN</Box>
+            <Box sx={{ typography: 'body1', color: 'text.secondary', mb: 2 }}>
+              Le compte email ne donne aucun droit. Utilisez « Session » dans la barre ci-dessus
+              pour ouvrir un badge, ou déconnectez-vous (en-tête) si ce n’est pas votre poste.
+            </Box>
           </Box>
         </Box>
       </Paper>
@@ -308,6 +321,7 @@ const AppRouter: React.FC<AppRouterProps> = ({
         onOpen={() => setNavOpen(true)}
         onClose={() => setNavOpen(false)}
         onSelect={selectTab}
+        showPinSessions
       />
 
       <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>

@@ -22,10 +22,15 @@ const LazyPinPadDialog = React.lazy(() => import('../POS/PinPadDialog'));
 
 const TOAST_MS = 3000;
 
+export type PinSessionTabsTone = 'onDark' | 'onPaper';
+
 /**
- * Header session tabs: establishment-wide open badges; focus needs PIN when locked here.
+ * Establishment-wide PIN badges; focus / close need that user's PIN.
+ * Lives in the main nav bar so zoom in the top AppBar does not hide the tabs.
  */
-export const PinSessionHeaderTabs: React.FC = () => {
+export const PinSessionHeaderTabs: React.FC<{ tone?: PinSessionTabsTone }> = ({
+  tone = 'onPaper',
+}) => {
   const {
     sessions,
     activeSessionId,
@@ -54,6 +59,8 @@ export const PinSessionHeaderTabs: React.FC = () => {
     permissions: permissions ?? user?.permissions ?? [],
   });
 
+  const onPaper = tone === 'onPaper';
+
   return (
     <Box
       sx={{
@@ -65,8 +72,9 @@ export const PinSessionHeaderTabs: React.FC = () => {
         px: 0.5,
         py: 0.25,
         borderRadius: 1,
-        border: '1px solid rgba(255,255,255,0.18)',
-        bgcolor: 'rgba(0,0,0,0.22)',
+        border: onPaper ? '1px solid' : '1px solid rgba(255,255,255,0.18)',
+        borderColor: onPaper ? 'divider' : undefined,
+        bgcolor: onPaper ? 'action.hover' : 'rgba(0,0,0,0.22)',
       }}
     >
       {sessions.length > 0 ? (
@@ -78,23 +86,32 @@ export const PinSessionHeaderTabs: React.FC = () => {
           allowScrollButtonsMobile
           sx={{
             minHeight: 40,
-            maxWidth: { xs: 180, sm: 320, md: 480 },
+            flex: 1,
+            minWidth: 0,
+            maxWidth: { xs: '100%', sm: '100%', md: '100%' },
             '& .MuiTab-root': {
               minHeight: 36,
               py: 0.25,
               px: 0.75,
               mx: 0.25,
               textTransform: 'none',
-              color: 'rgba(255,255,255,0.75)',
+              color: onPaper ? 'text.secondary' : 'rgba(255,255,255,0.75)',
               borderRadius: 1,
               border: '1px solid transparent',
               minWidth: 'auto',
             },
-            '& .Mui-selected': {
-              color: '#fff !important',
-              bgcolor: 'rgba(255,255,255,0.12)',
-              border: '1px solid rgba(255,255,255,0.35)',
-            },
+            '& .Mui-selected': onPaper
+              ? {
+                  color: 'text.primary !important',
+                  bgcolor: 'background.paper',
+                  border: '1px solid',
+                  borderColor: 'primary.main',
+                }
+              : {
+                  color: '#fff !important',
+                  bgcolor: 'rgba(255,255,255,0.12)',
+                  border: '1px solid rgba(255,255,255,0.35)',
+                },
             '& .MuiTabs-indicator': { display: 'none' },
           }}
         >
@@ -119,7 +136,10 @@ export const PinSessionHeaderTabs: React.FC = () => {
           })}
         </Tabs>
       ) : (
-        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mr: 0.5 }}>
+        <Typography
+          variant="body2"
+          sx={{ color: onPaper ? 'text.secondary' : 'rgba(255,255,255,0.7)', mr: 0.5 }}
+        >
           Aucune session — appuyez sur Session
         </Typography>
       )}
@@ -144,13 +164,13 @@ export const PinSessionHeaderTabs: React.FC = () => {
       <Tooltip title="Ouvrir une session PIN">
         <Button
           size="small"
-          color="inherit"
+          color={onPaper ? 'primary' : 'inherit'}
           variant="outlined"
           startIcon={<AddIcon />}
           onClick={openNewSessionPad}
           sx={{
             textTransform: 'none',
-            borderColor: 'rgba(255,255,255,0.4)',
+            borderColor: onPaper ? undefined : 'rgba(255,255,255,0.4)',
             whiteSpace: 'nowrap',
             flexShrink: 0,
           }}

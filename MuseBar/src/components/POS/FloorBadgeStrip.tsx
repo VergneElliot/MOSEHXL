@@ -9,7 +9,7 @@ interface FloorBadgeStripProps {
   onTableClick: () => void;
 }
 
-/** POS strip under header sessions: table binding only (PIN sessions live in AppHeader). */
+/** POS strip: table binding only (PIN sessions live in AppMainNav). */
 export const FloorBadgeStrip: React.FC<FloorBadgeStripProps> = ({
   sessionName,
   tableLabel,

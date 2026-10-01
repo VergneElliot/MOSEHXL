@@ -14,6 +14,7 @@ import {
   Typography,
 } from '@mui/material';
 import { Menu as MenuIcon } from '@mui/icons-material';
+import { PinSessionHeaderTabs } from './PinSessionHeaderTabs';
 
 export type AppNavTab = {
   label: string;
@@ -28,6 +29,8 @@ type AppMainNavProps = {
   onOpen: () => void;
   onClose: () => void;
   onSelect: (index: number) => void;
+  /** PIN badges strip — kept here so top-bar zoom never hides sessions. */
+  showPinSessions?: boolean;
 };
 
 export const AppMainNav: React.FC<AppMainNavProps> = ({
@@ -37,6 +40,7 @@ export const AppMainNav: React.FC<AppMainNavProps> = ({
   onOpen,
   onClose,
   onSelect,
+  showPinSessions = false,
 }) => {
   const active = tabs[activeIndex];
 
@@ -53,6 +57,7 @@ export const AppMainNav: React.FC<AppMainNavProps> = ({
           borderBottom: 1,
           borderColor: 'divider',
           bgcolor: 'background.paper',
+          minWidth: 0,
         }}
       >
         <IconButton
@@ -61,11 +66,21 @@ export const AppMainNav: React.FC<AppMainNavProps> = ({
           edge="start"
           size="large"
           color="inherit"
+          sx={{ flexShrink: 0 }}
         >
           <MenuIcon fontSize="large" />
         </IconButton>
         {active && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              minWidth: 0,
+              flexShrink: 0,
+              maxWidth: { xs: 120, sm: 200 },
+            }}
+          >
             {active.icon && (
               <Box sx={{ display: 'flex', color: 'primary.main', '& .MuiSvgIcon-root': { fontSize: 28 } }}>
                 {active.icon}
@@ -75,6 +90,11 @@ export const AppMainNav: React.FC<AppMainNavProps> = ({
               {active.label}
             </Typography>
           </Box>
+        )}
+        {showPinSessions ? (
+          <PinSessionHeaderTabs tone="onPaper" />
+        ) : (
+          <Box sx={{ flex: 1 }} />
         )}
       </Box>
 
