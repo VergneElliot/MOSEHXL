@@ -9,7 +9,7 @@
     "test:coverage": "vitest run --coverage",
     "test:real-db": "RUN_REAL_DB_TESTS=true vitest run --project real-db",
     "test:watch": "vitest",
-    "lint": "eslint src --ext .ts,.tsx",
+    "lint": "eslint src",
     "type-check": "tsc --noEmit",
     "dev": "ts-node src/app.ts",
     "build": "tsc && mkdir -p dist/docs dist/migrations/files && cp src/docs/openapi.yaml dist/docs/ && cp src/migrations/files/*.sql dist/migrations/files/",

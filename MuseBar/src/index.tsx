@@ -7,6 +7,7 @@ import App from './App';
 import { AuthProvider } from './hooks/useAuth';
 import { initializeClientErrorLogging } from './services/clientErrorLogger';
 import { createAppTheme } from './theme/createAppTheme';
+import { PwaUpdateSnackbar } from './components/common/PwaUpdateSnackbar';
 import './i18n';
 
 /** Default before a PIN session loads prefs (dark is the product default). */
@@ -23,6 +24,7 @@ root.render(
         <CssBaseline />
         <AuthProvider>
           <App />
+          <PwaUpdateSnackbar />
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>
