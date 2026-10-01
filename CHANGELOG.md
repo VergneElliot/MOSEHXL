@@ -49,8 +49,9 @@ specific-permission step-up UX is authorization-only).
 - Identité : compte établissement = email/mot de passe sans droits métier ; droits
   uniquement via session PIN ; staff = acteurs PIN-only (`can_login=false`).
 - Basculement d’établissement : PIN propriétaire du compte sur l’établissement cible.
-- Pointage : ouvrir / fermer un badge PIN = entrée / sortie ; fermeture bloquée si
-  tables ouvertes ; anciennes API punch désactivées (410).
+- Pointage : ouvrir / fermer un badge PIN = entrée / sortie ; fermeture bloquée
+  seulement si des tables ouvertes sont **assignées** à ce profil ; anciennes API
+  punch désactivées (410).
 - Boîte mail : liste par **conversation** (plus une ligne par e-mail de confirmation
   `slug@mosehxl.com`) ; fil type messagerie (client / établissement) ; archivage
   de tout le fil réservation.
@@ -67,6 +68,12 @@ specific-permission step-up UX is authorization-only).
   fermeture depuis n’importe quel appareil après saisie du PIN du profil
   (évite de clôturer le pointage d’autrui). Première ouverture et fermeture de
   badge = pointage **uniquement sur le Wi‑Fi** configuré ; caisse utilisable hors réseau.
+- Fermeture de badge : ne bloque plus si des tables ouvertes appartiennent à
+  **un autre** serveur (critère = `last_served_by_user_id`, pas le simple
+  `opened_by`).
+- Droits **spécifiques** (clôtures, administration, paramètres hors profil, etc.) :
+  le pavé PIN s’ouvre à l’entrée de l’onglet / section même si le badge focalisé
+  détient déjà le droit (plus de court-circuit `hasAccess`).
 
 - Copies venue « Nouvelle demande… » : l’email de contact Paramètres (`business_settings`)
   est maintenant utilisé et synchronisé — plus le legacy `establishments.email`

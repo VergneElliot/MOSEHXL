@@ -94,7 +94,7 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
   onDataUpdate = () => {},
 }) => {
   const [currentTab, setCurrentTab] = useState(0);
-  const { ensureAccess, hasAccess } = useStepUpAuth();
+  const { ensureAccess } = useStepUpAuth();
 
   const tabs: SettingsTab[] = useMemo(() => {
     const base: SettingsTab[] = [
@@ -207,17 +207,13 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
     (_event: React.SyntheticEvent, newValue: number) => {
       const tab = tabs[newValue];
       if (!tab) return;
-      // Profil is a basic right; every other Paramètres tab is a specific one.
+      // Profil is a basic right; every other Paramètres tab is specific → always PIN.
       if (tab.id === 'profile') {
         setCurrentTab(newValue);
         return;
       }
       const required =
         tab.id === 'menu' ? PERMISSIONS.access_menu : PERMISSIONS.access_settings;
-      if (hasAccess(required)) {
-        setCurrentTab(newValue);
-        return;
-      }
       void ensureAccess(required, {
         title: tab.id === 'menu' ? 'Gestion du menu' : `Paramètres — ${tab.label}`,
         description:
@@ -230,7 +226,7 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
           /* stay on current sub-tab */
         });
     },
-    [tabs, ensureAccess, hasAccess]
+    [tabs, ensureAccess]
   );
 
   return (

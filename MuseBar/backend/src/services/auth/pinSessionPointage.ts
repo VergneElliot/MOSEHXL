@@ -7,6 +7,11 @@ import { TimeEntryModel } from '../../models/timeEntry';
 import { Logger } from '../../utils/logger';
 import { AppError } from '../../middleware/errorHandler';
 
+/**
+ * Open tickets whose live owner is this waiter (`last_served_by_user_id`).
+ * `opened_by_user_id` alone does not block — tables reassigned to someone else
+ * must not prevent clock-out.
+ */
 export async function countOpenTicketsForWaiter(
   establishmentId: string,
   userId: number
@@ -16,10 +21,7 @@ export async function countOpenTicketsForWaiter(
      FROM open_tickets
      WHERE establishment_id = $1
        AND status = 'open'
-       AND (
-         opened_by_user_id = $2
-         OR last_served_by_user_id = $2
-       )`,
+       AND last_served_by_user_id = $2`,
     [establishmentId, userId]
   );
   return Number(result.rows[0]?.n ?? 0);
@@ -54,7 +56,7 @@ export async function clockInOnPinOpen(input: {
 
 /**
  * Clock-out when closing a PIN session.
- * Blocks if the actor still has open floor tickets.
+ * Blocks only if this waiter still owns open floor tickets.
  */
 export async function clockOutOnPinClose(input: {
   establishmentId: string;
@@ -64,7 +66,7 @@ export async function clockOutOnPinClose(input: {
   const openCount = await countOpenTicketsForWaiter(input.establishmentId, input.userId);
   if (openCount > 0) {
     throw new AppError(
-      `Impossible de fermer le badge : ${openCount} table(s) encore ouverte(s). Libérez ou transférez-les avant de pointer la sortie.`,
+      `Impossible de fermer le badge : ${openCount} table(s) encore assignée(s) à ce profil. Libérez ou transférez-les avant de pointer la sortie.`,
       409,
       'PIN_CLOSE_OPEN_TABLES',
       { open_ticket_count: openCount }

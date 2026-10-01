@@ -22,7 +22,6 @@ export function useTableInterventionGate(
     if (!activeTable || !pinActor) return;
     const assignedId = activeTable.assignedWaiterUserId;
     if (assignedId == null || pinActor.userId === assignedId) return;
-    if (pinActor.role === 'establishment_admin') return;
     await ensurePermission(PERMISSIONS.pos_intervene_table, { ...INTERVENE_COPY });
   }, [activeTable, pinActor, ensurePermission]);
 }

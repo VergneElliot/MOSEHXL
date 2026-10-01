@@ -11,10 +11,9 @@ import {
   Gavel as ComplianceIcon,
   TableRestaurant as FloorIcon,
 } from '@mui/icons-material';
-import { PERMISSIONS, type PermissionName } from '@mosehxl/types';
+import { PERMISSIONS } from '@mosehxl/types';
 import type { User } from '../../types/auth';
 import { useStepUpAuth } from '../../contexts/StepUpAuthContext';
-import { usePinSessions } from '../../contexts/PinSessionsContext';
 import DocumentsPanel from './DocumentsPanel';
 import InboxPanel from './InboxPanel';
 import ReservationsPanel from './ReservationsPanel';
@@ -54,12 +53,11 @@ type AdminSection =
   | 'audit';
 
 const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user, token }) => {
-  const { ensureAccess, hasAccess, releaseAccess } = useStepUpAuth();
-  const { activeSession } = usePinSessions();
+  const { ensureAccess, releaseAccess } = useStepUpAuth();
 
   /**
-   * Every section stays visible; opening one asks for a PIN when the acting identity lacks
-   * its permission. Pointage is basic — any member of the establishment may clock in.
+   * Every section stays visible. Specific sections always ask for a PIN on entry
+   * (even if the focused badge already holds the right). Pointage is basic — no PIN.
    */
   const sections = useMemo(
     () => [
@@ -80,15 +78,6 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
   const [inboxFocusReservationId, setInboxFocusReservationId] = useState<number | null>(null);
   const active = sections[Math.min(tab, Math.max(sections.length - 1, 0))]?.key;
 
-  const canOpen = useCallback(
-    (permission: PermissionName | null): boolean => {
-      if (!permission) return true;
-      if (activeSession) return hasAccess(permission);
-      return user.permissions?.includes(permission) ?? false;
-    },
-    [activeSession, hasAccess, user.permissions]
-  );
-
   const openInboxConversation = useCallback(
     (reservationId: number) => {
       const inboxIndex = sections.findIndex((s) => s.key === 'inbox');
@@ -98,7 +87,7 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
         setTab(inboxIndex);
       };
       const required = sections[inboxIndex]?.permission;
-      if (!required || canOpen(required)) {
+      if (!required) {
         go();
         return;
       }
@@ -109,7 +98,7 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
         .then(go)
         .catch(() => undefined);
     },
-    [sections, canOpen, ensureAccess]
+    [sections, ensureAccess]
   );
 
   // Leaving a section ends the authorization its PIN granted.
@@ -152,7 +141,7 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
             setPlanningUiDirty(false);
           }
           const required = next.permission;
-          if (!required || canOpen(required)) {
+          if (!required) {
             setTab(v);
             return;
           }
