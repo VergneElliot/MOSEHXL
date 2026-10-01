@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AppError } from '../../middleware/errorHandler';
 import {
-  assertPinPointageOnVenueNetwork,
+  isPinPointageOnVenueNetwork,
   normalizeClientIp,
 } from './venueNetworkGuard';
 
@@ -26,25 +25,16 @@ describe('venueNetworkGuard', () => {
     expect(normalizeClientIp('::ffff:203.0.113.10')).toBe('203.0.113.10');
   });
 
-  it('allows a listed client IP', async () => {
+  it('returns true for a listed client IP', async () => {
     getNetwork.mockResolvedValue({ allowed_ips: ['203.0.113.10'] });
-    await expect(
-      assertPinPointageOnVenueNetwork('est-1', '203.0.113.10')
-    ).resolves.toBeUndefined();
+    await expect(isPinPointageOnVenueNetwork('est-1', '203.0.113.10')).resolves.toBe(true);
   });
 
-  it('rejects off-network and empty allowlist', async () => {
+  it('returns false off-network and for empty allowlist', async () => {
     getNetwork.mockResolvedValue({ allowed_ips: ['203.0.113.10'] });
-    await expect(
-      assertPinPointageOnVenueNetwork('est-1', '198.51.100.1')
-    ).rejects.toMatchObject({
-      errorCode: 'PIN_POINTAGE_OFF_VENUE_NETWORK',
-      statusCode: 403,
-    });
+    await expect(isPinPointageOnVenueNetwork('est-1', '198.51.100.1')).resolves.toBe(false);
 
     getNetwork.mockResolvedValue({ allowed_ips: [] });
-    await expect(assertPinPointageOnVenueNetwork('est-1', '203.0.113.10')).rejects.toBeInstanceOf(
-      AppError
-    );
+    await expect(isPinPointageOnVenueNetwork('est-1', '203.0.113.10')).resolves.toBe(false);
   });
 });

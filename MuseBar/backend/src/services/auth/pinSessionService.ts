@@ -3,13 +3,13 @@ import { Logger } from '../../utils/logger';
 import { AppError } from '../../middleware/errorHandler';
 import { PIN_ACTOR_TTL_MS } from './pinActorToken';
 import { clockInOnPinOpen, clockOutOnPinClose } from './pinSessionPointage';
-import { assertPinPointageOnVenueNetwork } from './venueNetworkGuard';
+import { isPinPointageOnVenueNetwork } from './venueNetworkGuard';
 
 /**
  * Opens or reuses the server-side badge session and returns its id (`sid` in the PIN actor
- * token). Re-verify on another device must reuse the same row (one open session per user)
- * and must not clock-in again. First open requires venue Wi‑Fi (pointage). Soft failures
- * (DB) still return null so the floor is not hard-blocked; network denials propagate.
+ * token). Re-verify on another device must reuse the same row (one open session per user).
+ * Session open/reuse is always allowed; clock-in only when the client is on the venue
+ * Wi‑Fi allowlist. Soft DB failures still return null so the floor is not hard-blocked.
  */
 export async function openPinSession(input: {
   establishmentId: string;
@@ -26,6 +26,10 @@ export async function openPinSession(input: {
       input.establishmentId,
       input.pinUserId
     );
+    const onVenue = await isPinPointageOnVenueNetwork(
+      input.establishmentId,
+      input.ipAddress
+    );
 
     if (existing) {
       await StaffPinSessionModel.touchAndExtend(
@@ -38,11 +42,16 @@ export async function openPinSession(input: {
         input.establishmentId,
         existing.id
       );
-      // Already clocked in when this session was first opened — no Wi‑Fi check.
+      // Home→venue unlock: clock in if now on allowlist and not already punched.
+      if (onVenue) {
+        await clockInOnPinOpen({
+          establishmentId: input.establishmentId,
+          userId: input.pinUserId,
+          ip: input.ipAddress ?? null,
+        });
+      }
       return existing.id;
     }
-
-    await assertPinPointageOnVenueNetwork(input.establishmentId, input.ipAddress);
 
     const session = await StaffPinSessionModel.open({
       establishmentId: input.establishmentId,
@@ -52,11 +61,13 @@ export async function openPinSession(input: {
       ipAddress: input.ipAddress,
       userAgent: input.userAgent,
     });
-    await clockInOnPinOpen({
-      establishmentId: input.establishmentId,
-      userId: input.pinUserId,
-      ip: input.ipAddress ?? null,
-    });
+    if (onVenue) {
+      await clockInOnPinOpen({
+        establishmentId: input.establishmentId,
+        userId: input.pinUserId,
+        ip: input.ipAddress ?? null,
+      });
+    }
     return session.id;
   } catch (error) {
     if (error instanceof AppError) throw error;
@@ -69,19 +80,26 @@ export async function openPinSession(input: {
   }
 }
 
+/**
+ * Closes the badge session. Always allowed off-venue; clock-out only on venue Wi‑Fi.
+ * Owned open tables still block close everywhere.
+ */
 export async function closePinSession(
   sessionId: string,
   establishmentId: string,
   reason: string,
   options?: { pinUserId?: number; ipAddress?: string | null }
 ): Promise<boolean> {
-  await assertPinPointageOnVenueNetwork(establishmentId, options?.ipAddress ?? null);
-
   if (options?.pinUserId != null) {
+    const onVenue = await isPinPointageOnVenueNetwork(
+      establishmentId,
+      options.ipAddress ?? null
+    );
     await clockOutOnPinClose({
       establishmentId,
       userId: options.pinUserId,
       ip: options.ipAddress ?? null,
+      recordPointage: onVenue,
     });
   }
   return StaffPinSessionModel.close(sessionId, establishmentId, reason);

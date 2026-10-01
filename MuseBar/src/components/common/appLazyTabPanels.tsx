@@ -36,6 +36,6 @@ export const LazyAdministrationContainer = React.lazy(() =>
   import('../Administration').then(mod => ({ default: mod.AdministrationContainer }))
 );
 
-export const LazyFloorPlanConsultPanel = React.lazy(
-  () => import('../floor/FloorPlanConsultPanel')
+export const LazyFloorPlanTabContainer = React.lazy(
+  () => import('../floor/FloorPlanTabContainer')
 );

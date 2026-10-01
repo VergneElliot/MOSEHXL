@@ -75,4 +75,14 @@ describe('clockOutOnPinClose', () => {
       ip: '1.2.3.4',
     });
   });
+
+  it('checks tables but skips TimeEntry when recordPointage is false', async () => {
+    mocks.query.mockResolvedValueOnce({ rows: [{ n: 0 }] });
+    await clockOutOnPinClose({
+      establishmentId: 'est-1',
+      userId: 7,
+      recordPointage: false,
+    });
+    expect(mocks.clockOut).not.toHaveBeenCalled();
+  });
 });

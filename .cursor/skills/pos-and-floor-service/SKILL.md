@@ -14,8 +14,8 @@ description: >-
 | UI | Where | Purpose | Main code |
 |----|-------|---------|-----------|
 | **Caisse** floor map | POS tab → dialog | Pick table while selling; ties cart to table | `FloorMapDialog.tsx`, `useFloorService` |
-| **Plan de salle** tab | Top-level tab `floor_plan` | Transfer, merge, abandon tickets; consult-only canvas | `FloorPlanConsultPanel.tsx`, `useFloorPlanManagement` |
-| **Plans de tables** | Administration → Plans de tables | Edit layout (create/move tables) | `FloorPlansPanel.tsx` — see `administration-space` skill |
+| **Plan de salle → Service** | Top-level tab `floor_plan` | Transfer, merge, abandon tickets; consult canvas | `FloorPlanConsultPanel.tsx`, `useFloorPlanManagement` |
+| **Plan de salle → Modifier** | Same tab, sub-tab | Edit layout (create/move tables) | `FloorPlansPanel.tsx` via `FloorPlanTabContainer` |
 
 ## Architecture
 
@@ -27,11 +27,12 @@ PinSessionsContext (multi-tab carts, sessionStorage)
     → ProductGrid, OrderSummary, payment dialogs
 
 Plan de salle tab
-  → FloorPlanConsultPanel
-  → useFloorPlanManagement (focus on click, transfer / merge / open / abandon)
-  → TableResumeDialog (select mode: resume before Caisse)
-  → TableDropActionDialog (drag table→table → transfer / merge)
-  → FloorCanvasView (shared with admin editor; select-mode table DnD)
+    → FloorPlanTabContainer (Service | Modifier le plan)
+    → FloorPlanConsultPanel / FloorPlansPanel
+    → useFloorPlanManagement (focus on click, transfer / merge / open / abandon)
+    → TableResumeDialog (select mode: resume before Caisse)
+    → TableDropActionDialog (drag table→table → transfer / merge)
+    → FloorCanvasView (shared with layout editor; select-mode table DnD)
 ```
 
 In **Ouvrir / charger** (`mode === 'select'`), table click sets page focus

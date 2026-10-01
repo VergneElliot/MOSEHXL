@@ -19,6 +19,7 @@ export const SettingsContainer: React.FC<SettingsProps> = ({
   products = [],
   categories = [],
   onDataUpdate = () => {},
+  token = '',
 }) => {
   const settingsHook = useSettings();
 
@@ -51,6 +52,7 @@ export const SettingsContainer: React.FC<SettingsProps> = ({
         products={products}
         categories={categories}
         onDataUpdate={onDataUpdate}
+        token={token}
       />
     </Box>
   );

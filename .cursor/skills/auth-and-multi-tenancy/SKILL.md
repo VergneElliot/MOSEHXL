@@ -43,16 +43,16 @@ Login rejects `can_login = false`. Setup wizard collects email + password + **ow
 
 | Layer | Location |
 |-------|----------|
-| Verify PIN | `POST /api/auth/pin/verify` → opens or **reuses** session + clock-in only on first open |
+| Verify PIN | `POST /api/auth/pin/verify` → opens or **reuses** session; **clock-in only if on venue IP allowlist** |
 | Actor token | `pinActorToken.ts` (`token_use: 'pin_actor'`, default **1 day**; `AUTH_PIN_ACTOR_TTL_DAYS`) |
-| Close | `POST /api/auth/pin/sessions/:id/close` → **clock-out**; blocked only if **this** PIN user still owns open tickets (`last_served_by_user_id`) |
-| Pointage glue | `services/auth/pinSessionPointage.ts` |
-| One open badge / user | `openPinSession` reuses `staff_pin_sessions` for `(establishment, pin_user)`; no second clock-in |
+| Close | `POST /api/auth/pin/sessions/:id/close` → always closes badge; **clock-out only on allowlist**; blocked if **this** PIN user still owns open tickets (`last_served_by_user_id`) |
+| Pointage glue | `services/auth/pinSessionPointage.ts` + `venueNetworkGuard.ts` (`isPinPointageOnVenueNetwork`) |
+| One open badge / user | `openPinSession` reuses `staff_pin_sessions` for `(establishment, pin_user)` |
 | Shared header tabs | `GET /api/auth/pin/sessions` (any auth) + FE merge; **one tab per PIN user**; focus remote → that user's PIN; carts local by `sid` |
 | Tab sync | Poll ~12s while visible + window focus / online / manual refresh; drop local unlock after grace if closed remotely |
 | Close badge | Header ✕ requires that user's PIN (any device); token proves ownership; managers may force-close from admin |
 | Device focus | Shared tab *list*; which tab is **focused** stays per-device (`sessionStorage`) |
-| Pointage network | **First** PIN open + any PIN close require venue Wi‑Fi allowlist; unlock/reuse + POS work off-network (5G/terrasse) |
+| Pointage network | Badge open/close **always** allowed; clock-in/out **only** on venue Wi‑Fi allowlist (empty list = no hours recorded). Home→venue unlock can clock in on reuse. |
 | Specific rights | Always step-up PIN (`ensurePermission` / `ensureAccess`); UI must not short-circuit on `hasAccess` for specific keys before calling ensure* |
 | Page entry | Closures / Administration / Settings (non-Profil) always `ensureAccess`; scope reuse only after a successful PIN that visit |
 | Enforcement | `middleware/pinActor.ts` + `pinSessionGuard.ts` — `x-pin-actor-token` |

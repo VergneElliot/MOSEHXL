@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box,
   Typography,
@@ -22,6 +22,7 @@ import WaiterDayReportPanel from './WaiterDayReportPanel';
 import OngoingOrdersPanel from './OngoingOrdersPanel';
 import { Order } from '../../types';
 import { useStepUpAuth } from '../../contexts/StepUpAuthContext';
+import { useRegisterNavSubsections } from '../../contexts/NavSubsectionsContext';
 import { PERMISSIONS } from '@mosehxl/types';
 
 interface HistoryContainerProps {
@@ -44,6 +45,25 @@ const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn =
     Array<{ waiter_user_id: number; waiter_display_name: string }>
   >([]);
   const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  const historyNavItems = useMemo(
+    () => [
+      { id: 'sales', label: 'Ventes' },
+      { id: 'ongoing', label: 'En cours' },
+    ],
+    []
+  );
+
+  const selectHistorySection = useCallback((id: string) => {
+    setSectionTab(id === 'ongoing' ? 1 : 0);
+  }, []);
+
+  useRegisterNavSubsections(
+    'history',
+    historyNavItems,
+    sectionTab === 1 ? 'ongoing' : 'sales',
+    selectHistorySection
+  );
 
   const logic = useHistoryLogic();
 

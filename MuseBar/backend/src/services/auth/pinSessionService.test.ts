@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   close: vi.fn(),
   clockInOnPinOpen: vi.fn(),
   clockOutOnPinClose: vi.fn(),
-  assertPinPointageOnVenueNetwork: vi.fn(),
+  isPinPointageOnVenueNetwork: vi.fn(),
   error: vi.fn(),
 }));
 
@@ -30,7 +30,7 @@ vi.mock('./pinSessionPointage', () => ({
 }));
 
 vi.mock('./venueNetworkGuard', () => ({
-  assertPinPointageOnVenueNetwork: mocks.assertPinPointageOnVenueNetwork,
+  isPinPointageOnVenueNetwork: mocks.isPinPointageOnVenueNetwork,
 }));
 
 vi.mock('../../utils/logger', () => ({
@@ -41,7 +41,6 @@ vi.mock('./pinActorToken', () => ({
   PIN_ACTOR_TTL_MS: 86_400_000,
 }));
 
-import { AppError } from '../../middleware/errorHandler';
 import { closePinSession, openPinSession } from './pinSessionService';
 
 const BASE = {
@@ -59,16 +58,16 @@ describe('openPinSession', () => {
     mocks.touchAndExtend.mockResolvedValue(true);
     mocks.closeDuplicatesForUser.mockResolvedValue(0);
     mocks.clockInOnPinOpen.mockResolvedValue(undefined);
-    mocks.assertPinPointageOnVenueNetwork.mockResolvedValue(undefined);
+    mocks.isPinPointageOnVenueNetwork.mockResolvedValue(true);
   });
 
-  it('reuses an open session and does not clock in again', async () => {
+  it('reuses on venue and clocks in if needed (home→venue unlock)', async () => {
     mocks.findActiveForUser.mockResolvedValue({ id: 'sid-existing', user_id: 42 });
 
     const id = await openPinSession(BASE);
 
     expect(id).toBe('sid-existing');
-    expect(mocks.assertPinPointageOnVenueNetwork).not.toHaveBeenCalled();
+    expect(mocks.isPinPointageOnVenueNetwork).toHaveBeenCalledWith('est-1', '127.0.0.1');
     expect(mocks.touchAndExtend).toHaveBeenCalledWith(
       'sid-existing',
       'est-1',
@@ -76,17 +75,32 @@ describe('openPinSession', () => {
     );
     expect(mocks.closeDuplicatesForUser).toHaveBeenCalledWith(42, 'est-1', 'sid-existing');
     expect(mocks.open).not.toHaveBeenCalled();
+    expect(mocks.clockInOnPinOpen).toHaveBeenCalledWith({
+      establishmentId: 'est-1',
+      userId: 42,
+      ip: '127.0.0.1',
+    });
+  });
+
+  it('reuses off venue without clock-in', async () => {
+    mocks.findActiveForUser.mockResolvedValue({ id: 'sid-existing', user_id: 42 });
+    mocks.isPinPointageOnVenueNetwork.mockResolvedValue(false);
+
+    const id = await openPinSession(BASE);
+
+    expect(id).toBe('sid-existing');
+    expect(mocks.open).not.toHaveBeenCalled();
     expect(mocks.clockInOnPinOpen).not.toHaveBeenCalled();
   });
 
-  it('inserts and clocks in when no open session exists', async () => {
+  it('inserts and clocks in when on venue and no open session', async () => {
     mocks.findActiveForUser.mockResolvedValue(null);
     mocks.open.mockResolvedValue({ id: 'sid-new' });
 
     const id = await openPinSession(BASE);
 
     expect(id).toBe('sid-new');
-    expect(mocks.assertPinPointageOnVenueNetwork).toHaveBeenCalledWith('est-1', '127.0.0.1');
+    expect(mocks.isPinPointageOnVenueNetwork).toHaveBeenCalledWith('est-1', '127.0.0.1');
     expect(mocks.open).toHaveBeenCalledWith(
       expect.objectContaining({
         establishmentId: 'est-1',
@@ -102,16 +116,15 @@ describe('openPinSession', () => {
     expect(mocks.touchAndExtend).not.toHaveBeenCalled();
   });
 
-  it('propagates venue-network denial on first open', async () => {
+  it('inserts without clock-in when off venue', async () => {
     mocks.findActiveForUser.mockResolvedValue(null);
-    mocks.assertPinPointageOnVenueNetwork.mockRejectedValue(
-      new AppError('off network', 403, 'PIN_POINTAGE_OFF_VENUE_NETWORK')
-    );
+    mocks.open.mockResolvedValue({ id: 'sid-home' });
+    mocks.isPinPointageOnVenueNetwork.mockResolvedValue(false);
 
-    await expect(openPinSession(BASE)).rejects.toMatchObject({
-      errorCode: 'PIN_POINTAGE_OFF_VENUE_NETWORK',
-    });
-    expect(mocks.open).not.toHaveBeenCalled();
+    const id = await openPinSession(BASE);
+
+    expect(id).toBe('sid-home');
+    expect(mocks.open).toHaveBeenCalled();
     expect(mocks.clockInOnPinOpen).not.toHaveBeenCalled();
   });
 
@@ -127,13 +140,13 @@ describe('closePinSession', () => {
   beforeEach(() => {
     mocks.clockOutOnPinClose.mockReset();
     mocks.close.mockReset();
-    mocks.assertPinPointageOnVenueNetwork.mockReset();
+    mocks.isPinPointageOnVenueNetwork.mockReset();
     mocks.clockOutOnPinClose.mockResolvedValue(undefined);
     mocks.close.mockResolvedValue(true);
-    mocks.assertPinPointageOnVenueNetwork.mockResolvedValue(undefined);
+    mocks.isPinPointageOnVenueNetwork.mockResolvedValue(true);
   });
 
-  it('clocks out then closes the row after network check', async () => {
+  it('clocks out on venue then closes the row', async () => {
     await expect(
       closePinSession('sid-1', 'est-1', 'closed_by_user', {
         pinUserId: 42,
@@ -141,26 +154,32 @@ describe('closePinSession', () => {
       })
     ).resolves.toBe(true);
 
-    expect(mocks.assertPinPointageOnVenueNetwork).toHaveBeenCalledWith('est-1', '127.0.0.1');
+    expect(mocks.isPinPointageOnVenueNetwork).toHaveBeenCalledWith('est-1', '127.0.0.1');
     expect(mocks.clockOutOnPinClose).toHaveBeenCalledWith({
       establishmentId: 'est-1',
       userId: 42,
       ip: '127.0.0.1',
+      recordPointage: true,
     });
     expect(mocks.close).toHaveBeenCalledWith('sid-1', 'est-1', 'closed_by_user');
   });
 
-  it('refuses close off venue network', async () => {
-    mocks.assertPinPointageOnVenueNetwork.mockRejectedValue(
-      new AppError('off network', 403, 'PIN_POINTAGE_OFF_VENUE_NETWORK')
-    );
+  it('closes off venue without recording clock-out', async () => {
+    mocks.isPinPointageOnVenueNetwork.mockResolvedValue(false);
 
     await expect(
       closePinSession('sid-1', 'est-1', 'closed_by_user', {
         pinUserId: 42,
         ipAddress: '198.51.100.1',
       })
-    ).rejects.toMatchObject({ errorCode: 'PIN_POINTAGE_OFF_VENUE_NETWORK' });
-    expect(mocks.close).not.toHaveBeenCalled();
+    ).resolves.toBe(true);
+
+    expect(mocks.clockOutOnPinClose).toHaveBeenCalledWith({
+      establishmentId: 'est-1',
+      userId: 42,
+      ip: '198.51.100.1',
+      recordPointage: false,
+    });
+    expect(mocks.close).toHaveBeenCalledWith('sid-1', 'est-1', 'closed_by_user');
   });
 });

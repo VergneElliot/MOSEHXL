@@ -27,6 +27,22 @@ export async function countOpenTicketsForWaiter(
   return Number(result.rows[0]?.n ?? 0);
 }
 
+/** Reject PIN close when this waiter still owns open floor tickets. */
+export async function assertNoOwnedOpenTablesForPinClose(
+  establishmentId: string,
+  userId: number
+): Promise<void> {
+  const openCount = await countOpenTicketsForWaiter(establishmentId, userId);
+  if (openCount > 0) {
+    throw new AppError(
+      `Impossible de fermer le badge : ${openCount} table(s) encore assignée(s) à ce profil. Libérez ou transférez-les avant de pointer la sortie.`,
+      409,
+      'PIN_CLOSE_OPEN_TABLES',
+      { open_ticket_count: openCount }
+    );
+  }
+}
+
 /** Clock-in when opening a PIN session; ignore if already on the clock. */
 export async function clockInOnPinOpen(input: {
   establishmentId: string;
@@ -55,23 +71,19 @@ export async function clockInOnPinOpen(input: {
 }
 
 /**
- * Clock-out when closing a PIN session.
- * Blocks only if this waiter still owns open floor tickets.
+ * Clock-out when closing a PIN session on the venue network.
+ * Always enforces no owned open tables; skips TimeEntry write when
+ * `recordPointage` is false (remote close without counting hours).
  */
 export async function clockOutOnPinClose(input: {
   establishmentId: string;
   userId: number;
   ip?: string | null;
+  /** Default true. False = table check only (home / off-venue close). */
+  recordPointage?: boolean;
 }): Promise<void> {
-  const openCount = await countOpenTicketsForWaiter(input.establishmentId, input.userId);
-  if (openCount > 0) {
-    throw new AppError(
-      `Impossible de fermer le badge : ${openCount} table(s) encore assignée(s) à ce profil. Libérez ou transférez-les avant de pointer la sortie.`,
-      409,
-      'PIN_CLOSE_OPEN_TABLES',
-      { open_ticket_count: openCount }
-    );
-  }
+  await assertNoOwnedOpenTablesForPinClose(input.establishmentId, input.userId);
+  if (input.recordPointage === false) return;
 
   try {
     await TimeEntryModel.clockOut({

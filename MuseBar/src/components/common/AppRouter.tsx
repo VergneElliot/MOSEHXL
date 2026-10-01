@@ -13,7 +13,7 @@ import POSContainer from '../POS/POSContainer';
 import {
   LazyAdministrationContainer,
   LazyClosureContainer,
-  LazyFloorPlanConsultPanel,
+  LazyFloorPlanTabContainer,
   LazyHistoryContainer,
   LazySettings,
   TabPanelFallback,
@@ -25,6 +25,7 @@ import { PERMISSIONS, type PermissionName } from '@mosehxl/types';
 import { useStepUpAuth } from '../../contexts/StepUpAuthContext';
 import { usePinSessions } from '../../contexts/PinSessionsContext';
 import { canEnterWithoutStepUpPin } from '../../contexts/stepUpPageEntryPolicy';
+import { NavSubsectionsProvider } from '../../contexts/NavSubsectionsContext';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -304,78 +305,81 @@ const AppRouter: React.FC<AppRouterProps> = ({
   }
 
   return (
-    <Paper
-      sx={{
-        width: '100%',
-        flex: 1,
-        minHeight: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-      }}
-    >
-      <AppMainNav
-        tabs={filteredTabs}
-        activeIndex={tabValue}
-        open={navOpen}
-        onOpen={() => setNavOpen(true)}
-        onClose={() => setNavOpen(false)}
-        onSelect={selectTab}
-        showPinSessions
-      />
+    <NavSubsectionsProvider>
+      <Paper
+        sx={{
+          width: '100%',
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+      >
+        <AppMainNav
+          tabs={filteredTabs}
+          activeIndex={tabValue}
+          open={navOpen}
+          onOpen={() => setNavOpen(true)}
+          onClose={() => setNavOpen(false)}
+          onSelect={selectTab}
+          showPinSessions
+        />
 
-      <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        {filteredTabs.map((tab, i) => (
-          <TabPanel
-            value={tabValue}
-            index={i}
-            key={tab.value}
-            scrollMode={tab.value === 'pos' || tab.value === 'floor_plan' ? 'hidden' : 'auto'}
-          >
-            {tab.value === 'pos' && (
-              <POSContainer
-                categories={categories}
-                products={products}
-                isHappyHourActive={isHappyHourActive}
-                onDataUpdate={onDataUpdate}
-              />
-            )}
-            {tab.value === 'floor_plan' && (
-              <Suspense fallback={<TabPanelFallback />}>
-                <LazyFloorPlanConsultPanel onSwitchToPos={switchToPosTab} />
-              </Suspense>
-            )}
-            {tab.value === 'history' && (
-              <Suspense fallback={<TabPanelFallback />}>
-                <LazyHistoryContainer canCancelOrReturn />
-              </Suspense>
-            )}
-            {tab.value === 'settings' && (
-              <Suspense fallback={<TabPanelFallback />}>
-                <LazySettings
-                  isHappyHourActive={isHappyHourActive}
-                  timeUntilHappyHour={timeUntilHappyHour}
-                  onHappyHourStatusUpdate={onHappyHourStatusUpdate}
-                  products={products}
+        <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          {filteredTabs.map((tab, i) => (
+            <TabPanel
+              value={tabValue}
+              index={i}
+              key={tab.value}
+              scrollMode={tab.value === 'pos' || tab.value === 'floor_plan' ? 'hidden' : 'auto'}
+            >
+              {tab.value === 'pos' && (
+                <POSContainer
                   categories={categories}
+                  products={products}
+                  isHappyHourActive={isHappyHourActive}
                   onDataUpdate={onDataUpdate}
                 />
-              </Suspense>
-            )}
-            {tab.value === 'closures' && (
-              <Suspense fallback={<TabPanelFallback />}>
-                <LazyClosureContainer />
-              </Suspense>
-            )}
-            {tab.value === 'administration' && (
-              <Suspense fallback={<TabPanelFallback />}>
-                <LazyAdministrationContainer user={user} token={token} />
-              </Suspense>
-            )}
-          </TabPanel>
-        ))}
-      </Box>
-    </Paper>
+              )}
+              {tab.value === 'floor_plan' && (
+                <Suspense fallback={<TabPanelFallback />}>
+                  <LazyFloorPlanTabContainer onSwitchToPos={switchToPosTab} />
+                </Suspense>
+              )}
+              {tab.value === 'history' && (
+                <Suspense fallback={<TabPanelFallback />}>
+                  <LazyHistoryContainer canCancelOrReturn />
+                </Suspense>
+              )}
+              {tab.value === 'settings' && (
+                <Suspense fallback={<TabPanelFallback />}>
+                  <LazySettings
+                    isHappyHourActive={isHappyHourActive}
+                    timeUntilHappyHour={timeUntilHappyHour}
+                    onHappyHourStatusUpdate={onHappyHourStatusUpdate}
+                    products={products}
+                    categories={categories}
+                    onDataUpdate={onDataUpdate}
+                    token={token}
+                  />
+                </Suspense>
+              )}
+              {tab.value === 'closures' && (
+                <Suspense fallback={<TabPanelFallback />}>
+                  <LazyClosureContainer />
+                </Suspense>
+              )}
+              {tab.value === 'administration' && (
+                <Suspense fallback={<TabPanelFallback />}>
+                  <LazyAdministrationContainer user={user} token={token} />
+                </Suspense>
+              )}
+            </TabPanel>
+          ))}
+        </Box>
+      </Paper>
+    </NavSubsectionsProvider>
   );
 };
 

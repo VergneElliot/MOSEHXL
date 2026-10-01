@@ -143,7 +143,9 @@ const FloorPlanConsultPanel: React.FC<FloorPlanConsultPanelProps> = ({ onSwitchT
           <CircularProgress />
         </Box>
       ) : floor.tables.length === 0 ? (
-        <Alert severity="info">Aucune table configurée — créez un plan dans Administration.</Alert>
+        <Alert severity="info">
+          Aucune table configurée — ouvrez l&apos;onglet « Modifier le plan » pour en créer.
+        </Alert>
       ) : (
         <>
           {floor.activePlans.length > 1 && (

@@ -96,11 +96,12 @@ export const TimeClockNetworkSettings: React.FC = () => {
         </Box>
 
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Les employés ne peuvent <strong>ouvrir ou fermer un badge PIN</strong> (pointage
-          entrée / sortie) que depuis les adresses IP publiques listées ci-dessous —
-          en pratique l&apos;IP Internet de la box Wi‑Fi du lieu. La caisse (commandes,
-          tables, etc.) reste utilisable hors Wi‑Fi (terrasse, 5G). Connectez-vous au
-          Wi‑Fi du bar puis cliquez sur « Ajouter l&apos;IP actuelle ».
+          Les adresses IP publiques listées ci-dessous (en pratique l&apos;IP Internet
+          de la box Wi‑Fi du lieu) déterminent le <strong>pointage</strong> : ouvrir ou
+          fermer un badge PIN <strong>depuis le Wi‑Fi du lieu</strong> enregistre
+          l&apos;entrée / la sortie. Depuis chez soi ou un autre réseau, le badge
+          s&apos;ouvre et se ferme normalement <strong>sans</strong> compter d&apos;heures.
+          Connectez-vous au Wi‑Fi du bar puis cliquez sur « Ajouter l&apos;IP actuelle ».
         </Typography>
 
         {message && (
@@ -137,8 +138,9 @@ export const TimeClockNetworkSettings: React.FC = () => {
             <Stack spacing={1} sx={{ mb: 2 }}>
               {ips.length === 0 ? (
                 <Alert severity="warning">
-                  Aucune IP autorisée — l&apos;ouverture / fermeture de badge PIN
-                  (pointage) est bloquée jusqu&apos;à configuration.
+                  Aucune IP autorisée — les badges PIN s&apos;ouvrent et se ferment
+                  partout, mais aucun pointage (heures) ne sera enregistré tant que
+                  le Wi‑Fi du lieu n&apos;est pas configuré.
                 </Alert>
               ) : (
                 ips.map((ip) => (

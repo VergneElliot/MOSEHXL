@@ -5,27 +5,27 @@ import {
   Email as InboxIcon,
   EventSeat as ResaIcon,
   CalendarMonth as PlanIcon,
-  People as UsersIcon,
   Security as AuditIcon,
   AccessTime as ClockIcon,
   Gavel as ComplianceIcon,
-  TableRestaurant as FloorIcon,
 } from '@mui/icons-material';
 import { PERMISSIONS } from '@mosehxl/types';
 import type { User } from '../../types/auth';
 import { useStepUpAuth } from '../../contexts/StepUpAuthContext';
+import {
+  useRegisterNavSubsections,
+  type NavSubsectionItem,
+} from '../../contexts/NavSubsectionsContext';
 import DocumentsPanel from './DocumentsPanel';
 import InboxPanel from './InboxPanel';
 import ReservationsPanel from './ReservationsPanel';
 import PlanningPanel from './PlanningPanel';
 import TimeClockPanel from './TimeClockPanel';
-import FloorPlansPanel from './FloorPlansPanel';
 import { isPlanningUiDirty, setPlanningUiDirty } from './planningDraft';
 
-const LazyUserManagement = React.lazy(() => import('../Admin/UserManagement'));
 const LazyAuditTrailDashboard = React.lazy(() => import('../Admin/AuditTrailDashboard'));
 const LazyLegalComplianceDashboard = React.lazy(() =>
-  import('../Legal').then(mod => ({ default: mod.LegalComplianceDashboard }))
+  import('../Legal').then((mod) => ({ default: mod.LegalComplianceDashboard }))
 );
 
 function PanelFallback() {
@@ -42,13 +42,11 @@ interface AdministrationContainerProps {
 }
 
 type AdminSection =
-  | 'documents'
   | 'inbox'
   | 'reservations'
   | 'planning'
   | 'time_clock'
-  | 'floor'
-  | 'users'
+  | 'documents'
   | 'compliance'
   | 'audit';
 
@@ -56,18 +54,16 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
   const { ensureAccess, releaseAccess } = useStepUpAuth();
 
   /**
-   * Every section stays visible. Specific sections always ask for a PIN on entry
-   * (even if the focused badge already holds the right). Pointage is basic — no PIN.
+   * Landing order: inbox + reservations first. Floor editor and users live elsewhere
+   * (Plan de salle / Paramètres). Specific sections always PIN on entry.
    */
   const sections = useMemo(
     () => [
-      { key: 'documents' as AdminSection, label: 'Documents', icon: <DocsIcon />, permission: PERMISSIONS.access_documents },
       { key: 'inbox' as AdminSection, label: 'Boîte mail', icon: <InboxIcon />, permission: PERMISSIONS.access_inbox },
       { key: 'reservations' as AdminSection, label: 'Réservations', icon: <ResaIcon />, permission: PERMISSIONS.access_reservations },
       { key: 'planning' as AdminSection, label: 'Planning', icon: <PlanIcon />, permission: PERMISSIONS.access_planning },
       { key: 'time_clock' as AdminSection, label: 'Pointage', icon: <ClockIcon />, permission: null },
-      { key: 'floor' as AdminSection, label: 'Plans de tables', icon: <FloorIcon />, permission: PERMISSIONS.manage_floor_plan },
-      { key: 'users' as AdminSection, label: 'Utilisateurs', icon: <UsersIcon />, permission: PERMISSIONS.access_user_management },
+      { key: 'documents' as AdminSection, label: 'Documents', icon: <DocsIcon />, permission: PERMISSIONS.access_documents },
       { key: 'compliance' as AdminSection, label: 'Conformité Légale', icon: <ComplianceIcon />, permission: PERMISSIONS.access_compliance },
       { key: 'audit' as AdminSection, label: 'Journal de sécurité', icon: <AuditIcon />, permission: PERMISSIONS.access_compliance },
     ],
@@ -77,6 +73,54 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
   const [tab, setTab] = useState(0);
   const [inboxFocusReservationId, setInboxFocusReservationId] = useState<number | null>(null);
   const active = sections[Math.min(tab, Math.max(sections.length - 1, 0))]?.key;
+
+  const selectAdminSection = useCallback(
+    (v: number) => {
+      const next = sections[v];
+      if (!next) return;
+      if (active === 'planning' && next.key !== 'planning' && isPlanningUiDirty()) {
+        const ok = window.confirm(
+          'Des modifications du planning ne sont pas enregistrées. Quitter sans enregistrer ?'
+        );
+        if (!ok) return;
+        setPlanningUiDirty(false);
+      }
+      const required = next.permission;
+      if (!required) {
+        setTab(v);
+        return;
+      }
+      void ensureAccess(required, {
+        title: `Administration — ${next.label}`,
+        description: `PIN d’un profil autorisé pour ouvrir « ${next.label} ».`,
+      })
+        .then(() => setTab(v))
+        .catch(() => {
+          /* stay on current section */
+        });
+    },
+    [sections, active, ensureAccess]
+  );
+
+  const navItems: NavSubsectionItem[] = useMemo(
+    () => sections.map((s) => ({ id: s.key, label: s.label, icon: s.icon })),
+    [sections]
+  );
+
+  const selectAdminSectionById = useCallback(
+    (id: string) => {
+      const idx = sections.findIndex((s) => s.key === id);
+      if (idx >= 0) selectAdminSection(idx);
+    },
+    [sections, selectAdminSection]
+  );
+
+  useRegisterNavSubsections(
+    'administration',
+    navItems,
+    sections[Math.min(tab, Math.max(sections.length - 1, 0))]?.key ?? 'inbox',
+    selectAdminSectionById
+  );
 
   const openInboxConversation = useCallback(
     (reservationId: number) => {
@@ -101,7 +145,6 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
     [sections, ensureAccess]
   );
 
-  // Leaving a section ends the authorization its PIN granted.
   useEffect(() => {
     const keep = sections.find((s) => s.key === active)?.permission;
     for (const section of sections) {
@@ -124,46 +167,28 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, height: '100%', minHeight: 0 }}>
       <Typography variant="h4">Administration</Typography>
       <Typography variant="body2" color="text.secondary">
-        Documents, boîte mail, réservations, planning, pointage, plans de tables, utilisateurs,
-        conformité légale et journal de sécurité.
+        Boîte mail, réservations, planning, pointage, documents, conformité légale et journal de
+        sécurité.
       </Typography>
 
       <Tabs
         value={Math.min(tab, sections.length - 1)}
-        onChange={(_e, v) => {
-          const next = sections[v];
-          if (!next) return;
-          if (active === 'planning' && next.key !== 'planning' && isPlanningUiDirty()) {
-            const ok = window.confirm(
-              'Des modifications du planning ne sont pas enregistrées. Quitter sans enregistrer ?'
-            );
-            if (!ok) return;
-            setPlanningUiDirty(false);
-          }
-          const required = next.permission;
-          if (!required) {
-            setTab(v);
-            return;
-          }
-          void ensureAccess(required, {
-            title: `Administration — ${next.label}`,
-            description: `PIN d’un profil autorisé pour ouvrir « ${next.label} ».`,
-          })
-            .then(() => setTab(v))
-            .catch(() => {
-              /* stay on current section */
-            });
-        }}
+        onChange={(_e, v) => selectAdminSection(v)}
         variant="scrollable"
         allowScrollButtonsMobile
       >
         {sections.map((s) => (
-          <Tab key={s.key} icon={s.icon} iconPosition="start" label={s.label} sx={{ textTransform: 'none' }} />
+          <Tab
+            key={s.key}
+            icon={s.icon}
+            iconPosition="start"
+            label={s.label}
+            sx={{ textTransform: 'none' }}
+          />
         ))}
       </Tabs>
 
       <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-        {active === 'documents' && <DocumentsPanel />}
         {active === 'inbox' && (
           <InboxPanel
             focusReservationId={inboxFocusReservationId}
@@ -175,12 +200,7 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
         )}
         {active === 'planning' && <PlanningPanel />}
         {active === 'time_clock' && <TimeClockPanel user={user} />}
-        {active === 'floor' && <FloorPlansPanel />}
-        {active === 'users' && (
-          <Suspense fallback={<PanelFallback />}>
-            <LazyUserManagement token={token} />
-          </Suspense>
-        )}
+        {active === 'documents' && <DocumentsPanel />}
         {active === 'compliance' && (
           <Suspense fallback={<PanelFallback />}>
             <LazyLegalComplianceDashboard />

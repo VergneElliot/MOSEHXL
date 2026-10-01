@@ -65,6 +65,8 @@ export interface SettingsProps {
   products?: Product[];
   categories?: Category[];
   onDataUpdate?: () => void;
+  /** Venue JWT — required for Gestion des utilisateurs. */
+  token?: string;
 }
 
 /** @deprecated General settings form removed; business identity is BusinessSettingsProps. */

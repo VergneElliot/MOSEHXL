@@ -15,6 +15,7 @@ import {
   Wifi as WifiIcon,
   RestaurantMenu as MenuIcon,
   Person as PersonIcon,
+  People as PeopleIcon,
 } from '@mui/icons-material';
 import { SettingsTab } from './types';
 import { EstablishmentSettings } from './EstablishmentSettings';
@@ -23,16 +24,21 @@ import { OpeningHoursSettingsPanel } from './OpeningHoursSettings';
 import { EstablishmentOperatingHoursPanel } from './EstablishmentOperatingHoursSettings';
 import { TimeClockNetworkSettings } from './TimeClockNetworkSettings';
 import { ClosureSettings } from './ClosureSettings';
-import { PrinterSetup } from '../../PrinterSetup';
+import { PrinterSettingsPanel } from '../../PrinterSetup/PrinterSettingsPanel';
 import { HappyHourControl } from '../../HappyHour';
 import { Product, Category } from '../../../types';
 import { UseSettingsReturn } from './types';
 import { useStepUpAuth } from '../../../contexts/StepUpAuthContext';
+import {
+  useRegisterNavSubsections,
+  type NavSubsectionItem,
+} from '../../../contexts/NavSubsectionsContext';
 import { PERMISSIONS } from '@mosehxl/types';
 
 const LazyMenuContainer = React.lazy(() =>
   import('../../Menu').then((mod) => ({ default: mod.MenuContainer }))
 );
+const LazyUserManagement = React.lazy(() => import('../../Admin/UserManagement'));
 
 interface SettingsTabsProps {
   settingsHook: UseSettingsReturn;
@@ -42,6 +48,7 @@ interface SettingsTabsProps {
   products?: Product[];
   categories?: Category[];
   onDataUpdate?: () => void;
+  token?: string;
 }
 
 /**
@@ -92,6 +99,7 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
   products = [],
   categories = [],
   onDataUpdate = () => {},
+  token = '',
 }) => {
   const [currentTab, setCurrentTab] = useState(0);
   const { ensureAccess } = useStepUpAuth();
@@ -103,6 +111,16 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
         label: 'Profil',
         icon: <PersonIcon />,
         component: <ProfileSettings />,
+      },
+      {
+        id: 'users',
+        label: 'Utilisateurs',
+        icon: <PeopleIcon />,
+        component: (
+          <Suspense fallback={<MenuPanelFallback />}>
+            <LazyUserManagement token={token} />
+          </Suspense>
+        ),
       },
       {
         id: 'establishment',
@@ -170,13 +188,11 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
         id: 'printer',
         label: 'Imprimante',
         icon: <PrintIcon />,
-        component: (
-          <PrinterSetup embedded />
-        ),
+        component: <PrinterSettingsPanel embedded />,
       },
     ];
 
-    base.splice(1, 0, {
+    base.splice(2, 0, {
       id: 'menu',
       label: 'Menu',
       icon: <MenuIcon />,
@@ -201,10 +217,11 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
     products,
     categories,
     onDataUpdate,
+    token,
   ]);
 
-  const handleTabChange = useCallback(
-    (_event: React.SyntheticEvent, newValue: number) => {
+  const selectSettingsTab = useCallback(
+    (newValue: number) => {
       const tab = tabs[newValue];
       if (!tab) return;
       // Profil is a basic right; every other Paramètres tab is specific → always PIN.
@@ -213,20 +230,57 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
         return;
       }
       const required =
-        tab.id === 'menu' ? PERMISSIONS.access_menu : PERMISSIONS.access_settings;
-      void ensureAccess(required, {
-        title: tab.id === 'menu' ? 'Gestion du menu' : `Paramètres — ${tab.label}`,
-        description:
-          tab.id === 'menu'
-            ? 'PIN d’un profil autorisé à modifier le catalogue (menu).'
-            : `PIN d’un profil autorisé pour ouvrir « ${tab.label} ».`,
-      })
+        tab.id === 'menu'
+          ? PERMISSIONS.access_menu
+          : tab.id === 'users'
+            ? PERMISSIONS.access_user_management
+            : PERMISSIONS.access_settings;
+      const title =
+        tab.id === 'menu'
+          ? 'Gestion du menu'
+          : tab.id === 'users'
+            ? 'Gestion des utilisateurs'
+            : `Paramètres — ${tab.label}`;
+      const description =
+        tab.id === 'menu'
+          ? 'PIN d’un profil autorisé à modifier le catalogue (menu).'
+          : tab.id === 'users'
+            ? 'PIN d’un profil autorisé à gérer les utilisateurs et leurs droits.'
+            : `PIN d’un profil autorisé pour ouvrir « ${tab.label} ».`;
+      void ensureAccess(required, { title, description })
         .then(() => setCurrentTab(newValue))
         .catch(() => {
           /* stay on current sub-tab */
         });
     },
     [tabs, ensureAccess]
+  );
+
+  const handleTabChange = useCallback(
+    (_event: React.SyntheticEvent, newValue: number) => {
+      selectSettingsTab(newValue);
+    },
+    [selectSettingsTab]
+  );
+
+  const navItems: NavSubsectionItem[] = useMemo(
+    () => tabs.map((tab) => ({ id: tab.id, label: tab.label, icon: tab.icon })),
+    [tabs]
+  );
+
+  const selectSettingsTabById = useCallback(
+    (id: string) => {
+      const idx = tabs.findIndex((tab) => tab.id === id);
+      if (idx >= 0) selectSettingsTab(idx);
+    },
+    [tabs, selectSettingsTab]
+  );
+
+  useRegisterNavSubsections(
+    'settings',
+    navItems,
+    tabs[currentTab]?.id ?? 'profile',
+    selectSettingsTabById
   );
 
   return (
