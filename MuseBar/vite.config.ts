@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import legacy from '@vitejs/plugin-legacy';
+import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 
 export default defineConfig({
@@ -9,6 +10,38 @@ export default defineConfig({
     legacy({
       // Cashier PCs may run older Chromium; CRA previously transpiled to ES5.
       targets: ['defaults', 'not dead', 'chrome >= 49', 'firefox >= 52', 'safari >= 10'],
+    }),
+    VitePWA({
+      // Existing public/manifest.webmanifest — do not generate a second one.
+      manifest: false,
+      registerType: 'prompt',
+      injectRegister: false,
+      includeAssets: [
+        'favicon.ico',
+        'favicon-32.png',
+        'apple-touch-icon.png',
+        'icons/icon-192.png',
+        'icons/icon-512.png',
+        'manifest.webmanifest',
+      ],
+      workbox: {
+        // Static shell only. Hashed assets update via new SW revision.
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest,woff2}'],
+        globIgnores: ['**/*.map'],
+        navigateFallback: '/index.html',
+        // Never SPA-fallback API (or other non-app paths).
+        navigateFallbackDenylist: [/^\/api(?:\/|$)/],
+        // No CacheFirst/StaleWhileRevalidate for APIs — fiscal/auth must hit the network.
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/api'),
+            handler: 'NetworkOnly',
+          },
+        ],
+      },
+      devOptions: {
+        enabled: false,
+      },
     }),
   ],
   resolve: {

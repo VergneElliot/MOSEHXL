@@ -23,10 +23,10 @@
   },
   "lint-staged": {
     "MuseBar/src/**/*.{ts,tsx}": [
-      "npm run lint --workspace MuseBar -- --fix"
+      "npm run lint --workspace musebar -- --fix"
     ],
     "MuseBar/backend/src/**/*.ts": [
-      "npm run lint --workspace MuseBar/backend -- --fix"
+      "npm run lint --workspace mosehxl-backend -- --fix"
     ]
   },
   "workspaces": [

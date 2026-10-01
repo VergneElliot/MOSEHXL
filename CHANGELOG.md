@@ -19,7 +19,14 @@ Fiscal sequence counters are never reset across versions.
 ## [Unreleased]
 
 **Fiscal impact:** MINOR (venue login + PIN-only actors; dual actor trace unchanged;
-per-PIN visual prefs / POS card UX are UI-only).
+per-PIN visual prefs / POS card UX are UI-only; PWA install is packaging/UI only).
+
+### Added
+
+- Application installable (PWA) : manifeste `standalone`, icônes, méta iOS, bouton
+  d’en-tête « Installer » (Chrome/Edge) ou aide « Sur l’écran d’accueil » (Safari iOS).
+  Service worker minimal (précharge UI) ; `/api` en NetworkOnly ; toast
+  « Une mise à jour est prête » → Recharger. Pas de mode hors-ligne POS.
 
 ### Changed
 
