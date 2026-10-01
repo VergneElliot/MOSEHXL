@@ -77,6 +77,7 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
   );
 
   const [tab, setTab] = useState(0);
+  const [inboxFocusReservationId, setInboxFocusReservationId] = useState<number | null>(null);
   const active = sections[Math.min(tab, Math.max(sections.length - 1, 0))]?.key;
 
   const canOpen = useCallback(
@@ -86,6 +87,29 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
       return user.permissions?.includes(permission) ?? false;
     },
     [activeSession, hasAccess, user.permissions]
+  );
+
+  const openInboxConversation = useCallback(
+    (reservationId: number) => {
+      const inboxIndex = sections.findIndex((s) => s.key === 'inbox');
+      if (inboxIndex < 0) return;
+      const go = () => {
+        setInboxFocusReservationId(reservationId);
+        setTab(inboxIndex);
+      };
+      const required = sections[inboxIndex]?.permission;
+      if (!required || canOpen(required)) {
+        go();
+        return;
+      }
+      void ensureAccess(required, {
+        title: 'Administration — Boîte mail',
+        description: 'PIN d’un profil autorisé pour ouvrir « Boîte mail ».',
+      })
+        .then(go)
+        .catch(() => undefined);
+    },
+    [sections, canOpen, ensureAccess]
   );
 
   // Leaving a section ends the authorization its PIN granted.
@@ -151,8 +175,15 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
 
       <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         {active === 'documents' && <DocumentsPanel />}
-        {active === 'inbox' && <InboxPanel />}
-        {active === 'reservations' && <ReservationsPanel />}
+        {active === 'inbox' && (
+          <InboxPanel
+            focusReservationId={inboxFocusReservationId}
+            onFocusConsumed={() => setInboxFocusReservationId(null)}
+          />
+        )}
+        {active === 'reservations' && (
+          <ReservationsPanel onOpenConversation={openInboxConversation} />
+        )}
         {active === 'planning' && <PlanningPanel />}
         {active === 'time_clock' && <TimeClockPanel user={user} />}
         {active === 'floor' && <FloorPlansPanel />}

@@ -105,7 +105,7 @@ Track major polish passes here when completing an area:
 | Area | Status |
 |------|--------|
 | Documents | baseline shipped |
-| Inbox | baseline shipped |
+| Inbox | **conversation / messenger UX** (532–533) |
 | Réservations | baseline shipped |
 | Planning | baseline + congés slice A |
 | Pointage | UI tabs + compliance report (slice A) |

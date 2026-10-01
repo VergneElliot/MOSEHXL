@@ -101,7 +101,7 @@ const PERMISSION_META: Record<PermissionName, { label: string; group: string }> 
   },
   orders_cancel: {
     label: 'Annuler / retour (article validé ou vente encaissée)',
-    group: 'Caisse / Historique',
+    group: 'Caisse',
   },
   access_settings: { label: 'Paramètres (hors profil)', group: 'Paramètres' },
   access_menu: { label: 'Gestion du menu', group: 'Paramètres' },

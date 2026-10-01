@@ -1,6 +1,5 @@
 /**
- * User Form Management
- * Handles add user form state and validation
+ * User Form Management — PIN-only staff create.
  */
 
 import { useState, useCallback } from 'react';
@@ -8,113 +7,63 @@ import { EstablishmentAssignableRole } from '../../../../types/auth';
 
 export const useUserForm = () => {
   const [showAdd, setShowAdd] = useState(false);
-  const [newEmail, setNewEmail] = useState('');
-  const [newPassword, setNewPassword] = useState('');
+  const [newFirstName, setNewFirstName] = useState('');
+  const [newLastName, setNewLastName] = useState('');
+  const [newPin, setNewPin] = useState('');
   const [newRole, setNewRole] = useState<EstablishmentAssignableRole>('staff');
 
-  /**
-   * Open add user dialog
-   */
   const openAddDialog = useCallback(() => {
     setShowAdd(true);
   }, []);
 
-  /**
-   * Close add user dialog and reset form
-   */
   const closeAddDialog = useCallback(() => {
     setShowAdd(false);
-    setNewEmail('');
-    setNewPassword('');
+    setNewFirstName('');
+    setNewLastName('');
+    setNewPin('');
     setNewRole('staff');
   }, []);
 
-  /**
-   * Update email field
-   */
-  const updateEmail = useCallback((email: string) => {
-    setNewEmail(email);
-  }, []);
+  const updateFirstName = useCallback((v: string) => setNewFirstName(v), []);
+  const updateLastName = useCallback((v: string) => setNewLastName(v), []);
+  const updatePin = useCallback((v: string) => setNewPin(v), []);
+  const updateRole = useCallback((role: EstablishmentAssignableRole) => setNewRole(role), []);
 
-  /**
-   * Update password field
-   */
-  const updatePassword = useCallback((password: string) => {
-    setNewPassword(password);
-  }, []);
-
-  const updateRole = useCallback((role: EstablishmentAssignableRole) => {
-    setNewRole(role);
-  }, []);
-
-  /**
-   * Validate form fields
-   */
   const validateForm = useCallback((): string | null => {
-    if (!newEmail.trim()) {
-      return 'Email is required';
-    }
-    
-    if (!/\S+@\S+\.\S+/.test(newEmail)) {
-      return 'Invalid email format';
-    }
-    
-    if (!newPassword.trim()) {
-      return 'Password is required';
-    }
-    
-    if (newPassword.length < 6) {
-      return 'Password must be at least 6 characters';
-    }
-    
+    if (!newFirstName.trim()) return 'Prénom requis';
+    if (!/^\d{2,8}$/.test(newPin.trim())) return 'PIN : 2 à 8 chiffres';
     return null;
-  }, [newEmail, newPassword]);
+  }, [newFirstName, newPin]);
 
-  /**
-   * Check if form is valid
-   */
-  const isFormValid = useCallback((): boolean => {
-    return validateForm() === null;
-  }, [validateForm]);
+  const isFormValid = useCallback((): boolean => validateForm() === null, [validateForm]);
 
-  /**
-   * Get form data
-   */
-  const getFormData = useCallback(() => {
-    return {
-      email: newEmail.trim(),
-      password: newPassword,
+  const getFormData = useCallback(
+    () => ({
+      firstName: newFirstName.trim(),
+      lastName: newLastName.trim(),
+      pin: newPin.trim(),
       role: newRole,
-    };
-  }, [newEmail, newPassword, newRole]);
-
-  /**
-   * Reset form to initial state
-   */
-  const resetForm = useCallback(() => {
-    setNewEmail('');
-    setNewPassword('');
-    setNewRole('staff');
-  }, []);
+    }),
+    [newFirstName, newLastName, newPin, newRole]
+  );
 
   return {
-    // Dialog state
     showAdd,
-    
-    // Form fields
-    newEmail,
-    newPassword,
+    newFirstName,
+    newLastName,
+    newPin,
     newRole,
-    
-    // Actions
+    // legacy aliases so older call sites keep compiling during transition
+    newEmail: newFirstName,
+    newPassword: newPin,
     openAddDialog,
     closeAddDialog,
-    updateEmail,
-    updatePassword,
+    updateFirstName,
+    updateLastName,
+    updatePin,
+    updateEmail: updateFirstName,
+    updatePassword: updatePin,
     updateRole,
-    resetForm,
-    
-    // Validation
     validateForm,
     isFormValid,
     getFormData,

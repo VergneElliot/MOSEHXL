@@ -82,127 +82,6 @@ sessionRoutes.get('/me', requireAuth, asyncHandler(async (req, res) => {
   }
 }));
 
-sessionRoutes.get(
-  '/me/profile',
-  requireAuth,
-  asyncHandler(async (req, res) => {
-    const userId = req.user!.id;
-    const establishmentId = req.user!.establishment_id ?? null;
-    if (!establishmentId) {
-      throw new ValidationError('Aucun établissement actif');
-    }
-    const [profile, membership, used] = await Promise.all([
-      UserModel.getAuthMeProfile(userId),
-      MembershipModel.get(userId, establishmentId),
-      MembershipModel.listUsedCalendarColors(establishmentId, userId),
-    ]);
-    if (!profile || !membership) {
-      throw new NotFoundError('Profil introuvable');
-    }
-    return res.json({
-      email: req.user!.email,
-      first_name: profile.first_name || '',
-      last_name: profile.last_name || '',
-      phone: profile.phone || '',
-      date_of_birth: profile.date_of_birth || '',
-      calendar_color: membership.calendar_color,
-      available_colors: MembershipModel.availableColorsForUser(
-        used,
-        membership.calendar_color
-      ),
-      used_colors: used,
-    });
-  })
-);
-
-sessionRoutes.patch(
-  '/me/profile',
-  requireAuth,
-  asyncHandler(async (req, res) => {
-    const userId = req.user!.id;
-    const establishmentId = req.user!.establishment_id ?? null;
-    if (!establishmentId) {
-      throw new ValidationError('Aucun établissement actif');
-    }
-
-    const firstName =
-      req.body.first_name !== undefined
-        ? req.body.first_name == null
-          ? null
-          : String(req.body.first_name)
-        : undefined;
-    const lastName =
-      req.body.last_name !== undefined
-        ? req.body.last_name == null
-          ? null
-          : String(req.body.last_name)
-        : undefined;
-    const phone =
-      req.body.phone !== undefined
-        ? req.body.phone == null
-          ? null
-          : String(req.body.phone)
-        : undefined;
-    const dateOfBirth =
-      req.body.date_of_birth !== undefined
-        ? req.body.date_of_birth == null || req.body.date_of_birth === ''
-          ? null
-          : String(req.body.date_of_birth)
-        : undefined;
-
-    if (phone && !/^[\d\s\-+().]{0,40}$/.test(phone)) {
-      throw new ValidationError('Numéro de téléphone invalide');
-    }
-    if (dateOfBirth && !/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) {
-      throw new ValidationError('Date de naissance invalide (AAAA-MM-JJ)');
-    }
-
-    const personal = await UserModel.updatePersonalProfile(userId, {
-      first_name: firstName,
-      last_name: lastName,
-      phone,
-      date_of_birth: dateOfBirth,
-    });
-
-    let membership = await MembershipModel.get(userId, establishmentId);
-    if (!membership) throw new NotFoundError('Profil introuvable');
-
-    if (req.body.calendar_color != null && String(req.body.calendar_color).trim() !== '') {
-      try {
-        membership = await MembershipModel.setCalendarColor(
-          userId,
-          establishmentId,
-          String(req.body.calendar_color)
-        );
-      } catch (error) {
-        const code = (error as Error & { code?: string }).code;
-        if (code === 'INVALID_COLOR') {
-          throw new ValidationError('Couleur invalide (attendu #RRGGBB)');
-        }
-        if (code === 'COLOR_TAKEN') {
-          throw new ValidationError('Cette couleur est déjà utilisée dans l’établissement');
-        }
-        throw error;
-      }
-    }
-
-    const used = await MembershipModel.listUsedCalendarColors(establishmentId, userId);
-    return res.json({
-      email: req.user!.email,
-      first_name: personal.first_name || '',
-      last_name: personal.last_name || '',
-      phone: personal.phone || '',
-      date_of_birth: personal.date_of_birth || '',
-      calendar_color: membership.calendar_color,
-      available_colors: MembershipModel.availableColorsForUser(
-        used,
-        membership.calendar_color
-      ),
-      used_colors: used,
-    });
-  })
-);
-
 // ---------------------------------------------------------------------------
 // POST /api/auth/switch-establishment — re-issue JWT for another membership
 // ---------------------------------------------------------------------------
@@ -211,49 +90,31 @@ sessionRoutes.post('/switch-establishment', requireAuth, asyncHandler(async (req
   const establishmentIdRaw = req.body?.establishment_id;
   const establishment_id =
     typeof establishmentIdRaw === 'string' ? establishmentIdRaw.trim() : '';
-
-  if (!establishment_id) {
-    throw new ValidationError('establishment_id is required');
-  }
-
-  if (req.user!.role === 'system_admin' && !req.user!.support_impersonation) {
-    throw new AuthorizationError('System administrators cannot switch establishments this way');
-  }
-
-  const membership = await MembershipModel.get(userId, establishment_id);
-  if (!membership) {
-    throw new AuthorizationError('No active membership for this establishment');
-  }
-
-  await MembershipModel.setActiveEstablishment(userId, establishment_id, membership.role);
-
-  const role = deriveCanonicalRole({
-    roleFromDb: membership.role,
-    isAdminFlag: false,
-    establishmentId: establishment_id,
-  });
-
+  const ownerPinRaw = req.body?.owner_pin;
+  const owner_pin = typeof ownerPinRaw === 'string' ? ownerPinRaw.trim() : '';
   const rememberMe = req.body?.rememberMe === true ||
     (typeof req.headers.cookie === 'string' && /refresh_token=/.test(req.headers.cookie));
 
-  const token = generateToken(
-    { id: userId, email: req.user!.email, role, establishment_id },
-    rememberMe,
-    ACCESS_TOKEN_EXPIRES_IN as Parameters<typeof generateToken>[2]
+  const { switchEstablishmentWithOwnerPin } = await import(
+    '../../services/auth/switchEstablishmentWithOwnerPin'
   );
-
-  const [userRow, permissions, memberships] = await Promise.all([
-    UserModel.getAuthMeProfile(userId),
-    UserModel.getUserPermissions(userId, establishment_id).catch(() => [] as string[]),
-    MembershipModel.listForUser(userId),
-  ]);
+  const result = await switchEstablishmentWithOwnerPin({
+    userId,
+    email: req.user!.email,
+    currentEstablishmentId: req.user!.establishment_id,
+    targetEstablishmentId: establishment_id,
+    ownerPin: owner_pin,
+    rememberMe,
+    isSystemAdmin: req.user!.role === 'system_admin',
+    supportImpersonation: Boolean(req.user!.support_impersonation),
+  });
 
   await logAuditOrThrow({
     user_id: String(userId),
     action_type: 'SWITCH_ESTABLISHMENT',
     action_details: {
       establishment_id,
-      role: membership.role,
+      role: result.membershipRole,
       previous_establishment_id: req.user!.establishment_id ?? null,
     },
     ip_address: req.ip,
@@ -261,21 +122,9 @@ sessionRoutes.post('/switch-establishment', requireAuth, asyncHandler(async (req
   }, 'SWITCH_ESTABLISHMENT');
 
   return res.json({
-    token,
-    expiresIn: ACCESS_TOKEN_EXPIRES_IN,
-    user: {
-      id: userId,
-      email: req.user!.email,
-      is_admin: false,
-      role,
-      establishment_id,
-      first_name: userRow?.first_name || '',
-      last_name: userRow?.last_name || '',
-      email_verified: userRow?.email_verified ?? false,
-      permissions,
-      memberships: MembershipModel.toApiList(memberships),
-      support_impersonation: req.user!.support_impersonation ?? null,
-    },
+    token: result.token,
+    expiresIn: result.expiresIn,
+    user: result.user,
   });
 }));
 

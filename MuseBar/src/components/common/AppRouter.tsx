@@ -1,5 +1,5 @@
-import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { Box, Tabs, Tab, Paper, useTheme, useMediaQuery } from '@mui/material';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Box, Paper } from '@mui/material';
 import {
   PointOfSale as POSIcon,
   History as HistoryIcon,
@@ -18,6 +18,7 @@ import {
   LazySettings,
   TabPanelFallback,
 } from './appLazyTabPanels';
+import { AppMainNav } from './AppMainNav';
 
 import { Category, Product, User } from '../../types';
 import { PERMISSIONS, type PermissionName } from '@mosehxl/types';
@@ -75,7 +76,7 @@ interface AppRouterProps {
   products: Product[];
   isHappyHourActive: boolean;
   timeUntilHappyHour: string;
-  onDataUpdate: () => void;
+  onDataUpdate: () => void | Promise<void | boolean>;
   onHappyHourStatusUpdate: () => void;
 }
 
@@ -87,6 +88,7 @@ const ADMINISTRATION_PERMISSIONS: PermissionName[] = [
   PERMISSIONS.access_planning,
   PERMISSIONS.access_user_management,
   PERMISSIONS.manage_floor_plan,
+  PERMISSIONS.access_compliance,
 ];
 
 /**
@@ -125,10 +127,9 @@ const AppRouter: React.FC<AppRouterProps> = ({
   onHappyHourStatusUpdate,
 }) => {
   const [tabValue, setTabValue] = useState(0);
-  const theme = useTheme();
-  const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
-  const { ensureAccess, hasAccess, releaseAccess } = useStepUpAuth();
-  const { activeSession } = usePinSessions();
+  const [navOpen, setNavOpen] = useState(false);
+  const { ensureAccess, ensureSession, hasAccess, releaseAccess, releaseAllAccess } = useStepUpAuth();
+  const { activeSession, activeSessionId } = usePinSessions();
 
   const TABS: TabConfig[] = [
     { label: 'Caisse', icon: <POSIcon />, value: 'pos' },
@@ -152,26 +153,35 @@ const AppRouter: React.FC<AppRouterProps> = ({
   }, [posTabIndex]);
 
   /**
-   * A PIN session is the acting identity when one is open, so its rights govern and the
-   * account's own grants are not enough. Without any session, the logged-in account acts
-   * for itself.
+   * Feature tabs require an active PIN session. Empty permission lists are still
+   * PIN-gated (basic POS/history/settings). Account JWT grants never open tabs.
    */
   const canEnter = useCallback(
     (permissions: PermissionName[]): boolean => {
+      if (!activeSession) return false;
       if (permissions.length === 0) return true;
-      if (activeSession) return hasAccess(permissions);
-      return permissions.some((p) => user?.permissions?.includes(p) ?? false);
+      return hasAccess(permissions);
     },
-    [activeSession, hasAccess, user?.permissions]
+    [activeSession, hasAccess]
   );
 
-  const handleTabChange = useCallback(
-    (_event: React.SyntheticEvent, newValue: number) => {
+  const selectTab = useCallback(
+    (newValue: number) => {
       const tab = filteredTabs[newValue];
       if (!tab) return;
       const required = TAB_ENTRY_PERMISSIONS[tab.value] ?? [];
       if (canEnter(required)) {
         setTabValue(newValue);
+        return;
+      }
+      if (!activeSession) {
+        void ensureAccess(required.length ? required : [PERMISSIONS.access_pos], {
+          title: 'Ouvrir une session PIN',
+          description:
+            'Connectez un badge PIN pour accéder aux fonctionnalités. Le compte email n’accorde aucun droit seul.',
+        })
+          .then(() => setTabValue(newValue))
+          .catch(() => undefined);
         return;
       }
       void ensureAccess(required, {
@@ -183,7 +193,7 @@ const AppRouter: React.FC<AppRouterProps> = ({
           /* stay on current tab */
         });
     },
-    [filteredTabs, canEnter, ensureAccess]
+    [filteredTabs, canEnter, ensureAccess, activeSession]
   );
 
   // Leaving a gated page ends the authorization the PIN gave for it.
@@ -195,6 +205,91 @@ const AppRouter: React.FC<AppRouterProps> = ({
     }
   }, [activeTabKey, releaseAccess]);
 
+  // Switching (or closing) the active badge always returns to Caisse — never keep a
+  // previous session's gated tab open under another identity.
+  const lastSessionIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const id = activeSessionId;
+    if (lastSessionIdRef.current !== null && lastSessionIdRef.current !== id) {
+      switchToPosTab();
+      releaseAllAccess();
+    }
+    lastSessionIdRef.current = id;
+  }, [activeSessionId, releaseAllAccess, switchToPosTab]);
+
+  useEffect(() => {
+    if (!activeSession) switchToPosTab();
+  }, [activeSession, switchToPosTab]);
+
+  // Catalog loads once per PIN session id (APIs are PIN-gated).
+  const catalogLoadedForSession = useRef<string | null>(null);
+  useEffect(() => {
+    const sessionId = activeSession?.id ?? null;
+    if (!sessionId) {
+      catalogLoadedForSession.current = null;
+      return;
+    }
+    if (catalogLoadedForSession.current === sessionId) return;
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const load = async (attempt: number) => {
+      const ok = await onDataUpdate();
+      if (cancelled) return;
+      if (ok) {
+        catalogLoadedForSession.current = sessionId;
+        return;
+      }
+      // Token may not be registered yet, or a parallel load briefly failed — retry a few times.
+      if (attempt < 4) {
+        retryTimer = setTimeout(() => {
+          void load(attempt + 1);
+        }, 150 * (attempt + 1));
+      }
+    };
+
+    void load(0);
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [activeSession?.id, onDataUpdate]);
+
+  // Remember-me JWT alone: open the PIN pad once so the user is not stuck.
+  const autoPinPrompted = useRef(false);
+  useEffect(() => {
+    if (!user?.establishment_id || activeSession || autoPinPrompted.current) return;
+    autoPinPrompted.current = true;
+    void ensureSession({
+      message:
+        'Connectez un badge PIN pour accéder à l’application. Le compte email n’accorde aucun droit seul.',
+    }).catch(() => undefined);
+  }, [user?.establishment_id, activeSession, ensureSession]);
+
+  if (user?.establishment_id && !activeSession) {
+    return (
+      <Paper
+        sx={{
+          width: '100%',
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          p: 4,
+        }}
+      >
+        <Box sx={{ maxWidth: 480, textAlign: 'center' }}>
+          <Box sx={{ typography: 'h5', mb: 1, fontWeight: 600 }}>Ouvrez une session PIN</Box>
+          <Box sx={{ typography: 'body1', color: 'text.secondary', mb: 2 }}>
+            Le compte email ne donne aucun droit. Utilisez le pavé PIN pour ouvrir un badge, ou
+            déconnectez-vous (en-tête) si ce n’est pas votre poste.
+          </Box>
+        </Box>
+      </Paper>
+    );
+  }
+
   return (
     <Paper
       sx={{
@@ -202,59 +297,18 @@ const AppRouter: React.FC<AppRouterProps> = ({
         flex: 1,
         minHeight: 0,
         display: 'flex',
-        flexDirection: { xs: 'column', md: 'row' },
+        flexDirection: 'column',
         overflow: 'hidden',
       }}
     >
-      <Tabs
-        value={tabValue}
-        onChange={handleTabChange}
-        aria-label="Navigation principale"
-        orientation={isDesktop ? 'vertical' : 'horizontal'}
-        variant={isDesktop ? 'standard' : 'scrollable'}
-        scrollButtons={isDesktop ? false : 'auto'}
-        allowScrollButtonsMobile={!isDesktop}
-        sx={{
-          borderRight: { md: 1 },
-          borderBottom: { xs: 1, md: 0 },
-          borderColor: 'divider',
-          minWidth: { md: 220 },
-          width: { xs: '100%', md: 220 },
-          flexShrink: 0,
-          '& .MuiTabs-scrollButtons': {
-            color: 'primary.main',
-          },
-          '& .MuiTabs-flexContainer': {
-            alignItems: { md: 'stretch' },
-          },
-          '& .MuiTab-root': {
-            minWidth: { xs: 'auto', md: 200 },
-            fontSize: { xs: '1.1rem', sm: '1.3rem', md: '1.68rem' },
-            px: { xs: 1, sm: 2 },
-            py: { xs: 1.75, sm: 2.25 },
-            justifyContent: { md: 'flex-start' },
-            alignItems: { md: 'flex-start' },
-            textAlign: { md: 'left' },
-          },
-          '& .MuiTab-iconWrapper': {
-            fontSize: { xs: 24, sm: 28 },
-          },
-        }}
-      >
-        {filteredTabs.map((tab, idx) => (
-          <Tab
-            key={idx}
-            icon={tab.icon}
-            iconPosition={tab.icon ? 'start' : undefined}
-            label={tab.label}
-            sx={{
-              textTransform: 'none',
-              fontWeight: tabValue === idx ? 600 : 400,
-              alignItems: { md: 'flex-start' },
-            }}
-          />
-        ))}
-      </Tabs>
+      <AppMainNav
+        tabs={filteredTabs}
+        activeIndex={tabValue}
+        open={navOpen}
+        onOpen={() => setNavOpen(true)}
+        onClose={() => setNavOpen(false)}
+        onSelect={selectTab}
+      />
 
       <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {filteredTabs.map((tab, i) => (
@@ -279,7 +333,6 @@ const AppRouter: React.FC<AppRouterProps> = ({
             )}
             {tab.value === 'history' && (
               <Suspense fallback={<TabPanelFallback />}>
-                {/* Cancellation is offered to everyone and asks for a PIN when needed. */}
                 <LazyHistoryContainer canCancelOrReturn />
               </Suspense>
             )}

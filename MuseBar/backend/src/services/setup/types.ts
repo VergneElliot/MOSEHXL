@@ -28,6 +28,8 @@ export interface BusinessSetupRequest {
   email: string;
   password: string;
   confirm_password: string;
+  /** Owner PIN for the venue-login admin (required for feature access via PIN session). */
+  owner_pin: string;
   
   // Business information
   business_name: string;

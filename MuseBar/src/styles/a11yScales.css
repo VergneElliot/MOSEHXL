@@ -1,0 +1,64 @@
+/**
+ * Accessibility fine scales (independent of header zoom).
+ * Ratios are set on :root by VisualPrefsContext (--a11y-*-scale).
+ */
+
+/* Buttons / icon buttons */
+.MuiButton-root {
+  font-size: calc(0.9375rem * var(--a11y-button-scale, 1)) !important;
+  min-height: calc(2.25rem * var(--a11y-button-scale, 1));
+  padding-top: calc(0.375rem * var(--a11y-button-scale, 1));
+  padding-bottom: calc(0.375rem * var(--a11y-button-scale, 1));
+  padding-left: calc(1rem * var(--a11y-button-scale, 1));
+  padding-right: calc(1rem * var(--a11y-button-scale, 1));
+}
+
+.MuiButton-sizeSmall {
+  min-height: calc(1.875rem * var(--a11y-button-scale, 1));
+  font-size: calc(0.8125rem * var(--a11y-button-scale, 1)) !important;
+  padding-top: calc(0.25rem * var(--a11y-button-scale, 1));
+  padding-bottom: calc(0.25rem * var(--a11y-button-scale, 1));
+  padding-left: calc(0.625rem * var(--a11y-button-scale, 1));
+  padding-right: calc(0.625rem * var(--a11y-button-scale, 1));
+}
+
+.MuiButton-sizeLarge {
+  min-height: calc(2.75rem * var(--a11y-button-scale, 1));
+  font-size: calc(1rem * var(--a11y-button-scale, 1)) !important;
+}
+
+.MuiIconButton-root {
+  padding: calc(0.5rem * var(--a11y-button-scale, 1));
+}
+
+.MuiIconButton-root .MuiSvgIcon-root {
+  font-size: calc(1.5rem * var(--a11y-button-scale, 1));
+}
+
+/* Main nav tabs + category chips */
+.MuiTab-root {
+  font-size: calc(1em * var(--a11y-nav-scale, 1)) !important;
+  min-height: calc(3rem * var(--a11y-nav-scale, 1)) !important;
+  padding-top: calc(0.75rem * var(--a11y-nav-scale, 1));
+  padding-bottom: calc(0.75rem * var(--a11y-nav-scale, 1));
+  padding-left: calc(1rem * var(--a11y-nav-scale, 1));
+  padding-right: calc(1rem * var(--a11y-nav-scale, 1));
+}
+
+.MuiTab-root .MuiSvgIcon-root {
+  font-size: calc(1.5rem * var(--a11y-nav-scale, 1));
+}
+
+.pos-category-filter .MuiChip-root {
+  height: calc(2.625rem * var(--a11y-nav-scale, 1)) !important;
+}
+
+.pos-category-filter .MuiChip-label {
+  font-size: calc(1rem * var(--a11y-nav-scale, 1)) !important;
+  padding-left: calc(0.85rem * var(--a11y-nav-scale, 1));
+  padding-right: calc(0.85rem * var(--a11y-nav-scale, 1));
+}
+
+.pos-category-filter .MuiChip-icon {
+  font-size: calc(1.25rem * var(--a11y-nav-scale, 1)) !important;
+}

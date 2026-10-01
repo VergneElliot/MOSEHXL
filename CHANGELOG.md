@@ -18,8 +18,30 @@ Fiscal sequence counters are never reset across versions.
 
 ## [Unreleased]
 
-**Fiscal impact:** PATCH (reservation inbox/inbound harden + prior En cours / cancel-reopen). Prior
-Unreleased items remain MINOR / PATCH as noted below.
+**Fiscal impact:** MINOR (venue login + PIN-only actors; dual actor trace unchanged;
+per-PIN visual prefs / POS card UX are UI-only).
+
+### Changed
+
+- Affichage : thème MUI sombre par défaut (bleu-gris), zoom en-tête fonctionnel,
+  préférences `ui_prefs` par badge PIN (Profil → Affichage / Accessibilité : police,
+  cartes, boutons, onglets).
+- Caisse : cartes produit cliquables (plus de bouton « Ajouter » ni de glisser-déposer
+  produit → panier) ; boutons `+`/`−` agrandis.
+- Identité : compte établissement = email/mot de passe sans droits métier ; droits
+  uniquement via session PIN ; staff = acteurs PIN-only (`can_login=false`).
+- Basculement d’établissement : PIN propriétaire du compte sur l’établissement cible.
+- Pointage : ouvrir / fermer un badge PIN = entrée / sortie ; fermeture bloquée si
+  tables ouvertes ; anciennes API punch désactivées (410).
+- Boîte mail : liste par **conversation** (plus une ligne par e-mail de confirmation
+  `slug@mosehxl.com`) ; fil type messagerie (client / établissement) ; archivage
+  de tout le fil réservation.
+- Boîte mail / réservations : les réponses staff et e-mails de statut ciblent
+  toujours `customer_email` (jamais `@mosehxl.com`) ; confirmation visuelle de
+  l’adresse destinataire après envoi.
+- Réservations : bouton **Accéder à la conversation** ; **commentaire** e-mailé
+  au client (changement de statut ou du texte) ; **notes** strictement internes
+  (plus de remplissage auto depuis le formulaire public).
 
 ### Fixed
 

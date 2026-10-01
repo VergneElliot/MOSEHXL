@@ -32,7 +32,7 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({
   );
 
   return (
-    <Box sx={{ mb: 2, px: { xs: 0, md: 0 } }}>
+    <Box className="pos-category-filter" sx={{ mb: 2, px: { xs: 0, md: 0 } }}>
       <Box
         sx={{
           display: 'flex',

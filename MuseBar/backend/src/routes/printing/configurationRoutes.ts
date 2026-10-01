@@ -1,7 +1,8 @@
 import { Router, type Response } from 'express';
 
 import { pool } from '../../db/pool';
-import { authenticateToken } from '../../middleware/auth';
+import { authenticateToken, requirePermission } from '../../middleware/auth';
+import { P } from '../../permissions/registry';
 import {
   listPrintingConfigurations,
   savePrintingConfiguration,
@@ -13,9 +14,15 @@ import { AppError, asyncHandler, ValidationError } from '../../middleware/errorH
 import { ensureEstablishment, getPrintingUser, printingServiceManager } from './context';
 
 const router = Router();
+const requireSettings = requirePermission(P.access_settings);
 
 // GET /api/printing/configuration
-router.get('/configuration', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.get(
+  '/configuration',
+  authenticateToken,
+  ensureEstablishment,
+  requireSettings,
+  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
 
@@ -35,7 +42,12 @@ router.get('/configuration', authenticateToken, ensureEstablishment, asyncHandle
 }));
 
 // POST /api/printing/configuration
-router.post('/configuration', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.post(
+  '/configuration',
+  authenticateToken,
+  ensureEstablishment,
+  requireSettings,
+  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const { provider, config: bodyConfig } = req.body;

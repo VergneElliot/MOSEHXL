@@ -1,6 +1,7 @@
 import { StaffPinSessionModel } from '../../models/staffPinSession';
 import { Logger } from '../../utils/logger';
 import { PIN_ACTOR_TTL_MS } from './pinActorToken';
+import { clockInOnPinOpen, clockOutOnPinClose } from './pinSessionPointage';
 
 /**
  * Opens the server-side record of a badge-in and returns its id, which is embedded in the PIN
@@ -23,6 +24,11 @@ export async function openPinSession(input: {
       ipAddress: input.ipAddress,
       userAgent: input.userAgent,
     });
+    await clockInOnPinOpen({
+      establishmentId: input.establishmentId,
+      userId: input.pinUserId,
+      ip: input.ipAddress ?? null,
+    });
     return session.id;
   } catch (error) {
     Logger.getInstance().error(
@@ -37,7 +43,15 @@ export async function openPinSession(input: {
 export async function closePinSession(
   sessionId: string,
   establishmentId: string,
-  reason: string
+  reason: string,
+  options?: { pinUserId?: number; ipAddress?: string | null }
 ): Promise<boolean> {
+  if (options?.pinUserId != null) {
+    await clockOutOnPinClose({
+      establishmentId,
+      userId: options.pinUserId,
+      ip: options.ipAddress ?? null,
+    });
+  }
   return StaffPinSessionModel.close(sessionId, establishmentId, reason);
 }

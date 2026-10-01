@@ -31,6 +31,7 @@ export const useSetupSubmission = ({ onSuccess, onError, onLoading }: UseSetupSu
       email: formData.email || '',
       password: formData.password || '',
       confirm_password: formData.password || '', // Use same password for confirmation
+      owner_pin: formData.ownerPin || '',
       
       // Business information
       business_name: formData.businessName || '',
@@ -54,6 +55,7 @@ export const useSetupSubmission = ({ onSuccess, onError, onLoading }: UseSetupSu
     // Required user fields
     if (!request.email) errors.push('Email manquant');
     if (!request.password) errors.push('Mot de passe manquant');
+    if (!request.owner_pin) errors.push('PIN propriétaire manquant');
     if (!request.first_name) errors.push('Prénom manquant');
     if (!request.last_name) errors.push('Nom manquant');
 

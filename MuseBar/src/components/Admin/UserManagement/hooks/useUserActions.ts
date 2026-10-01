@@ -65,23 +65,25 @@ export const useUserActions = ({
    * Create a new user in the establishment (establishment_admin or staff only).
    */
   const createUser = useCallback(async (
-    email: string,
-    password: string,
-    role: EstablishmentAssignableRole
+    firstName: string,
+    pin: string,
+    role: EstablishmentAssignableRole,
+    lastName?: string
   ): Promise<boolean> => {
     onError(null);
     
     try {
-      const response = await apiService.post<ApiUser>('/auth/users', {
-        email,
-        password,
+      const response = await apiService.post<ApiUser>('/auth/pin-staff', {
+        first_name: firstName,
+        last_name: lastName || null,
+        pin,
         role,
       });
       
       onUserAdd(mapApiUser(response.data));
       return true;
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to create user');
+      onError(err instanceof Error ? err.message : 'Création impossible');
       return false;
     }
   }, [onUserAdd, onError]);

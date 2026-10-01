@@ -10,10 +10,14 @@ interface DataState {
 }
 
 interface DataActions {
-  updateData: () => Promise<void>;
+  updateData: () => Promise<boolean>;
   refreshData: () => Promise<void>;
 }
 
+/**
+ * POS catalog loader. Pass `enabled=true` only when a PIN session can authorize
+ * catalog reads — JWT alone gets 403 and must not auto-poll.
+ */
 export const useDataManagement = (enabled: boolean = true): DataState & DataActions => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -22,52 +26,52 @@ export const useDataManagement = (enabled: boolean = true): DataState & DataActi
 
   const dataService = DataService.getInstance();
   const hasLoadedOnce = useRef(false);
+  /** Shared promise so StrictMode double-mount / parallel callers await the same load. */
+  const inFlightPromise = useRef<Promise<boolean> | null>(null);
 
-  const updateData = useCallback(async () => {
-    if (!enabled) {
-      setIsLoading(false);
-      setError(null);
-      return;
-    }
+  const updateData = useCallback(async (): Promise<boolean> => {
+    if (inFlightPromise.current) return inFlightPromise.current;
 
-    // Only show full-screen loading on initial load. Refreshes after e.g. creating an order
-    // run without loading so the app stays mounted and snackbars (success/error) stay visible.
     const isInitialLoad = !hasLoadedOnce.current;
-    if (isInitialLoad) {
-      setIsLoading(true);
-    }
+    if (isInitialLoad) setIsLoading(true);
     setError(null);
 
-    try {
-      const [categoriesData, productsData] = await Promise.all([
-        dataService.getCategories(),
-        dataService.getProducts(),
-      ]);
+    inFlightPromise.current = (async () => {
+      try {
+        const [categoriesData, productsData] = await Promise.all([
+          dataService.getCategories(),
+          dataService.getProducts(),
+        ]);
 
-      setCategories(categoriesData);
-      setProducts(productsData);
-      hasLoadedOnce.current = true;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load data');
-    } finally {
-      if (isInitialLoad) {
-        setIsLoading(false);
+        setCategories(categoriesData);
+        setProducts(productsData);
+        hasLoadedOnce.current = true;
+        return true;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to load data';
+        if (/PIN session required/i.test(message)) {
+          setError(null);
+          return false;
+        }
+        setError(message);
+        return false;
+      } finally {
+        inFlightPromise.current = null;
+        if (isInitialLoad) setIsLoading(false);
       }
-    }
-  }, [dataService, enabled]);
+    })();
+
+    return inFlightPromise.current;
+  }, [dataService]);
 
   const refreshData = useCallback(async () => {
     await updateData();
   }, [updateData]);
 
-  // Initialize data on mount (only if enabled)
   useEffect(() => {
-    if (enabled) {
-      updateData();
-    } else {
-      hasLoadedOnce.current = false;
-    }
-  }, [updateData, enabled]);
+    if (!enabled) return;
+    void updateData();
+  }, [enabled, updateData]);
 
   return {
     categories,
@@ -77,4 +81,4 @@ export const useDataManagement = (enabled: boolean = true): DataState & DataActi
     updateData,
     refreshData,
   };
-}; 
+};

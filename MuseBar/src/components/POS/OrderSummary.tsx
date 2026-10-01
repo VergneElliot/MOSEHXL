@@ -39,12 +39,7 @@ import OrderSummaryItem from './OrderSummaryItem';
 import LineNoteDialog from './LineNoteDialog';
 import { getLineNoteFromOptions } from '../../utils/lineItemNote';
 import { canUseVirtualization } from '../../utils/canUseVirtualization';
-import { POS_PRODUCT_DND_MIME, type PosProductDragPayload } from './posProductDnD';
 import { posActionButtonSx } from './posActionButtonSx';
-import { useOrderSummaryProductDrop } from './useOrderSummaryProductDrop';
-
-export type { PosProductDragPayload } from './posProductDnD';
-export { POS_PRODUCT_DND_MIME } from './posProductDnD';
 
 interface OrderSummaryProps {
   currentOrder: OrderItem[];
@@ -70,8 +65,6 @@ interface OrderSummaryProps {
   onApplyPerso?: (index: number) => void;
   /** Add or edit an ad-hoc kitchen note on a line */
   onUpdateLineNote?: (index: number, note: string) => void;
-  /** Drop a product card onto the cart */
-  onDropProduct?: (payload: PosProductDragPayload) => void;
   /** Open remise dialog for selected line indices (empty = all eligible). */
   onApplyRemise?: (indices: number[]) => void;
   /** Open floor map / select table */
@@ -115,7 +108,6 @@ const OrderSummary = React.memo(function OrderSummary({
   onApplyPerso,
   onApplyRemise,
   onUpdateLineNote,
-  onDropProduct,
   onSelectTable,
   activeTableLabel = null,
   onSuivre,
@@ -129,8 +121,6 @@ const OrderSummary = React.memo(function OrderSummary({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const useVirtualization = canUseVirtualization();
-  const { dropRef, dropActive, handleDragOver, handleDragLeave, handleDrop } =
-    useOrderSummaryProductDrop(onDropProduct);
   const [lineNoteDialog, setLineNoteDialog] = useState<{
     targetIds: string[];
     productName: string;
@@ -479,19 +469,12 @@ const OrderSummary = React.memo(function OrderSummary({
 
   return (
     <Card
-      ref={dropRef as React.RefObject<HTMLDivElement>}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
       sx={{
         height: '100%',
         minHeight: 0,
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        outline: dropActive ? '2px solid' : 'none',
-        outlineColor: 'primary.main',
-        bgcolor: dropActive ? 'action.hover' : undefined,
       }}
     >
       <CardContent
@@ -603,9 +586,7 @@ const OrderSummary = React.memo(function OrderSummary({
                   minHeight="100%"
                 >
                   <Typography color="textSecondary">
-                    {dropActive
-                      ? 'Déposez le produit ici'
-                      : 'Aucun article — cliquez ou glissez un produit'}
+                    Aucun article — appuyez sur un produit pour l’ajouter
                   </Typography>
                 </Box>
               ) : useVirtualization ? (

@@ -7,6 +7,12 @@ export interface UserProfileDto {
   calendar_color: string;
   available_colors: string[];
   used_colors: string[];
+  /** False for PIN-only staff — no email/password login. */
+  can_login?: boolean;
+  ui_prefs?: {
+    scale_percent?: number;
+    color_mode?: 'light' | 'dark';
+  };
 }
 
 export const HEX_RE = /^#[0-9A-Fa-f]{6}$/;

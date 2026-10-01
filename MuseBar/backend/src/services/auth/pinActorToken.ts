@@ -5,14 +5,12 @@ export const PIN_ACTOR_TOKEN_USE = 'pin_actor';
 
 /**
  * Hard cap on a badge JWT / staff_pin_sessions.expires_at.
- * Defaults to the remember-me refresh window (30 days). Override with AUTH_PIN_ACTOR_TTL_DAYS
- * or AUTH_REFRESH_REMEMBER_DAYS.
+ * Shift-oriented default (1 day). Override with AUTH_PIN_ACTOR_TTL_DAYS.
+ * Closing a badge clocks the person out (see pinSessionPointage).
  */
 function resolvePinActorTtlDays(): number {
-  const raw = Number(
-    process.env.AUTH_PIN_ACTOR_TTL_DAYS ?? process.env.AUTH_REFRESH_REMEMBER_DAYS ?? 30
-  );
-  return Number.isFinite(raw) && raw > 0 ? raw : 30;
+  const raw = Number(process.env.AUTH_PIN_ACTOR_TTL_DAYS ?? 1);
+  return Number.isFinite(raw) && raw > 0 ? raw : 1;
 }
 
 export const PIN_ACTOR_TTL_DAYS = resolvePinActorTtlDays();

@@ -3,6 +3,7 @@ import request from 'supertest';
 import express from 'express';
 import { generateToken } from '../auth';
 import { errorHandler } from '../../middleware/errorHandler';
+import { signPinActorToken } from '../../services/auth/pinActorToken';
 
 const EST = '11111111-1111-4111-8111-111111111111';
 
@@ -10,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   poolQuery: vi.fn(),
   getUserPermissions: vi.fn(),
   getEstablishmentAuditTrail: vi.fn(),
+  checkPinSession: vi.fn(),
 }));
 
 vi.mock('../../db/pool', () => ({
@@ -38,6 +40,12 @@ vi.mock('../../models/auditTrail', () => ({
   },
 }));
 
+vi.mock('../../services/auth/pinSessionGuard', () => ({
+  checkPinSession: (...args: unknown[]) => mocks.checkPinSession(...args),
+  touchPinSession: vi.fn(),
+  resetPinSessionTouchCache: vi.fn(),
+}));
+
 import auditRouter from './audit';
 
 const app = express();
@@ -58,11 +66,24 @@ function tokenFor(role: 'establishment_admin' | 'staff', establishmentId: string
   );
 }
 
+function pinFor(role: 'establishment_admin' | 'staff', permissions: string[] = []) {
+  return signPinActorToken({
+    id: role === 'staff' ? 12 : 7,
+    email: `${role}@example.com`,
+    role,
+    establishment_id: EST,
+    display_name: role,
+    permissions,
+  });
+}
+
 describe('legal audit trail route', () => {
   beforeEach(() => {
     mocks.poolQuery.mockReset();
     mocks.getUserPermissions.mockReset();
     mocks.getEstablishmentAuditTrail.mockReset();
+    mocks.checkPinSession.mockReset();
+    mocks.checkPinSession.mockResolvedValue('active');
 
     mocks.poolQuery.mockImplementation(async (query: unknown) => {
       const sql = String(query ?? '');
@@ -78,7 +99,7 @@ describe('legal audit trail route', () => {
     });
   });
 
-  it('denies /audit/trail for non-admin staff', async () => {
+  it('denies /audit/trail for staff JWT without PIN', async () => {
     mocks.getUserPermissions.mockResolvedValue([]);
     const res = await request(app)
       .get('/audit/trail')
@@ -87,11 +108,20 @@ describe('legal audit trail route', () => {
     expect(mocks.getEstablishmentAuditTrail).not.toHaveBeenCalled();
   });
 
-  it('allows /audit/trail for establishment_admin and returns audit entries', async () => {
-    mocks.getUserPermissions.mockResolvedValue([]);
+  it('denies /audit/trail for staff PIN without access_compliance', async () => {
+    const res = await request(app)
+      .get('/audit/trail')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`)
+      .set('x-pin-actor-token', pinFor('staff', ['access_pos']));
+    expect(res.status).toBe(403);
+    expect(mocks.getEstablishmentAuditTrail).not.toHaveBeenCalled();
+  });
+
+  it('allows /audit/trail for establishment_admin PIN', async () => {
     const res = await request(app)
       .get('/audit/trail?limit=25&offset=0')
-      .set('Authorization', `Bearer ${tokenFor('establishment_admin')}`);
+      .set('Authorization', `Bearer ${tokenFor('establishment_admin')}`)
+      .set('x-pin-actor-token', pinFor('establishment_admin'));
 
     expect(res.status).toBe(200);
     expect(res.body.audit_entries).toHaveLength(1);
@@ -100,5 +130,15 @@ describe('legal audit trail route', () => {
       EST,
       expect.objectContaining({ limit: 25, offset: 0 })
     );
+  });
+
+  it('allows /audit/trail for staff PIN with access_compliance', async () => {
+    const res = await request(app)
+      .get('/audit/trail')
+      .set('Authorization', `Bearer ${tokenFor('staff')}`)
+      .set('x-pin-actor-token', pinFor('staff', ['access_compliance']));
+
+    expect(res.status).toBe(200);
+    expect(mocks.getEstablishmentAuditTrail).toHaveBeenCalled();
   });
 });

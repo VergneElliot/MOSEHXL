@@ -5,9 +5,6 @@ import {
   VolunteerActivism as TipIcon,
 } from '@mui/icons-material';
 import { Product, Category } from '../../types';
-import { POS_PRODUCT_DND_MIME } from './posProductDnD';
-import { setCompactDragGhost } from './posDragGhost';
-import { PosTouchDraggable } from './PosTouchDraggable';
 import './ProductGrid.css';
 
 interface ProductGridProps {
@@ -36,6 +33,16 @@ function Glyph({ path }: { path: string }) {
       <path d={path} />
     </svg>
   );
+}
+
+function activateOnEnterSpace(
+  e: React.KeyboardEvent,
+  action: () => void
+): void {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    action();
+  }
 }
 
 const ProductGrid = React.memo(function ProductGrid({
@@ -72,6 +79,19 @@ const ProductGrid = React.memo(function ProductGrid({
         '--pos-action-hover': theme.palette.action.hover,
         '--pos-shadow-1': theme.shadows[1],
         '--pos-shadow-2': theme.shadows[2],
+        /* Price chip: high contrast on saturated category fills */
+        '--pos-price-chip-bg':
+          theme.palette.mode === 'dark'
+            ? 'rgba(15, 23, 42, 0.88)'
+            : 'rgba(255, 255, 255, 0.92)',
+        '--pos-price-chip-fg':
+          theme.palette.mode === 'dark' ? '#ffffff' : theme.palette.text.primary,
+        '--pos-price-chip-fg-muted':
+          theme.palette.mode === 'dark'
+            ? 'rgba(255, 255, 255, 0.72)'
+            : theme.palette.text.secondary,
+        '--pos-price-chip-fg-accent':
+          theme.palette.mode === 'dark' ? '#ffb3c7' : theme.palette.secondary.main,
       }) as React.CSSProperties,
     [theme]
   );
@@ -79,18 +99,20 @@ const ProductGrid = React.memo(function ProductGrid({
   /**
    * One style object per category, reused by every card in it — keeps the
    * `cardStyle` prop referentially stable so React.memo actually holds.
+   * Dark mode uses stronger fills so category hues stay vivid on slate surfaces.
    */
   const categoryStyleMap = useMemo(() => {
+    const isDark = theme.palette.mode === 'dark';
     const map = new Map<string, React.CSSProperties>();
     categories.forEach(category => {
       if (!category.color) return;
       map.set(String(category.id), {
-        '--pos-card-bg': alpha(category.color, 0.2),
-        '--pos-card-border': alpha(category.color, 0.8),
+        '--pos-card-bg': alpha(category.color, isDark ? 0.65 : 0.2),
+        '--pos-card-border': isDark ? category.color : alpha(category.color, 0.8),
       } as React.CSSProperties);
     });
     return map;
-  }, [categories]);
+  }, [categories, theme.palette.mode]);
 
   const totalCount =
     products.length + (onDiversClick ? 1 : 0) + (onPourboireClick ? 1 : 0);
@@ -126,28 +148,15 @@ const ProductGrid = React.memo(function ProductGrid({
   );
 });
 
-function startSpecialDrag(
-  event: React.DragEvent,
-  kind: 'divers' | 'pourboire',
-  label: string
-) {
-  const payload = JSON.stringify({ kind });
-  event.dataTransfer.setData(POS_PRODUCT_DND_MIME, payload);
-  event.dataTransfer.setData('text/plain', payload);
-  event.dataTransfer.effectAllowed = 'copy';
-  setCompactDragGhost(event, label);
-}
-
 const DiversCard = React.memo(function DiversCard({ onAdd }: { onAdd: () => void }) {
   return (
-    <PosTouchDraggable
-      className="pos-card pos-card--special"
-      onDragStart={e => startSpecialDrag(e, 'divers', 'Divers')}
-      getPayload={() => ({
-        mime: POS_PRODUCT_DND_MIME,
-        data: JSON.stringify({ kind: 'divers' }),
-        label: 'Divers',
-      })}
+    <div
+      className="pos-card pos-card--special pos-card--clickable"
+      role="button"
+      tabIndex={0}
+      aria-label="Ajouter un article Divers"
+      onClick={onAdd}
+      onKeyDown={e => activateOnEnterSpace(e, onAdd)}
     >
       <div className="pos-card__content">
         <div>
@@ -159,31 +168,21 @@ const DiversCard = React.memo(function DiversCard({ onAdd }: { onAdd: () => void
             Article personnalisé (prix, TVA, description)
           </p>
         </div>
-        <button
-          type="button"
-          className="pos-add-button pos-add-button--block"
-          onClick={e => {
-            e.stopPropagation();
-            onAdd();
-          }}
-        >
-          Ajouter
-        </button>
+        <p className="pos-card__hint">Appuyer pour ajouter</p>
       </div>
-    </PosTouchDraggable>
+    </div>
   );
 });
 
 const PourboireCard = React.memo(function PourboireCard({ onAdd }: { onAdd: () => void }) {
   return (
-    <PosTouchDraggable
-      className="pos-card pos-card--special"
-      onDragStart={e => startSpecialDrag(e, 'pourboire', 'Pourboire')}
-      getPayload={() => ({
-        mime: POS_PRODUCT_DND_MIME,
-        data: JSON.stringify({ kind: 'pourboire' }),
-        label: 'Pourboire',
-      })}
+    <div
+      className="pos-card pos-card--special pos-card--clickable"
+      role="button"
+      tabIndex={0}
+      aria-label="Ajouter un pourboire"
+      onClick={onAdd}
+      onKeyDown={e => activateOnEnterSpace(e, onAdd)}
     >
       <div className="pos-card__content">
         <div>
@@ -195,18 +194,9 @@ const PourboireCard = React.memo(function PourboireCard({ onAdd }: { onAdd: () =
             Pourboire carte (hors CA — +carte / −espèces)
           </p>
         </div>
-        <button
-          type="button"
-          className="pos-add-button pos-add-button--secondary pos-add-button--block"
-          onClick={e => {
-            e.stopPropagation();
-            onAdd();
-          }}
-        >
-          Ajouter
-        </button>
+        <p className="pos-card__hint">Appuyer pour ajouter</p>
       </div>
-    </PosTouchDraggable>
+    </div>
   );
 });
 
@@ -246,43 +236,25 @@ const ProductCard = React.memo(function ProductCard({
     if (!Number.isNaN(parsed)) setQuantity(Math.min(999, Math.max(1, parsed)));
   };
 
-  const handleAdd = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleAdd = () => {
     onRequestAddProduct(product, quantity);
     setQuantity(1);
   };
 
-  const handleDragStart = (e: React.DragEvent) => {
-    const payload = JSON.stringify({
-      kind: 'product',
-      productId: product.id,
-      quantity,
-    });
-    e.dataTransfer.setData(POS_PRODUCT_DND_MIME, payload);
-    e.dataTransfer.setData('text/plain', payload);
-    e.dataTransfer.effectAllowed = 'copy';
-    setCompactDragGhost(e, `${product.name}${quantity > 1 ? ` ×${quantity}` : ''}`);
-  };
-
   const className =
-    'pos-card' +
+    'pos-card pos-card--clickable' +
     (isFavorite ? ' pos-card--favorite' : '') +
     (isDiscounted ? ' pos-card--discounted' : '');
 
   return (
-    <PosTouchDraggable
+    <div
       className={className}
       style={cardStyle}
-      onDragStart={handleDragStart}
-      getPayload={() => ({
-        mime: POS_PRODUCT_DND_MIME,
-        data: JSON.stringify({
-          kind: 'product',
-          productId: product.id,
-          quantity,
-        }),
-        label: `${product.name}${quantity > 1 ? ` ×${quantity}` : ''}`,
-      })}
+      role="button"
+      tabIndex={0}
+      aria-label={`Ajouter ${product.name}${quantity > 1 ? ` ×${quantity}` : ''}`}
+      onClick={handleAdd}
+      onKeyDown={e => activateOnEnterSpace(e, handleAdd)}
     >
       {isFavorite && (
         <span className="pos-card__favorite" aria-label="Favori" title="Favori">
@@ -303,7 +275,11 @@ const ProductCard = React.memo(function ProductCard({
           <p className="pos-card__price">{formatCurrency(currentPrice)}</p>
 
           <div className="pos-card__actions">
-            <div className="pos-card__qty">
+            <div
+              className="pos-card__qty"
+              onClick={e => e.stopPropagation()}
+              onKeyDown={e => e.stopPropagation()}
+            >
               <button
                 type="button"
                 className="pos-quantity-button"
@@ -338,13 +314,10 @@ const ProductCard = React.memo(function ProductCard({
                 <Glyph path={ICON_ADD} />
               </button>
             </div>
-            <button type="button" className="pos-add-button pos-add-button--block" onClick={handleAdd}>
-              Ajouter
-            </button>
           </div>
         </div>
       </div>
-    </PosTouchDraggable>
+    </div>
   );
 });
 

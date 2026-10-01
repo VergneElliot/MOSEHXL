@@ -62,6 +62,9 @@ CREATE TABLE IF NOT EXISTS user_establishment_memberships (
 ALTER TABLE user_establishment_memberships
   ADD COLUMN IF NOT EXISTS calendar_color VARCHAR(7) NOT NULL DEFAULT '#1565C0';
 
+ALTER TABLE user_establishment_memberships
+  ADD COLUMN IF NOT EXISTS ui_prefs JSONB NOT NULL DEFAULT '{}'::jsonb;
+
 CREATE UNIQUE INDEX IF NOT EXISTS uq_membership_calendar_color_per_est
   ON user_establishment_memberships (establishment_id, upper(calendar_color))
   WHERE is_active = TRUE;

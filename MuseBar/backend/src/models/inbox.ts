@@ -133,6 +133,24 @@ export class InboxModel {
     return result.rows as InboxMessage[];
   }
 
+  static async findLatestForReservation(
+    establishmentId: string,
+    reservationId: number
+  ): Promise<{ id: number; is_archived: boolean } | null> {
+    const result = await pool.query(
+      `SELECT id, is_archived FROM inbox_messages
+       WHERE establishment_id = $1 AND reservation_id = $2
+       ORDER BY received_at DESC, id DESC
+       LIMIT 1`,
+      [establishmentId, reservationId]
+    );
+    if (!result.rows[0]) return null;
+    return {
+      id: Number(result.rows[0].id),
+      is_archived: Boolean(result.rows[0].is_archived),
+    };
+  }
+
   static async addAttachment(input: {
     establishment_id: string;
     message_id: number;
@@ -172,6 +190,29 @@ export class InboxModel {
       [establishmentId, id, archived]
     );
     return (result.rowCount ?? 0) > 0;
+  }
+
+  /** Archive / unarchive every message in a reservation thread. */
+  static async setArchivedForReservation(
+    establishmentId: string,
+    reservationId: number,
+    archived: boolean
+  ): Promise<number> {
+    const result = await pool.query(
+      `UPDATE inbox_messages SET is_archived = $3
+       WHERE establishment_id = $1 AND reservation_id = $2`,
+      [establishmentId, reservationId, archived]
+    );
+    return result.rowCount ?? 0;
+  }
+
+  /** Mark all inbound messages in a reservation thread as read. */
+  static async markThreadRead(establishmentId: string, reservationId: number): Promise<void> {
+    await pool.query(
+      `UPDATE inbox_messages SET is_read = TRUE
+       WHERE establishment_id = $1 AND reservation_id = $2 AND direction = 'inbound'`,
+      [establishmentId, reservationId]
+    );
   }
 
   static async getAttachment(

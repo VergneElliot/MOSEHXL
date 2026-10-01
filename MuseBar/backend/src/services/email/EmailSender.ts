@@ -153,7 +153,14 @@ export class EmailSender {
       const messageId = response[0].headers['x-message-id'];
 
       this.logger.info(
-        'Email sent successfully via provider'
+        'Email sent successfully via provider',
+        {
+          to: options.to,
+          subject: options.subject,
+          replyTo: options.replyTo || null,
+          messageId,
+        },
+        'EMAIL_SENDER'
       );
 
       return {

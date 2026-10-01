@@ -3,6 +3,7 @@ import { getEstablishmentId, requireAuth, requireEstablishmentAdminOrPermission 
 import { P } from '../../permissions/registry';
 import { asyncHandler, NotFoundError, ValidationError, AppError } from '../../middleware/errorHandler';
 import { InboxModel } from '../../models/inbox';
+import { listInboxConversations } from '../../models/inboxConversations';
 import { AdminDocumentModel } from '../../models/adminDocument';
 import { pool } from '../../db/pool';
 import { getEnvironmentConfig } from '../../config/environment';
@@ -17,6 +18,7 @@ import { GuestNoShowFlagModel } from '../../models/guestNoShowFlag';
 import { venueInboxReservationReplyTo } from '../../services/reservations/venueInboxAddress';
 import { recordOutboundReservationEmail } from '../../services/reservations/recordOutboundReservationEmail';
 import { resolveVenueContactEmail } from '../../services/establishment/venueContactEmail';
+import { resolveInboxReplyRecipient } from '../../services/reservations/resolveInboxReplyRecipient';
 
 const router = express.Router();
 router.use(requireAuth, requireEstablishmentAdminOrPermission(P.access_inbox));
@@ -29,7 +31,7 @@ router.get(
     const archived = req.query.archived === 'true';
     const limit = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : 50;
     const offset = typeof req.query.offset === 'string' ? parseInt(req.query.offset, 10) : 0;
-    const data = await InboxModel.list(establishmentId, {
+    const data = await listInboxConversations(establishmentId, {
       archived,
       limit: Number.isFinite(limit) ? limit : 50,
       offset: Number.isFinite(offset) ? offset : 0,
@@ -40,7 +42,8 @@ router.get(
     );
     const contactEmail = await resolveVenueContactEmail(establishmentId);
     return res.json({
-      ...data,
+      conversations: data.conversations,
+      total: data.total,
       inbox_address: est.rows[0]?.slug ? `${est.rows[0].slug}@mosehxl.com` : null,
       autoforward: est.rows[0]?.admin_inbox_autoforward ?? true,
       owner_email: contactEmail,
@@ -94,6 +97,36 @@ router.put(
 );
 
 router.get(
+  '/by-reservation/:reservationId',
+  asyncHandler(async (req, res) => {
+    const establishmentId = getEstablishmentId(req, res);
+    if (!establishmentId) return;
+    const reservationId = parseInt(req.params.reservationId ?? '', 10);
+    if (!Number.isFinite(reservationId)) throw new ValidationError('Identifiant invalide');
+    const hit = await InboxModel.findLatestForReservation(establishmentId, reservationId);
+    if (!hit) {
+      const reservation = await ReservationModel.getById(establishmentId, reservationId);
+      if (reservation?.inbox_message_id) {
+        const message = await InboxModel.getMessage(establishmentId, reservation.inbox_message_id);
+        if (message) {
+          return res.json({
+            message_id: message.id,
+            is_archived: message.is_archived,
+            reservation_id: reservationId,
+          });
+        }
+      }
+      throw new NotFoundError('Aucune conversation pour cette réservation');
+    }
+    return res.json({
+      message_id: hit.id,
+      is_archived: hit.is_archived,
+      reservation_id: reservationId,
+    });
+  })
+);
+
+router.get(
   '/:id',
   asyncHandler(async (req, res) => {
     const establishmentId = getEstablishmentId(req, res);
@@ -102,7 +135,7 @@ router.get(
     if (!Number.isFinite(id)) throw new ValidationError('Identifiant invalide');
     const message = await InboxModel.getMessage(establishmentId, id);
     if (!message) throw new NotFoundError('Message introuvable');
-    await InboxModel.markRead(establishmentId, id, true);
+
     let reservation =
       message.reservation_id != null
         ? await ReservationModel.getById(establishmentId, message.reservation_id)
@@ -119,6 +152,18 @@ router.get(
         );
       }
     }
+
+    if (reservation?.id != null) {
+      await InboxModel.markThreadRead(establishmentId, reservation.id);
+    } else {
+      await InboxModel.markRead(establishmentId, id, true);
+    }
+
+    const thread =
+      reservation?.id != null
+        ? await InboxModel.listByReservation(establishmentId, reservation.id)
+        : [message];
+
     let guest_reliability = null;
     if (reservation) {
       guest_reliability = await GuestNoShowFlagModel.lookup(
@@ -133,6 +178,7 @@ router.get(
     }
     return res.json({
       message: { ...message, is_read: true },
+      thread: thread.map((m) => ({ ...m, is_read: true })),
       reservation: reservation
         ? {
             id: reservation.id,
@@ -160,8 +206,17 @@ router.post(
     const id = parseInt(req.params.id ?? '', 10);
     if (!Number.isFinite(id)) throw new ValidationError('Identifiant invalide');
     const archived = req.body?.archived !== false;
-    const ok = await InboxModel.setArchived(establishmentId, id, archived);
-    if (!ok) throw new NotFoundError('Message introuvable');
+    const message = await InboxModel.getMessage(establishmentId, id);
+    if (!message) throw new NotFoundError('Message introuvable');
+    if (message.reservation_id != null) {
+      await InboxModel.setArchivedForReservation(
+        establishmentId,
+        message.reservation_id,
+        archived
+      );
+    } else {
+      await InboxModel.setArchived(establishmentId, id, archived);
+    }
     return res.json({ success: true, archived });
   })
 );
@@ -241,18 +296,31 @@ router.post(
     if (!slug) throw new AppError('Slug établissement manquant', 500, 'ESTABLISHMENT_SLUG_MISSING');
 
     const fromAddress = `${slug}@mosehxl.com`;
-    const toMatch = String(message.from_address || '').match(
-      /[\w.+-]+@[\w.-]+\.\w+/
-    );
-    const toAddress = toMatch?.[0];
-    if (!toAddress) {
-      throw new ValidationError('Adresse destinataire introuvable dans le message');
-    }
 
     let reservationId = message.reservation_id;
     if (reservationId == null) {
       const bySeed = await ReservationModel.findByInboxMessageId(establishmentId, id);
       reservationId = bySeed?.id ?? null;
+    }
+
+    const reservation =
+      reservationId != null
+        ? await ReservationModel.getById(establishmentId, reservationId)
+        : null;
+    const thread =
+      reservationId != null
+        ? await InboxModel.listByReservation(establishmentId, reservationId)
+        : [message];
+
+    const toAddress = resolveInboxReplyRecipient({
+      message,
+      reservationEmail: reservation?.customer_email,
+      thread,
+    });
+    if (!toAddress) {
+      throw new ValidationError(
+        'Adresse client introuvable — vérifiez l’e-mail de la réservation (ne pas répondre à un message « établissement » sans client lié).'
+      );
     }
 
     const replyTo =
@@ -281,6 +349,19 @@ router.post(
       );
     }
 
+    Logger.getInstance().info(
+      'Inbox staff reply sent to guest',
+      {
+        establishmentId,
+        messageId: id,
+        reservationId,
+        to: toAddress,
+        from: fromAddress,
+        replyTo,
+      },
+      'INBOX_REPLY'
+    );
+
     if (reservationId != null) {
       await recordOutboundReservationEmail({
         establishmentId,
@@ -301,7 +382,12 @@ router.post(
       });
     }
 
-    return res.json({ success: true, from: fromAddress, reply_to: replyTo });
+    return res.json({
+      success: true,
+      to: toAddress,
+      from: fromAddress,
+      reply_to: replyTo,
+    });
   })
 );
 

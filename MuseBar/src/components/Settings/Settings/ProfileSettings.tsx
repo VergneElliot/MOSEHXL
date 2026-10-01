@@ -1,5 +1,5 @@
 /**
- * Settings → Profil : personal info, unique calendar color, password & PIN.
+ * Settings → Profil : personal info for the **active PIN session** actor.
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -19,7 +19,9 @@ import { Person as PersonIcon, Save as SaveIcon } from '@mui/icons-material';
 import { ApiService } from '../../../services/apiService';
 import { ParisDateField } from '../../common/ParisDateTimeField';
 import { logger } from '../../../utils/logger';
+import { usePinSessions } from '../../../contexts/PinSessionsContext';
 import { ProfileCalendarColorField } from './ProfileCalendarColorField';
+import { ProfileDisplaySettings } from './ProfileDisplaySettings';
 import { ProfileSecurityDialogs } from './ProfileSecurityDialogs';
 import { normalizeHex, type UserProfileDto } from './profileTypes';
 
@@ -28,6 +30,10 @@ export type { UserProfileDto } from './profileTypes';
 const api = ApiService.getInstance();
 
 export const ProfileSettings: React.FC = () => {
+  const { activeSession } = usePinSessions();
+  const actorUserId = activeSession?.actor.userId ?? null;
+  const actorName = activeSession?.actor.displayName ?? '';
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -56,8 +62,14 @@ export const ProfileSettings: React.FC = () => {
   };
 
   const load = useCallback(async () => {
+    if (actorUserId == null) {
+      setProfile(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
+    setMessage(null);
     try {
       const { data } = await api.get<UserProfileDto>('/auth/me/profile');
       applyProfile(data);
@@ -67,7 +79,7 @@ export const ProfileSettings: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [actorUserId]);
 
   useEffect(() => {
     void load();
@@ -127,6 +139,12 @@ export const ProfileSettings: React.FC = () => {
     }
   };
 
+  if (actorUserId == null) {
+    return (
+      <Alert severity="info">Ouvrez une session PIN pour voir et modifier un profil.</Alert>
+    );
+  }
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" p={4}>
@@ -140,11 +158,11 @@ export const ProfileSettings: React.FC = () => {
       <CardContent>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
           <PersonIcon color="primary" />
-          <Typography variant="h6">Mon profil</Typography>
+          <Typography variant="h6">Profil — {actorName || profile?.email || 'Badge PIN'}</Typography>
         </Box>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Informations personnelles (facultatives) et couleur unique dans cet établissement —
-          utilisée notamment dans le planning.
+          Informations du badge actuellement sélectionné (en-tête). Changer de session PIN
+          affiche le profil de l’autre personne.
         </Typography>
 
         {error && (
@@ -223,7 +241,17 @@ export const ProfileSettings: React.FC = () => {
 
         <Divider sx={{ my: 3 }} />
 
-        <ProfileSecurityDialogs onMessage={setMessage} />
+        <ProfileDisplaySettings />
+
+        <Divider sx={{ my: 3 }} />
+
+        <ProfileSecurityDialogs
+          onMessage={setMessage}
+          canLogin={profile?.can_login !== false}
+          pinActorUserId={actorUserId}
+          pinActorRole={activeSession?.actor.role}
+          pinActorPermissions={activeSession?.actor.permissions}
+        />
       </CardContent>
     </Card>
   );

@@ -3,16 +3,17 @@
  */
 import express from 'express';
 import { AuditTrailModel } from '../../models/auditTrail';
-import { getEstablishmentId, requireAuth, requireEstablishmentAdmin } from '../auth';
+import { getEstablishmentId, requireAuth, requireEstablishmentAdminOrPermission } from '../auth';
+import { P } from '../../permissions/registry';
 import { asyncHandler } from '../../middleware/errorHandler';
 
 const router = express.Router();
 
-router.use(requireAuth, requireEstablishmentAdmin);
+router.use(requireAuth, requireEstablishmentAdminOrPermission(P.access_compliance));
 
 /**
  * GET /api/legal/audit/trail
- * Paginated audit log for the authenticated establishment (admin only).
+ * Paginated audit log — PIN with access_compliance (or establishment_admin PIN).
  */
 router.get('/trail', asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);

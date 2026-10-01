@@ -69,6 +69,7 @@ router.post('/complete', validateBody([
   { field: 'email', required: true },
   { field: 'password', required: true },
   { field: 'confirm_password', required: true },
+  { field: 'owner_pin', required: true },
   { field: 'business_name', required: true },
   { field: 'contact_email', required: true },
   { field: 'phone', required: true },

@@ -30,13 +30,13 @@ import {
 } from '@mui/icons-material';
 import { PERMISSIONS } from '@mosehxl/types';
 import type { User } from '../../types/auth';
+import { useStepUpAuth } from '../../contexts/StepUpAuthContext';
 import {
   deleteTimeEntry,
   downloadAccountantExport,
   getPayrollSummary,
   listTimeClockStaff,
   listTimeEntries,
-  punchTimeClock,
   TimeClockStaffDto,
   TimeEntryDto,
   TimeHoursTotalDto,
@@ -49,6 +49,12 @@ import {
   utcToParisDateTimeLocal,
 } from '../../utils/formatDate';
 import { ParisDateTimeField } from '../common/ParisDateTimeField';
+import {
+  endOfMonthIso,
+  endOfWeekIso,
+  startOfMonthIso,
+  startOfWeekIso,
+} from './timeClockPanelDates';
 
 function msToDecimalHours(ms: number): number {
   return Math.round((ms / 3600000) * 100) / 100;
@@ -78,53 +84,20 @@ function fromLocalInputValue(local: string): string {
   return parisDateTimeLocalToUtcIso(local);
 }
 
-function startOfWeekIso(): string {
-  const d = new Date();
-  const day = (d.getDay() + 6) % 7;
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - day);
-  return d.toISOString();
-}
-
-function endOfWeekIso(): string {
-  const d = new Date(startOfWeekIso());
-  d.setDate(d.getDate() + 7);
-  return d.toISOString();
-}
-
-function startOfMonthIso(): string {
-  const d = new Date();
-  d.setDate(1);
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString();
-}
-
-function endOfMonthIso(): string {
-  const d = new Date();
-  d.setMonth(d.getMonth() + 1);
-  d.setDate(0);
-  d.setHours(23, 59, 0, 0);
-  return d.toISOString();
-}
-
 interface TimeClockPanelProps {
   user: User;
 }
 
 const TimeClockPanel: React.FC<TimeClockPanelProps> = ({ user }) => {
+  const { hasAccess } = useStepUpAuth();
   const canManage =
-    user.role === 'establishment_admin' ||
-    (user.permissions ?? []).includes(PERMISSIONS.access_planning);
+    hasAccess(PERMISSIONS.access_planning) || user.role === 'establishment_admin';
 
   const [tab, setTab] = useState(0);
   const [staff, setStaff] = useState<TimeClockStaffDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-
-  const [punchTarget, setPunchTarget] = useState<TimeClockStaffDto | null>(null);
-  const [password, setPassword] = useState('');
-  const [punchBusy, setPunchBusy] = useState(false);
 
   const [from, setFrom] = useState(startOfWeekIso);
   const [to, setTo] = useState(endOfWeekIso);
@@ -192,38 +165,6 @@ const TimeClockPanel: React.FC<TimeClockPanelProps> = ({ user }) => {
   }, [refreshActiveTab, canManage, tab, from, to]);
 
   const currentlyIn = useMemo(() => staff.filter((s) => s.open_entry), [staff]);
-
-  const openPunch = (s: TimeClockStaffDto) => {
-    setPunchTarget(s);
-    setPassword('');
-    setMessage(null);
-  };
-
-  const submitPunch = async () => {
-    if (!punchTarget) return;
-    setPunchBusy(true);
-    setError(null);
-    try {
-      const result = await punchTimeClock(punchTarget.id, password);
-      const leaveWarn =
-        'leave_warning' in result && result.leave_warning
-          ? ` Attention : ${String(result.leave_warning)}`
-          : '';
-      setMessage(
-        (result.action === 'clock_in'
-          ? `Entrée enregistrée pour ${staffLabel(punchTarget)}`
-          : `Sortie enregistrée pour ${staffLabel(punchTarget)}`) + leaveWarn
-      );
-      setPunchTarget(null);
-      setPassword('');
-      await refreshStaff();
-      if (canManage) await refreshActiveTab();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Échec du pointage');
-    } finally {
-      setPunchBusy(false);
-    }
-  };
 
   const openEdit = (entry: TimeEntryDto) => {
     setEditEntry(entry);
@@ -306,8 +247,9 @@ const TimeClockPanel: React.FC<TimeClockPanelProps> = ({ user }) => {
         <Box>
           <Typography variant="h5">Pointage</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 640 }}>
-            Terminal partagé sur le réseau de l&apos;établissement. Synthèse mensuelle :
-            heures (base 100), repas et congés pour le comptable.
+            Ouvrir un badge PIN = entrée ; fermer le badge = sortie. Libérez ou transférez
+            les tables ouvertes avant de fermer un badge. Les corrections manuelles restent
+            disponibles pour les managers.
           </Typography>
         </Box>
         <Button startIcon={<RefreshIcon />} onClick={() => void refreshStaff()} disabled={loading}>
@@ -328,7 +270,7 @@ const TimeClockPanel: React.FC<TimeClockPanelProps> = ({ user }) => {
 
       {canManage && (
         <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tab label="Terminal" />
+          <Tab label="Présence" />
           <Tab label="Rapport heures" />
           <Tab label="Synthèse paie" />
         </Tabs>
@@ -336,6 +278,9 @@ const TimeClockPanel: React.FC<TimeClockPanelProps> = ({ user }) => {
 
       {(tab === 0 || !canManage) && (
         <Box>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Pas de boutons de pointage ici — utilisez le pavé PIN (ouvrir / fermer badge).
+          </Alert>
           {currentlyIn.length > 0 && (
             <Paper variant="outlined" sx={{ p: 2, mb: 2, bgcolor: 'success.50' }}>
               <Typography variant="subtitle2" gutterBottom>
@@ -343,12 +288,7 @@ const TimeClockPanel: React.FC<TimeClockPanelProps> = ({ user }) => {
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                 {currentlyIn.map((s) => (
-                  <Chip
-                    key={s.id}
-                    color="success"
-                    label={staffLabel(s)}
-                    onClick={() => openPunch(s)}
-                  />
+                  <Chip key={s.id} color="success" label={staffLabel(s)} />
                 ))}
               </Box>
             </Paper>
@@ -371,13 +311,9 @@ const TimeClockPanel: React.FC<TimeClockPanelProps> = ({ user }) => {
                       sx={{
                         p: 2,
                         height: '100%',
-                        cursor: 'pointer',
                         borderWidth: inService ? 2 : 1,
                         borderColor: inService ? 'success.main' : 'divider',
-                        transition: 'box-shadow 0.15s',
-                        '&:hover': { boxShadow: 3 },
                       }}
-                      onClick={() => openPunch(s)}
                     >
                       <Typography variant="subtitle1" fontWeight={700} noWrap>
                         {staffLabel(s)}
@@ -389,7 +325,7 @@ const TimeClockPanel: React.FC<TimeClockPanelProps> = ({ user }) => {
                         size="small"
                         sx={{ mt: 1.5 }}
                         color={inService ? 'success' : 'default'}
-                        label={inService ? 'En service — sortie' : 'Hors service — entrée'}
+                        label={inService ? 'En service' : 'Hors service'}
                       />
                     </Paper>
                   </Grid>
@@ -595,36 +531,6 @@ const TimeClockPanel: React.FC<TimeClockPanelProps> = ({ user }) => {
           )}
         </Paper>
       )}
-
-      <Dialog open={Boolean(punchTarget)} onClose={() => setPunchTarget(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>
-          {punchTarget
-            ? punchTarget.open_entry
-              ? `Sortie — ${staffLabel(punchTarget)}`
-              : `Entrée — ${staffLabel(punchTarget)}`
-            : 'Pointage'}
-        </DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            fullWidth
-            type="password"
-            label="Mot de passe de l'employé"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') void submitPunch();
-            }}
-            margin="dense"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPunchTarget(null)}>Annuler</Button>
-          <Button variant="contained" disabled={punchBusy || !password} onClick={() => void submitPunch()}>
-            Confirmer
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       <Dialog open={Boolean(editEntry)} onClose={() => setEditEntry(null)} maxWidth="sm" fullWidth>
         <DialogTitle>Corriger le pointage</DialogTitle>

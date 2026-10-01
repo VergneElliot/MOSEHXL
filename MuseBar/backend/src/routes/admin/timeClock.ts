@@ -8,11 +8,11 @@ import {
 import { P } from '../../permissions/registry';
 import {
   asyncHandler,
-  AuthorizationError,
   NotFoundError,
   ValidationError,
   AppError,
 } from '../../middleware/errorHandler';
+import { readOptionalPinActor } from '../../middleware/pinActor';
 import { UserModel } from '../../models/user';
 import {
   TimeClockNetworkSettingsModel,
@@ -49,6 +49,20 @@ async function assertOnVenueNetwork(
   return { ip, allowed, allowed_ips: network.allowed_ips };
 }
 
+/** Status for the active PIN badge when present, else the venue-login account. */
+function resolveTimeClockUserId(req: express.Request): number {
+  const actor = req.pinActor ?? readOptionalPinActor(req);
+  if (actor?.id != null) {
+    const pinUserId = Number(actor.id);
+    if (Number.isFinite(pinUserId) && pinUserId > 0) return pinUserId;
+  }
+  const accountId = Number(req.user?.id);
+  if (!Number.isFinite(accountId) || accountId <= 0) {
+    throw new ValidationError('Utilisateur invalide');
+  }
+  return accountId;
+}
+
 /** Self-service: any authenticated establishment member. */
 router.get(
   '/status',
@@ -56,8 +70,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const establishmentId = getEstablishmentId(req, res);
     if (!establishmentId) return;
-    const userId = Number(req.user?.id);
-    if (!Number.isFinite(userId)) throw new ValidationError('Utilisateur invalide');
+    const userId = resolveTimeClockUserId(req);
 
     const network = await assertOnVenueNetwork(establishmentId, req);
     const open = await TimeEntryModel.getOpenEntry(establishmentId, userId);
@@ -74,88 +87,24 @@ router.get(
 router.post(
   '/clock-in',
   requireAuth,
-  asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req, res);
-    if (!establishmentId) return;
-    const userId = Number(req.user?.id);
-    if (!Number.isFinite(userId)) throw new ValidationError('Utilisateur invalide');
-
-    const network = await assertOnVenueNetwork(establishmentId, req);
-    if (!network.allowed_ips.length) {
-      throw new AppError(
-        "Aucune IP autorisée n'est configurée. Un administrateur doit enregistrer l'IP du réseau de l'établissement (Paramètres → Pointage).",
-        403,
-        'TIME_CLOCK_NETWORK_NOT_CONFIGURED'
-      );
-    }
-    if (!network.allowed) {
-      throw new AuthorizationError(
-        "Pointage impossible hors du réseau de l'établissement."
-      );
-    }
-
-    const leaveCheck = await checkPunchLeaveConflict(establishmentId, userId);
-    if (leaveCheck.block) {
-      throw new AppError(leaveCheck.message ?? 'Congé approuvé', 409, 'TIME_CLOCK_ON_LEAVE');
-    }
-
-    try {
-      const entry = await TimeEntryModel.clockIn({
-        establishmentId,
-        userId,
-        ip: network.ip,
-        source: 'self',
-      });
-      return res.status(201).json({
-        entry,
-        leave_warning: leaveCheck.on_leave ? leaveCheck.message : undefined,
-      });
-    } catch (error) {
-      const code = (error as Error & { code?: string }).code;
-      if (code === 'TIME_ENTRY_ALREADY_OPEN' || code === '23505') {
-        throw new AppError(
-          'Un pointage est déjà ouvert pour cet utilisateur',
-          409,
-          'TIME_ENTRY_ALREADY_OPEN'
-        );
-      }
-      throw error;
-    }
+  asyncHandler(async (_req, res) => {
+    throw new AppError(
+      'Le pointage se fait en ouvrant un badge PIN. Utilisez le pavé PIN pour pointer l’entrée.',
+      410,
+      'TIME_CLOCK_VIA_PIN_ONLY'
+    );
   })
 );
 
 router.post(
   '/clock-out',
   requireAuth,
-  asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req, res);
-    if (!establishmentId) return;
-    const userId = Number(req.user?.id);
-    if (!Number.isFinite(userId)) throw new ValidationError('Utilisateur invalide');
-
-    const network = await assertOnVenueNetwork(establishmentId, req);
-    if (!network.allowed_ips.length) {
-      throw new AppError(
-        "Aucune IP autorisée n'est configurée. Un administrateur doit enregistrer l'IP du réseau de l'établissement (Paramètres → Pointage).",
-        403,
-        'TIME_CLOCK_NETWORK_NOT_CONFIGURED'
-      );
-    }
-    if (!network.allowed) {
-      throw new AuthorizationError(
-        "Pointage impossible hors du réseau de l'établissement."
-      );
-    }
-
-    const entry = await TimeEntryModel.clockOut({
-      establishmentId,
-      userId,
-      ip: network.ip,
-    });
-    if (!entry) {
-      throw new AppError('Aucun pointage ouvert', 409, 'TIME_ENTRY_NOT_OPEN');
-    }
-    return res.json({ entry });
+  asyncHandler(async (_req, res) => {
+    throw new AppError(
+      'Le pointage de sortie se fait en fermant le badge PIN. Libérez vos tables ouvertes avant.',
+      410,
+      'TIME_CLOCK_VIA_PIN_ONLY'
+    );
   })
 );
 
@@ -185,88 +134,12 @@ router.get(
 router.post(
   '/punch',
   requireAuth,
-  asyncHandler(async (req, res) => {
-    const establishmentId = getEstablishmentId(req, res);
-    if (!establishmentId) return;
-
-    const targetUserId = Number(req.body.user_id);
-    const password = String(req.body.password || '');
-    if (!Number.isFinite(targetUserId) || targetUserId <= 0) {
-      throw new ValidationError('user_id invalide');
-    }
-    if (!password) throw new ValidationError('Mot de passe requis');
-
-    const network = await assertOnVenueNetwork(establishmentId, req);
-    if (!network.allowed_ips.length) {
-      throw new AppError(
-        "Aucune IP autorisée n'est configurée. Un administrateur doit enregistrer l'IP du réseau de l'établissement.",
-        403,
-        'TIME_CLOCK_NETWORK_NOT_CONFIGURED'
-      );
-    }
-    if (!network.allowed) {
-      throw new AuthorizationError(
-        "Pointage impossible hors du réseau de l'établissement."
-      );
-    }
-
-    const belongs = await UserModel.userBelongsToEstablishment(
-      targetUserId,
-      establishmentId
+  asyncHandler(async (_req, _res) => {
+    throw new AppError(
+      'Le pointage partagé est désactivé. Ouvrir ou fermer un badge PIN pointe automatiquement.',
+      410,
+      'TIME_CLOCK_VIA_PIN_ONLY'
     );
-    if (!belongs) throw new NotFoundError('Employé');
-
-    const targetUser = await UserModel.findById(targetUserId);
-    if (!targetUser || !targetUser.is_active) {
-      throw new NotFoundError('Employé');
-    }
-    const valid = await UserModel.verifyPassword(targetUser, password);
-    if (!valid) {
-      throw new AuthorizationError('Mot de passe incorrect');
-    }
-
-    const leaveCheck = await checkPunchLeaveConflict(establishmentId, targetUserId);
-    if (leaveCheck.block) {
-      throw new AppError(leaveCheck.message ?? 'Congé approuvé', 409, 'TIME_CLOCK_ON_LEAVE');
-    }
-
-    const open = await TimeEntryModel.getOpenEntry(establishmentId, targetUserId);
-    if (open) {
-      const entry = await TimeEntryModel.clockOut({
-        establishmentId,
-        userId: targetUserId,
-        ip: network.ip,
-      });
-      return res.json({
-        action: 'clock_out',
-        entry,
-        leave_warning: leaveCheck.on_leave ? leaveCheck.message : undefined,
-      });
-    }
-
-    try {
-      const entry = await TimeEntryModel.clockIn({
-        establishmentId,
-        userId: targetUserId,
-        ip: network.ip,
-        source: 'shared_terminal',
-      });
-      return res.status(201).json({
-        action: 'clock_in',
-        entry,
-        leave_warning: leaveCheck.on_leave ? leaveCheck.message : undefined,
-      });
-    } catch (error) {
-      const code = (error as Error & { code?: string }).code;
-      if (code === 'TIME_ENTRY_ALREADY_OPEN' || code === '23505') {
-        throw new AppError(
-          'Un pointage est déjà ouvert pour cet utilisateur',
-          409,
-          'TIME_ENTRY_ALREADY_OPEN'
-        );
-      }
-      throw error;
-    }
   })
 );
 

@@ -2,11 +2,12 @@
 
 ## Model
 
-- One `users` row is the login identity (email UNIQUE case-insensitive, password, MFA).
+- One `users` row with `can_login = true` is the **venue login** (email UNIQUE, password).
+  Staff are separate PIN-only actors (`can_login = false`, one establishment).
 - Access to venues is via `user_establishment_memberships` (`role` = `establishment_admin` | `staff`).
-- Permissions are venue-scoped: `user_permissions (user_id, permission_id, establishment_id)`.
-- JWT shape is unchanged: `{ id, email, role, establishment_id }` for the **active** membership.
-- `users.establishment_id` / `users.role` are a last-active cache updated on login and `POST /api/auth/switch-establishment`.
+- **Feature permissions come only from an active PIN session**, not from the account JWT.
+- JWT shape: `{ id, email, role, establishment_id }` for the **active** membership (shell only).
+- `users.establishment_id` / `users.role` are a last-active cache updated on login and switch.
 
 ## Migration notes (`2026_07_30_16_00_00_user_establishment_memberships.sql`)
 
@@ -17,6 +18,9 @@
    - Remaps / drops `auth_refresh_tokens` and planning ICS tokens for loser rows (skipped when those tables are absent).
    - Deletes loser `users` rows (audit trail may keep historical user ids as text — no FK rewrite).
 4. Enforces `UNIQUE (LOWER(email))`.
+
+Later: `users.can_login` + backfill marks PIN staff (`2026_09_30_*_users_can_login` /
+`pin_staff_can_login_backfill`).
 
 ### Edge cases after merge
 
@@ -30,9 +34,12 @@
 ## API
 
 - Login and `GET /auth/me` return `memberships: [{ establishment_id, name, role }]`.
-- `POST /auth/switch-establishment` `{ establishment_id }` verifies membership, updates cache, re-issues access token + `/me`-shaped user.
-- `POST /auth/users`: if email already exists, **links a membership** (no second user row). New emails still require a password.
+- `POST /auth/switch-establishment` `{ establishment_id, owner_pin }` verifies the login
+  account’s PIN on the **target** venue, then re-issues the access token.
+- Staff create: `POST /auth/pin-staff` (name + PIN). No email invite for PIN staff.
 
 ## Frontend
 
-Header name opens a venue menu when `memberships.length > 1` (hidden for `system_admin`). Switch refreshes token and reloads catalog / happy-hour data.
+Header name opens a venue menu when `memberships.length > 1` (hidden for `system_admin`).
+Switch prompts for owner PIN, then refreshes token and reloads catalog / happy-hour data.
+PIN-first shell: no feature tabs until a badge is open.
