@@ -19,7 +19,8 @@ Fiscal sequence counters are never reset across versions.
 ## [Unreleased]
 
 **Fiscal impact:** MINOR (venue login + PIN-only actors; dual actor trace unchanged;
-per-PIN visual prefs / POS card UX are UI-only; PWA install is packaging/UI only).
+per-PIN visual prefs / POS card UX are UI-only; PWA install is packaging/UI only;
+specific-permission step-up UX is authorization-only).
 
 ### Added
 
@@ -27,6 +28,16 @@ per-PIN visual prefs / POS card UX are UI-only; PWA install is packaging/UI only
   d’en-tête « Installer » (Chrome/Edge) ou aide « Sur l’écran d’accueil » (Safari iOS).
   Service worker minimal (précharge UI) ; `/api` en NetworkOnly ; toast
   « Une mise à jour est prête » → Recharger. Pas de mode hors-ligne POS.
+- Droits **spécifiques** : le pavé PIN est toujours demandé (même si le badge
+  actif détient déjà le droit) ; les actions de base (caisse) restent sans
+  re-saisie tant qu’un badge est focalisé.
+- Badge PIN : une seule session serveur ouverte par utilisateur et établissement
+  (re-saisie sur un autre appareil réutilise le même `sid`, sans double
+  pointage entrée).
+- Badges PIN partagés entre appareils : liste d’onglets depuis l’API ; focus d’un
+  badge distant = saisie du PIN de ce profil ; paniers / focus restent locaux
+  (clé `sid`). Actualisation visible / focus / manuel ; badge fermé ailleurs
+  disparaît après synchronisation.
 
 ### Changed
 
@@ -51,6 +62,11 @@ per-PIN visual prefs / POS card UX are UI-only; PWA install is packaging/UI only
   (plus de remplissage auto depuis le formulaire public).
 
 ### Fixed
+
+- Badges PIN : une seule pastille par profil (déduplication serveur + onglets) ;
+  fermeture depuis n’importe quel appareil après saisie du PIN du profil
+  (évite de clôturer le pointage d’autrui). Première ouverture et fermeture de
+  badge = pointage **uniquement sur le Wi‑Fi** configuré ; caisse utilisable hors réseau.
 
 - Copies venue « Nouvelle demande… » : l’email de contact Paramètres (`business_settings`)
   est maintenant utilisé et synchronisé — plus le legacy `establishments.email`

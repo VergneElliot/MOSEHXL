@@ -1,5 +1,5 @@
 import express from 'express';
-import { getEstablishmentId, requireAuth, requirePermission } from './auth';
+import { getEstablishmentId, requireAuth } from './auth';
 import { P } from '../permissions/registry';
 import { asyncHandler, NotFoundError, ValidationError } from '../middleware/errorHandler';
 import { readOptionalPinActor } from '../middleware/pinActor';
@@ -14,23 +14,26 @@ const UUID_RE = /^[0-9a-fA-F-]{36}$/;
 
 router.use(requireAuth);
 
-/** Active badges on this establishment. Seeing who is logged in is a management view. */
+/** Active badges on this establishment (header tabs + admin panel). One row per PIN user. */
 router.get(
   '/',
-  requirePermission(P.access_user_management),
   asyncHandler(async (req, res) => {
     const establishmentId = getEstablishmentId(req, res);
     if (!establishmentId) return;
     // Settle expired badge rows so the list and close_reason stay honest.
     await StaffPinSessionModel.closeStale(establishmentId);
+    await StaffPinSessionModel.closeDuplicateOpens(establishmentId);
     const sessions = await StaffPinSessionModel.listActive(establishmentId);
+    sessions.sort(
+      (a, b) => new Date(b.last_seen_at).getTime() - new Date(a.last_seen_at).getTime()
+    );
     res.json({ success: true, data: sessions });
   })
 );
 
 /**
- * Close a badge. Closing your own current badge is always allowed (that is what leaving a tab
- * does); closing someone else's is a management action.
+ * Close a badge. The badge owner's PIN (any device) or the venue account that opened it
+ * may close; otherwise user-management is required.
  */
 router.post(
   '/:sessionId/close',
@@ -46,7 +49,11 @@ router.post(
     if (!session) throw new NotFoundError('Session not found or already closed');
 
     const actor = readOptionalPinActor(req);
-    const isOwnSession = actor?.sid === sessionId || session.opened_by_user_id === req.user!.id;
+    const isOwnPinUser = actor?.id != null && Number(actor.id) === session.user_id;
+    const isOwnSession =
+      actor?.sid === sessionId ||
+      isOwnPinUser ||
+      session.opened_by_user_id === req.user!.id;
     if (!isOwnSession) {
       const permissions = await UserModel.getUserPermissions(req.user!.id, establishmentId);
       if (!permissions.includes(P.access_user_management)) {
@@ -57,7 +64,7 @@ router.post(
       }
     }
 
-    const reason = isOwnSession ? 'closed_by_user' : 'closed_by_manager';
+    const reason = isOwnPinUser || actor?.sid === sessionId ? 'closed_by_user' : 'closed_by_manager';
     await closePinSession(sessionId, establishmentId, reason, {
       pinUserId: session.user_id,
       ipAddress: req.ip ?? null,

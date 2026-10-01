@@ -4,8 +4,8 @@ import * as floorApi from '../services/api/floor';
 import {
   usePinSessions,
   type ActiveTableState,
-  type PinActorState,
 } from '../contexts/PinSessionsContext';
+import { pinActorFromVerify } from '../contexts/pinActorFromVerify';
 import { useTableInterventionGate } from './useTableInterventionGate';
 import { abandonFloorTicket } from './floorTicketAbandon';
 import { tableHasActiveOrder } from '../components/floor/tableOccupancy';
@@ -97,14 +97,7 @@ export function useFloorPlanManagement(options: {
   const badgeIn = useCallback(
     async (pin: string) => {
       const result = await floorApi.verifyPin(pin);
-      const actor: PinActorState = {
-        token: result.pin_actor_token,
-        userId: result.user_id,
-        displayName: result.display_name,
-        email: result.email,
-        role: result.role,
-        permissions: result.permissions,
-      };
+      const actor = pinActorFromVerify(result);
       addOrFocusSession(actor);
       setPinDialogOpen(false);
       onInfo(`Session : ${actor.displayName}`);
