@@ -1,5 +1,5 @@
 /**
- * Profile security: change password / PIN buttons and dialogs.
+ * Profile security: change password (venue login only) / PIN (active badge).
  */
 
 import React, { useMemo, useState } from 'react';
@@ -16,7 +16,7 @@ import {
 } from '@mui/material';
 import { Lock as LockIcon, Pin as PinIcon } from '@mui/icons-material';
 import { ApiService } from '../../../services/apiService';
-import { setPin as apiSetPin } from '../../../services/api/floor';
+import { setPin as apiSetPin } from '../../../services/api/pin';
 import PinPadDialog from '../../POS/PinPadDialog';
 import { useAuth } from '../../../hooks/useAuth';
 import { resolvePinLengthRules } from '../../../utils/pinRules';
@@ -26,10 +26,19 @@ const api = ApiService.getInstance();
 
 export interface ProfileSecurityDialogsProps {
   onMessage: (message: string) => void;
+  /** Venue-login profiles only — PIN-only staff have no password. */
+  canLogin?: boolean;
+  pinActorUserId?: number | null;
+  pinActorRole?: string;
+  pinActorPermissions?: string[];
 }
 
 export const ProfileSecurityDialogs: React.FC<ProfileSecurityDialogsProps> = ({
   onMessage,
+  canLogin = true,
+  pinActorUserId = null,
+  pinActorRole,
+  pinActorPermissions,
 }) => {
   const { user, permissions, logout } = useAuth();
 
@@ -47,11 +56,18 @@ export const ProfileSecurityDialogs: React.FC<ProfileSecurityDialogsProps> = ({
   const pinRules = useMemo(
     () =>
       resolvePinLengthRules({
-        role: user?.role || 'staff',
-        permissions: permissions || [],
+        role: pinActorRole || user?.role || 'staff',
+        permissions: pinActorPermissions || permissions || [],
       }),
-    [user?.role, permissions]
+    [pinActorRole, pinActorPermissions, user?.role, permissions]
   );
+
+  /** Password only when this profile is a venue-login account matching the JWT. */
+  const showPassword =
+    canLogin &&
+    pinActorUserId != null &&
+    user?.id != null &&
+    Number(pinActorUserId) === Number(user.id);
 
   const submitPassword = async () => {
     setPasswordError(null);
@@ -84,7 +100,7 @@ export const ProfileSecurityDialogs: React.FC<ProfileSecurityDialogsProps> = ({
   };
 
   const handleSetPin = async (pin: string) => {
-    await apiSetPin(pin);
+    await apiSetPin(pin, pinActorUserId ?? undefined);
     setPinOpen(false);
     onMessage('PIN enregistré');
   };
@@ -92,25 +108,29 @@ export const ProfileSecurityDialogs: React.FC<ProfileSecurityDialogsProps> = ({
   return (
     <>
       <Typography variant="subtitle1" gutterBottom>
-        Sécurité du compte
+        Sécurité
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Changer le mot de passe de connexion ou le PIN d’identification en salle.
+        {showPassword
+          ? 'Mot de passe de connexion (compte établissement) et PIN du badge actif.'
+          : 'PIN du badge actuellement sélectionné (pas de mot de passe sur un profil PIN-only).'}
       </Typography>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
-        <Button
-          variant="outlined"
-          startIcon={<LockIcon />}
-          onClick={() => {
-            setPasswordError(null);
-            setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-            setPasswordOpen(true);
-          }}
-        >
-          Changer le mot de passe
-        </Button>
+        {showPassword && (
+          <Button
+            variant="outlined"
+            startIcon={<LockIcon />}
+            onClick={() => {
+              setPasswordError(null);
+              setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+              setPasswordOpen(true);
+            }}
+          >
+            Changer le mot de passe
+          </Button>
+        )}
         <Button variant="outlined" startIcon={<PinIcon />} onClick={() => setPinOpen(true)}>
-          Changer mon PIN
+          Changer le PIN du badge
         </Button>
       </Box>
 
@@ -193,8 +213,8 @@ export const ProfileSecurityDialogs: React.FC<ProfileSecurityDialogsProps> = ({
         stepUp={{
           title:
             pinRules.kind === 'basic'
-              ? 'Changer mon PIN (2 chiffres)'
-              : `Changer mon PIN (${pinRules.min_length}–${pinRules.max_length} chiffres)`,
+              ? 'Changer le PIN (2 chiffres)'
+              : `Changer le PIN (${pinRules.min_length}–${pinRules.max_length} chiffres)`,
           description:
             pinRules.kind === 'basic'
               ? 'Choisissez un PIN à 2 chiffres, unique dans l’établissement.'

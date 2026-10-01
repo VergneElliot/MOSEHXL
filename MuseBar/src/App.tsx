@@ -12,6 +12,7 @@ import type { User } from './types';
 import { AppHeader } from './components/common/AppHeader';
 import { PinSessionsProvider } from './contexts/PinSessionsContext';
 import { StepUpAuthProvider } from './contexts/StepUpAuthContext';
+import { VisualPrefsProvider } from './contexts/VisualPrefsContext';
 import { useTranslation } from 'react-i18next';
 
 const SystemAdminRouter = React.lazy(() => import('./components/common/SystemAdminRouter'));
@@ -78,14 +79,13 @@ function App() {
     updateHappyHourStatus,
   } = useHappyHour(!isSystemAdmin && isAuthenticated);
 
-  // Only load POS data for business users, NOT for system admins
+  // Catalog requires PIN — do not auto-fetch on JWT alone (avoids 403 storm + rate limits).
   const {
     categories,
     products,
-    isLoading,
     error,
     updateData,
-  } = useDataManagement(!isSystemAdmin && isAuthenticated);
+  } = useDataManagement(false);
 
   const establishmentBrandName = useEstablishmentBrandName(
     !isSystemAdmin && isAuthenticated,
@@ -122,8 +122,8 @@ function App() {
     logout();
   };
 
-  const handleSwitchEstablishment = async (establishmentId: string) => {
-    await switchEstablishment(establishmentId);
+  const handleSwitchEstablishment = async (establishmentId: string, ownerPin: string) => {
+    await switchEstablishment(establishmentId, ownerPin);
     // Soft re-login for the venue: reload catalog / happy-hour tenant data.
     await updateData();
     updateHappyHourStatus();
@@ -137,23 +137,9 @@ function App() {
     );
   }
 
-  // Show loading state while data is being fetched (only for business users)
-  if (!isSystemAdmin && isAuthenticated && isLoading) {
-    return (
-      <Container maxWidth="xl" sx={{ mt: 2 }}>
-        <div>{t('loading')}</div>
-      </Container>
-    );
-  }
-
-  // Show error state if data loading failed (only for business users)
-  if (!isSystemAdmin && isAuthenticated && error) {
-    return (
-      <Container maxWidth="xl" sx={{ mt: 2 }}>
-        <div>{t('errorPrefix')} {error}</div>
-      </Container>
-    );
-  }
+  // Never unmount the business shell for catalog loading/errors — that tears down
+  // PinSessionsProvider, clears the PIN actor header, and storms 403/429 retries.
+  // Catalog is loaded after PIN open (AppRouter); surface non-PIN errors inline.
 
   return (
     <Routes>
@@ -208,6 +194,7 @@ function App() {
             // Business Interface - viewport-height chain so tab content can use flex/scroll
             <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
               <PinSessionsProvider>
+                <VisualPrefsProvider>
                 <StepUpAuthProvider>
                 <AppHeader
                   isHappyHourActive={isHappyHourActive}
@@ -219,6 +206,13 @@ function App() {
                   onHappyHourStatusUpdate={updateHappyHourStatus}
                   establishmentBrandName={establishmentBrandName}
                 />
+                {error && (
+                  <Box sx={{ px: 2, pt: 1 }}>
+                    <div>
+                      {t('errorPrefix')} {error}
+                    </div>
+                  </Box>
+                )}
                 <Box
                   sx={{
                     flex: 1,
@@ -242,6 +236,7 @@ function App() {
                   />
                 </Box>
                 </StepUpAuthProvider>
+                </VisualPrefsProvider>
               </PinSessionsProvider>
             </Box>
           )}

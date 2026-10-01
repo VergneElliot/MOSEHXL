@@ -58,7 +58,10 @@ router.post(
     }
 
     const reason = isOwnSession ? 'closed_by_user' : 'closed_by_manager';
-    await closePinSession(sessionId, establishmentId, reason);
+    await closePinSession(sessionId, establishmentId, reason, {
+      pinUserId: session.user_id,
+      ipAddress: req.ip ?? null,
+    });
     await logActorAction(req, {
       action_type: 'pin_session_closed',
       resource_type: 'pin_session',

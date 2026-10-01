@@ -6,22 +6,17 @@ import express from 'express';
 import { pool } from '../../db/pool';
 import { runWithTenantContext } from '../../rls/tenantContext';
 import { ReservationModel } from '../../models/reservation';
-import {
-  OpeningHoursSettingsModel,
-  isBookableSlot,
-} from '../../models/openingHoursSettings';
-import { ReservationClosedDatesModel, toDateKey } from '../../models/reservationClosedDates';
+import { OpeningHoursSettingsModel } from '../../models/openingHoursSettings';
+import { ReservationClosedDatesModel } from '../../models/reservationClosedDates';
 import { InboxModel } from '../../models/inbox';
-import { GuestNoShowFlagModel } from '../../models/guestNoShowFlag';
 import { isValidEstablishmentSlug } from '../../utils/establishmentSlug';
 import { asyncHandler, NotFoundError, ValidationError } from '../../middleware/errorHandler';
 import { createAuthRateLimitMiddleware } from '../../middleware/security/AuthEndpointRateLimit';
 import {
-  notifyReservationRequested,
   notifyReservationReminder,
   notifyReservationCancelled,
 } from '../../services/reservations/reservationEmailService';
-import { seedReservationInboxMessage } from '../../services/reservations/seedReservationInboxMessage';
+import { createPublicReservationBooking } from '../../services/reservations/createPublicReservationBooking';
 import {
   parseReservationRemindToken,
   parseReservationActionToken,
@@ -30,11 +25,9 @@ import {
 } from '../../services/reservations/reservationRemindToken';
 import { resolveVenueContactEmail } from '../../services/establishment/venueContactEmail';
 import { Logger } from '../../utils/logger';
-import { formatDateOnly, formatDateTime } from '@mosehxl/types';
+import { formatDateTime } from '@mosehxl/types';
 
 const router = express.Router();
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** In-memory cooldown for guest relance (reservationId → last remind ms). */
 const lastRemindAt = new Map<number, number>();
@@ -288,110 +281,29 @@ router.post(
     const slug = String(req.params.slug || '').toLowerCase();
     const est = await resolveEstablishment(slug);
 
-    // Honeypot: bots fill hidden "website" field
     if (typeof req.body?.website === 'string' && req.body.website.trim() !== '') {
       return res.status(201).json({ ok: true });
     }
 
-    const customerName = String(req.body?.customer_name || '').trim();
-    const customerEmail = String(req.body?.customer_email || '').trim().toLowerCase();
-    const customerPhone = String(req.body?.customer_phone || '').trim();
-    const partySize = Number(req.body?.party_size ?? 2);
-    const startsAtRaw = String(req.body?.starts_at || '').trim();
-    const notes =
+    const guestMessage =
       req.body?.notes != null && String(req.body.notes).trim()
         ? String(req.body.notes).trim().slice(0, 2000)
         : null;
 
-    if (!customerName || customerName.length < 2) {
-      throw new ValidationError('Nom requis');
-    }
-    if (!EMAIL_RE.test(customerEmail)) {
-      throw new ValidationError('Email invalide');
-    }
-    if (!customerPhone || customerPhone.length < 6) {
-      throw new ValidationError('Téléphone requis');
-    }
-    if (!Number.isFinite(partySize) || partySize < 1 || partySize > 200) {
-      throw new ValidationError('Nombre de personnes invalide');
-    }
-    if (!startsAtRaw) throw new ValidationError('Date/heure requise');
-
-    const startsAt = new Date(startsAtRaw);
-    if (Number.isNaN(startsAt.getTime())) {
-      throw new ValidationError('Date/heure invalide');
-    }
-
-    const now = new Date();
-    if (startsAt.getTime() < now.getTime() - 5 * 60 * 1000) {
-      throw new ValidationError('La date doit être dans le futur');
-    }
-
-    const hours = await runWithTenantContext({ establishmentId: est.id }, () =>
-      OpeningHoursSettingsModel.get(est.id)
-    );
-    const closedDates = await runWithTenantContext({ establishmentId: est.id }, () =>
-      ReservationClosedDatesModel.get(est.id)
-    );
-    const timezone = hours.timezone || est.timezone || 'Europe/Paris';
-    const slot = isBookableSlot(startsAt, hours, timezone, closedDates.dates);
-    if (!slot.ok) {
-      throw new ValidationError(slot.reason || 'Créneau non disponible');
-    }
-
-    // Extra guard using the same date key as admin closures
-    const dateKey = toDateKey(startsAt, timezone);
-    if (closedDates.dates.includes(dateKey)) {
-      throw new ValidationError('Les réservations sont fermées pour cette date');
-    }
-
-    const reliability = await GuestNoShowFlagModel.lookup(customerEmail, customerPhone);
-
-    const startsIso = startsAt.toISOString();
-
-    const { reservation, inboxMessageId } = await runWithTenantContext(
-      { establishmentId: est.id },
-      async () => {
-        const inbox = await seedReservationInboxMessage({
-          establishmentId: est.id,
-          establishmentSlug: est.slug,
-          customerName,
-          customerEmail,
-          customerPhone,
-          partySize,
-          startsAtIso: startsIso,
-          notes,
-          source: 'public',
-          reliabilityLine: reliability.flagged
-            ? `⚠ ALERTE NO-SHOW : ce contact a déjà été signalé (${reliability.flag_count}×, dernier : ${reliability.last_flagged_at ? formatDateOnly(reliability.last_flagged_at) : '—'})`
-            : null,
-        });
-
-        const reservation = await ReservationModel.create({
-          establishment_id: est.id,
-          customer_name: customerName,
-          customer_email: customerEmail,
-          customer_phone: customerPhone,
-          party_size: partySize,
-          starts_at: startsIso,
-          status: 'requested',
-          notes,
-          source: 'public',
-          inbox_message_id: inbox.id,
-        });
-
-        await InboxModel.linkReservation(est.id, inbox.id, reservation.id);
-
-        return { reservation, inboxMessageId: inbox.id };
-      }
-    );
-
-    void notifyReservationRequested({
-      reservation,
-      establishmentName: est.name,
-      establishmentSlug: est.slug,
-      venueEmail: est.email,
-      timezone,
+    const { reservation, inboxMessageId } = await createPublicReservationBooking({
+      establishment: {
+        id: est.id,
+        name: est.name,
+        slug: est.slug,
+        email: est.email,
+        timezone: est.timezone,
+      },
+      customerName: String(req.body?.customer_name || '').trim(),
+      customerEmail: String(req.body?.customer_email || '').trim().toLowerCase(),
+      customerPhone: String(req.body?.customer_phone || '').trim(),
+      partySize: Number(req.body?.party_size ?? 2),
+      startsAtRaw: String(req.body?.starts_at || '').trim(),
+      guestMessage,
     });
 
     return res.status(201).json({

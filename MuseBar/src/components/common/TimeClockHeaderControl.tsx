@@ -1,23 +1,12 @@
+/**
+ * Header status for pointage — open/close is via PIN badge only.
+ * Follows the **active** PIN session (not the venue-login JWT alone).
+ */
+
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  Alert,
-  Box,
-  Button,
-  Chip,
-  CircularProgress,
-  Tooltip,
-} from '@mui/material';
-import {
-  Login as ClockInIcon,
-  Logout as ClockOutIcon,
-  WifiOff as OfflineIcon,
-} from '@mui/icons-material';
-import {
-  clockIn,
-  clockOut,
-  getTimeClockStatus,
-  TimeClockStatusDto,
-} from '../../services/api/adminSpace';
+import { Box, Chip, CircularProgress, Tooltip } from '@mui/material';
+import { getTimeClockStatus, TimeClockStatusDto } from '../../services/api/adminSpace';
+import { usePinSessions } from '../../contexts/PinSessionsContext';
 
 function formatElapsed(isoStart: string, now: number): string {
   const ms = Math.max(0, now - new Date(isoStart).getTime());
@@ -27,30 +16,31 @@ function formatElapsed(isoStart: string, now: number): string {
   return `${h}h${String(m).padStart(2, '0')}`;
 }
 
-/**
- * Personal clock-in / clock-out control for the app header.
- * Disabled when the client is not on the venue's registered public IP.
- */
 export const TimeClockHeaderControl: React.FC = () => {
+  const { activeSession } = usePinSessions();
+  const actorUserId = activeSession?.actor.userId ?? null;
   const [status, setStatus] = useState<TimeClockStatusDto | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
 
   const refresh = useCallback(async () => {
+    if (actorUserId == null) {
+      setStatus(null);
+      setLoading(false);
+      return;
+    }
     try {
       const data = await getTimeClockStatus();
       setStatus(data);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur pointage');
+    } catch {
+      /* status is best-effort in header */
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [actorUserId]);
 
   useEffect(() => {
+    setLoading(true);
     void refresh();
     const id = window.setInterval(() => void refresh(), 60_000);
     return () => window.clearInterval(id);
@@ -62,86 +52,42 @@ export const TimeClockHeaderControl: React.FC = () => {
     return () => window.clearInterval(id);
   }, [status?.open_entry]);
 
-  const onToggle = async () => {
-    if (!status?.on_venue_network) return;
-    setBusy(true);
-    setError(null);
-    try {
-      if (status.open_entry) {
-        await clockOut();
-      } else {
-        await clockIn();
-      }
-      await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Échec du pointage');
-    } finally {
-      setBusy(false);
-    }
-  };
+  if (actorUserId == null) {
+    return (
+      <Tooltip title="Ouvrir un badge PIN pour pointer l’entrée">
+        <Chip
+          size="small"
+          label="Hors service"
+          sx={{ bgcolor: 'rgba(255,255,255,0.12)', color: 'white', height: 24 }}
+        />
+      </Tooltip>
+    );
+  }
 
   if (loading && !status) {
     return <CircularProgress size={18} sx={{ color: 'white' }} />;
   }
-  if (!status) return null;
-
-  const offline = !status.on_venue_network;
-  const clockedIn = Boolean(status.open_entry);
-  const tip = offline
-    ? status.allowed_ips_configured
-      ? "Hors réseau de l'établissement — pointage indisponible"
-      : "Réseau de l'établissement non configuré (IP publique)"
-    : clockedIn
-      ? 'Cliquer pour pointer la sortie'
-      : "Cliquer pour pointer l'entrée";
+  if (!status?.open_entry) {
+    return (
+      <Tooltip title="Ouvrir un badge PIN pour pointer l’entrée">
+        <Chip
+          size="small"
+          label="Hors service"
+          sx={{ bgcolor: 'rgba(255,255,255,0.12)', color: 'white', height: 24 }}
+        />
+      </Tooltip>
+    );
+  }
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-      {error && (
-        <Alert
-          severity="error"
-          onClose={() => setError(null)}
-          sx={{ py: 0, px: 1, maxWidth: 220, '& .MuiAlert-message': { fontSize: 12 } }}
-        >
-          {error}
-        </Alert>
-      )}
-      {clockedIn && status.open_entry && (
+      <Tooltip title="Fermer le badge PIN pour pointer la sortie (libérer les tables d’abord)">
         <Chip
           size="small"
           color="success"
           label={`En service ${formatElapsed(status.open_entry.clock_in_at, now)}`}
-          sx={{ fontWeight: 600 }}
+          sx={{ height: 24 }}
         />
-      )}
-      {offline && (
-        <Chip
-          size="small"
-          icon={<OfflineIcon />}
-          label="Hors réseau"
-          color="default"
-          variant="outlined"
-          sx={{ color: 'rgba(255,255,255,0.85)', borderColor: 'rgba(255,255,255,0.4)' }}
-        />
-      )}
-      <Tooltip title={tip}>
-        <span>
-          <Button
-            color="inherit"
-            size="small"
-            variant={clockedIn ? 'outlined' : 'contained'}
-            disabled={busy || offline}
-            onClick={() => void onToggle()}
-            startIcon={clockedIn ? <ClockOutIcon /> : <ClockInIcon />}
-            sx={{
-              textTransform: 'none',
-              bgcolor: clockedIn ? 'transparent' : 'success.main',
-              '&:hover': { bgcolor: clockedIn ? 'rgba(255,255,255,0.08)' : 'success.dark' },
-            }}
-          >
-            {clockedIn ? 'Sortie' : 'Entrée'}
-          </Button>
-        </span>
       </Tooltip>
     </Box>
   );

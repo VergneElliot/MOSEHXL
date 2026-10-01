@@ -3,7 +3,6 @@ import type { OrderItem } from '../../types';
 import { usePOSOrderTotals } from '../../hooks/usePOSOrderTotals';
 import { formatCurrency } from '../../utils/formatCurrency';
 import OrderSummary from './OrderSummary';
-import type { PosProductDragPayload } from './posProductDnD';
 
 export interface POSOrderPanelProps {
   currentOrder: OrderItem[];
@@ -17,7 +16,6 @@ export interface POSOrderPanelProps {
   onApplyPerso?: (index: number) => void;
   onApplyRemise?: (indices: number[]) => void;
   onUpdateLineNote?: (index: number, note: string) => void;
-  onDropProduct?: (payload: PosProductDragPayload) => void;
   onSelectTable?: () => void;
   activeTableLabel?: string | null;
   onSuivre?: () => void;
@@ -40,7 +38,6 @@ const POSOrderPanel = React.memo(function POSOrderPanel({
   onApplyPerso,
   onApplyRemise,
   onUpdateLineNote,
-  onDropProduct,
   onSelectTable,
   activeTableLabel,
   onSuivre,
@@ -71,7 +68,6 @@ const POSOrderPanel = React.memo(function POSOrderPanel({
       onApplyPerso={onApplyPerso}
       onApplyRemise={onApplyRemise}
       onUpdateLineNote={onUpdateLineNote}
-      onDropProduct={onDropProduct}
       onSelectTable={onSelectTable}
       activeTableLabel={activeTableLabel}
       onSuivre={onSuivre}

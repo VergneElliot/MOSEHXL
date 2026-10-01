@@ -24,6 +24,7 @@ import {
   type PinSessionsState,
 } from './pinSessionsState';
 import { closePinSession } from '../services/api/pin';
+import { registerSessionTokenProvider } from '../services/pinElevation';
 
 export type {
   PinActorState,
@@ -89,10 +90,18 @@ export function PinSessionsProvider({ children }: { children: ReactNode }) {
    * drop a concurrently opened session.
    */
   const stateRef = useRef(state);
+  stateRef.current = state;
+
+  // Render-time registration so child effects (catalog fetch) already see the PIN token.
+  registerSessionTokenProvider(
+    () =>
+      stateRef.current.sessions.find((s) => s.id === stateRef.current.activeSessionId)?.actor
+        .token ?? null
+  );
 
   useEffect(() => {
-    stateRef.current = state;
     writeStored(state);
+    return () => registerSessionTokenProvider(null);
   }, [state]);
 
   const hasExpiringSession = state.sessions.some(

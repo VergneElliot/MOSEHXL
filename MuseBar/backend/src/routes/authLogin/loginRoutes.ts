@@ -75,6 +75,17 @@ loginRoutes.post('/login', loginRateLimit, asyncHandler(async (req, res) => {
       throw new AuthorizationError('Account is inactive');
     }
 
+    if (user.can_login === false) {
+      await logAuditOrThrow({
+        user_id: String(user.id),
+        action_type: 'LOGIN_FAILED',
+        action_details: { reason: 'PIN-only staff cannot login', email },
+        ip_address: ip,
+        user_agent: userAgent,
+      }, 'LOGIN_FAILED_CANNOT_LOGIN');
+      throw new AuthenticationError('Invalid credentials');
+    }
+
     const now = new Date();
     if (user.locked_until && new Date(user.locked_until).getTime() > now.getTime()) {
       await logAuditOrThrow({

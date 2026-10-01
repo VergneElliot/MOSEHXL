@@ -56,6 +56,7 @@ export class ReservationRequestedGuestTemplate {
          <p><strong>Nombre de personnes :</strong> {{partySize}}</p>
        </div>
        <p>L’établissement vous répondra bientôt par e-mail. Vous pouvez aussi répondre à ce message pour toute précision.</p>
+       ${commentBlockHtml}
        <div class="hint">
          <p>Si vous ne recevez pas de réponse de la part de l’établissement, n’hésitez pas à les relancer.</p>
          <p style="text-align:center;">
@@ -63,11 +64,11 @@ export class ReservationRequestedGuestTemplate {
          </p>
          <p style="font-size:12px;color:#666;">Ou ouvrez ce lien : {{relanceUrl}}</p>
        </div>`,
-      `Bonjour {{customerName}},\n\nDemande reçue chez {{establishmentName}}.\nDate : {{startsAtFormatted}}\nPersonnes : {{partySize}}\n\nSi vous ne recevez pas de réponse, relancez l’établissement : {{relanceUrl}}`,
+      `Bonjour {{customerName}},\n\nDemande reçue chez {{establishmentName}}.\nDate : {{startsAtFormatted}}\nPersonnes : {{partySize}}\nCommentaire : {{commentaire}}\n\nSi vous ne recevez pas de réponse, relancez l’établissement : {{relanceUrl}}`,
       BuiltInTemplateId.RESERVATION_REQUESTED_GUEST,
       'Reservation Requested Guest',
       'Demande de réservation reçue — {{establishmentName}}',
-      ['customerName', 'establishmentName', 'startsAtFormatted', 'partySize', 'relanceUrl']
+      ['customerName', 'establishmentName', 'startsAtFormatted', 'partySize', 'relanceUrl', 'commentaire']
     );
   }
 }
@@ -83,10 +84,10 @@ export class ReservationRequestedVenueTemplate {
          <p><strong>Téléphone :</strong> {{customerPhone}}</p>
          <p><strong>Date :</strong> {{startsAtFormatted}}</p>
          <p><strong>Personnes :</strong> {{partySize}}</p>
-         <p><strong>Notes :</strong> {{notes}}</p>
+         <p><strong>Message client :</strong> {{guestMessage}}</p>
        </div>
        <p>Traitez la demande dans Administration → Réservations ou Boîte mail.</p>`,
-      `Nouvelle demande — {{establishmentName}}\nClient: {{customerName}}\nEmail: {{customerEmail}}\nTél: {{customerPhone}}\nDate: {{startsAtFormatted}}\nPersonnes: {{partySize}}\nNotes: {{notes}}`,
+      `Nouvelle demande — {{establishmentName}}\nClient: {{customerName}}\nEmail: {{customerEmail}}\nTél: {{customerPhone}}\nDate: {{startsAtFormatted}}\nPersonnes: {{partySize}}\nMessage client: {{guestMessage}}`,
       BuiltInTemplateId.RESERVATION_REQUESTED_VENUE,
       'Reservation Requested Venue',
       'Nouvelle demande de réservation — {{customerName}} — {{startsAtFormatted}}',
@@ -97,7 +98,7 @@ export class ReservationRequestedVenueTemplate {
         'customerPhone',
         'startsAtFormatted',
         'partySize',
-        'notes',
+        'guestMessage',
       ]
     );
   }
@@ -114,10 +115,10 @@ export class ReservationReminderVenueTemplate {
          <p><strong>Téléphone :</strong> {{customerPhone}}</p>
          <p><strong>Date :</strong> {{startsAtFormatted}}</p>
          <p><strong>Personnes :</strong> {{partySize}}</p>
-         <p><strong>Notes :</strong> {{notes}}</p>
+         <p><strong>Message client :</strong> {{guestMessage}}</p>
        </div>
        <p>Merci de traiter la demande (valider, mettre en attente ou refuser) dans Administration.</p>`,
-      `RELANCE — {{establishmentName}}\nClient: {{customerName}}\nEmail: {{customerEmail}}\nTél: {{customerPhone}}\nDate: {{startsAtFormatted}}\nPersonnes: {{partySize}}\nNotes: {{notes}}`,
+      `RELANCE — {{establishmentName}}\nClient: {{customerName}}\nEmail: {{customerEmail}}\nTél: {{customerPhone}}\nDate: {{startsAtFormatted}}\nPersonnes: {{partySize}}\nMessage client: {{guestMessage}}`,
       BuiltInTemplateId.RESERVATION_REMINDER_VENUE,
       'Reservation Reminder Venue',
       'Relance — demande de réservation — {{customerName}} — {{startsAtFormatted}}',
@@ -128,7 +129,7 @@ export class ReservationReminderVenueTemplate {
         'customerPhone',
         'startsAtFormatted',
         'partySize',
-        'notes',
+        'guestMessage',
       ]
     );
   }

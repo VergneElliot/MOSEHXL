@@ -81,6 +81,7 @@ export function validateSetupData(setupData: BusinessSetupRequest): SetupValidat
     { field: 'last_name', value: setupData.last_name, name: 'Last name' },
     { field: 'email', value: setupData.email, name: 'Email' },
     { field: 'password', value: setupData.password, name: 'Password' },
+    { field: 'owner_pin', value: setupData.owner_pin, name: 'Owner PIN' },
     { field: 'business_name', value: setupData.business_name, name: 'Business name' },
     { field: 'contact_email', value: setupData.contact_email, name: 'Contact email' },
     { field: 'phone', value: setupData.phone, name: 'Phone' },
@@ -91,6 +92,9 @@ export function validateSetupData(setupData: BusinessSetupRequest): SetupValidat
     if (!field.value || field.value.trim() === '') errors.push({ field: field.field, message: `${field.name} is required` });
   }
   if (setupData.password !== setupData.confirm_password) errors.push({ field: 'confirm_password', message: 'Passwords do not match' });
+  if (setupData.owner_pin && !/^\d{4,8}$/.test(setupData.owner_pin.trim())) {
+    errors.push({ field: 'owner_pin', message: 'Owner PIN must be 4–8 digits' });
+  }
   errors.push(...validatePassword(setupData.password));
   errors.push(...validateEmails(setupData.email, setupData.contact_email));
   errors.push(...validatePhone(setupData.phone));

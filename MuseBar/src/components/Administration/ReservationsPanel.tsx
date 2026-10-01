@@ -9,10 +9,7 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
-  MenuItem,
   Stack,
-  Tab,
-  Tabs,
   Table,
   TableBody,
   TableCell,
@@ -24,7 +21,6 @@ import {
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import {
-  createReservation,
   getReservationClosedDates,
   getReservationsIcs,
   getReservationsPublicLink,
@@ -39,14 +35,10 @@ import AdminMonthCalendar, {
   toLocalDateInputValue,
   type AdminCalendarItem,
 } from './AdminMonthCalendar';
-import { ParisDateTimeField } from '../common/ParisDateTimeField';
-import {
-  formatDate,
-  formatDateLong,
-  formatTime,
-  parisDateTimeLocalToUtcIso,
-  utcToParisDateTimeLocal,
-} from '../../utils/formatDate';
+import { formatDate, formatTime, utcToParisDateTimeLocal } from '../../utils/formatDate';
+import ReservationEditDialog from './ReservationEditDialog';
+import { resolveInboxByReservation } from '../../services/api/adminInboxApi';
+import { saveReservationEdit } from './saveReservationEdit';
 
 function localDateKey(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -73,11 +65,11 @@ const STATUS_COLOR: Record<string, string> = {
   cancelled: '#757575',
 };
 
-function needsCommentaire(status: string | undefined): boolean {
-  return status === 'on_hold' || status === 'refused' || status === 'confirmed';
-}
+type ReservationsPanelProps = {
+  onOpenConversation?: (reservationId: number) => void;
+};
 
-const ReservationsPanel: React.FC = () => {
+const ReservationsPanel: React.FC<ReservationsPanelProps> = ({ onOpenConversation }) => {
   const [rows, setRows] = useState<ReservationDto[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [icsUrl, setIcsUrl] = useState<string | null>(null);
@@ -95,6 +87,7 @@ const ReservationsPanel: React.FC = () => {
     commentaire: string;
   } | null>(null);
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
+  const [conversationBusy, setConversationBusy] = useState(false);
 
   const range = useMemo(() => {
     const from = addMonths(month, -1);
@@ -252,28 +245,9 @@ const ReservationsPanel: React.FC = () => {
   };
 
   const saveEdit = async () => {
-    if (!edit?.customer_name || !edit.starts_at || !edit.party_size) return;
-    const startsAt = edit.starts_at.includes('T')
-      ? parisDateTimeLocalToUtcIso(edit.starts_at)
-      : edit.starts_at;
-    if (edit.id) {
-      await updateReservation(edit.id, {
-        ...edit,
-        starts_at: startsAt,
-        status_reason: edit.status_reason ?? null,
-      });
-    } else {
-      await createReservation({
-        customer_name: edit.customer_name,
-        starts_at: startsAt,
-        party_size: Number(edit.party_size),
-        customer_email: edit.customer_email ?? null,
-        customer_phone: edit.customer_phone ?? null,
-        notes: edit.notes ?? null,
-        status: edit.status || 'requested',
-        status_reason: edit.status_reason ?? null,
-      });
-    }
+    if (!edit) return;
+    const { emailWarning } = await saveReservationEdit(edit);
+    if (emailWarning) setError(emailWarning);
     setOpen(false);
     setEdit(null);
     await refresh();
@@ -458,163 +432,57 @@ const ReservationsPanel: React.FC = () => {
         </TableBody>
       </Table>
 
-      <Dialog
+      <ReservationEditDialog
         open={open}
+        edit={edit}
+        dayContext={dayContext}
+        dialogTab={dialogTab}
+        selectedDayClosed={selectedDayClosed}
+        dayStatusBusy={dayStatusBusy}
+        conversationBusy={conversationBusy}
         onClose={() => {
           setOpen(false);
           setDayContext(null);
           setDialogTab(0);
         }}
-        fullWidth
-        maxWidth="sm"
-      >
-        <DialogTitle>
-          {edit?.id
-            ? 'Modifier la réservation'
-            : dayContext
-              ? formatDateLong(dayContext)
-              : 'Nouvelle réservation'}
-        </DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-          {!edit?.id && dayContext && (
-            <Tabs
-              value={dialogTab}
-              onChange={(_e, v) => setDialogTab(v)}
-              sx={{ borderBottom: 1, borderColor: 'divider', mb: 1 }}
-            >
-              <Tab label="Nouvelle réservation" sx={{ textTransform: 'none' }} />
-              <Tab label="Statut de la journée" sx={{ textTransform: 'none' }} />
-            </Tabs>
-          )}
-
-          {(edit?.id || dialogTab === 0) && (
-            <>
-              <TextField
-                label="Nom"
-                value={edit?.customer_name || ''}
-                onChange={(e) => setEdit({ ...edit, customer_name: e.target.value })}
-                fullWidth
-              />
-              <TextField
-                label="Téléphone"
-                value={edit?.customer_phone || ''}
-                onChange={(e) => setEdit({ ...edit, customer_phone: e.target.value })}
-                fullWidth
-              />
-              <TextField
-                label="Email"
-                value={edit?.customer_email || ''}
-                onChange={(e) => setEdit({ ...edit, customer_email: e.target.value })}
-                fullWidth
-              />
-              <TextField
-                label="Nombre de personnes"
-                type="number"
-                value={edit?.party_size ?? 2}
-                onChange={(e) => setEdit({ ...edit, party_size: Number(e.target.value) })}
-                fullWidth
-              />
-              <ParisDateTimeField
-                value={edit?.starts_at || ''}
-                onChange={(next) => setEdit({ ...edit, starts_at: next })}
-              />
-              <TextField
-                select
-                label="Statut"
-                value={edit?.status || 'requested'}
-                onChange={(e) => setEdit({ ...edit, status: e.target.value })}
-                fullWidth
-              >
-                {STATUSES.map((s) => (
-                  <MenuItem key={s.id} value={s.id}>
-                    {s.label}
-                  </MenuItem>
-                ))}
-              </TextField>
-              {needsCommentaire(edit?.status) && (
-                <TextField
-                  label="Commentaire"
-                  multiline
-                  minRows={2}
-                  value={edit?.status_reason || ''}
-                  onChange={(e) => setEdit({ ...edit, status_reason: e.target.value })}
-                  fullWidth
-                  helperText="Optionnel — modalités (espace, table…) incluses dans l’e-mail au client"
-                />
-              )}
-              <TextField
-                label="Notes"
-                multiline
-                minRows={2}
-                value={edit?.notes || ''}
-                onChange={(e) => setEdit({ ...edit, notes: e.target.value })}
-                fullWidth
-              />
-            </>
-          )}
-
-          {!edit?.id && dayContext && dialogTab === 1 && (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, py: 1 }}>
-              <Alert severity={selectedDayClosed ? 'warning' : 'info'}>
-                {selectedDayClosed
-                  ? 'Cette journée est fermée aux nouvelles demandes de réservation sur le calendrier public. Les réservations déjà acceptées restent visibles.'
-                  : 'Cette journée est ouverte aux demandes selon les plages de réservations configurées.'}
-              </Alert>
-              <Typography variant="body2" color="text.secondary">
-                Fermer une journée complète évite de refuser manuellement chaque demande quand vous
-                êtes complets, sans modifier les plages habituelles. Vous pourrez la rouvrir si une
-                place se libère.
-              </Typography>
-              {selectedDayClosed ? (
-                <Button
-                  variant="contained"
-                  color="success"
-                  disabled={dayStatusBusy}
-                  onClick={() => void toggleDayClosed(false)}
-                >
-                  Rouvrir la journée aux réservations
-                </Button>
-              ) : (
-                <Button
-                  variant="contained"
-                  color="warning"
-                  disabled={dayStatusBusy}
-                  onClick={() => void toggleDayClosed(true)}
-                >
-                  Fermer la journée aux réservations
-                </Button>
-              )}
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              setOpen(false);
-              setDayContext(null);
-              setDialogTab(0);
-            }}
-          >
-            {dialogTab === 1 && !edit?.id ? 'Fermer' : 'Annuler'}
-          </Button>
-          {(edit?.id || dialogTab === 0) && (
-            <Button
-              variant="contained"
-              onClick={() => {
+        onDialogTabChange={setDialogTab}
+        onEditChange={setEdit}
+        onSave={() => {
+          void (async () => {
+            try {
+              await saveEdit();
+            } catch (err) {
+              setError(err instanceof Error ? err.message : 'Enregistrement impossible');
+            }
+          })();
+        }}
+        onToggleDayClosed={(closed) => void toggleDayClosed(closed)}
+        onOpenConversation={
+          edit?.id && onOpenConversation
+            ? () => {
                 void (async () => {
+                  if (!edit.id) return;
+                  setConversationBusy(true);
                   try {
-                    await saveEdit();
+                    setError(null);
+                    const hit = await resolveInboxByReservation(edit.id);
+                    setOpen(false);
+                    onOpenConversation(edit.id);
+                    void hit;
                   } catch (err) {
-                    setError(err instanceof Error ? err.message : 'Enregistrement impossible');
+                    setError(
+                      err instanceof Error
+                        ? err.message
+                        : 'Aucune conversation trouvée pour cette réservation'
+                    );
+                  } finally {
+                    setConversationBusy(false);
                   }
                 })();
-              }}
-            >
-              Enregistrer
-            </Button>
-          )}
-        </DialogActions>
-      </Dialog>
+              }
+            : undefined
+        }
+      />
 
       <Dialog
         open={Boolean(commentDialog)}

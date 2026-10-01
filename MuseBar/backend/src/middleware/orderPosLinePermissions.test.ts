@@ -1,17 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Request, Response } from 'express';
 
-const mocks = vi.hoisted(() => ({
-  getUserPermissions: vi.fn(),
-  verifyPinActorToken: vi.fn(),
-}));
-
-vi.mock('../models/user', () => ({
-  UserModel: { getUserPermissions: mocks.getUserPermissions },
-}));
-
 vi.mock('../services/auth/pinActorToken', () => ({
-  verifyPinActorToken: mocks.verifyPinActorToken,
+  verifyPinActorToken: vi.fn(),
   pinActorHasPermission: (
     actor: { permissions?: string[] } | null | undefined,
     permission: string
@@ -20,11 +11,15 @@ vi.mock('../services/auth/pinActorToken', () => ({
 
 import { assertPosOrderLinePermissions } from './orderPosLinePermissions';
 
-function buildRequest(body: unknown, pinToken?: string): Request {
+function buildRequest(
+  body: unknown,
+  pinActor?: { id: number; establishment_id: string; permissions: string[]; role: string }
+): Request {
   return {
     user: { id: 7, establishment_id: 'est-1', role: 'staff' },
-    headers: pinToken ? { 'x-pin-actor-token': pinToken } : {},
+    headers: {},
     body,
+    pinActor,
   } as unknown as Request;
 }
 
@@ -44,9 +39,7 @@ function buildResponse(): Response & { statusCode?: number; body?: unknown } {
 
 describe('assertPosOrderLinePermissions', () => {
   beforeEach(() => {
-    mocks.getUserPermissions.mockReset();
-    mocks.verifyPinActorToken.mockReset();
-    mocks.getUserPermissions.mockResolvedValue([]);
+    vi.clearAllMocks();
   });
 
   it('allows a cart with no elevated line tags', async () => {
@@ -59,11 +52,14 @@ describe('assertPosOrderLinePermissions', () => {
     expect(next).toHaveBeenCalled();
   });
 
-  it('refuses Remise when neither account nor PIN holds pos_apply_remise', async () => {
+  it('refuses Remise when PIN actor lacks pos_apply_remise', async () => {
     const res = buildResponse();
     const next = vi.fn();
     await assertPosOrderLinePermissions()(
-      buildRequest({ items: [{ description: '[Remise −10%]' }] }),
+      buildRequest(
+        { items: [{ description: '[Remise −10%]' }] },
+        { id: 7, establishment_id: 'est-1', permissions: ['access_pos'], role: 'staff' }
+      ),
       res,
       next
     );
@@ -71,16 +67,18 @@ describe('assertPosOrderLinePermissions', () => {
     expect(res.statusCode).toBe(403);
   });
 
-  it('accepts Remise when a step-up PIN identity holds the right', async () => {
-    mocks.verifyPinActorToken.mockReturnValue({
-      id: 42,
-      establishment_id: 'est-1',
-      permissions: ['pos_apply_remise'],
-      role: 'staff',
-    });
+  it('accepts Remise when the PIN identity holds the right', async () => {
     const next = vi.fn();
     await assertPosOrderLinePermissions()(
-      buildRequest({ items: [{ description: '[Remise −2.00€]' }] }, 'manager-token'),
+      buildRequest(
+        { items: [{ description: '[Remise −2.00€]' }] },
+        {
+          id: 42,
+          establishment_id: 'est-1',
+          permissions: ['pos_apply_remise'],
+          role: 'staff',
+        }
+      ),
       buildResponse(),
       next
     );
@@ -90,9 +88,12 @@ describe('assertPosOrderLinePermissions', () => {
   it('still gates manual Happy Hour, Offert and Perso', async () => {
     const res = buildResponse();
     await assertPosOrderLinePermissions()(
-      buildRequest({
-        items: [{ description: '[Offert]', is_manual_happy_hour: true }],
-      }),
+      buildRequest(
+        {
+          items: [{ description: '[Offert]', is_manual_happy_hour: true }],
+        },
+        { id: 7, establishment_id: 'est-1', permissions: ['access_pos'], role: 'staff' }
+      ),
       res,
       vi.fn()
     );
@@ -100,5 +101,17 @@ describe('assertPosOrderLinePermissions', () => {
     expect(String(res.body && (res.body as { error?: string }).error)).toMatch(
       /Happy Hour manuel/
     );
+  });
+
+  it('does not accept account JWT grants without a PIN actor', async () => {
+    const res = buildResponse();
+    const next = vi.fn();
+    await assertPosOrderLinePermissions()(
+      buildRequest({ items: [{ description: '[Offert]' }] }),
+      res,
+      next
+    );
+    expect(next).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(403);
   });
 });

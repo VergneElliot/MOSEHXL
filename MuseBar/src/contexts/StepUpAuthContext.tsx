@@ -96,9 +96,12 @@ export function StepUpAuthProvider({ children }: { children: ReactNode }) {
   const scopesSessionRef = useRef<string | null>(activeSessionId);
 
   // The active session badge is the default identity on every API request.
+  // (Also registered from PinSessionsProvider — keep this as a belt-and-suspenders sync.)
   useEffect(() => {
     registerSessionTokenProvider(() => activeSession?.actor.token ?? null);
-    return () => registerSessionTokenProvider(null);
+    return () => {
+      /* PinSessionsProvider owns clear-on-unmount */
+    };
   }, [activeSession]);
 
   // Switching badge drops every step-up authorization obtained under the previous one.

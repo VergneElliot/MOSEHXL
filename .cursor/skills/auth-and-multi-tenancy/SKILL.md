@@ -9,17 +9,29 @@ description: >-
 
 # Auth and Multi-Tenancy
 
-Two session layers: **account JWT** (email/password login) and **PIN actor JWT** (on-floor staff identity).
+Two identity kinds, two session layers:
+
+| Kind | Rule |
+|------|------|
+| **Venue login** | `users.can_login = true`, email/password; may have many establishment memberships |
+| **PIN staff** | `can_login = false`, one establishment, no usable password; created via `POST /api/auth/pin-staff` |
+
+| Session | Rights |
+|---------|--------|
+| **Account JWT** | Shell only: open PIN, switch venue (with owner PIN), logout, `/me` — **no feature permissions** |
+| **PIN actor JWT** | Sole source of POS / Admin / Settings permissions |
 
 ## Account authentication
 
 | Concern | Location |
 |---------|----------|
-| Routes | `backend/src/routes/authSession.ts`, `authLogin/*`, `authPin.ts` |
+| Routes | `backend/src/routes/authSession.ts`, `authLogin/*`, `authPin.ts`, `pinStaff.ts` |
 | JWT sign/verify | `backend/src/security/jwtConfig.ts` |
-| Middleware | `backend/src/middleware/auth.ts` |
+| Middleware | `backend/src/middleware/auth.ts` — `requirePermission` = **PIN actor only** |
 | Refresh + CSRF | `backend/src/routes/authLogin/sessionRoutes.ts`, `cookies.ts` |
-| Frontend | `MuseBar/src/hooks/useAuth.tsx`, `services/api/core.ts` |
+| Frontend | `MuseBar/src/hooks/useAuth.tsx`, PIN-first `AppRouter`, `services/api/core.ts` |
+
+Login rejects `can_login = false`. Setup wizard collects email + password + **owner PIN**.
 
 ### Token storage (frontend)
 
@@ -27,22 +39,20 @@ Two session layers: **account JWT** (email/password login) and **PIN actor JWT**
 - Refresh: httpOnly cookie `musebar_refresh_token`
 - CSRF: cookie `musebar_csrf_token` + header `x-csrf-token` on refresh
 
-## PIN sessions (badges)
+## PIN sessions (badges) + pointage
 
 | Layer | Location |
 |-------|----------|
-| Verify PIN | `POST /api/auth/pin/verify` → opens `staff_pin_sessions` + returns token with `sid` |
-| Actor token | `pinActorToken.ts` (`token_use: 'pin_actor'`, **30d** hard cap by default) |
-| Server record | `models/staffPinSession.ts` — same hard expiry; **no idle kill**; not closed on daily Z |
+| Verify PIN | `POST /api/auth/pin/verify` → opens session + **clock-in** |
+| Actor token | `pinActorToken.ts` (`token_use: 'pin_actor'`, default **1 day**; `AUTH_PIN_ACTOR_TTL_DAYS`) |
+| Close | `POST /api/auth/pin/sessions/:id/close` → **clock-out**; blocked if open tables |
+| Pointage glue | `services/auth/pinSessionPointage.ts` |
 | Enforcement | `middleware/pinActor.ts` + `pinSessionGuard.ts` — `x-pin-actor-token` |
-| Frontend | `PinSessionsContext.tsx`, `pinElevation.ts`, `StepUpAuthContext.tsx` |
+| Frontend | `PinSessionsContext.tsx`, header PIN tabs, PIN-first shell |
 
-Lifetime: **30 days** (match remember-me refresh; override with `AUTH_PIN_ACTOR_TTL_DAYS`), or
-explicit close / PIN-or-permission change / account deactivate. Daily closure does **not**
-close badges.
+Every sale needs a PIN session (no comptoir-without-PIN). Daily Z does not auto-close badges.
 
-`requirePermission` accepts the **account or the PIN identity** on the request (step-up).
-`requirePinActor` is strict and checks the session row is still active.
+Venue switch: `owner_pin` of the **login account’s** membership on the **target** venue.
 
 ## Dual traceability
 
@@ -63,17 +73,14 @@ Source of truth: `PERMISSION_TIERS` in `@mosehxl/types`.
 - **Specific** — grantable checkbox; 4–8 digit PIN; feature stays visible and asks for PIN
   (`ensurePermission` / `ensureAccess`) when the acting badge lacks the right.
 
-When the user names a feature as a **specific permission**, implement all three: registry key +
-tier `specific`, step-up UX, and Gestion des utilisateurs checkbox. Anything not named specific
-is basic.
-
-`establishment_admin` holds every permission implicitly.
+`establishment_admin` holds every permission implicitly (on the **PIN** identity).
 
 ## Account lifecycle
 
-- Default remove = **deactivate** (`deactivateStaffAccount`) — not hard delete.
-- Hard purge only when footprint is empty (`purgeStaffAccount` / `DELETE .../purge`).
-- UI: `UserManagement/UserRowActions.tsx` + `ActivePinSessionsPanel.tsx`.
+- Staff create = PIN-only (`createPinOnlyStaff`).
+- Default remove = **deactivate** — not hard delete.
+- Hard purge only when footprint is empty.
+- UI: `UserManagement/*` — « Équipe (PIN) » add dialog.
 
 ## Multi-tenancy (defense in depth)
 
@@ -88,15 +95,15 @@ is basic.
 
 1. Every establishment-scoped route calls `getEstablishmentId()` and passes it to models.
 2. Backend authorization is mandatory — frontend gates are UX only.
-3. PIN actor token must match JWT `establishment_id`.
-4. Permission keys from `@mosehxl/types` only — no ad-hoc strings.
-5. Never put actor fields into the legal-journal **hash** payload.
-6. Do not emit or rely on JWT `is_admin` — use `role`.
-7. New code: one file per concern — see `code-hygiene` (400-line cap).
+3. Feature permissions require an active PIN actor (not JWT alone).
+4. PIN actor token must match JWT `establishment_id`.
+5. Permission keys from `@mosehxl/types` only — no ad-hoc strings.
+6. Never put actor fields into the legal-journal **hash** payload.
+7. Do not emit or rely on JWT `is_admin` — use `role`.
+8. New code: one file per concern — see `code-hygiene` (400-line cap).
 
 ## Docs
 
-- Foundation: `docs/patch-notes/486-IDENTITY-SESSIONS-PERMISSIONS-FOUNDATION-PLAN.md`
-- Slices: 487–491
-- `docs/course/06-AUTH-AND-SECURITY.md` (partially stale on token storage)
+- Plan: `docs/patch-notes/536-VENUE-LOGIN-PIN-ONLY-ACTORS-PLAN.md`
+- Slices: 537–541
 - `docs/runbooks/MULTI-ESTABLISHMENT-MEMBERSHIPS.md`

@@ -1,6 +1,9 @@
 /*
  * POS catalog grid — static stylesheet.
  *
+ * Card layout uses em under .pos-grid so --a11y-card-scale (Profil → Accessibilité)
+ * changes proportions independently of header zoom (html rem). Base ≈ 14px at 100%.
+ *
  * The cashier renders ~70 cards at once and re-renders the whole set on every
  * category switch. MUI `sx` re-serializes through Emotion on each render, so the
  * hot path uses plain DOM + these classes instead. Per-card values (category
@@ -10,32 +13,34 @@
  */
 
 .pos-grid {
+  /* Local em cascade: header zoom via rem, card slider via --a11y-card-scale */
+  font-size: calc(1rem * var(--a11y-card-scale, 1));
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(16.428em, 1fr)); /* 230px @ 100% */
+  gap: 1.143em; /* 16px */
   align-items: stretch;
 }
 
 @media (max-width: 1199.95px) {
   .pos-grid {
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(15.714em, 1fr)); /* 220px */
   }
 }
 
 @media (max-width: 899.95px) {
   .pos-grid {
-    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(15em, 1fr)); /* 210px */
   }
 }
 
 @media (max-width: 599.95px) {
   .pos-grid {
-    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(13.571em, 1fr)); /* 190px */
   }
 }
 
 .pos-grid__empty {
-  padding: 24px;
+  padding: 1.714em; /* 24px */
   text-align: center;
   color: var(--pos-text-secondary);
 }
@@ -47,29 +52,35 @@
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  min-height: 280px;
+  min-height: 20em; /* 280px */
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--pos-card-border, var(--pos-divider));
-  border-radius: 4px;
+  border-radius: 0.286em; /* 4px */
   background-color: var(--pos-card-bg, var(--pos-paper));
   box-shadow: var(--pos-shadow-1);
   color: var(--pos-text-primary);
-  cursor: grab;
+  cursor: pointer;
+  user-select: none;
 }
 
-.pos-card:active {
-  cursor: grabbing;
+.pos-card--clickable:focus-visible {
+  outline: 2px solid var(--pos-primary);
+  outline-offset: 2px;
+}
+
+.pos-card--clickable:active {
+  box-shadow: var(--pos-shadow-2);
 }
 
 /*
- * No hover elevation: scrolling drags cards under a stationary pointer, and the
+ * No hover elevation: scrolling drifts cards under a stationary pointer, and the
  * resulting shadow repaints were the original scroll tearing.
  */
 
 @media (max-width: 899.95px) {
   .pos-card {
-    min-height: 200px;
+    min-height: 14.286em; /* 200px */
   }
 }
 
@@ -78,12 +89,12 @@
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  padding: 16px;
+  padding: 1.143em; /* 16px */
 }
 
 @media (max-width: 899.95px) {
   .pos-card__content {
-    padding: 8px;
+    padding: 0.571em; /* 8px */
   }
 }
 
@@ -91,9 +102,9 @@
   display: -webkit-box;
   flex-shrink: 0;
   min-height: 2.4em;
-  margin: 0 0 8px;
+  margin: 0 0 0.571em; /* 8px */
   overflow: hidden;
-  font-size: clamp(1.15rem, 2.1vw, 1.85rem);
+  font-size: 1.5em;
   font-weight: 700;
   line-height: 1.2;
   word-break: break-word;
@@ -103,20 +114,20 @@
 }
 
 .pos-card--favorite .pos-card__name {
-  padding-left: 40px;
+  padding-left: 2.857em; /* 40px */
 }
 
 .pos-card--discounted .pos-card__name {
-  padding-right: 72px;
+  padding-right: 5.143em; /* 72px */
 }
 
 @media (max-width: 899.95px) {
   .pos-card__name {
-    font-size: 1.2rem;
+    font-size: 1.2em;
   }
 
   .pos-card--favorite .pos-card__name {
-    padding-left: 32px;
+    padding-left: 2.286em; /* 32px */
   }
 }
 
@@ -125,35 +136,45 @@
   flex: 1;
   flex-direction: column;
   align-items: stretch;
-  gap: 8px;
+  gap: 0.571em; /* 8px */
   min-height: 0;
 }
 
 .pos-card__price-original {
+  align-self: flex-start;
   margin: 0;
-  color: var(--pos-text-secondary);
-  font-size: clamp(0.95rem, 1.6vw, 1.35rem);
+  padding: 0.15em 0.55em;
+  border-radius: 0.35em;
+  background-color: var(--pos-price-chip-bg, rgba(0, 0, 0, 0.55));
+  color: var(--pos-price-chip-fg-muted, var(--pos-text-secondary));
+  font-size: 1.1em;
   text-decoration: line-through;
 }
 
 .pos-card__price {
+  align-self: flex-start;
   margin: 0;
-  color: var(--pos-primary);
-  font-size: clamp(1.35rem, 2.4vw, 2.1rem);
-  font-weight: 700;
+  padding: 0.2em 0.65em;
+  border-radius: 0.4em;
+  background-color: var(--pos-price-chip-bg, rgba(0, 0, 0, 0.55));
+  color: var(--pos-price-chip-fg, var(--pos-text-primary));
+  font-size: 1.75em;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
 }
 
 .pos-card--discounted .pos-card__price {
-  color: var(--pos-secondary);
+  color: var(--pos-price-chip-fg-accent, var(--pos-secondary));
 }
 
 @media (max-width: 899.95px) {
   .pos-card__price-original {
-    font-size: 1rem;
+    font-size: 1em;
   }
 
   .pos-card__price {
-    font-size: 1.4rem;
+    font-size: 1.4em;
   }
 }
 
@@ -161,44 +182,51 @@
 
 .pos-card__favorite {
   position: absolute;
-  top: 8px;
-  left: 8px;
+  top: 0.571em;
+  left: 0.571em;
   z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--pos-warning-border);
+  width: 2.429em; /* 34px */
+  height: 2.429em;
+  border: 1px solid #f6c343;
   border-radius: 50%;
-  background-color: var(--pos-warning-bg);
-  color: var(--pos-warning-dark);
-  font-size: 22px;
+  background: radial-gradient(circle at 35% 30%, #ffe9a8 0%, #ffc107 45%, #f9a825 100%);
+  color: #7a4f00;
+  box-shadow:
+    0 0 0 1px rgba(255, 213, 79, 0.55),
+    0 2px 6px rgba(0, 0, 0, 0.35);
+  font-size: 1.571em; /* 22px */
+}
+
+.pos-card__favorite .pos-icon {
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
 }
 
 .pos-card__happy-hour {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 0.571em;
+  right: 0.571em;
   z-index: 1;
   display: inline-flex;
   align-items: center;
-  height: 24px;
-  padding: 0 8px;
-  border-radius: 12px;
+  height: 1.714em; /* 24px */
+  padding: 0 0.571em;
+  border-radius: 0.857em;
   background-color: var(--pos-secondary);
   color: var(--pos-secondary-contrast);
-  font-size: 0.8125rem;
+  font-size: 0.8125em;
   font-weight: 500;
   white-space: nowrap;
 }
 
 @media (max-width: 899.95px) {
   .pos-card__favorite {
-    width: 28px;
-    height: 28px;
-    font-size: 18px;
+    width: 2em;
+    height: 2em;
+    font-size: 1.286em;
   }
 }
 
@@ -209,17 +237,17 @@
   flex-direction: column;
   flex-shrink: 0;
   align-items: stretch;
-  gap: 8px;
+  gap: 0.571em;
   width: 100%;
   margin-top: auto;
-  padding-top: 4px;
+  padding-top: 0.286em;
 }
 
 .pos-card__qty {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 0.286em;
   width: 100%;
 }
 
@@ -228,14 +256,14 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 3.143em; /* 44px */
+  height: 3.143em;
   padding: 0;
   border: none;
   border-radius: 50%;
   background-color: transparent;
   color: var(--pos-action-active);
-  font-size: 20px;
+  font-size: 2em; /* 28px */
   cursor: pointer;
 }
 
@@ -249,16 +277,16 @@
 }
 
 .pos-quantity-input {
-  flex: 0 0 44px;
+  flex: 0 0 3.714em; /* 52px */
   box-sizing: border-box;
-  width: 44px;
+  width: 3.714em;
   padding: 0;
   border: none;
   border-bottom: 1px solid var(--pos-divider);
   background-color: transparent;
   color: inherit;
   font-family: inherit;
-  font-size: 1.5rem;
+  font-size: 1.65em;
   font-weight: 700;
   text-align: center;
   -moz-appearance: textfield;
@@ -275,62 +303,24 @@
   outline: none;
 }
 
-.pos-add-button {
-  flex: 0 0 auto;
-  box-sizing: border-box;
-  width: 100%;
-  min-width: 0;
-  min-height: 40px;
-  padding: 8px 12px;
-  border: none;
-  border-radius: 4px;
-  background-color: var(--pos-primary);
-  box-shadow: var(--pos-shadow-2);
-  color: var(--pos-primary-contrast);
-  font-family: inherit;
-  font-size: 1rem;
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  cursor: pointer;
-}
-
-.pos-add-button:hover {
-  background-color: var(--pos-primary-dark);
-}
-
-.pos-add-button:focus-visible {
-  outline: 2px solid var(--pos-primary-dark);
-  outline-offset: 2px;
-}
-
-.pos-add-button--secondary {
-  background-color: var(--pos-secondary);
-  color: var(--pos-secondary-contrast);
-}
-
-.pos-add-button--secondary:hover {
-  background-color: var(--pos-secondary-dark);
-}
-
-.pos-add-button--block {
-  width: 100%;
-  margin-top: 0;
+.pos-card__hint {
+  margin: auto 0 0;
+  padding-top: 0.571em;
+  color: var(--pos-text-secondary);
+  font-size: 0.85em;
+  font-weight: 600;
+  text-align: center;
 }
 
 @media (max-width: 899.95px) {
-  .pos-quantity-input {
-    font-size: 1.2rem;
+  .pos-quantity-button {
+    width: 2.857em;
+    height: 2.857em;
+    font-size: 1.714em;
   }
 
-  .pos-add-button {
-    min-height: 34px;
-    padding: 6px 10px;
-    font-size: 0.9rem;
+  .pos-quantity-input {
+    font-size: 1.35em;
   }
 }
 
@@ -343,25 +333,25 @@
 .pos-card__special-header {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-bottom: 4px;
+  gap: 0.286em;
+  margin-bottom: 0.286em;
   /* Sizes the inherited icon; the title sets its own font-size. */
-  font-size: 24px;
+  font-size: 1.714em; /* 24px */
 }
 
 .pos-card__special-title {
   margin: 0;
-  font-size: clamp(1.2rem, 2vw, 1.75rem);
+  font-size: 1.5em;
   font-weight: 700;
   line-height: 1.2;
 }
 
 .pos-card__special-description {
   display: -webkit-box;
-  margin: 0 0 8px;
+  margin: 0 0 0.571em;
   overflow: hidden;
   color: var(--pos-text-secondary);
-  font-size: 0.8rem;
+  font-size: 0.8em;
   line-height: 1.35;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
@@ -369,11 +359,11 @@
 
 @media (max-width: 899.95px) {
   .pos-card__special-header {
-    font-size: 20px;
+    font-size: 1.429em;
   }
 
   .pos-card__special-title {
-    font-size: 1.25rem;
+    font-size: 1.25em;
   }
 }
 

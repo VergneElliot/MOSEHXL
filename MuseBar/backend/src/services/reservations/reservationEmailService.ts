@@ -19,6 +19,7 @@ import {
   venueInboxFromAddress,
   venueInboxReservationReplyTo,
 } from './venueInboxAddress';
+import { isPlausibleGuestEmail } from './resolveInboxReplyRecipient';
 
 export {
   venueInboxEmail,
@@ -75,18 +76,22 @@ async function sendSafe(
   to: string | null | undefined,
   data: Record<string, unknown>,
   opts: SendOpts
-): Promise<void> {
-  if (!to || !to.includes('@')) return;
+): Promise<{ sent: boolean; to: string | null; error?: string }> {
+  if (!to || !to.includes('@')) {
+    return { sent: false, to: null, error: 'missing_recipient' };
+  }
   if (!opts.fromSlug) {
     Logger.getInstance().warn(
       'Reservation email skipped — missing establishment slug',
       { templateId, to },
       'RESERVATION_EMAIL'
     );
-    return;
+    return { sent: false, to, error: 'missing_slug' };
   }
   const service = getEmailService();
-  if (!service) return;
+  if (!service) {
+    return { sent: false, to, error: 'email_service_unavailable' };
+  }
   const from = venueInboxFromAddress(opts.fromSlug, opts.establishmentName);
   const replyTo =
     opts.reservationId != null && opts.reservationId > 0
@@ -109,7 +114,14 @@ async function sendSafe(
         textBody: opts.outboundText || opts.outboundSubject || String(templateId),
       });
     }
+    Logger.getInstance().info(
+      'Reservation guest email sent',
+      { templateId, to, from, replyTo, reservationId: opts.reservationId ?? null },
+      'RESERVATION_EMAIL'
+    );
+    return { sent: true, to };
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     Logger.getInstance().warn(
       'Reservation email failed',
       {
@@ -117,10 +129,11 @@ async function sendSafe(
         to,
         from,
         replyTo,
-        error: error instanceof Error ? error.message : String(error),
+        error: message,
       },
       'RESERVATION_EMAIL'
     );
+    return { sent: false, to, error: message };
   }
 }
 
@@ -132,7 +145,8 @@ function commonPayload(r: Reservation, establishmentName: string): Record<string
     partySize: String(r.party_size),
     customerEmail: r.customer_email || '—',
     customerPhone: r.customer_phone || '—',
-    notes: r.notes || '—',
+    // Never expose establishment-internal `notes` to email templates.
+    commentaire: r.status_reason || '—',
   };
 }
 
@@ -160,10 +174,13 @@ export async function notifyReservationRequested(opts: {
   establishmentSlug: string;
   venueEmail: string | null;
   timezone?: string;
+  /** One-shot guest message from public form — never stored as reservation.notes. */
+  guestMessage?: string | null;
 }): Promise<void> {
   const { reservation: r, establishmentName, establishmentSlug, venueEmail } = opts;
   const common = {
     ...commonPayload(r, establishmentName),
+    guestMessage: opts.guestMessage?.trim() || '—',
     relanceUrl: buildRelanceUrl(establishmentSlug, r.id),
   };
   await sendSafe(
@@ -192,7 +209,10 @@ export async function notifyReservationReminder(opts: {
   timezone?: string;
 }): Promise<void> {
   const { reservation: r, establishmentName, establishmentSlug, venueEmail } = opts;
-  const common = commonPayload(r, establishmentName);
+  const common = {
+    ...commonPayload(r, establishmentName),
+    guestMessage: '—',
+  };
   await sendSafe(BuiltInTemplateId.RESERVATION_REMINDER_VENUE, venueEmail, common, {
     fromSlug: establishmentSlug,
     establishmentName,
@@ -231,12 +251,22 @@ export async function notifyGuestReservationStatus(opts: {
   establishmentName: string;
   establishmentSlug: string;
   timezone?: string;
-}): Promise<void> {
+}): Promise<{ sent: boolean; to: string | null; error?: string }> {
   const { reservation: r, establishmentName, establishmentSlug } = opts;
-  if (!r.customer_email) return;
+  if (!r.customer_email) {
+    return { sent: false, to: null, error: 'missing_customer_email' };
+  }
+  if (!isPlausibleGuestEmail(r.customer_email)) {
+    Logger.getInstance().warn(
+      'Reservation guest email skipped — not a plausible external address',
+      { reservationId: r.id, customer_email: r.customer_email },
+      'RESERVATION_EMAIL'
+    );
+    return { sent: false, to: r.customer_email, error: 'invalid_customer_email' };
+  }
 
   if (r.status === 'requested') {
-    await sendSafe(
+    return sendSafe(
       BuiltInTemplateId.RESERVATION_REQUESTED_GUEST,
       r.customer_email,
       {
@@ -251,7 +281,6 @@ export async function notifyGuestReservationStatus(opts: {
         `Demande enregistrée pour ${formatStartsAt(r.starts_at)} (${r.party_size} pers.).`
       )
     );
-    return;
   }
 
   const data = {
@@ -266,7 +295,7 @@ export async function notifyGuestReservationStatus(opts: {
   const commentLine = r.status_reason ? `Commentaire : ${r.status_reason}` : 'Sans commentaire.';
 
   if (r.status === 'confirmed') {
-    await sendSafe(
+    return sendSafe(
       BuiltInTemplateId.RESERVATION_CONFIRMED,
       r.customer_email,
       data,
@@ -278,8 +307,9 @@ export async function notifyGuestReservationStatus(opts: {
         `Statut : confirmée.\n${commentLine}`
       )
     );
-  } else if (r.status === 'refused') {
-    await sendSafe(
+  }
+  if (r.status === 'refused') {
+    return sendSafe(
       BuiltInTemplateId.RESERVATION_REFUSED,
       r.customer_email,
       data,
@@ -291,8 +321,9 @@ export async function notifyGuestReservationStatus(opts: {
         `Statut : refusée.\n${commentLine}`
       )
     );
-  } else if (r.status === 'on_hold') {
-    await sendSafe(
+  }
+  if (r.status === 'on_hold') {
+    return sendSafe(
       BuiltInTemplateId.RESERVATION_ON_HOLD,
       r.customer_email,
       data,
@@ -305,6 +336,7 @@ export async function notifyGuestReservationStatus(opts: {
       )
     );
   }
+  return { sent: false, to: r.customer_email, error: 'status_has_no_guest_mail' };
 }
 
 export async function notifyReservationStatusChange(opts: {
@@ -313,10 +345,12 @@ export async function notifyReservationStatusChange(opts: {
   establishmentName: string;
   establishmentSlug: string;
   timezone?: string;
-}): Promise<void> {
+}): Promise<{ sent: boolean; to: string | null; error?: string }> {
   const { reservation: r, previousStatus, establishmentName, establishmentSlug } = opts;
-  if (r.status === previousStatus) return;
-  await notifyGuestReservationStatus({
+  if (r.status === previousStatus) {
+    return { sent: false, to: r.customer_email, error: 'status_unchanged' };
+  }
+  return notifyGuestReservationStatus({
     reservation: r,
     establishmentName,
     establishmentSlug,

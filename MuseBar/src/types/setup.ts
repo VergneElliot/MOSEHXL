@@ -21,6 +21,7 @@ export interface BusinessSetupRequest {
   email: string;
   password: string;
   confirm_password: string;
+  owner_pin: string;
 
   // Business information (update existing establishment)
   business_name: string;
@@ -59,6 +60,7 @@ export interface SetupFormData {
   email: string;
   password: string;
   confirmPassword: string;
+  ownerPin: string;
 
   // Business information
   businessName: string;

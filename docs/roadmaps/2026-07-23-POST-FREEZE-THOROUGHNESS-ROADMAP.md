@@ -773,7 +773,8 @@ Business value; unrelated to attestation validity if ISCA paths untouched.
 
 ### How
 
-Separate feature roadmap; each PR checked by COMP-5 guard.
+Separate feature roadmap; each PR checked by COMP-5 guard.  
+Living shortlist (tick as you go): `docs/PRODUCT-BACKLOG.md`.
 
 ### Done when
 

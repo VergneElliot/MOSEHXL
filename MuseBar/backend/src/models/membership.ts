@@ -5,6 +5,7 @@ import {
   normalizeCalendarColor,
   pickNextCalendarColor,
 } from '../utils/calendarColors';
+import { mergeUiPrefsPatch, normalizeUiPrefs, type UiPrefs } from '../services/auth/uiPrefs';
 
 export type MembershipRole = 'establishment_admin' | 'staff';
 
@@ -14,6 +15,7 @@ export interface EstablishmentMembership {
   role: MembershipRole;
   is_active: boolean;
   calendar_color: string;
+  ui_prefs?: UiPrefs | Record<string, unknown>;
   establishment_name?: string;
   created_at?: string;
   updated_at?: string;
@@ -106,7 +108,7 @@ export class MembershipModel {
     establishmentId: string
   ): Promise<EstablishmentMembership | null> {
     const result = await pool.query(
-      `SELECT m.user_id, m.establishment_id, m.role, m.is_active, m.calendar_color,
+      `SELECT m.user_id, m.establishment_id, m.role, m.is_active, m.calendar_color, m.ui_prefs,
               e.name AS establishment_name
        FROM user_establishment_memberships m
        JOIN establishments e ON e.id = m.establishment_id
@@ -221,6 +223,31 @@ export class MembershipModel {
       throw Object.assign(new Error('Membership not found'), { code: 'NOT_FOUND' });
     }
     return result.rows[0] as EstablishmentMembership;
+  }
+
+  static async setUiPrefs(
+    userId: number,
+    establishmentId: string,
+    patch: unknown
+  ): Promise<EstablishmentMembership> {
+    const existing = await this.get(userId, establishmentId);
+    if (!existing) {
+      throw Object.assign(new Error('Membership not found'), { code: 'NOT_FOUND' });
+    }
+    const next = mergeUiPrefsPatch(existing.ui_prefs, patch);
+    const result = await pool.query(
+      `UPDATE user_establishment_memberships
+       SET ui_prefs = $3::jsonb, updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $1 AND establishment_id = $2 AND is_active = TRUE
+       RETURNING user_id, establishment_id, role, is_active, calendar_color, ui_prefs,
+                 created_at, updated_at`,
+      [userId, establishmentId, JSON.stringify(next)]
+    );
+    if (!result.rows[0]) {
+      throw Object.assign(new Error('Membership not found'), { code: 'NOT_FOUND' });
+    }
+    const row = result.rows[0] as EstablishmentMembership;
+    return { ...row, ui_prefs: normalizeUiPrefs(row.ui_prefs) };
   }
 
   static async remove(userId: number, establishmentId: string): Promise<boolean> {

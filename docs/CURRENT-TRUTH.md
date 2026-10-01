@@ -8,6 +8,8 @@ This page is the fastest way to find the current state of the project without sc
 - Latest code closure pass: `docs/audits/2026-05-28-code-closure-pass.md`
 - Branch reality and operational notes: `DEVELOPMENT-STATE.md`
 - Latest patch-note index (auto-generated): `docs/patch-notes/LATEST-INDEX.md`
+- Living product / soft-debt shortlist: [`docs/PRODUCT-BACKLOG.md`](./PRODUCT-BACKLOG.md)
+- Email provider long-term strategy: [`docs/EMAIL-PROVIDER-STRATEGY.md`](./EMAIL-PROVIDER-STRATEGY.md)
 
 ## Refreshing the patch-note index
 

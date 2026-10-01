@@ -569,29 +569,6 @@ const POSContainer: React.FC<POSContainerProps> = ({
     void handleQuickPayment('cash');
   }, [handleQuickPayment]);
 
-  const handleDropProduct = useCallback(
-    (payload: {
-      kind?: 'product' | 'divers' | 'pourboire';
-      productId?: string;
-      quantity?: number;
-    }) => {
-      if (payload.kind === 'divers') {
-        setDiversDialogOpen(true);
-        return;
-      }
-      if (payload.kind === 'pourboire') {
-        setPourboireDialogOpen(true);
-        return;
-      }
-      const productId = payload.productId;
-      if (!productId) return;
-      const product = products.find(p => String(p.id) === String(productId));
-      if (!product) return;
-      handleRequestAddProduct(product, payload.quantity ?? 1);
-    },
-    [products, handleRequestAddProduct]
-  );
-
   const handleCloseSnackbar = useCallback(() => {
     actions.closeSnackbar();
   }, [actions.closeSnackbar]);
@@ -705,7 +682,6 @@ const POSContainer: React.FC<POSContainerProps> = ({
               onApplyPerso={(index: number) => void gatedApplyPerso(index)}
               onApplyRemise={(indices) => void handleRequestRemise(indices)}
               onUpdateLineNote={handleUpdateLineNote}
-              onDropProduct={handleDropProduct}
               onSelectTable={floor.requestMap}
               activeTableLabel={floor.activeTable?.label ?? null}
               onSuivre={

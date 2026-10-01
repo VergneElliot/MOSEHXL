@@ -28,7 +28,7 @@ router.use(requireAuth);
 /**
  * GET /api/orders — order history for this establishment
  */
-router.get('/', asyncHandler(async (req, res) => {
+router.get('/', requirePermission(P.access_pos), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {
@@ -111,7 +111,7 @@ router.get('/', asyncHandler(async (req, res) => {
 /**
  * GET /api/orders/waiters — distinct waiters who have paid orders (for History filter)
  */
-router.get('/waiters', asyncHandler(async (req, res) => {
+router.get('/waiters', requirePermission(P.access_pos), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   const waiters = await OrderModel.listWaitersWithSales(establishmentId);
@@ -122,7 +122,7 @@ router.get('/waiters', asyncHandler(async (req, res) => {
  * GET /api/orders/waiter-day-report?date=YYYY-MM-DD
  * Non-fiscal CA by waiter for the business day containing `date` (cut→cut).
  */
-router.get('/waiter-day-report', asyncHandler(async (req, res) => {
+router.get('/waiter-day-report', requirePermission(P.access_pos), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   const dateRaw = typeof req.query.date === 'string' ? req.query.date : '';
@@ -163,7 +163,7 @@ router.get('/waiter-day-report', asyncHandler(async (req, res) => {
 /**
  * GET /api/orders/:id
  */
-router.get('/:id', validateParams([paramValidations.id]), asyncHandler(async (req, res) => {
+router.get('/:id', requirePermission(P.access_pos), validateParams([paramValidations.id]), asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
   try {

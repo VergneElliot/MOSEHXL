@@ -7,7 +7,6 @@
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import type { SignOptions } from 'jsonwebtoken';
-import { UserModel } from '../models/user';
 import { readOptionalPinActor } from './pinActor';
 import { pinActorHasPermission } from '../services/auth/pinActorToken';
 import { runWithTenantContext } from '../rls/tenantContext';
@@ -185,26 +184,13 @@ export function requireEstablishmentAdmin(
 
 /** Gate: user must hold the named permission (active establishment). */
 /**
- * A specific permission can be held by two complementary identities:
- * the logged-in account, or the PIN identity presented for this request (active PIN session,
- * or the PIN typed into a step-up prompt).
- *
- * When the PIN identity is what authorizes the call, it is attached to `req.pinActor` so
- * downstream handlers can record who actually performed the action.
+ * Feature permissions are held only by the PIN identity (active session or step-up).
+ * The venue login account JWT never authorizes feature routes by itself.
  */
 async function requestHoldsAnyPermission(
   req: Request,
   permissions: string[]
 ): Promise<boolean> {
-  const accountPermissions = await UserModel.getUserPermissions(
-    Number(req.user?.id),
-    req.user?.establishment_id
-  );
-  if (permissions.some((permission) => accountPermissions.includes(permission))) {
-    req.pinActor = req.pinActor ?? readOptionalPinActor(req) ?? undefined;
-    return true;
-  }
-
   const actor = readOptionalPinActor(req);
   if (!actor) return false;
   if (!permissions.some((permission) => pinActorHasPermission(actor, permission))) {
@@ -217,29 +203,39 @@ async function requestHoldsAnyPermission(
 export function requirePermission(permission: string) {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!(await requestHoldsAnyPermission(req, [permission]))) {
-      return res.status(403).json({ error: 'Permission denied' });
+      return res.status(403).json({
+        error: 'PIN session required',
+        code: 'PIN_ACTOR_REQUIRED',
+      });
     }
     next();
   };
 }
 
-/** User must have at least one of the given permissions (active establishment). */
+/** User must have at least one of the given permissions (PIN actor). */
 export function requireAnyPermission(permissions: string[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!(await requestHoldsAnyPermission(req, permissions))) {
-      return res.status(403).json({ error: 'Permission denied' });
+      return res.status(403).json({
+        error: 'PIN session required',
+        code: 'PIN_ACTOR_REQUIRED',
+      });
     }
     next();
   };
 }
 
 /**
- * establishment_admin always passes; otherwise require the given permission
- * (used for "Gestion des utilisateurs" so trusted staff can manage users without being admin).
+ * PIN actor who is establishment_admin (or holds the permission) passes.
+ * Venue login JWT alone never bypasses.
  */
 export function requireEstablishmentAdminOrPermission(permission: string) {
   return async (req: Request, res: Response, next: NextFunction) => {
-    if (req.user?.role === 'establishment_admin') return next();
+    const actor = readOptionalPinActor(req);
+    if (actor?.role === 'establishment_admin') {
+      req.pinActor = actor;
+      return next();
+    }
     return requirePermission(permission)(req, res, next);
   };
 }

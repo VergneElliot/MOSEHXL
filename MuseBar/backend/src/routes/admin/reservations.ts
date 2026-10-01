@@ -236,6 +236,13 @@ router.patch(
     });
     if (!updated) throw new NotFoundError('Réservation introuvable');
 
+    let guestEmailDelivery: { sent: boolean; to: string | null; error?: string } | null = null;
+
+    const statusChanged = updated.status !== existing.status;
+    const commentaireChanged =
+      statusReason !== undefined &&
+      (statusReason || null) !== (existing.status_reason || null);
+
     if (updated.status !== existing.status && updated.status === 'no_show') {
       void GuestNoShowFlagModel.flagContacts({
         email: updated.customer_email,
@@ -245,19 +252,26 @@ router.patch(
       });
     }
 
-    if (updated.status !== existing.status && updated.customer_email) {
+    if ((statusChanged || commentaireChanged) && updated.customer_email) {
       const est = await pool.query(`SELECT name, slug, timezone FROM establishments WHERE id = $1`, [
         establishmentId,
       ]);
       const slug = est.rows[0]?.slug as string | undefined;
       if (slug) {
-        void notifyReservationStatusChange({
-          reservation: updated,
-          previousStatus: existing.status,
-          establishmentName: String(est.rows[0]?.name || ''),
-          establishmentSlug: slug,
-          timezone: (est.rows[0]?.timezone as string) || undefined,
-        });
+        guestEmailDelivery = statusChanged
+          ? await notifyReservationStatusChange({
+              reservation: updated,
+              previousStatus: existing.status,
+              establishmentName: String(est.rows[0]?.name || ''),
+              establishmentSlug: slug,
+              timezone: (est.rows[0]?.timezone as string) || undefined,
+            })
+          : await notifyGuestReservationStatus({
+              reservation: updated,
+              establishmentName: String(est.rows[0]?.name || ''),
+              establishmentSlug: slug,
+              timezone: (est.rows[0]?.timezone as string) || undefined,
+            });
       }
     }
 
@@ -265,7 +279,10 @@ router.patch(
       updated.customer_email,
       updated.customer_phone
     );
-    return res.json({ reservation: { ...updated, guest_reliability } });
+    return res.json({
+      reservation: { ...updated, guest_reliability },
+      guest_email_delivery: guestEmailDelivery,
+    });
   })
 );
 

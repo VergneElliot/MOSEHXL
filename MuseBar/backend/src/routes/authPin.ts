@@ -13,7 +13,7 @@ import { MembershipPinModel } from '../models/membershipPin';
 import { StaffPinSessionModel } from '../models/staffPinSession';
 import { UserModel } from '../models/user';
 import { AuditTrailModel } from '../models/auditTrail';
-import { parsePinBody } from '../middleware/pinActor';
+import { parsePinBody, readOptionalPinActor } from '../middleware/pinActor';
 import { createAuthRateLimitMiddleware } from '../middleware/security/AuthEndpointRateLimit';
 import {
   buildDisplayName,
@@ -72,14 +72,22 @@ function getDummyHash(): Promise<string> {
   return dummyHashPromise;
 }
 
-/** Self-service allowed; managing another user requires user management. */
+/**
+ * Self-service allowed for the venue-login account or the active PIN badge.
+ * Changing another membership's PIN requires user-management on the PIN actor
+ * (account JWT holds no feature permissions).
+ */
 async function assertSelfOrUserManagement(
-  actorId: number,
+  accountUserId: number,
   targetUserId: number,
-  establishmentId: string
+  establishmentId: string,
+  pinActorId?: number | null,
+  pinActorPermissions?: string[] | null
 ): Promise<void> {
-  if (actorId === targetUserId) return;
-  const perms = await UserModel.getUserPermissions(actorId, establishmentId);
+  if (accountUserId === targetUserId) return;
+  if (pinActorId != null && pinActorId === targetUserId) return;
+  if (pinActorPermissions?.includes(P.access_user_management)) return;
+  const perms = await UserModel.getUserPermissions(accountUserId, establishmentId);
   if (!perms.includes(P.access_user_management)) {
     throw new AuthorizationError('Permission denied');
   }
@@ -214,12 +222,24 @@ router.post(
     const establishmentId = getEstablishmentId(req, res);
     if (!establishmentId) return;
     const pin = parsePinBody(req.body?.pin);
+    const pinActor = readOptionalPinActor(req);
+    const pinActorId = pinActor ? Number(pinActor.id) : null;
     const targetUserId =
-      req.body?.user_id != null ? Number(req.body.user_id) : req.user!.id;
+      req.body?.user_id != null
+        ? Number(req.body.user_id)
+        : pinActorId != null && Number.isInteger(pinActorId) && pinActorId > 0
+          ? pinActorId
+          : req.user!.id;
     if (!Number.isInteger(targetUserId) || targetUserId <= 0) {
       throw new ValidationError('user_id must be a positive integer');
     }
-    await assertSelfOrUserManagement(req.user!.id, targetUserId, establishmentId);
+    await assertSelfOrUserManagement(
+      req.user!.id,
+      targetUserId,
+      establishmentId,
+      pinActorId,
+      pinActor?.permissions ?? null
+    );
 
     // Ensure PIN uniqueness within establishment
     const existing = await MembershipPinModel.listPinMemberships(establishmentId);

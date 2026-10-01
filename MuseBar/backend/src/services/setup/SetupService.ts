@@ -101,12 +101,24 @@ export class SetupService {
     userAgent?: string
   ): Promise<BusinessSetupResponse> {
     try {
-      return await SetupWizard.completeBusinessSetup(
+      const result = await SetupWizard.completeBusinessSetup(
         pool,
         setupData,
         ipAddress,
         userAgent
       );
+      if (result.success && result.user?.id && setupData.owner_pin) {
+        const establishmentId = result.user.establishment?.id;
+        if (establishmentId) {
+          const { bootstrapOwnerPin } = await import('../auth/bootstrapOwnerPin');
+          await bootstrapOwnerPin({
+            userId: result.user.id,
+            establishmentId,
+            ownerPin: setupData.owner_pin,
+          });
+        }
+      }
+      return result;
     } catch (error) {
       this.logger.error(
         'Error completing business setup',

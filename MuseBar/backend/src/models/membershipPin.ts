@@ -136,6 +136,24 @@ export class MembershipPinModel {
     return (result.rowCount || 0) > 0;
   }
 
+  /** Verify the login account's own PIN on a given membership (venue switch). */
+  static async verifyUserPin(
+    userId: number,
+    establishmentId: string,
+    pin: string
+  ): Promise<{ ok: true } | { ok: false; reason: 'missing' | 'locked' | 'wrong' }> {
+    const row = await this.getMembershipWithPin(userId, establishmentId);
+    if (!row?.pin_hash) return { ok: false, reason: 'missing' };
+    if (this.isLocked(row)) return { ok: false, reason: 'locked' };
+    const match = await bcrypt.compare(pin, row.pin_hash);
+    if (!match) {
+      await this.recordFailedAttempt(userId, establishmentId);
+      return { ok: false, reason: 'wrong' };
+    }
+    await this.clearLockout(userId, establishmentId);
+    return { ok: true };
+  }
+
   static isLocked(row: Pick<MembershipPinRow, 'pin_locked_until'>): boolean {
     if (!row.pin_locked_until) return false;
     return new Date(row.pin_locked_until).getTime() > Date.now();

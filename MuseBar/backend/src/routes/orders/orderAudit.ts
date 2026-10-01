@@ -91,7 +91,7 @@ router.get('/:orderId', requireAuth, requireAnyPermission([P.access_pos, P.acces
  * GET audit summary for order
  * GET /api/orders/audit/:orderId/summary
  */
-router.get('/:orderId/summary', requireAuth, asyncHandler(async (req, res) => {
+router.get('/:orderId/summary', requireAuth, requireAnyPermission([P.access_pos, P.access_compliance]), asyncHandler(async (req, res) => {
   try {
     const establishmentId = getEstablishmentId(req, res);
     if (!establishmentId) return;

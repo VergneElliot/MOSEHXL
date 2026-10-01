@@ -22,6 +22,7 @@ function buildSetupData(): BusinessSetupRequest {
     email: 'john@example.com',
     password: 'Password123',
     confirm_password: 'Password123',
+    owner_pin: '1234',
     business_name: 'Muse Bar',
     contact_email: 'contact@musebar.test',
     phone: '+33123456789',

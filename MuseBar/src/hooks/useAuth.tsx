@@ -31,7 +31,7 @@ interface AuthActions {
   ) => void;
   logout: () => void;
   refreshToken: () => Promise<void>;
-  switchEstablishment: (establishmentId: string) => Promise<void>;
+  switchEstablishment: (establishmentId: string, ownerPin: string) => Promise<void>;
 }
 
 type RefreshResponse = {
@@ -143,14 +143,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [clearLocalSession, rememberMe]);
 
-  const switchEstablishment = useCallback(async (establishmentId: string) => {
+  const switchEstablishment = useCallback(async (establishmentId: string, ownerPin: string) => {
     if (!apiConfig.isReady()) {
       await apiConfig.initialize();
     }
     const rememberMeFlag = rememberMe || localStorage.getItem('remember_me') === 'true';
     const response = await apiService.post<SwitchEstablishmentResponse>(
       '/auth/switch-establishment',
-      { establishment_id: establishmentId, rememberMe: rememberMeFlag }
+      { establishment_id: establishmentId, owner_pin: ownerPin, rememberMe: rememberMeFlag }
     );
     const { token: newToken, user: nextUser, expiresIn } = response.data;
     ApiService.setToken(newToken);

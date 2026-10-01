@@ -1,3 +1,7 @@
+/**
+ * Header bar with venue switcher (owner PIN challenge) and PIN session tabs.
+ */
+
 import React from 'react';
 import {
   AppBar,
@@ -9,6 +13,12 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Alert,
 } from '@mui/material';
 import {
   Restaurant as RestaurantIcon,
@@ -19,7 +29,7 @@ import { User } from '../../types/auth';
 import { useTranslation } from 'react-i18next';
 import { TimeClockHeaderControl } from './TimeClockHeaderControl';
 import { PinSessionHeaderTabs } from './PinSessionHeaderTabs';
-import { DisplayScalePlaceholder } from './DisplayScalePlaceholder';
+import { DisplayScaleControl } from './DisplayScaleControl';
 import { HappyHourHeaderChip } from './HappyHourHeaderChip';
 
 interface AppHeaderProps {
@@ -27,11 +37,9 @@ interface AppHeaderProps {
   timeUntilHappyHour: string;
   onLogout: () => void;
   user: User | null;
-  onSwitchEstablishment?: (establishmentId: string) => Promise<void> | void;
-  /** Show PIN session tabs (establishment POS shell). */
+  onSwitchEstablishment?: (establishmentId: string, ownerPin: string) => Promise<void> | void;
   showPinSessions?: boolean;
   onHappyHourStatusUpdate?: () => void;
-  /** Établissement name from settings (Paramètres → Établissement). */
   establishmentBrandName?: string;
 }
 
@@ -48,6 +56,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const { t } = useTranslation('common');
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [switching, setSwitching] = React.useState(false);
+  const [pendingEstablishmentId, setPendingEstablishmentId] = React.useState<string | null>(null);
+  const [ownerPin, setOwnerPin] = React.useState('');
+  const [pinError, setPinError] = React.useState<string | null>(null);
 
   const membershipName =
     user?.memberships?.find((m) => m.establishment_id === user?.establishment_id)?.name?.trim() ??
@@ -61,6 +72,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     user?.role !== 'system_admin' &&
     memberships.length > 1;
 
+  const pendingName =
+    memberships.find((m) => m.establishment_id === pendingEstablishmentId)?.name ||
+    pendingEstablishmentId ||
+    '';
+
   const handleOpen = (event: React.MouseEvent<HTMLElement>) => {
     if (!showSwitcher) return;
     setAnchorEl(event.currentTarget);
@@ -68,17 +84,36 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   const handleClose = () => setAnchorEl(null);
 
-  const handleSelect = async (establishmentId: string) => {
+  const handleSelect = (establishmentId: string) => {
     if (!onSwitchEstablishment || establishmentId === user?.establishment_id) {
       handleClose();
       return;
     }
+    handleClose();
+    setPendingEstablishmentId(establishmentId);
+    setOwnerPin('');
+    setPinError(null);
+  };
+
+  const handleConfirmSwitch = async () => {
+    if (!onSwitchEstablishment || !pendingEstablishmentId) return;
+    if (!/^\d{2,8}$/.test(ownerPin.trim())) {
+      setPinError('Saisissez le PIN propriétaire de ce compte sur l’établissement cible');
+      return;
+    }
     setSwitching(true);
+    setPinError(null);
     try {
-      await onSwitchEstablishment(establishmentId);
+      await onSwitchEstablishment(pendingEstablishmentId, ownerPin.trim());
+      setPendingEstablishmentId(null);
+      setOwnerPin('');
+    } catch (err: unknown) {
+      const e = err as { message?: string; response?: { data?: { error?: string } } };
+      setPinError(
+        e.response?.data?.error || e.message || 'Basculement impossible — vérifiez le PIN'
+      );
     } finally {
       setSwitching(false);
-      handleClose();
     }
   };
 
@@ -95,7 +130,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         {!showPinSessions && <Box sx={{ flexGrow: 1 }} />}
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, ml: 'auto', flexShrink: 0 }}>
-          {showPinSessions && <DisplayScalePlaceholder />}
+          {showPinSessions && <DisplayScaleControl />}
           {user && user.role !== 'system_admin' && user.establishment_id && (
             <TimeClockHeaderControl />
           )}
@@ -138,7 +173,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                         key={m.establishment_id}
                         selected={selected}
                         disabled={switching}
-                        onClick={() => void handleSelect(m.establishment_id)}
+                        onClick={() => handleSelect(m.establishment_id)}
                       >
                         {selected && (
                           <ListItemIcon>
@@ -162,6 +197,43 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           )}
         </Box>
       </Toolbar>
+
+      <Dialog
+        open={pendingEstablishmentId != null}
+        onClose={() => !switching && setPendingEstablishmentId(null)}
+      >
+        <DialogTitle>Basculer vers {pendingName}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Saisissez le PIN propriétaire de votre compte sur cet établissement.
+          </Typography>
+          {pinError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {pinError}
+            </Alert>
+          )}
+          <TextField
+            autoFocus
+            fullWidth
+            label="PIN propriétaire"
+            type="password"
+            value={ownerPin}
+            onChange={(e) => setOwnerPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void handleConfirmSwitch();
+            }}
+            inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPendingEstablishmentId(null)} disabled={switching}>
+            Annuler
+          </Button>
+          <Button variant="contained" onClick={() => void handleConfirmSwitch()} disabled={switching}>
+            Basculer
+          </Button>
+        </DialogActions>
+      </Dialog>
     </AppBar>
   );
 };

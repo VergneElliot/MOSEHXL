@@ -50,6 +50,7 @@ export const BusinessSetupWizard: React.FC = () => {
     email: '',
     password: '',
     confirmPassword: '',
+    ownerPin: '',
     businessName: '',
     contactEmail: '',
     phone: '',

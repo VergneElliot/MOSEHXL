@@ -18,10 +18,6 @@ import {
   TableRow,
   Button,
   TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -30,7 +26,6 @@ import {
   Chip,
 } from '@mui/material';
 
-import { EstablishmentAssignableRole } from '../../types/auth';
 import {
   useUserState,
   useUserActions,
@@ -41,6 +36,7 @@ import * as floorApi from '../../services/api/floor';
 import ActivePinSessionsPanel from './UserManagement/ActivePinSessionsPanel';
 import PermissionsDialog from './UserManagement/PermissionsDialog';
 import UserRowActions from './UserManagement/UserRowActions';
+import AddPinStaffDialog from './UserManagement/AddPinStaffDialog';
 
 function formatEstablishmentRoleLabel(role: string): string {
   switch (role) {
@@ -123,9 +119,10 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
 
     const formData = userForm.getFormData();
     const success = await userActions.createUser(
-      formData.email,
-      formData.password,
-      formData.role
+      formData.firstName,
+      formData.pin,
+      formData.role,
+      formData.lastName
     );
 
     if (success) {
@@ -222,7 +219,7 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
 
       <Box sx={{ mb: 2 }}>
         <Button variant="contained" color="primary" onClick={userForm.openAddDialog}>
-          Ajouter un utilisateur
+          Ajouter un membre (PIN)
         </Button>
       </Box>
 
@@ -230,7 +227,7 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Email</TableCell>
+              <TableCell>Identité</TableCell>
               <TableCell>Rôle</TableCell>
               <TableCell>PIN badge</TableCell>
               <TableCell>Actions</TableCell>
@@ -279,56 +276,20 @@ const UserManagement: React.FC<{ token: string }> = ({ token }) => {
 
       <ActivePinSessionsPanel />
 
-      <Dialog open={userForm.showAdd} onClose={userForm.closeAddDialog}>
-        <DialogTitle>Ajouter un nouvel utilisateur</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Email"
-            type="email"
-            fullWidth
-            variant="outlined"
-            value={userForm.newEmail}
-            onChange={(e) => userForm.updateEmail(e.target.value)}
-          />
-          <TextField
-            margin="dense"
-            label="Mot de passe"
-            type="password"
-            fullWidth
-            variant="outlined"
-            value={userForm.newPassword}
-            onChange={(e) => userForm.updatePassword(e.target.value)}
-          />
-          <FormControl fullWidth margin="dense" variant="outlined">
-            <InputLabel id="add-user-role-label">Rôle</InputLabel>
-            <Select<EstablishmentAssignableRole>
-              labelId="add-user-role-label"
-              label="Rôle"
-              value={userForm.newRole}
-              onChange={(e) =>
-                userForm.updateRole(e.target.value as EstablishmentAssignableRole)
-              }
-            >
-              <MenuItem value="staff">Staff</MenuItem>
-              <MenuItem value="establishment_admin">
-                Administrateur d&apos;établissement
-              </MenuItem>
-            </Select>
-          </FormControl>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={userForm.closeAddDialog}>Annuler</Button>
-          <Button
-            onClick={handleAddUser}
-            disabled={!userForm.isFormValid()}
-            variant="contained"
-          >
-            Ajouter
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <AddPinStaffDialog
+        open={userForm.showAdd}
+        firstName={userForm.newFirstName}
+        lastName={userForm.newLastName}
+        pin={userForm.newPin}
+        role={userForm.newRole}
+        onClose={userForm.closeAddDialog}
+        onFirstName={userForm.updateFirstName}
+        onLastName={userForm.updateLastName}
+        onPin={userForm.updatePin}
+        onRole={userForm.updateRole}
+        onSubmit={() => void handleAddUser()}
+        canSubmit={userForm.isFormValid()}
+      />
 
       <Dialog open={pinDialog != null} onClose={() => setPinDialog(null)}>
         <DialogTitle>PIN badge — {pinDialog?.email}</DialogTitle>

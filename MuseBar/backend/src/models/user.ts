@@ -2,49 +2,9 @@ import { pool } from '../db/pool';
 import bcrypt from 'bcrypt';
 import { validatePasswordWithBreachCheck } from '../utils/passwordValidation';
 import { resolveEffectivePermissions } from '../permissions/resolve';
+import type { AuthenticatedUser, UserRow } from './userTypes';
 
-/**
- * Full database row from the `users` table.
- * Returned by SELECT * queries. Contains sensitive fields (password_hash)
- * that must NEVER be sent to the frontend.
- */
-export interface UserRow {
-  id: number;
-  email: string;
-  password_hash: string;
-  is_admin: boolean;
-  role: string;
-  establishment_id: string | null;
-  first_name: string | null;
-  last_name: string | null;
-  email_verified: boolean;
-  is_active: boolean;
-  failed_login_attempts: number;
-  lockout_count: number;
-  locked_until: Date | null;
-  mfa_totp_enabled?: boolean;
-  mfa_totp_secret?: string | null;
-  mfa_totp_enabled_at?: Date | null;
-  last_login: Date | null;
-  created_at: Date;
-  updated_at: Date;
-}
-
-/**
- * Subset of user data carried in the JWT and attached to `req.user`.
- * This is the backend's "session" representation -- no DB query needed.
- * Must stay in sync with `types/express/index.d.ts`.
- */
-export interface AuthenticatedUser {
-  id: number;
-  email: string;
-  is_admin: boolean;
-  role: string;
-  establishment_id: string | null;
-}
-
-/** @deprecated Use UserRow instead. Alias kept for backward compatibility during migration. */
-export type User = UserRow;
+export type { AuthenticatedUser, UserRow, User } from './userTypes';
 
 export class UserModel {
   private static async assertPasswordPolicy(password: string): Promise<void> {

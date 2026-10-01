@@ -3,6 +3,10 @@
 Operational checklist for the establishment Administration space
 (`Documents`, `Boîte mail`, `Réservations`, `Planning`, `Pointage`).
 
+**Related:** long-term provider choice (SendGrid → SES/ESP, never self-host) is documented in
+[`docs/EMAIL-PROVIDER-STRATEGY.md`](../EMAIL-PROVIDER-STRATEGY.md). This runbook remains the
+day-to-day SendGrid + Spaces checklist.
+
 ## 0. SendGrid Domain Authentication (required for `slug@mosehxl.com`)
 
 Reservation mails and inbox replies send **From** `Name <slug@mosehxl.com>`.

@@ -64,6 +64,12 @@ export const PersonalInfoStep: React.FC<PersonalInfoStepProps> = ({
       newErrors.confirmPassword = 'Passwords do not match';
     }
 
+    if (!formData.ownerPin) {
+      newErrors.ownerPin = 'PIN propriétaire requis';
+    } else if (!/^\d{4,8}$/.test(formData.ownerPin)) {
+      newErrors.ownerPin = 'Le PIN doit contenir 4 à 8 chiffres';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -212,6 +218,31 @@ export const PersonalInfoStep: React.FC<PersonalInfoStepProps> = ({
                   >
                     {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
                   </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="PIN propriétaire"
+            type="password"
+            value={formData.ownerPin}
+            onChange={(e) => {
+              const value = e.target.value.replace(/\D/g, '').slice(0, 8);
+              onUpdate({ ownerPin: value });
+              if (errors.ownerPin) setErrors((prev) => ({ ...prev, ownerPin: '' }));
+            }}
+            error={!!errors.ownerPin}
+            helperText={errors.ownerPin || '4–8 chiffres — ouvre votre session caisse / admin'}
+            required
+            inputProps={{ inputMode: 'numeric', pattern: '[0-9]*', autoComplete: 'off' }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Lock color="action" />
                 </InputAdornment>
               ),
             }}

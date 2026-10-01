@@ -59,7 +59,10 @@ router.get(
  * PUT /api/settings/happy-hour
  * Saves Happy Hour settings for the authenticated user's establishment.
  */
-router.put('/happy-hour', requirePermission(P.access_settings), asyncHandler(async (req, res) => {
+router.put(
+  '/happy-hour',
+  requireAnyPermission([P.access_settings, P.pos_happyhour_manual]),
+  asyncHandler(async (req, res) => {
   const establishmentId = getEstablishmentId(req, res);
   if (!establishmentId) return;
 
