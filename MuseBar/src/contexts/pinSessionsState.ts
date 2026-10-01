@@ -27,6 +27,8 @@ export interface PinSession {
   actor: PinActorState;
   cart: OrderItem[];
   activeTable: ActiveTableState | null;
+  /** Device-local stamp so a just-verified badge survives a racey list refresh. */
+  localUnlockedAt?: number | null;
 }
 
 /** Sessions plus focus, kept in one object so every transition is atomic. */
@@ -35,7 +37,9 @@ export interface PinSessionsState {
   activeSessionId: string | null;
 }
 
-export type PinSessionPatch = Partial<Pick<PinSession, 'cart' | 'activeTable' | 'actor'>>;
+export type PinSessionPatch = Partial<
+  Pick<PinSession, 'cart' | 'activeTable' | 'actor' | 'localUnlockedAt'>
+>;
 
 export const EMPTY_PIN_SESSIONS: PinSessionsState = { sessions: [], activeSessionId: null };
 
@@ -96,8 +100,8 @@ export function isSessionExpired(
 }
 
 /**
- * Adds a session for `actor`, or refreshes the existing one for the same user.
- * The result is always focused on the resulting session.
+ * Adds / unlocks a session for `actor`, or refreshes the existing one for the same user.
+ * Tab ids prefer the server badge `sid` so shared lists and local unlocks align.
  */
 export function addOrFocusSession(
   state: PinSessionsState,
@@ -105,33 +109,53 @@ export function addOrFocusSession(
   id: string
 ): PinSessionsState {
   const withExpiry = withTokenExpiry(actor);
+  const preferredId =
+    typeof withExpiry.sessionId === 'string' && withExpiry.sessionId.length > 0
+      ? withExpiry.sessionId
+      : id;
+  const unlockedAt = Date.now();
   const existing = state.sessions.find((s) => s.actor.userId === withExpiry.userId);
   if (existing) {
     return {
       sessions: state.sessions.map((s) =>
-        s.id === existing.id ? { ...s, actor: withExpiry } : s
+        s.id === existing.id
+          ? { ...s, id: preferredId, actor: withExpiry, localUnlockedAt: unlockedAt }
+          : s
       ),
-      activeSessionId: existing.id,
+      activeSessionId: preferredId,
     };
   }
   return {
-    sessions: [...state.sessions, { id, actor: withExpiry, cart: [], activeTable: null }],
-    activeSessionId: id,
+    sessions: [
+      ...state.sessions,
+      {
+        id: preferredId,
+        actor: withExpiry,
+        cart: [],
+        activeTable: null,
+        localUnlockedAt: unlockedAt,
+      },
+    ],
+    activeSessionId: preferredId,
   };
 }
 
 /** Id that `addOrFocusSession` would end up focusing, without applying it. */
 export function resolveSessionId(
-  state: PinSessionsState,
-  userId: number,
-  candidateId: string
+  _state: PinSessionsState,
+  _userId: number,
+  candidateId: string,
+  sessionId?: string | null
 ): string {
-  return state.sessions.find((s) => s.actor.userId === userId)?.id ?? candidateId;
+  return typeof sessionId === 'string' && sessionId.length > 0 ? sessionId : candidateId;
 }
 
 export function focusSession(state: PinSessionsState, id: string | null): PinSessionsState {
   if (state.activeSessionId === id) return state;
-  if (id != null && !state.sessions.some((s) => s.id === id)) return state;
+  if (id != null) {
+    const target = state.sessions.find((s) => s.id === id);
+    if (!target?.actor.token) return state;
+  }
   return { ...state, activeSessionId: id };
 }
 
@@ -170,9 +194,14 @@ export function normalizeState(input: unknown): PinSessionsState {
     if (!s || typeof s.id !== 'string' || !s.actor?.token || typeof s.actor.userId !== 'number') {
       continue;
     }
+    const actor = withTokenExpiry({ ...s.actor, permissions: s.actor.permissions ?? [] });
+    const id =
+      typeof actor.sessionId === 'string' && actor.sessionId.length > 0
+        ? actor.sessionId
+        : s.id;
     sessions.push({
-      id: s.id,
-      actor: withTokenExpiry({ ...s.actor, permissions: s.actor.permissions ?? [] }),
+      id,
+      actor,
       cart: Array.isArray(s.cart) ? s.cart : [],
       activeTable: s.activeTable ?? null,
     });

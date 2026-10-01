@@ -13,8 +13,10 @@ import {
   usePinSessions,
   type PinActorState,
 } from './PinSessionsContext';
+import { pinActorFromVerify } from './pinActorFromVerify';
 import * as floorApi from '../services/api/floor';
 import { pinActorHasPermission } from '../utils/pinSessionPermissions';
+import { canSkipPinForActiveActor } from './stepUpElevationPolicy';
 import {
   clearElevationScopes,
   clearTransientElevation,
@@ -53,17 +55,19 @@ interface StepUpAuthContextValue {
   /** Ensure an active PIN session exists (opens session pad if needed). */
   ensureSession: (opts?: { message?: string }) => Promise<PinActorState>;
   /**
-   * Single action step-up: if the active session holds `permission`, return its actor;
-   * otherwise prompt for a PIN that holds the right. The authorization applies to the next
-   * request only — the next click prompts again. Does not open a session tab.
+   * Single action step-up: always prompts for a PIN that holds a **specific**
+   * permission (even if the focused badge already has it). Basic permissions may
+   * use the focused actor without re-entry. Authorization applies to the next
+   * request only. Does not open a session tab.
    */
   ensurePermission: (
     permission: string | string[],
     opts?: { title?: string; description?: string }
   ) => Promise<PinActorState>;
   /**
-   * Page-scoped step-up: same prompt, but the authorization stays open so the page's own
-   * reads and writes keep working. Release it when leaving the page.
+   * Page-scoped step-up: same PIN rules as ensurePermission for entry; once a
+   * scope is open after a successful PIN, further calls for that permission may
+   * reuse the scope until the page releases it.
    */
   ensureAccess: (
     permission: string | string[],
@@ -78,14 +82,7 @@ interface StepUpAuthContextValue {
 const StepUpAuthContext = createContext<StepUpAuthContextValue | null>(null);
 
 function toActor(result: floorApi.PinVerifyResult): PinActorState {
-  return {
-    token: result.pin_actor_token,
-    userId: result.user_id,
-    displayName: result.display_name,
-    email: result.email,
-    role: result.role,
-    permissions: result.permissions ?? [],
-  };
+  return pinActorFromVerify(result);
 }
 
 export function StepUpAuthProvider({ children }: { children: ReactNode }) {
@@ -98,7 +95,7 @@ export function StepUpAuthProvider({ children }: { children: ReactNode }) {
   // The active session badge is the default identity on every API request.
   // (Also registered from PinSessionsProvider — keep this as a belt-and-suspenders sync.)
   useEffect(() => {
-    registerSessionTokenProvider(() => activeSession?.actor.token ?? null);
+    registerSessionTokenProvider(() => activeSession?.actor.token || null);
     return () => {
       /* PinSessionsProvider owns clear-on-unmount */
     };
@@ -146,12 +143,16 @@ export function StepUpAuthProvider({ children }: { children: ReactNode }) {
       opts?: { title?: string; description?: string }
     ) => {
       const permissions = Array.isArray(permission) ? permission : [permission];
+      // Specific rights always prompt. Basic may reuse the focused badge without PIN.
       if (
         activeSession?.actor &&
-        permissions.some((p) => pinActorHasPermission(activeSession.actor, p))
+        canSkipPinForActiveActor(permissions, (p) =>
+          pinActorHasPermission(activeSession.actor, p)
+        )
       ) {
         return Promise.resolve(activeSession.actor);
       }
+      // Page scope: after a successful PIN for this visit, reuse until releaseAccess.
       if (elevation === 'scope') {
         for (const p of permissions) {
           const openScopeActor = scopeActorsRef.current.get(p);

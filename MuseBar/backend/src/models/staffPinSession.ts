@@ -82,6 +82,27 @@ export class StaffPinSessionModel {
   }
 
   /**
+   * Most recently seen open badge for one PIN user in the venue.
+   * Used so a second terminal reuses the same session (no double clock-in).
+   */
+  static async findActiveForUser(
+    establishmentId: string,
+    userId: number
+  ): Promise<StaffPinSessionRow | null> {
+    const result = await pool.query(
+      `SELECT * FROM staff_pin_sessions
+       WHERE establishment_id = $1
+         AND user_id = $2
+         AND closed_at IS NULL
+         AND expires_at > CURRENT_TIMESTAMP
+       ORDER BY last_seen_at DESC
+       LIMIT 1`,
+      [establishmentId, userId]
+    );
+    return (result.rows[0] as StaffPinSessionRow | undefined) ?? null;
+  }
+
+  /**
    * Marks time-expired badges closed. Access control does not depend on this (the queries
    * already exclude them); it keeps the sessions list and the audit reason honest.
    */
@@ -122,6 +143,44 @@ export class StaffPinSessionModel {
     );
   }
 
+  /** Refresh activity + extend TTL when the same badge is unlocked on another device. */
+  static async touchAndExtend(
+    sessionId: string,
+    establishmentId: string,
+    expiresAt: Date
+  ): Promise<boolean> {
+    const result = await pool.query(
+      `UPDATE staff_pin_sessions
+       SET last_seen_at = CURRENT_TIMESTAMP,
+           expires_at = $3
+       WHERE id = $1 AND establishment_id = $2 AND closed_at IS NULL`,
+      [sessionId, establishmentId, expiresAt]
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  /**
+   * Closes duplicate open badges for the same user, keeping `keepSessionId`.
+   * Cleans legacy multi-insert verifies after the one-session-per-user rule.
+   */
+  static async closeDuplicatesForUser(
+    userId: number,
+    establishmentId: string,
+    keepSessionId: string,
+    reason = 'superseded_by_reuse'
+  ): Promise<number> {
+    const result = await pool.query(
+      `UPDATE staff_pin_sessions
+       SET closed_at = CURRENT_TIMESTAMP, close_reason = $4
+       WHERE user_id = $1
+         AND establishment_id = $2
+         AND closed_at IS NULL
+         AND id <> $3`,
+      [userId, establishmentId, keepSessionId, reason]
+    );
+    return result.rowCount ?? 0;
+  }
+
   static async close(
     sessionId: string,
     establishmentId: string,
@@ -151,9 +210,34 @@ export class StaffPinSessionModel {
     return result.rowCount ?? 0;
   }
 
+  /**
+   * Closes extra open badges so at most one open row remains per PIN user.
+   * Keeps the most recently seen session. Heals legacy multi-device duplicates.
+   */
+  static async closeDuplicateOpens(establishmentId: string): Promise<number> {
+    const result = await pool.query(
+      `UPDATE staff_pin_sessions AS s
+       SET closed_at = CURRENT_TIMESTAMP,
+           close_reason = 'superseded_by_reuse'
+       WHERE s.establishment_id = $1
+         AND s.closed_at IS NULL
+         AND s.id NOT IN (
+           SELECT DISTINCT ON (user_id) id
+           FROM staff_pin_sessions
+           WHERE establishment_id = $1
+             AND closed_at IS NULL
+             AND expires_at > CURRENT_TIMESTAMP
+           ORDER BY user_id, last_seen_at DESC
+         )`,
+      [establishmentId]
+    );
+    return result.rowCount ?? 0;
+  }
+
   static async listActive(establishmentId: string): Promise<ActivePinSessionSummary[]> {
     const result = await pool.query(
-      `SELECT s.id,
+      `SELECT DISTINCT ON (s.user_id)
+              s.id,
               s.user_id,
               u.email,
               TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')) AS full_name,
@@ -168,7 +252,7 @@ export class StaffPinSessionModel {
        WHERE s.establishment_id = $1
          AND s.closed_at IS NULL
          AND s.expires_at > CURRENT_TIMESTAMP
-       ORDER BY s.last_seen_at DESC`,
+       ORDER BY s.user_id, s.last_seen_at DESC`,
       [establishmentId]
     );
 

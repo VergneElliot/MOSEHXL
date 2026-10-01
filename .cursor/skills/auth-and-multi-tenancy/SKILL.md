@@ -43,10 +43,17 @@ Login rejects `can_login = false`. Setup wizard collects email + password + **ow
 
 | Layer | Location |
 |-------|----------|
-| Verify PIN | `POST /api/auth/pin/verify` → opens session + **clock-in** |
+| Verify PIN | `POST /api/auth/pin/verify` → opens or **reuses** session + clock-in only on first open |
 | Actor token | `pinActorToken.ts` (`token_use: 'pin_actor'`, default **1 day**; `AUTH_PIN_ACTOR_TTL_DAYS`) |
 | Close | `POST /api/auth/pin/sessions/:id/close` → **clock-out**; blocked if open tables |
 | Pointage glue | `services/auth/pinSessionPointage.ts` |
+| One open badge / user | `openPinSession` reuses `staff_pin_sessions` for `(establishment, pin_user)`; no second clock-in |
+| Shared header tabs | `GET /api/auth/pin/sessions` (any auth) + FE merge; **one tab per PIN user**; focus remote → that user's PIN; carts local by `sid` |
+| Tab sync | Poll ~12s while visible + window focus / online / manual refresh; drop local unlock after grace if closed remotely |
+| Close badge | Header ✕ requires that user's PIN (any device); token proves ownership; managers may force-close from admin |
+| Device focus | Shared tab *list*; which tab is **focused** stays per-device (`sessionStorage`) |
+| Pointage network | **First** PIN open + any PIN close require venue Wi‑Fi allowlist; unlock/reuse + POS work off-network (5G/terrasse) |
+| Specific rights | Always step-up PIN (`ensurePermission` / `ensureAccess`); no silent short-circuit on focused badge |
 | Enforcement | `middleware/pinActor.ts` + `pinSessionGuard.ts` — `x-pin-actor-token` |
 | Frontend | `PinSessionsContext.tsx`, header PIN tabs, PIN-first shell |
 

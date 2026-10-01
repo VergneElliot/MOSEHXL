@@ -65,6 +65,12 @@ export async function listActivePinSessions(): Promise<ActivePinSessionDto[]> {
 }
 
 /** Closing a badge revokes its token server-side, ahead of the 8h expiry. */
-export async function closePinSession(sessionId: string): Promise<void> {
-  await request(`/auth/pin/sessions/${encodeURIComponent(sessionId)}/close`, { method: 'POST' });
+export async function closePinSession(
+  sessionId: string,
+  pinActorToken?: string
+): Promise<void> {
+  await request(`/auth/pin/sessions/${encodeURIComponent(sessionId)}/close`, {
+    method: 'POST',
+    headers: pinActorToken ? { 'x-pin-actor-token': pinActorToken } : undefined,
+  });
 }

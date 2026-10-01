@@ -44,19 +44,46 @@ describe('pinSessionsState — session set transitions', () => {
   });
 
   it('refreshes and focuses the existing session for the same user', () => {
-    const first = addOrFocusSession(EMPTY_PIN_SESSIONS, actor(1), 'a');
-    const withCart = patchSession(first, 'a', { cart: [{ id: 'x' }] as never });
+    const first = addOrFocusSession(
+      EMPTY_PIN_SESSIONS,
+      actor(1, { sessionId: 'sid-a' }),
+      'sid-a'
+    );
+    const withCart = patchSession(first, 'sid-a', { cart: [{ id: 'x' }] as never });
     const second = addOrFocusSession(
       withCart,
-      actor(1, { token: fakeToken(), displayName: 'Renamed' }),
-      'b'
+      actor(1, { token: fakeToken(), displayName: 'Renamed', sessionId: 'sid-a' }),
+      'ignored-candidate'
     );
 
     expect(second.sessions).toHaveLength(1);
-    expect(second.sessions[0]?.id).toBe('a');
+    expect(second.sessions[0]?.id).toBe('sid-a');
     expect(second.sessions[0]?.actor.displayName).toBe('Renamed');
     expect(second.sessions[0]?.cart).toHaveLength(1);
-    expect(second.activeSessionId).toBe('a');
+    expect(second.activeSessionId).toBe('sid-a');
+  });
+
+  it('rebases the tab id onto the server sid when unlocking', () => {
+    const locked: PinSessionsState = {
+      sessions: [
+        {
+          id: 'sid-42',
+          actor: actor(1, { token: '', sessionId: 'sid-42' }),
+          cart: [{ id: 'line' } as never],
+          activeTable: null,
+        },
+      ],
+      activeSessionId: null,
+    };
+    const next = addOrFocusSession(
+      locked,
+      actor(1, { token: fakeToken(undefined, 'sid-42'), sessionId: 'sid-42' }),
+      'local-fallback'
+    );
+    expect(next.sessions).toHaveLength(1);
+    expect(next.sessions[0]?.id).toBe('sid-42');
+    expect(next.sessions[0]?.cart).toHaveLength(1);
+    expect(next.activeSessionId).toBe('sid-42');
   });
 
   it('keeps one tab per distinct user', () => {
@@ -105,18 +132,31 @@ describe('pinSessionsState — session set transitions', () => {
     expect(next.activeSessionId).toBe('b');
   });
 
-  it('refuses to focus an unknown session', () => {
+  it('refuses to focus an unknown or locked session', () => {
     const state = addOrFocusSession(EMPTY_PIN_SESSIONS, actor(1), 'a');
     expect(focusSession(state, 'ghost')).toBe(state);
+
+    const withLocked: PinSessionsState = {
+      ...state,
+      sessions: [
+        ...state.sessions,
+        {
+          id: 'locked',
+          actor: actor(2, { token: '' }),
+          cart: [],
+          activeTable: null,
+        },
+      ],
+    };
+    expect(focusSession(withLocked, 'locked')).toBe(withLocked);
   });
 
-  it('resolves the id a verify will land on', () => {
+  it('resolves to the server sid when provided', () => {
     const state = addOrFocusSession(EMPTY_PIN_SESSIONS, actor(1), 'a');
-    expect(resolveSessionId(state, 1, 'candidate')).toBe('a');
+    expect(resolveSessionId(state, 1, 'candidate', 'sid-9')).toBe('sid-9');
     expect(resolveSessionId(state, 9, 'candidate')).toBe('candidate');
   });
 });
-
 describe('pinSessionsState — token expiry', () => {
   it('reads exp from the actor token', () => {
     expect(readTokenExpiryMs(fakeToken(1_700_000_000))).toBe(1_700_000_000_000);
