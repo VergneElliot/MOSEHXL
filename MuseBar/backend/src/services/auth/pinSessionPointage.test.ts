@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getOpenEntryAnyEstablishment: vi.fn(),
   clockIn: vi.fn(),
   clockOut: vi.fn(),
+  abandonEmptyOpenTicketsForWaiter: vi.fn(),
 }));
 
 vi.mock('../../db/pool', () => ({
@@ -19,6 +20,10 @@ vi.mock('../../models/timeEntry', () => ({
     clockIn: mocks.clockIn,
     clockOut: mocks.clockOut,
   },
+}));
+
+vi.mock('../floor/openTicketEmptyCleanup', () => ({
+  abandonEmptyOpenTicketsForWaiter: mocks.abandonEmptyOpenTicketsForWaiter,
 }));
 
 vi.mock('../../utils/logger', () => ({
@@ -36,14 +41,12 @@ describe('countOpenTicketsForWaiter', () => {
     mocks.query.mockReset();
   });
 
-  it('counts only tickets owned via last_served_by_user_id', async () => {
+  it('counts only tickets owned via last_served_by_user_id with active lines', async () => {
     mocks.query.mockResolvedValueOnce({ rows: [{ n: 2 }] });
     await expect(countOpenTicketsForWaiter('est-1', 42)).resolves.toBe(2);
-    expect(mocks.query).toHaveBeenCalledWith(
-      expect.stringContaining('last_served_by_user_id = $2'),
-      ['est-1', 42]
-    );
     const sql = String(mocks.query.mock.calls[0]?.[0] ?? '');
+    expect(sql).toMatch(/last_served_by_user_id = \$2/);
+    expect(sql).toMatch(/line_status IN \('draft', 'validated'\)/);
     expect(sql).not.toMatch(/opened_by_user_id/);
   });
 });
@@ -52,27 +55,41 @@ describe('clockOutOnPinClose', () => {
   beforeEach(() => {
     mocks.query.mockReset();
     mocks.clockOut.mockReset();
+    mocks.abandonEmptyOpenTicketsForWaiter.mockReset();
+    mocks.abandonEmptyOpenTicketsForWaiter.mockResolvedValue(0);
   });
 
-  it('blocks when the waiter still owns open tables', async () => {
-    mocks.query.mockResolvedValueOnce({ rows: [{ n: 1 }] });
+  it('purges empty shells then blocks when owned tables still have items', async () => {
+    mocks.query.mockResolvedValueOnce({ rows: [{ label: '12' }] });
     await expect(
       clockOutOnPinClose({ establishmentId: 'est-1', userId: 7 })
     ).rejects.toMatchObject({
       statusCode: 409,
       errorCode: 'PIN_CLOSE_OPEN_TABLES',
     } satisfies Partial<AppError>);
+    expect(mocks.abandonEmptyOpenTicketsForWaiter).toHaveBeenCalledWith('est-1', 7);
     expect(mocks.clockOut).not.toHaveBeenCalled();
   });
 
-  it('clocks out when no tables are attributed to the waiter', async () => {
-    mocks.query.mockResolvedValueOnce({ rows: [{ n: 0 }] });
+  it('clocks out when no active owned tables remain after purge', async () => {
+    mocks.query.mockResolvedValueOnce({ rows: [] });
     mocks.clockOut.mockResolvedValueOnce(undefined);
     await clockOutOnPinClose({ establishmentId: 'est-1', userId: 7, ip: '1.2.3.4' });
+    expect(mocks.abandonEmptyOpenTicketsForWaiter).toHaveBeenCalledWith('est-1', 7);
     expect(mocks.clockOut).toHaveBeenCalledWith({
       establishmentId: 'est-1',
       userId: 7,
       ip: '1.2.3.4',
     });
+  });
+
+  it('checks tables but skips TimeEntry when recordPointage is false', async () => {
+    mocks.query.mockResolvedValueOnce({ rows: [] });
+    await clockOutOnPinClose({
+      establishmentId: 'est-1',
+      userId: 7,
+      recordPointage: false,
+    });
+    expect(mocks.clockOut).not.toHaveBeenCalled();
   });
 });

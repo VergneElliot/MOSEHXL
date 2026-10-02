@@ -1,4 +1,5 @@
 import { pool } from '../../db/pool';
+import { abandonAllEmptyOpenTickets } from '../../services/floor/openTicketEmptyCleanup';
 
 export interface FloorPlan {
   id: number;
@@ -240,6 +241,7 @@ export const DiningTableModel = {
       }
     >
   > {
+    await abandonAllEmptyOpenTickets(establishmentId);
     const result = await pool.query(
       `SELECT t.*,
               ot.id AS open_ticket_id,

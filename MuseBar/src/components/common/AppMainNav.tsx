@@ -1,5 +1,6 @@
 /**
  * Hamburger main navigation — replaces the permanent side/top tab strip.
+ * When the active page registers sub-tabs, they appear nested under that item.
  */
 
 import React from 'react';
@@ -15,6 +16,7 @@ import {
 } from '@mui/material';
 import { Menu as MenuIcon } from '@mui/icons-material';
 import { PinSessionHeaderTabs } from './PinSessionHeaderTabs';
+import { useNavSubsections } from '../../contexts/NavSubsectionsContext';
 
 export type AppNavTab = {
   label: string;
@@ -43,6 +45,12 @@ export const AppMainNav: React.FC<AppMainNavProps> = ({
   showPinSessions = false,
 }) => {
   const active = tabs[activeIndex];
+  const subsections = useNavSubsections();
+  const showSubs =
+    subsections != null &&
+    active != null &&
+    subsections.mainTabValue === active.value &&
+    subsections.items.length > 0;
 
   return (
     <>
@@ -117,36 +125,82 @@ export const AppMainNav: React.FC<AppMainNavProps> = ({
           {tabs.map((tab, idx) => {
             const selected = idx === activeIndex;
             return (
-              <ListItemButton
-                key={tab.value}
-                selected={selected}
-                onClick={() => {
-                  onSelect(idx);
-                  onClose();
-                }}
-                sx={{
-                  py: 1.5,
-                  px: 2,
-                  '&.Mui-selected': {
-                    bgcolor: 'action.selected',
-                    borderLeft: 3,
-                    borderColor: 'primary.main',
-                  },
-                }}
-              >
-                {tab.icon && (
-                  <ListItemIcon sx={{ minWidth: 44, color: selected ? 'primary.main' : 'inherit' }}>
-                    {tab.icon}
-                  </ListItemIcon>
-                )}
-                <ListItemText
-                  primary={tab.label}
-                  primaryTypographyProps={{
-                    fontWeight: selected ? 700 : 500,
-                    fontSize: '1.15rem',
+              <React.Fragment key={tab.value}>
+                <ListItemButton
+                  selected={selected}
+                  onClick={() => {
+                    onSelect(idx);
+                    onClose();
                   }}
-                />
-              </ListItemButton>
+                  sx={{
+                    py: 1.5,
+                    px: 2,
+                    '&.Mui-selected': {
+                      bgcolor: 'action.selected',
+                      borderLeft: 3,
+                      borderColor: 'primary.main',
+                    },
+                  }}
+                >
+                  {tab.icon && (
+                    <ListItemIcon sx={{ minWidth: 44, color: selected ? 'primary.main' : 'inherit' }}>
+                      {tab.icon}
+                    </ListItemIcon>
+                  )}
+                  <ListItemText
+                    primary={tab.label}
+                    primaryTypographyProps={{
+                      fontWeight: selected ? 700 : 500,
+                      fontSize: '1.15rem',
+                    }}
+                  />
+                </ListItemButton>
+                {selected && showSubs
+                  ? subsections!.items.map((sub) => {
+                      const subSelected = sub.id === subsections!.activeId;
+                      return (
+                        <ListItemButton
+                          key={sub.id}
+                          selected={subSelected}
+                          onClick={() => {
+                            subsections!.onSelect(sub.id);
+                            onClose();
+                          }}
+                          sx={{
+                            py: 1,
+                            pl: 5,
+                            pr: 2,
+                            '&.Mui-selected': {
+                              bgcolor: 'action.selected',
+                              borderLeft: 3,
+                              borderColor: 'primary.light',
+                            },
+                          }}
+                        >
+                          {sub.icon != null && (
+                            <ListItemIcon
+                              sx={{
+                                minWidth: 36,
+                                color: subSelected ? 'primary.main' : 'text.secondary',
+                                '& .MuiSvgIcon-root': { fontSize: 20 },
+                              }}
+                            >
+                              {sub.icon}
+                            </ListItemIcon>
+                          )}
+                          <ListItemText
+                            primary={sub.label}
+                            primaryTypographyProps={{
+                              fontWeight: subSelected ? 600 : 400,
+                              fontSize: '1rem',
+                              color: subSelected ? 'text.primary' : 'text.secondary',
+                            }}
+                          />
+                        </ListItemButton>
+                      );
+                    })
+                  : null}
+              </React.Fragment>
             );
           })}
         </List>

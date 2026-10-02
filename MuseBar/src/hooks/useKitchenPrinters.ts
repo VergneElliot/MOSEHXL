@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { DataService } from '../services/dataService';
 import { KitchenPrinter } from '../types';
 import type { KitchenPrinterFormInput } from '../services/api/kitchenPrinters';
@@ -52,6 +52,12 @@ export function useKitchenPrinters(
   const [printers, setPrinters] = useState<KitchenPrinter[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Keep toast callbacks out of load deps — unstable parents must not re-fetch forever.
+  const showSuccessRef = useRef(showSuccess);
+  const showErrorRef = useRef(showError);
+  showSuccessRef.current = showSuccess;
+  showErrorRef.current = showError;
+
   const loadPrinters = useCallback(async () => {
     setLoading(true);
     try {
@@ -59,11 +65,11 @@ export function useKitchenPrinters(
       setPrinters(loaded);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erreur inconnue';
-      showError(`Erreur lors du chargement des imprimantes: ${message}`);
+      showErrorRef.current(`Erreur lors du chargement des imprimantes: ${message}`);
     } finally {
       setLoading(false);
     }
-  }, [dataService, showError]);
+  }, [dataService]);
 
   useEffect(() => {
     void loadPrinters();
@@ -72,36 +78,36 @@ export function useKitchenPrinters(
   const createPrinter = useCallback(
     async (form: KitchenPrinterFormData) => {
       await dataService.createKitchenPrinter(toFormInput(form));
-      showSuccess('Imprimante créée avec succès');
+      showSuccessRef.current('Imprimante créée avec succès');
       await loadPrinters();
     },
-    [dataService, loadPrinters, showSuccess]
+    [dataService, loadPrinters]
   );
 
   const updatePrinter = useCallback(
     async (id: string, form: KitchenPrinterFormData) => {
       await dataService.updateKitchenPrinter(id, toFormInput(form));
-      showSuccess('Imprimante mise à jour avec succès');
+      showSuccessRef.current('Imprimante mise à jour avec succès');
       await loadPrinters();
     },
-    [dataService, loadPrinters, showSuccess]
+    [dataService, loadPrinters]
   );
 
   const deletePrinter = useCallback(
     async (id: string) => {
       const result = await dataService.deleteKitchenPrinter(id);
-      showSuccess(result.message || 'Imprimante supprimée');
+      showSuccessRef.current(result.message || 'Imprimante supprimée');
       await loadPrinters();
     },
-    [dataService, loadPrinters, showSuccess]
+    [dataService, loadPrinters]
   );
 
   const testPrinter = useCallback(
     async (id: string) => {
       const result = await dataService.testKitchenPrinter(id);
-      showSuccess(result.message || 'Ticket de test envoyé à la file d’impression');
+      showSuccessRef.current(result.message || 'Ticket de test envoyé à la file d’impression');
     },
-    [dataService, showSuccess]
+    [dataService]
   );
 
   return {

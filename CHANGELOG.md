@@ -49,7 +49,8 @@ specific-permission step-up UX is authorization-only).
 - Identité : compte établissement = email/mot de passe sans droits métier ; droits
   uniquement via session PIN ; staff = acteurs PIN-only (`can_login=false`).
 - Basculement d’établissement : PIN propriétaire du compte sur l’établissement cible.
-- Pointage : ouvrir / fermer un badge PIN = entrée / sortie ; fermeture bloquée
+- Pointage : ouvrir / fermer un badge PIN sur le Wi‑Fi du lieu = entrée / sortie ;
+  hors Wi‑Fi le badge fonctionne sans compter d’heures ; fermeture bloquée
   seulement si des tables ouvertes sont **assignées** à ce profil ; anciennes API
   punch désactivées (410).
 - Boîte mail : liste par **conversation** (plus une ligne par e-mail de confirmation
@@ -66,8 +67,9 @@ specific-permission step-up UX is authorization-only).
 
 - Badges PIN : une seule pastille par profil (déduplication serveur + onglets) ;
   fermeture depuis n’importe quel appareil après saisie du PIN du profil
-  (évite de clôturer le pointage d’autrui). Première ouverture et fermeture de
-  badge = pointage **uniquement sur le Wi‑Fi** configuré ; caisse utilisable hors réseau.
+  (évite de clôturer le pointage d’autrui). Ouverture / fermeture de badge
+  **toujours** possibles hors Wi‑Fi ; le pointage (heures) n’est enregistré
+  **que** depuis le Wi‑Fi / IP autorisé du lieu.
 - Fermeture de badge : ne bloque plus si des tables ouvertes appartiennent à
   **un autre** serveur (critère = `last_served_by_user_id`, pas le simple
   `opened_by`).

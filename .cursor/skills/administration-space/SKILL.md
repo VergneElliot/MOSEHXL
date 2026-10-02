@@ -21,17 +21,24 @@ Establishment-facing **Administration** tab (not System Admin). Gated by permiss
 
 | Sub-tab (FR) | Key | Permission / gate | Panel |
 |--------------|-----|-------------------|-------|
-| Documents | `documents` | `access_documents` or est. admin | `DocumentsPanel.tsx` |
 | Boîte mail | `inbox` | `access_inbox` | `InboxPanel.tsx` |
 | Réservations | `reservations` | `access_reservations` | `ReservationsPanel.tsx` |
 | Planning | `planning` | `access_planning` | `PlanningPanel.tsx` |
 | Pointage | `time_clock` | any establishment member | `TimeClockPanel.tsx` |
-| Plans de tables | `floor` | `manage_floor_plan` | `FloorPlansPanel.tsx` |
-| Utilisateurs | `users` | `access_user_management` | lazy `UserManagement` |
-| Conformité Légale | `compliance` | establishment_admin only | lazy `LegalComplianceDashboard` |
-| Journal de sécurité | `audit` | establishment_admin only | lazy `AuditTrailDashboard` |
+| Documents | `documents` | `access_documents` or est. admin | `DocumentsPanel.tsx` |
+| Conformité Légale | `compliance` | `access_compliance` | lazy `LegalComplianceDashboard` |
+| Journal de sécurité | `audit` | `access_compliance` | lazy `AuditTrailDashboard` |
 
-**Do not confuse** with top-level **Plan de salle** tab — that is operational floor service during POS (`pos-and-floor-service` skill). **Plans de tables** here is the **layout editor** (create/move/resize tables on canvas).
+**Landing / nav:** open the first sub-tab the focused PIN already holds (else Pointage).
+Within Administration, sub-tabs held by that PIN (or opened via step-up this visit) need
+no extra PIN; other sub-tabs still step-up. Main Administration tab entry still requires
+`ensureAccess` for any admin permission (AppRouter).
+
+**Moved out of Administration:**
+- **Plans de tables** (layout editor) → top-level **Plan de salle** → sub-tab « Modifier le plan » (`FloorPlanTabContainer` + `FloorPlansPanel`)
+- **Utilisateurs** → **Paramètres** → « Utilisateurs » (`UserManagement`)
+
+**Do not confuse** Plan de salle **Service** (operational) with **Modifier le plan** (layout editor).
 
 ## Backend
 

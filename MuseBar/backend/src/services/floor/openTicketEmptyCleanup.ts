@@ -39,3 +39,52 @@ export async function abandonOpenTicketIfEmpty(
   );
   return (result.rowCount ?? 0) > 0;
 }
+
+/**
+ * Ghost shells: `status='open'` with no draft/validated lines.
+ * They look free on the floor plan but still block PIN close via last_served_by.
+ */
+export async function abandonEmptyOpenTicketsForWaiter(
+  establishmentId: string,
+  userId: number
+): Promise<number> {
+  const result = await pool.query(
+    `UPDATE open_tickets ot
+     SET status = 'cancelled',
+         closed_at = CURRENT_TIMESTAMP,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE ot.establishment_id = $1
+       AND ot.status = 'open'
+       AND ot.last_served_by_user_id = $2
+       AND NOT EXISTS (
+         SELECT 1 FROM open_ticket_items oti
+         WHERE oti.open_ticket_id = ot.id
+           AND oti.establishment_id = ot.establishment_id
+           AND oti.line_status IN ('draft', 'validated')
+       )`,
+    [establishmentId, userId]
+  );
+  return result.rowCount ?? 0;
+}
+
+/** Sweep all empty open shells for a venue (floor status / hygiene). */
+export async function abandonAllEmptyOpenTickets(
+  establishmentId: string
+): Promise<number> {
+  const result = await pool.query(
+    `UPDATE open_tickets ot
+     SET status = 'cancelled',
+         closed_at = CURRENT_TIMESTAMP,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE ot.establishment_id = $1
+       AND ot.status = 'open'
+       AND NOT EXISTS (
+         SELECT 1 FROM open_ticket_items oti
+         WHERE oti.open_ticket_id = ot.id
+           AND oti.establishment_id = ot.establishment_id
+           AND oti.line_status IN ('draft', 'validated')
+       )`,
+    [establishmentId]
+  );
+  return result.rowCount ?? 0;
+}
