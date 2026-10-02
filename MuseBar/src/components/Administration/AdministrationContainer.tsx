@@ -80,10 +80,11 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
   const [inboxFocusReservationId, setInboxFocusReservationId] = useState<number | null>(null);
   const active = sections[Math.min(tab, Math.max(sections.length - 1, 0))]?.key;
 
-  // Land on the first sub-tab this PIN can open without another step-up.
+  // Land once per focused badge — not on every PIN-list poll (new actor object refs).
   useEffect(() => {
     setTab(firstHeldAdminSectionIndex(sections, activeSession?.actor ?? null));
-  }, [activeSessionId, activeSession?.actor, sections]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when badge identity changes
+  }, [activeSessionId, sections]);
 
   const selectAdminSection = useCallback(
     (v: number) => {
