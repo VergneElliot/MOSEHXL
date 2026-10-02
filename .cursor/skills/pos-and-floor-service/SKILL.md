@@ -77,8 +77,10 @@ require `orders_cancel`. Sync never deletes validated lines.
 | Free / transfer target | `!has_active_items` (empty open-ticket shells count as free) |
 
 Empty shells (open ticket, 0 lines) are cancelled on « Laisser ouverte » (discard
-drafts), after last retour, and when transferring onto that table. `POST /floor/tickets`
-reuses an empty shell instead of conflicting.
+drafts), after last retour, when transferring onto that table, on **PIN badge close**,
+and on **GET /floor/status** (`DiningTableModel.listStatus`). `POST /floor/tickets` reuses an
+empty shell instead of conflicting. PIN close only blocks on tickets that still have
+draft/validated lines (and lists those table labels in the error).
 
 
 ## Historique cancel + reopen table

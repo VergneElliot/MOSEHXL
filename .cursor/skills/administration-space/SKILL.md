@@ -29,6 +29,11 @@ Establishment-facing **Administration** tab (not System Admin). Gated by permiss
 | Conformité Légale | `compliance` | `access_compliance` | lazy `LegalComplianceDashboard` |
 | Journal de sécurité | `audit` | `access_compliance` | lazy `AuditTrailDashboard` |
 
+**Landing / nav:** open the first sub-tab the focused PIN already holds (else Pointage).
+Within Administration, sub-tabs held by that PIN (or opened via step-up this visit) need
+no extra PIN; other sub-tabs still step-up. Main Administration tab entry still requires
+`ensureAccess` for any admin permission (AppRouter).
+
 **Moved out of Administration:**
 - **Plans de tables** (layout editor) → top-level **Plan de salle** → sub-tab « Modifier le plan » (`FloorPlanTabContainer` + `FloorPlansPanel`)
 - **Utilisateurs** → **Paramètres** → « Utilisateurs » (`UserManagement`)

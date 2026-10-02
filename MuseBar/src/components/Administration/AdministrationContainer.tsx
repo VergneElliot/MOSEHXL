@@ -12,10 +12,15 @@ import {
 import { PERMISSIONS } from '@mosehxl/types';
 import type { User } from '../../types/auth';
 import { useStepUpAuth } from '../../contexts/StepUpAuthContext';
+import { usePinSessions } from '../../contexts/PinSessionsContext';
 import {
   useRegisterNavSubsections,
   type NavSubsectionItem,
 } from '../../contexts/NavSubsectionsContext';
+import {
+  adminSectionHeldByActor,
+  firstHeldAdminSectionIndex,
+} from './adminSectionAccess';
 import DocumentsPanel from './DocumentsPanel';
 import InboxPanel from './InboxPanel';
 import ReservationsPanel from './ReservationsPanel';
@@ -51,11 +56,12 @@ type AdminSection =
   | 'audit';
 
 const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user, token }) => {
-  const { ensureAccess, releaseAccess } = useStepUpAuth();
+  const { ensureAccess, hasAccess } = useStepUpAuth();
+  const { activeSession, activeSessionId } = usePinSessions();
 
   /**
-   * Landing order: inbox + reservations first. Floor editor and users live elsewhere
-   * (Plan de salle / Paramètres). Specific sections always PIN on entry.
+   * Landing order: inbox + reservations first. Within the page, sections the focused
+   * PIN already holds need no extra step-up; others still ask for an authorized PIN.
    */
   const sections = useMemo(
     () => [
@@ -74,6 +80,11 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
   const [inboxFocusReservationId, setInboxFocusReservationId] = useState<number | null>(null);
   const active = sections[Math.min(tab, Math.max(sections.length - 1, 0))]?.key;
 
+  // Land on the first sub-tab this PIN can open without another step-up.
+  useEffect(() => {
+    setTab(firstHeldAdminSectionIndex(sections, activeSession?.actor ?? null));
+  }, [activeSessionId, activeSession?.actor, sections]);
+
   const selectAdminSection = useCallback(
     (v: number) => {
       const next = sections[v];
@@ -86,7 +97,12 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
         setPlanningUiDirty(false);
       }
       const required = next.permission;
-      if (!required) {
+      // Free nav among rights this badge already holds (or a scope opened this visit).
+      if (
+        required == null ||
+        adminSectionHeldByActor(required, activeSession?.actor ?? null) ||
+        hasAccess(required)
+      ) {
         setTab(v);
         return;
       }
@@ -99,7 +115,7 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
           /* stay on current section */
         });
     },
-    [sections, active, ensureAccess]
+    [sections, active, ensureAccess, hasAccess, activeSession?.actor]
   );
 
   const navItems: NavSubsectionItem[] = useMemo(
@@ -131,7 +147,11 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
         setTab(inboxIndex);
       };
       const required = sections[inboxIndex]?.permission;
-      if (!required) {
+      if (
+        required == null ||
+        adminSectionHeldByActor(required, activeSession?.actor ?? null) ||
+        hasAccess(required)
+      ) {
         go();
         return;
       }
@@ -142,17 +162,8 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
         .then(go)
         .catch(() => undefined);
     },
-    [sections, ensureAccess]
+    [sections, ensureAccess, hasAccess, activeSession?.actor]
   );
-
-  useEffect(() => {
-    const keep = sections.find((s) => s.key === active)?.permission;
-    for (const section of sections) {
-      if (section.permission && section.permission !== keep) {
-        releaseAccess(section.permission);
-      }
-    }
-  }, [active, sections, releaseAccess]);
 
   if (!user.establishment_id) {
     return (

@@ -6,11 +6,11 @@ import { pool } from '../../db/pool';
 import { TimeEntryModel } from '../../models/timeEntry';
 import { Logger } from '../../utils/logger';
 import { AppError } from '../../middleware/errorHandler';
+import { abandonEmptyOpenTicketsForWaiter } from '../floor/openTicketEmptyCleanup';
 
 /**
- * Open tickets whose live owner is this waiter (`last_served_by_user_id`).
- * `opened_by_user_id` alone does not block — tables reassigned to someone else
- * must not prevent clock-out.
+ * Open tickets with real order lines owned by this waiter (`last_served_by_user_id`).
+ * Empty shells are ignored here — they are cancelled first on PIN close.
  */
 export async function countOpenTicketsForWaiter(
   establishmentId: string,
@@ -18,29 +18,65 @@ export async function countOpenTicketsForWaiter(
 ): Promise<number> {
   const result = await pool.query(
     `SELECT COUNT(*)::int AS n
-     FROM open_tickets
-     WHERE establishment_id = $1
-       AND status = 'open'
-       AND last_served_by_user_id = $2`,
+     FROM open_tickets ot
+     WHERE ot.establishment_id = $1
+       AND ot.status = 'open'
+       AND ot.last_served_by_user_id = $2
+       AND EXISTS (
+         SELECT 1 FROM open_ticket_items oti
+         WHERE oti.open_ticket_id = ot.id
+           AND oti.establishment_id = ot.establishment_id
+           AND oti.line_status IN ('draft', 'validated')
+       )`,
     [establishmentId, userId]
   );
   return Number(result.rows[0]?.n ?? 0);
 }
 
-/** Reject PIN close when this waiter still owns open floor tickets. */
+/** Table labels for owned tickets that still have draft/validated lines. */
+export async function listOwnedActiveTableLabels(
+  establishmentId: string,
+  userId: number
+): Promise<string[]> {
+  const result = await pool.query(
+    `SELECT COALESCE(dt.label, 'table #' || ot.dining_table_id::text) AS label
+     FROM open_tickets ot
+     LEFT JOIN dining_tables dt
+       ON dt.id = ot.dining_table_id AND dt.establishment_id = ot.establishment_id
+     WHERE ot.establishment_id = $1
+       AND ot.status = 'open'
+       AND ot.last_served_by_user_id = $2
+       AND EXISTS (
+         SELECT 1 FROM open_ticket_items oti
+         WHERE oti.open_ticket_id = ot.id
+           AND oti.establishment_id = ot.establishment_id
+           AND oti.line_status IN ('draft', 'validated')
+       )
+     ORDER BY label ASC`,
+    [establishmentId, userId]
+  );
+  return result.rows.map((row: { label: string }) => String(row.label));
+}
+
+/**
+ * Reject PIN close when this waiter still owns open floor tickets with items.
+ * Auto-cancels empty shells first (ghost tables invisible on the plan).
+ */
 export async function assertNoOwnedOpenTablesForPinClose(
   establishmentId: string,
   userId: number
 ): Promise<void> {
-  const openCount = await countOpenTicketsForWaiter(establishmentId, userId);
-  if (openCount > 0) {
-    throw new AppError(
-      `Impossible de fermer le badge : ${openCount} table(s) encore assignée(s) à ce profil. Libérez ou transférez-les avant de pointer la sortie.`,
-      409,
-      'PIN_CLOSE_OPEN_TABLES',
-      { open_ticket_count: openCount }
-    );
-  }
+  await abandonEmptyOpenTicketsForWaiter(establishmentId, userId);
+  const labels = await listOwnedActiveTableLabels(establishmentId, userId);
+  if (labels.length === 0) return;
+
+  const list = labels.join(', ');
+  throw new AppError(
+    `Impossible de fermer le badge : ${labels.length} table(s) encore assignée(s) à ce profil (${list}). Libérez ou transférez-les avant de pointer la sortie.`,
+    409,
+    'PIN_CLOSE_OPEN_TABLES',
+    { open_ticket_count: labels.length, table_labels: labels }
+  );
 }
 
 /** Clock-in when opening a PIN session; ignore if already on the clock. */

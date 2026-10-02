@@ -61,6 +61,11 @@ export async function openPinSession(input: {
       ipAddress: input.ipAddress,
       userAgent: input.userAgent,
     });
+    await StaffPinSessionModel.closeDuplicatesForUser(
+      input.pinUserId,
+      input.establishmentId,
+      session.id
+    );
     if (onVenue) {
       await clockInOnPinOpen({
         establishmentId: input.establishmentId,
@@ -82,7 +87,8 @@ export async function openPinSession(input: {
 
 /**
  * Closes the badge session. Always allowed off-venue; clock-out only on venue Wi‑Fi.
- * Owned open tables still block close everywhere.
+ * Owned open tables with items still block close everywhere. Empty shells are purged.
+ * Closes every open badge row for that PIN user (heals duplicate sessions).
  */
 export async function closePinSession(
   sessionId: string,
@@ -101,6 +107,12 @@ export async function closePinSession(
       ip: options.ipAddress ?? null,
       recordPointage: onVenue,
     });
+    const n = await StaffPinSessionModel.closeAllForUser(
+      options.pinUserId,
+      establishmentId,
+      reason
+    );
+    return n > 0;
   }
   return StaffPinSessionModel.close(sessionId, establishmentId, reason);
 }
