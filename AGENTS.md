@@ -79,10 +79,11 @@ Domain skills live in `.cursor/skills/`. Read the relevant skill before touching
 | `pos-and-floor-service` | POS cart, floor plan, open tickets, kitchen |
 | `administration-space` | Documents, inbox, reservations, planning, admin floor editor |
 | `printing-and-receipts` | Receipts, kitchen printers, print bridge |
-| `testing-and-ci` | Vitest, CI jobs, real-db tests |
+| `testing-and-ci` | Vitest, CI jobs, real-db tests; **mandatory tests with new behaviour** |
 
 ## Key patterns
 
 - **Backend route:** `requireAuth` → `getEstablishmentId` → service → model → `asyncHandler` + `AppError`
 - **Frontend feature:** `*Container` + `useXState` / `useXLogic` / `useXAPI`
 - **Shared constants:** `@mosehxl/types` (`PERMISSIONS`, `pinRules`, etc.)
+- **Tests:** new behaviour ships with colocated unit tests (pure helpers first); see `testing-and-ci`

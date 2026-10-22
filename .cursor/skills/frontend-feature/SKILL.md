@@ -44,6 +44,20 @@ Or domain modules in `services/api/*.ts`. Auth token attached automatically in `
 
 PIN-gated calls: pass `pinActorToken` from `usePinSessions().activeSession?.actor.token`.
 
+## Tests (mandatory with new behaviour)
+
+See `testing-and-ci`. Prefer colocated unit tests of **pure** modules
+(`*Draft.ts`, `*Totals.ts`, `*Policy.ts`, mappers) over mounting full MUI trees.
+
+| You added / changed | Add |
+|---------------------|-----|
+| Pure helper / draft / totals / mapper | `foo.test.ts` next to `foo.ts` |
+| Policy / permission / PIN elevation helper | Unit test of inputs → decision |
+| Bug in UI logic | Regression test on the helper or hook |
+| Presentational-only markup | Optional; not required |
+
+Do not ship a new `useXLogic` / draft helper without a test file in the same PR.
+
 ## Rules
 
 - **No `@typescript-eslint/no-explicit-any`** — error level in frontend ESLint

@@ -3,9 +3,55 @@ name: testing-and-ci
 description: >-
   Run tests, coverage, lint, and CI workflows for MOSEHXL/MuseBar. Use when
   writing tests, debugging CI failures, running Vitest, or configuring GitHub Actions.
+  Also the policy for when new unit tests are mandatory with feature work.
 ---
 
 # Testing and CI
+
+## Mandatory: tests ship with the feature
+
+New behaviour is incomplete without tests. Do **not** finish a feature, fix, or
+extract of pure logic with “tests later”. Read this skill whenever you add or
+change application behaviour.
+
+| Change | Required tests |
+|--------|----------------|
+| New / changed Express route | Colocated `*.test.ts` or `*.permissions.test.ts` — happy path + auth/permission negative (no PIN → 403 `PIN_ACTOR_REQUIRED` when gated) |
+| New / changed service business rule | Unit test of the pure or service function (mock `pg` / collaborators) |
+| Fiscal / journal / closure / cancel path | Extend existing suite; real-db compliance stays green when that path is touched |
+| New pure helper (draft, totals, mapper, policy) | Colocated `*.test.ts` — **always**; these are the cheapest, highest-value tests |
+| New frontend logic hook / policy | Unit test without full UI mount when possible |
+| Bug fix | Regression test that fails before the fix |
+| Doc-only / skill-only / pure rename | No new tests |
+
+Refactor that only moves code without changing behaviour may rely on existing
+tests, but **any newly extracted pure module must get its own unit tests** in
+the same change (see `code-hygiene`).
+
+Skip only when the user explicitly says not to add tests, or the change cannot
+be unit-tested without a live DB and you document that in the IMPLEMENTATION
+patch note (prefer a mocked unit test first).
+
+## Current coverage reality (Oct 2026)
+
+| Area | Approx. test files | Gap |
+|------|--------------------|-----|
+| Backend routes (auth, orders, legal, floor, printing) | ~35 of ~108 route modules | Strong on fiscal/auth; **admin space routes mostly untested** |
+| Backend services | ~36 of ~189 | Labor / kitchen / some floor covered; many admin/email paths thin |
+| Backend models | ~11 of ~95 | Mostly legal journal; user/staff/time models thin |
+| Frontend | **19** files vs ~240 components + ~50 hooks | Almost all UI untested; pure helpers (split bill, planning draft, reservation hours) often lack tests after extracts |
+| Bridge | 3 | Acceptable for size |
+
+Frontend line coverage threshold is still a **1%** ratchet floor — that is a CI
+safety net, not a quality target. Prefer meaningful colocated tests over chasing %.
+
+Priority backlog when filling gaps (do not boil the ocean in one PR):
+
+1. Pure helpers extracted in hygiene (`splitBill*`, `planningShiftDraft`,
+   `closurePreviewTotals`, `publicReservationHours`, floor ticket mappers).
+2. Admin API routes (`routes/admin/*`) — permission + one happy path each.
+3. Frontend policies already partially covered (`pinSessions*`, `stepUp*`) —
+   keep extending those rather than mounting full MUI trees.
 
 ## Commands (repo root)
 
@@ -56,7 +102,8 @@ Frontend thresholds in `MuseBar/vite.config.ts` (flat Vitest shape, not Jest `gl
 - Baseline ~2026-09-02: lines/statements 1%, branches/functions 60%
 - Ratchet +5% lines per quarter
 
-Backend: coverage configured, no thresholds yet.
+Backend: coverage configured, no thresholds yet. Prefer colocated behaviour
+tests over raising a global % without meaning.
 
 ## CI pipeline (`.github/workflows/ci-cd.yml`)
 
@@ -93,9 +140,22 @@ import { adminPinActorTokenFor, withPinActor } from '../test/pinActorTestUtils';
 // assert 403 without the PIN header
 ```
 
+## Writing frontend / pure-helper tests
+
+Prefer testing **pure modules** (no React) colocated next to the source:
+
+```
+splitBillTotals.ts
+splitBillTotals.test.ts
+```
+
+For hooks with React state, use Testing Library + Vitest. Do not mount entire
+POS/Admin trees unless the bug is layout-specific.
+
 ## Related skills
 
 - `auth-and-multi-tenancy` — PIN actor vs account JWT
 - `legal-journal-compliance` — what real-db tests protect
 - `database-migrations` — migration tests in backend suite
-- `patch-notes-workflow` — document test additions in IMPLEMENTATION notes
+- `patch-notes-workflow` — PLAN Verification + IMPLEMENTATION must list tests
+- `frontend-feature` / `backend-api-route` — per-layer test checklist

@@ -59,7 +59,9 @@ components/MyFeature/
 ```
 
 Pure reducers and helpers extracted this way get unit tests for free; that is the main reason
-to extract them, not the line count.
+to extract them, not the line count. **When you extract a pure module, add
+`*.test.ts` in the same change** — see `testing-and-ci`. Leaving an untested
+`*Totals.ts` / `*Draft.ts` after a split is a hygiene miss.
 
 **Express route growing** — the handler stays orchestration only:
 

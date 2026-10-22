@@ -16,12 +16,16 @@ description: >-
 
 ## Feature delivery loop
 
-1. Write **PLAN** patch note at next number N
-2. Implement code + tests
-3. Write **IMPLEMENTATION** patch note at N+1 (consecutive, not same number)
-4. Run verification (lint, typecheck, tests, manual checks)
+1. Write **PLAN** patch note at next number N (include **which tests** you will add)
+2. Implement code **and** the tests from the PLAN (see `testing-and-ci` — mandatory)
+3. Write **IMPLEMENTATION** patch note at N+1 (consecutive, not same number); list test files
+4. Run verification (lint, typecheck, **new + existing tests**, manual checks)
 5. Commit and push to `development`
 6. Regenerate index: `npm run docs:patch-notes-index`
+
+A PLAN without a Verification checklist item for tests, or an IMPLEMENTATION that
+ships new behaviour with no test file and no explicit “deferred — reason” note,
+is incomplete.
 
 ## Naming convention
 
@@ -86,7 +90,8 @@ Files/areas touched.
 Step-by-step implementation plan.
 
 ## Verification
-- [ ] Tests to add/run
+- [ ] Unit/integration tests to **add** (name files) — required for new behaviour; see `testing-and-ci`
+- [ ] Existing suites to run (`npm test --workspace …`)
 - [ ] Manual checks
 - [ ] Fiscal impact assessment (if applicable)
 
@@ -106,17 +111,19 @@ What was done.
 - path/to/file.ts — description
 
 ## Verification results
-- npm test: pass
+- Tests added: path/to/foo.test.ts — covers …
+- npm test (touched workspaces): pass
 - manual: ...
 
 ## Follow-ups
-Deferred items, if any.
+Deferred items, if any (including deferred tests with a reason).
 ```
 
 ## Agent checklist before finishing a task
 
 - [ ] Code changes on `development` (or feature branch merging to it)
 - [ ] PLAN + IMPLEMENTATION patch notes if feature/fix delivery (not doc-only)
+- [ ] **Tests for new/changed behaviour** (or documented deferral) — `testing-and-ci`
 - [ ] CHANGELOG entry if user-facing or fiscal
 - [ ] `npm run docs:patch-notes-index` if patch notes added
 - [ ] Tests pass for touched workspaces

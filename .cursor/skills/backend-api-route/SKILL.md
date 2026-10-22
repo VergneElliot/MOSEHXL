@@ -49,7 +49,9 @@ router.get('/', asyncHandler(async (req, res) => {
 - [ ] Throw `ValidationError`, `NotFoundError`, `AppError` — don't manual `res.status` unless matching auth middleware style
 - [ ] Pass `establishmentId` to every model call
 - [ ] Log errors: `logger.error('message', error, 'CATEGORY')`
-- [ ] Colocated `*.test.ts` or `*.permissions.test.ts`
+- [ ] **Tests (mandatory for new/changed behaviour):** colocated `*.test.ts` or
+      `*.permissions.test.ts` — happy path + permission/PIN negative. Use
+      `pinActorTestUtils`. See `testing-and-ci`.
 
 ## Modular routes
 
