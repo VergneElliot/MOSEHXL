@@ -90,7 +90,7 @@ const InvitationValidationStep: React.FC<InvitationValidationStepProps> = ({
       </Typography>
       
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-        We're verifying your invitation to set up your establishment account.
+        We’re verifying your invitation to set up your establishment account.
       </Typography>
 
       <Card sx={{ mb: 3 }}>

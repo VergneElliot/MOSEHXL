@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 import { generateToken } from '../auth';
+import { adminPinActorTokenFor, withPinActor } from '../../test/pinActorTestUtils';
 
 const EST_A = '11111111-1111-1111-1111-111111111111';
 const EST_B = '22222222-2222-2222-2222-222222222222';
@@ -127,17 +128,30 @@ describe('GET /orders establishment isolation', () => {
     });
   });
 
-  it('returns exactly the caller establishment orders from a 100-order 3-tenant dataset', async () => {
-    const expectedForEstB = mocks.orders.filter((o) => o.establishment_id === EST_B);
-
+  it('denies GET /orders with the account JWT alone (no PIN actor)', async () => {
     const res = await request(app)
       .get('/orders')
       .set('Authorization', `Bearer ${tokenFor(EST_B)}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('PIN_ACTOR_REQUIRED');
+    expect(mocks.getAll).not.toHaveBeenCalled();
+  });
+
+  it('returns exactly the caller establishment orders from a 100-order 3-tenant dataset', async () => {
+    const expectedForEstB = mocks.orders.filter((o) => o.establishment_id === EST_B);
+
+    const res = await withPinActor(
+      request(app)
+        .get('/orders')
+        .set('Authorization', `Bearer ${tokenFor(EST_B)}`),
+      adminPinActorTokenFor(EST_B)
+    );
 
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
     expect(res.body).toHaveLength(expectedForEstB.length);
     expect(res.body.every((o: { establishment_id?: string }) => o.establishment_id === EST_B)).toBe(true);
-    expect(mocks.getAll).toHaveBeenCalledWith(EST_B, undefined);
+    expect(mocks.getAll).toHaveBeenCalledWith(EST_B, {});
   });
 });

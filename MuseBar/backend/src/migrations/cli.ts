@@ -4,11 +4,7 @@
 
 import { Pool } from 'pg';
 import { MigrationManager } from './migration-manager';
-import dotenv from 'dotenv';
 import { getEnvironmentConfig } from '../config/environment';
-
-// Load environment variables
-dotenv.config();
 
 const config = getEnvironmentConfig();
 

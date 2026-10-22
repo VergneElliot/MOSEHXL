@@ -5,8 +5,8 @@
 
 import * as dotenv from 'dotenv';
 
-// Load environment variables
-dotenv.config();
+// Single place where .env is loaded; every entry point imports this module first.
+dotenv.config({ quiet: true });
 
 /**
  * Required environment variables for the application.
@@ -361,12 +361,16 @@ export const getEnvironmentConfig = (): EnvironmentConfig => {
  * Initialize and validate environment
  * Call this at the start of your application
  */
+let initializedConfig: EnvironmentConfig | null = null;
+
 export const initializeEnvironment = (): EnvironmentConfig => {
-  // Initialize environment configuration
-  
+  // Both app.ts and db/pool.ts call this; validate and print the banner only once.
+  if (initializedConfig) return initializedConfig;
+
   validateEnvironment();
   const config = getEnvironmentConfig();
-  
+  initializedConfig = config;
+
   if (process.env.NODE_ENV !== 'test') {
     process.stdout.write(`🌍 Environment: ${config.app.environment}\n`);
     process.stdout.write(`📱 Application: ${config.app.name} v${config.app.version}\n`);

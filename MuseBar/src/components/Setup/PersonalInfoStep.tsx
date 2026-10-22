@@ -253,7 +253,7 @@ export const PersonalInfoStep: React.FC<PersonalInfoStepProps> = ({
       <Alert severity="info" sx={{ mt: 3, mb: 4 }}>
         <Typography variant="body2">
           <strong>Account Security:</strong> You will be the primary administrator of your business POS system. 
-          Choose a strong password to protect your establishment's data and transactions.
+          Choose a strong password to protect your establishment’s data and transactions.
         </Typography>
       </Alert>
 

@@ -14,6 +14,8 @@ vi.mock('./auth', () => ({
     () => (_req: express.Request, _res: express.Response, next: express.NextFunction) => next(),
   requirePermission:
     () => (_req: express.Request, _res: express.Response, next: express.NextFunction) => next(),
+  requireEstablishmentAdminOrPermission:
+    () => (_req: express.Request, _res: express.Response, next: express.NextFunction) => next(),
 }));
 
 vi.mock('../models/happyHourSettings', () => ({

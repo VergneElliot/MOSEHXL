@@ -3,43 +3,22 @@
  * Empty selection → actions apply to all eligible (non-tip) lines.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React from 'react';
 import {
   Card,
   CardContent,
-  Typography,
-  List,
-  IconButton,
-  Divider,
-  Button,
   Box,
+  Divider,
   useTheme,
   useMediaQuery,
-  Checkbox,
-  FormControlLabel,
-  Tooltip,
 } from '@mui/material';
-import {
-  Clear as ClearIcon,
-  CreditCard as CreditCardIcon,
-  LocalAtm as CashIcon,
-  Settings as OptionsIcon,
-  LocalOffer as OffertIcon,
-  Person as PersoIcon,
-  StickyNote2 as NoteIcon,
-  TableRestaurant as TableIcon,
-  Schedule as SuivreIcon,
-  Percent as RemiseIcon,
-  Done as ValidateIcon,
-  SwapHoriz as AssignIcon,
-} from '@mui/icons-material';
 import { OrderItem } from '../../types';
-import { Virtuoso } from 'react-virtuoso';
-import OrderSummaryItem from './OrderSummaryItem';
 import LineNoteDialog from './LineNoteDialog';
-import { getLineNoteFromOptions } from '../../utils/lineItemNote';
-import { canUseVirtualization } from '../../utils/canUseVirtualization';
-import { posActionButtonSx } from './posActionButtonSx';
+import OrderSummaryActions from './OrderSummaryActions';
+import OrderSummaryHeader from './OrderSummaryHeader';
+import OrderSummaryLines from './OrderSummaryLines';
+import OrderSummaryTotals from './OrderSummaryTotals';
+import { useOrderSummaryLogic } from './useOrderSummaryLogic';
 
 interface OrderSummaryProps {
   currentOrder: OrderItem[];
@@ -85,12 +64,6 @@ interface OrderSummaryProps {
   formatCurrency: (amount: number) => string;
 }
 
-function resolveTargetIds(order: OrderItem[], selected: Set<string>): string[] {
-  const eligible = order.filter(i => !i.isTip);
-  if (selected.size === 0) return eligible.map(i => i.id);
-  return eligible.filter(i => selected.has(i.id)).map(i => i.id);
-}
-
 const OrderSummary = React.memo(function OrderSummary({
   currentOrder,
   orderTotal,
@@ -120,351 +93,45 @@ const OrderSummary = React.memo(function OrderSummary({
 }: OrderSummaryProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const useVirtualization = canUseVirtualization();
-  const [lineNoteDialog, setLineNoteDialog] = useState<{
-    targetIds: string[];
-    productName: string;
-    initialNote: string;
-  } | null>(null);
-
-  // Prune selection when lines disappear
-  useEffect(() => {
-    const alive = new Set(currentOrder.map(i => i.id));
-    const next = new Set([...cartSelectedIds].filter(id => alive.has(id)));
-    if (next.size !== cartSelectedIds.size) {
-      onCartSelectedIdsChange(next);
-    }
-  }, [currentOrder, cartSelectedIds, onCartSelectedIdsChange]);
-
-  const selectedIds = cartSelectedIds;
-
-  const eligibleIds = useMemo(
-    () => currentOrder.filter(i => !i.isTip).map(i => i.id),
-    [currentOrder]
-  );
-
-  const allEligibleSelected =
-    eligibleIds.length > 0 && eligibleIds.every(id => selectedIds.has(id));
-
-  const indexById = useMemo(() => {
-    const map = new Map<string, number>();
-    currentOrder.forEach((item, index) => map.set(item.id, index));
-    return map;
-  }, [currentOrder]);
-
-  const targetIds = useMemo(
-    () => resolveTargetIds(currentOrder, selectedIds),
-    [currentOrder, selectedIds]
-  );
-
-  const hasPendingTableValidation = useMemo(() => {
-    const targets = currentOrder.filter((line) => targetIds.includes(line.id) && !line.isTip);
-    if (targets.length === 0) return false;
-    if (!activeTableLabel) return true;
-    return targets.some((line) => line.tableLineStatus !== 'validated');
-  }, [activeTableLabel, currentOrder, targetIds]);
-
-  const hasTargetItems = targetIds.length > 0;
-
-  const totalLabelSx = {
-    fontWeight: 800,
-    fontSize: { xs: '1rem', sm: '1.1rem', md: '1.15rem' },
-    lineHeight: 1.1,
-  } as const;
-
-  const totalValueSx = {
-    fontWeight: 900,
-    fontSize: { xs: '1.45rem', sm: '1.7rem', md: '1.9rem' },
-    lineHeight: 1.1,
-  } as const;
-
-  const actionBtnSx = posActionButtonSx(isMobile);
-
-  const toggleSelect = useCallback(
-    (id: string) => {
-      const next = new Set(selectedIds);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      onCartSelectedIdsChange(next);
-    },
-    [selectedIds, onCartSelectedIdsChange]
-  );
-
-  const toggleSelectAll = useCallback(() => {
-    if (allEligibleSelected) {
-      onCartSelectedIdsChange(new Set());
-    } else {
-      onCartSelectedIdsChange(new Set(eligibleIds));
-    }
-  }, [allEligibleSelected, eligibleIds, onCartSelectedIdsChange]);
-
-  const applyToTargets = useCallback(
-    (fn?: (index: number) => void) => {
-      if (!fn) return;
-      for (const id of targetIds) {
-        const index = indexById.get(id);
-        if (index != null) fn(index);
-      }
-    },
-    [targetIds, indexById]
-  );
-
-  const handleOpenNotes = useCallback(() => {
-    if (!onUpdateLineNote || targetIds.length === 0) return;
-    const noteable = targetIds.filter(id => {
-      const item = currentOrder[indexById.get(id) ?? -1];
-      return item && item.productId;
-    });
-    if (noteable.length === 0) return;
-    const first = currentOrder[indexById.get(noteable[0]!)!]!;
-    setLineNoteDialog({
-      targetIds: noteable,
-      productName:
-        noteable.length === 1
-          ? first.productName
-          : `${noteable.length} articles`,
-      initialNote:
-        noteable.length === 1 ? getLineNoteFromOptions(first.options) : '',
-    });
-  }, [onUpdateLineNote, targetIds, currentOrder, indexById]);
-
-  const handleClearOrder = useCallback(() => {
-    onCartSelectedIdsChange(new Set());
-    onClearOrder();
-  }, [onClearOrder, onCartSelectedIdsChange]);
-
-  const clearActionTitle = activeTableLabel
-    ? 'Quitter la table — retour mode comptoir'
-    : 'Vider la commande';
-  const clearActionDisabled = !activeTableLabel && currentOrder.length === 0;
-
-  const renderOrderLine = useCallback(
-    (index: number) => {
-      const item = currentOrder[index];
-      if (!item) return null;
-      return (
-        <OrderSummaryItem
-          item={item}
-          index={index}
-          isLast={index === currentOrder.length - 1}
-          selected={selectedIds.has(item.id)}
-          showTableLineStatus={Boolean(activeTableLabel)}
-          formatCurrency={formatCurrency}
-          onToggleSelect={toggleSelect}
-          onRemoveItem={onRemoveItem}
-        />
-      );
-    },
-    [currentOrder, selectedIds, activeTableLabel, formatCurrency, toggleSelect, onRemoveItem]
-  );
-
-  const hasTargets = targetIds.length > 0;
-  const canNote = Boolean(onUpdateLineNote) && targetIds.some(id => {
-    const item = currentOrder[indexById.get(id) ?? -1];
-    return item && item.productId;
+  const logic = useOrderSummaryLogic({
+    currentOrder,
+    cartSelectedIds,
+    onCartSelectedIdsChange,
+    activeTableLabel,
+    onUpdateLineNote,
+    onClearOrder,
   });
 
+  const remiseIndices = logic.targetIds
+    .map((id) => logic.indexById.get(id))
+    .filter((i): i is number => i != null);
+
   const actionsColumn = (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 1,
-        flexShrink: 0,
-        width: isMobile ? '100%' : 200,
-        minWidth: isMobile ? 0 : 180,
-        overflow: 'auto',
-      }}
-    >
-      <Typography variant="subtitle2" fontWeight={800}>
-        Actions
-      </Typography>
-      <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, lineHeight: 1.3 }}>
-        {selectedIds.size === 0
-          ? 'Aucune sélection → toute la commande'
-          : `${selectedIds.size} ligne(s) sélectionnée(s)`}
-      </Typography>
-
-      {onApplyHappyHour && (
-        <Button
-          variant="outlined"
-          color="secondary"
-          fullWidth
-          disabled={!hasTargets}
-          onClick={() => applyToTargets(onApplyHappyHour)}
-          sx={actionBtnSx}
-        >
-          Happy Hour
-        </Button>
-      )}
-      {onApplyOffert && (
-        <Button
-          variant="outlined"
-          color="success"
-          fullWidth
-          disabled={!hasTargets}
-          startIcon={<OffertIcon />}
-          onClick={() => applyToTargets(onApplyOffert)}
-          sx={actionBtnSx}
-        >
-          Offert
-        </Button>
-      )}
-      {onApplyPerso && (
-        <Button
-          variant="outlined"
-          color="info"
-          fullWidth
-          disabled={!hasTargets}
-          startIcon={<PersoIcon />}
-          onClick={() => applyToTargets(onApplyPerso)}
-          sx={actionBtnSx}
-        >
-          Perso
-        </Button>
-      )}
-      {onApplyRemise && (
-        <Button
-          variant="outlined"
-          color="secondary"
-          fullWidth
-          disabled={!hasTargets}
-          startIcon={<RemiseIcon />}
-          onClick={() => {
-            const indices = targetIds
-              .map((id) => indexById.get(id))
-              .filter((i): i is number => i != null);
-            onApplyRemise(indices);
-          }}
-          sx={actionBtnSx}
-        >
-          Remise
-        </Button>
-      )}
-      {onUpdateLineNote && (
-        <Button
-          variant="outlined"
-          color="warning"
-          fullWidth
-          disabled={!canNote}
-          startIcon={<NoteIcon />}
-          onClick={handleOpenNotes}
-          sx={actionBtnSx}
-        >
-          Notes
-        </Button>
-      )}
-
-      <Divider sx={{ my: 0.5 }} />
-
-      <Button
-        variant="contained"
-        fullWidth
-        disabled={!canProcessPayment}
-        startIcon={<CreditCardIcon />}
-        onClick={onQuickCard}
-        sx={{
-          ...actionBtnSx,
-          bgcolor: 'primary.main',
-          justifyContent: 'center',
-        }}
-      >
-        Paiement CB
-      </Button>
-      <Button
-        variant="contained"
-        fullWidth
-        disabled={!canProcessPayment}
-        startIcon={<CashIcon />}
-        onClick={onQuickCash}
-        sx={{
-          ...actionBtnSx,
-          bgcolor: 'success.main',
-          color: 'success.contrastText',
-          justifyContent: 'center',
-          '&:hover': { bgcolor: 'success.dark' },
-        }}
-      >
-        Paiement espèces
-      </Button>
-      <Button
-        variant="outlined"
-        fullWidth
-        startIcon={<OptionsIcon />}
-        onClick={onCheckout}
-        sx={{ ...actionBtnSx, justifyContent: 'center' }}
-      >
-        Options de paiement
-      </Button>
-
-      {onValidateTableOrder && (
-        <Tooltip
-          title={
-            activeTableLabel
-              ? 'Valider la commande table (cuisine, sans encaissement)'
-              : 'Choisir une table puis valider la commande'
-          }
-        >
-          <span>
-            <Button
-              variant="contained"
-              color="secondary"
-              fullWidth
-              disabled={!hasPendingTableValidation}
-              startIcon={<ValidateIcon />}
-              onClick={onValidateTableOrder}
-              sx={{ ...actionBtnSx, justifyContent: 'center' }}
-            >
-              Valider commande table
-            </Button>
-          </span>
-        </Tooltip>
-      )}
-
-      {onAssignOrder && (
-        <Button
-          variant="outlined"
-          fullWidth
-          disabled={!hasTargetItems}
-          startIcon={<AssignIcon />}
-          onClick={onAssignOrder}
-          sx={actionBtnSx}
-        >
-          Assigner à
-        </Button>
-      )}
-
-      <Divider sx={{ my: 0.5 }} />
-
-      <Tooltip title={activeTableLabel ? `Table ${activeTableLabel}` : 'Plan de salle'}>
-        <span>
-          <Button
-            variant="outlined"
-            fullWidth
-            disabled={!onSelectTable}
-            startIcon={<TableIcon />}
-            onClick={onSelectTable}
-            sx={actionBtnSx}
-          >
-            {activeTableLabel ? `Table ${activeTableLabel}` : 'Sélectionner une table'}
-          </Button>
-        </span>
-      </Tooltip>
-      <Tooltip title={onSuivre ? 'Envoyer en cuisine (sans encaisser)' : 'Badge requis'}>
-        <span>
-          <Button
-            variant="outlined"
-            fullWidth
-            disabled={!onSuivre || !hasTargetItems}
-            startIcon={<SuivreIcon />}
-            onClick={onSuivre}
-            sx={actionBtnSx}
-          >
-            À suivre
-          </Button>
-        </span>
-      </Tooltip>
-    </Box>
+    <OrderSummaryActions
+      isMobile={isMobile}
+      selectedCount={logic.selectedIds.size}
+      hasTargets={logic.hasTargets}
+      hasTargetItems={logic.hasTargetItems}
+      hasPendingTableValidation={logic.hasPendingTableValidation}
+      canNote={logic.canNote}
+      canProcessPayment={canProcessPayment}
+      activeTableLabel={activeTableLabel}
+      onApplyHappyHour={onApplyHappyHour}
+      onApplyOffert={onApplyOffert}
+      onApplyPerso={onApplyPerso}
+      onApplyRemise={onApplyRemise}
+      onUpdateLineNote={onUpdateLineNote}
+      onCheckout={onCheckout}
+      onQuickCard={onQuickCard}
+      onQuickCash={onQuickCash}
+      onValidateTableOrder={onValidateTableOrder}
+      onAssignOrder={onAssignOrder}
+      onSelectTable={onSelectTable}
+      onSuivre={onSuivre}
+      applyToTargets={logic.applyToTargets}
+      remiseIndices={remiseIndices}
+      onOpenNotes={logic.handleOpenNotes}
+    />
   );
 
   return (
@@ -510,146 +177,31 @@ const OrderSummary = React.memo(function OrderSummary({
               overflow: 'hidden',
             }}
           >
-            <Box
-              sx={{ flexShrink: 0 }}
-              display="flex"
-              justifyContent="space-between"
-              alignItems="flex-start"
-              mb={0.25}
-            >
-              <Box>
-                <Typography variant="subtitle1" component="h2" sx={{ fontWeight: 700 }}>
-                  Commande
-                </Typography>
-                {activeTableLabel ? (
-                  <Box>
-                    <Typography
-                      variant="caption"
-                      color="secondary.main"
-                      sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontWeight: 600 }}
-                    >
-                      <TableIcon sx={{ fontSize: 14 }} />
-                      Table {activeTableLabel}
-                    </Typography>
-                    {assignedWaiterDisplayName ? (
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                        Serveur : {assignedWaiterDisplayName}
-                      </Typography>
-                    ) : null}
-                  </Box>
-                ) : (
-                  <Typography variant="caption" color="text.secondary">
-                    Mode comptoir
-                  </Typography>
-                )}
-              </Box>
-              <IconButton
-                onClick={handleClearOrder}
-                color="error"
-                size="small"
-                disabled={clearActionDisabled}
-                title={clearActionTitle}
-                aria-label={clearActionTitle}
-              >
-                <ClearIcon />
-              </IconButton>
-            </Box>
-
-            {currentOrder.length > 0 && (
-              <FormControlLabel
-                sx={{ ml: 0, mb: 0.25, flexShrink: 0 }}
-                control={
-                  <Checkbox
-                    size="small"
-                    checked={allEligibleSelected}
-                    indeterminate={selectedIds.size > 0 && !allEligibleSelected}
-                    onChange={toggleSelectAll}
-                    disabled={eligibleIds.length === 0}
-                  />
-                }
-                label={
-                  <Typography variant="body2" fontWeight={600}>
-                    Tout sélectionner
-                  </Typography>
-                }
-              />
-            )}
-
-            <Box sx={{ flex: 1, minHeight: 0, overflow: useVirtualization ? 'hidden' : 'auto' }}>
-              {currentOrder.length === 0 ? (
-                <Box
-                  display="flex"
-                  alignItems="center"
-                  justifyContent="center"
-                  textAlign="center"
-                  py={4}
-                  minHeight="100%"
-                >
-                  <Typography color="textSecondary">
-                    Aucun article — appuyez sur un produit pour l’ajouter
-                  </Typography>
-                </Box>
-              ) : useVirtualization ? (
-                <Virtuoso
-                  style={{ height: '100%' }}
-                  totalCount={currentOrder.length}
-                  overscan={200}
-                  itemContent={renderOrderLine}
-                />
-              ) : (
-                <List sx={{ py: 0 }}>
-                  {currentOrder.map((item, index) => (
-                    <OrderSummaryItem
-                      key={item.id}
-                      item={item}
-                      index={index}
-                      isLast={index === currentOrder.length - 1}
-                      selected={selectedIds.has(item.id)}
-                      showTableLineStatus={Boolean(activeTableLabel)}
-                      formatCurrency={formatCurrency}
-                      onToggleSelect={toggleSelect}
-                      onRemoveItem={onRemoveItem}
-                    />
-                  ))}
-                </List>
-              )}
-            </Box>
-
-            <Box sx={{ flexShrink: 0, pt: 1 }}>
-              <Divider sx={{ mb: 1 }} />
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.75} flexWrap="wrap" gap={0.5}>
-                <Typography variant="body2">
-                  Sous-total HT:{' '}
-                  <Box component="span" sx={{ fontWeight: 600 }}>
-                    {formatCurrency(orderSubtotal - orderTax)}
-                  </Box>
-                </Typography>
-                <Typography variant="body2">
-                  TVA:{' '}
-                  <Box component="span" sx={{ fontWeight: 600 }}>
-                    {formatCurrency(orderTax)}
-                  </Box>
-                </Typography>
-              </Box>
-              <Box display="flex" justifyContent="space-between">
-                <Typography variant="h6" sx={totalLabelSx}>
-                  Total TTC:
-                </Typography>
-                <Typography variant="h6" color="primary" sx={totalValueSx}>
-                  {formatCurrency(orderTotal)}
-                </Typography>
-              </Box>
-              {tipsTotal > 0 && (
-                <Box display="flex" justifyContent="space-between" mt={0.5}>
-                  <Typography variant="body2" color="text.secondary">
-                    Pourboire carte (hors CA):
-                  </Typography>
-                  <Typography variant="body2" color="secondary" fontWeight={700}>
-                    {formatCurrency(tipsTotal)}
-                  </Typography>
-                </Box>
-              )}
-            </Box>
+            <OrderSummaryHeader
+              activeTableLabel={activeTableLabel}
+              assignedWaiterDisplayName={assignedWaiterDisplayName}
+              clearActionTitle={logic.clearActionTitle}
+              clearActionDisabled={logic.clearActionDisabled}
+              onClearOrder={logic.handleClearOrder}
+            />
+            <OrderSummaryLines
+              currentOrder={currentOrder}
+              selectedIds={logic.selectedIds}
+              eligibleIds={logic.eligibleIds}
+              allEligibleSelected={logic.allEligibleSelected}
+              activeTableLabel={activeTableLabel}
+              formatCurrency={formatCurrency}
+              onToggleSelect={logic.toggleSelect}
+              onToggleSelectAll={logic.toggleSelectAll}
+              onRemoveItem={onRemoveItem}
+            />
+            <OrderSummaryTotals
+              orderTotal={orderTotal}
+              orderTax={orderTax}
+              orderSubtotal={orderSubtotal}
+              tipsTotal={tipsTotal}
+              formatCurrency={formatCurrency}
+            />
           </Box>
 
           {!isMobile && (
@@ -668,17 +220,11 @@ const OrderSummary = React.memo(function OrderSummary({
       </CardContent>
 
       <LineNoteDialog
-        open={lineNoteDialog != null}
-        productName={lineNoteDialog?.productName ?? ''}
-        initialNote={lineNoteDialog?.initialNote ?? ''}
-        onClose={() => setLineNoteDialog(null)}
-        onSave={note => {
-          if (lineNoteDialog == null || !onUpdateLineNote) return;
-          for (const id of lineNoteDialog.targetIds) {
-            const index = indexById.get(id);
-            if (index != null) onUpdateLineNote(index, note);
-          }
-        }}
+        open={logic.lineNoteDialog != null}
+        productName={logic.lineNoteDialog?.productName ?? ''}
+        initialNote={logic.lineNoteDialog?.initialNote ?? ''}
+        onClose={logic.closeLineNoteDialog}
+        onSave={logic.handleSaveLineNotes}
       />
     </Card>
   );

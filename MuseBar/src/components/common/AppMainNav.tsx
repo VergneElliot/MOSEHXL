@@ -155,15 +155,15 @@ export const AppMainNav: React.FC<AppMainNavProps> = ({
                     }}
                   />
                 </ListItemButton>
-                {selected && showSubs
-                  ? subsections!.items.map((sub) => {
-                      const subSelected = sub.id === subsections!.activeId;
+                {selected && showSubs && subsections
+                  ? subsections.items.map((sub) => {
+                      const subSelected = sub.id === subsections.activeId;
                       return (
                         <ListItemButton
                           key={sub.id}
                           selected={subSelected}
                           onClick={() => {
-                            subsections!.onSelect(sub.id);
+                            subsections.onSelect(sub.id);
                             onClose();
                           }}
                           sx={{

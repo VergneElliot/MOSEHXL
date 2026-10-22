@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 import { generateToken } from '../auth';
+import { pinActorTokenFor, withPinActor } from '../../test/pinActorTestUtils';
 
 const EST = '11111111-1111-4111-8111-111111111111';
 
 const mocks = vi.hoisted(() => ({
   verifyIntegrity: vi.fn(),
-  getUserPermissions: vi.fn(),
   poolQuery: vi.fn(),
 }));
 
@@ -40,12 +40,6 @@ vi.mock('../../models', () => ({
   },
 }));
 
-vi.mock('../../models/user', () => ({
-  UserModel: {
-    getUserPermissions: mocks.getUserPermissions,
-  },
-}));
-
 import orderLegalRouter from './orderLegal';
 
 const app = express();
@@ -65,10 +59,13 @@ function tokenFor(role: 'establishment_admin' | 'staff') {
   );
 }
 
+function pinWith(permissions: string[]) {
+  return pinActorTokenFor({ id: 13, establishmentId: EST, permissions });
+}
+
 describe('orderLegal permission gating', () => {
   beforeEach(() => {
     mocks.verifyIntegrity.mockReset();
-    mocks.getUserPermissions.mockReset();
     mocks.poolQuery.mockReset();
 
     mocks.verifyIntegrity.mockResolvedValue({ isValid: true, errors: [] });
@@ -81,23 +78,35 @@ describe('orderLegal permission gating', () => {
     });
   });
 
-  it('returns 403 on compliance endpoint when access_compliance permission is missing', async () => {
-    mocks.getUserPermissions.mockResolvedValue([]);
-
+  it('denies access with the account JWT alone (no PIN actor)', async () => {
     const res = await request(app)
       .get('/legal/compliance/12')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+      .set('Authorization', `Bearer ${tokenFor('establishment_admin')}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('PIN_ACTOR_REQUIRED');
+    expect(mocks.verifyIntegrity).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 on compliance endpoint when access_compliance permission is missing', async () => {
+    const res = await withPinActor(
+      request(app)
+        .get('/legal/compliance/12')
+        .set('Authorization', `Bearer ${tokenFor('staff')}`),
+      pinWith([])
+    );
 
     expect(res.status).toBe(403);
     expect(mocks.verifyIntegrity).not.toHaveBeenCalled();
   });
 
   it('allows compliance endpoint when access_compliance permission is present', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
-
-    const res = await request(app)
-      .get('/legal/compliance/12')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await withPinActor(
+      request(app)
+        .get('/legal/compliance/12')
+        .set('Authorization', `Bearer ${tokenFor('staff')}`),
+      pinWith(['access_compliance'])
+    );
 
     expect(res.status).toBe(200);
     expect(mocks.verifyIntegrity).toHaveBeenCalledWith(EST);

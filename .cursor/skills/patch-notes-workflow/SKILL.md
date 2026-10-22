@@ -30,7 +30,7 @@ docs/patch-notes/NNN-SLUG-PLAN.md
 docs/patch-notes/NNN-SLUG-IMPLEMENTATION.md
 ```
 
-- **NNN** = next available integer (check `LATEST-INDEX.md` — currently ~471+)
+- **NNN** = next available integer (check `LATEST-INDEX.md` — currently ~562+)
 - **PLAN at N, IMPLEMENTATION at N+1** (consecutive numbering)
 - Priority prefixes in slug: `P0`, `P1`, `P2`, `P3`; pillar codes: `L` (legal), `S` (security), `Q` (quality)
 

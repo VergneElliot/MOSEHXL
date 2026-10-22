@@ -68,7 +68,7 @@ export const BusinessInfoStep: React.FC<BusinessInfoStepProps> = ({
   return (
     <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 600, mx: 'auto', p: 3 }}>
       <Typography variant="h4" gutterBottom align="center" sx={{ mb: 4 }}>
-        Informations de l'Établissement
+        Informations de l’Établissement
       </Typography>
 
       <Typography variant="body1" color="text.secondary" align="center" sx={{ mb: 4 }}>

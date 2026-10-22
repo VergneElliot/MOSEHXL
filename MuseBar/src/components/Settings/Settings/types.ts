@@ -24,17 +24,6 @@ export interface SchedulerStatusResponse {
   scheduler: SchedulerStatus;
 }
 
-/** @deprecated Unused in Settings UI; currency is EUR app-wide and language uses i18n switcher. */
-export interface GeneralSettings {
-  barName: string;
-  address: string;
-  phone: string;
-  email: string;
-  taxIdentification: string;
-  currency: string;
-  language: string;
-}
-
 export interface BusinessInfo {
   name: string;
   address: string;
@@ -42,14 +31,6 @@ export interface BusinessInfo {
   email: string;
   siret: string;
   taxIdentification: string;
-}
-
-/** @deprecated Legacy stub type; live printer config is PrinterSetup. */
-export interface PrinterSettings {
-  enabled: boolean;
-  printerName: string;
-  printReceipts: boolean;
-  printReports: boolean;
 }
 
 export interface SettingsState {
@@ -67,14 +48,6 @@ export interface SettingsProps {
   onDataUpdate?: () => void;
   /** Venue JWT — required for Gestion des utilisateurs. */
   token?: string;
-}
-
-/** @deprecated General settings form removed; business identity is BusinessSettingsProps. */
-export interface GeneralSettingsProps {
-  settings: GeneralSettings;
-  onUpdate: (settings: GeneralSettings) => void;
-  loading?: boolean;
-  onSave: () => Promise<void>;
 }
 
 export interface BusinessSettingsProps {

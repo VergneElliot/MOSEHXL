@@ -92,7 +92,8 @@ export const usePaymentProcessing = ({
 
       // Single payer (equal count=1): store as card/cash, not split — cleaner for closures.
       if (state.subBills.length === 1) {
-        const bill = state.subBills[0]!;
+        const bill = state.subBills[0];
+        if (!bill) return;
         const method = bill.payments[0]?.method === 'cash' ? 'cash' : 'card';
         const created = await createOrder({
           totalAmount: saleTotal,

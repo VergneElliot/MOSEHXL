@@ -24,7 +24,6 @@ import {
 import {
   buildComplianceReport,
   buildPayrollCsv,
-  checkPunchLeaveConflict,
 } from '../../services/labor/laborReportService';
 import {
   buildAccountantCsv,
@@ -87,7 +86,7 @@ router.get(
 router.post(
   '/clock-in',
   requireAuth,
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async () => {
     throw new AppError(
       'Le pointage se fait en ouvrant un badge PIN. Utilisez le pavé PIN pour pointer l’entrée.',
       410,
@@ -99,7 +98,7 @@ router.post(
 router.post(
   '/clock-out',
   requireAuth,
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async () => {
     throw new AppError(
       'Le pointage de sortie se fait en fermant le badge PIN. Libérez vos tables ouvertes avant.',
       410,
@@ -134,7 +133,7 @@ router.get(
 router.post(
   '/punch',
   requireAuth,
-  asyncHandler(async (_req, _res) => {
+  asyncHandler(async () => {
     throw new AppError(
       'Le pointage partagé est désactivé. Ouvrir ou fermer un badge PIN pointe automatiquement.',
       410,

@@ -182,13 +182,13 @@ function App() {
       {/* Main application routes */}
       <Route path="/*" element={
         <>
-          {!isAuthenticated ? (
+          {!isAuthenticated || !user ? (
             <Container maxWidth="xl" sx={{ mt: 2 }}>
               <Login onLogin={handleLogin} />
             </Container>
           ) : isSystemAdmin ? (
             <Suspense fallback={<RouteFallback />}>
-              <SystemAdminRouter user={user!} />
+              <SystemAdminRouter user={user} />
             </Suspense>
           ) : (
             // Business Interface - viewport-height chain so tab content can use flex/scroll
@@ -200,7 +200,7 @@ function App() {
                   isHappyHourActive={isHappyHourActive}
                   timeUntilHappyHour={timeUntilHappyHour}
                   onLogout={handleLogout}
-                  user={user!}
+                  user={user}
                   onSwitchEstablishment={handleSwitchEstablishment}
                   showPinSessions
                   onHappyHourStatusUpdate={updateHappyHourStatus}
@@ -225,8 +225,8 @@ function App() {
                   }}
                 >
                   <AppRouter
-                    user={user!}
-                    token={token!}
+                    user={user}
+                    token={token ?? ''}
                     categories={categories}
                     products={products}
                     isHappyHourActive={isHappyHourActive}

@@ -212,7 +212,7 @@ const AuditTrailDashboard: React.FC<{ token: string }> = ({ token }) => {
         />
       </TableContainer>
       <Dialog open={!!selected} onClose={() => setSelected(null)} maxWidth="md" fullWidth>
-        <DialogTitle>Détail de l'action</DialogTitle>
+        <DialogTitle>Détail de l’action</DialogTitle>
         <DialogContent>
           {selected && (
             <Box>

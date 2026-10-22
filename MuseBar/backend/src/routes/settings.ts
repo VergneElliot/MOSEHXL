@@ -9,7 +9,6 @@ import {
   requireAuth,
   getEstablishmentId,
   requireAnyPermission,
-  requirePermission,
   requireEstablishmentAdminOrPermission,
 } from './auth';
 import { P } from '../permissions/registry';

@@ -27,7 +27,7 @@ Two identity kinds, two session layers:
 |---------|----------|
 | Routes | `backend/src/routes/authSession.ts`, `authLogin/*`, `authPin.ts`, `pinStaff.ts` |
 | JWT sign/verify | `backend/src/security/jwtConfig.ts` |
-| Middleware | `backend/src/middleware/auth.ts` — `requirePermission` = **PIN actor only** |
+| Middleware | `backend/src/middleware/auth.ts` — `requireAuth` only (`authenticateToken` alias removed); `requirePermission` = **PIN actor only** (account JWT alone → 403 `PIN_ACTOR_REQUIRED`) |
 | Refresh + CSRF | `backend/src/routes/authLogin/sessionRoutes.ts`, `cookies.ts` |
 | Frontend | `MuseBar/src/hooks/useAuth.tsx`, PIN-first `AppRouter`, `services/api/core.ts` |
 
@@ -103,7 +103,7 @@ Source of truth: `PERMISSION_TIERS` in `@mosehxl/types`.
 
 1. Every establishment-scoped route calls `getEstablishmentId()` and passes it to models.
 2. Backend authorization is mandatory — frontend gates are UX only.
-3. Feature permissions require an active PIN actor (not JWT alone).
+3. Feature permissions require an active PIN actor (not JWT alone). Tests must send `x-pin-actor-token` via `backend/src/test/pinActorTestUtils.ts`.
 4. PIN actor token must match JWT `establishment_id`.
 5. Permission keys from `@mosehxl/types` only — no ad-hoc strings.
 6. Never put actor fields into the legal-journal **hash** payload.

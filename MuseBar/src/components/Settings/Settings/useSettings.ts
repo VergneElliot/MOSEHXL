@@ -1,9 +1,6 @@
 /**
  * Settings State Management Hook
- * Centralized state management for all settings functionality
- *
- * @deprecated Use individual modules from './hooks/' instead for better modularity
- * This file is maintained for backward compatibility
+ * Orchestrates business-info and closure settings for SettingsContainer.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -79,15 +76,17 @@ export const useSettings = (): UseSettingsReturn => {
     }
   };
 
+  const { saveBusinessInfo: persistBusinessInfo } = businessHook;
+
   const saveBusinessInfo = useCallback(async () => {
     try {
-      await businessHook.saveBusinessInfo();
+      await persistBusinessInfo();
       setInfoMessage("Informations de l'établissement enregistrées.");
     } catch (error) {
       setInfoMessage(null);
       throw error;
     }
-  }, [businessHook.saveBusinessInfo]);
+  }, [persistBusinessInfo]);
 
   return {
     state: {

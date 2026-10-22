@@ -32,14 +32,6 @@ export const BASE_HTML_FONT_PERCENT = 87.5;
 export const SCALE_MIN = 50;
 export const SCALE_MAX = 150;
 export const SCALE_STEP = 5;
-
-/** @deprecated use SCALE_MIN */
-export const FINE_SCALE_MIN = SCALE_MIN;
-/** @deprecated use SCALE_MAX */
-export const FINE_SCALE_MAX = SCALE_MAX;
-/** @deprecated use SCALE_STEP */
-export const FINE_SCALE_STEP = SCALE_STEP;
-
 export type FineScaleKey =
   | 'font_scale_percent'
   | 'card_scale_percent'

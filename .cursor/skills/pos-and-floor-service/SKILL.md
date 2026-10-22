@@ -46,7 +46,7 @@ Backend: `routes/floor.ts`, `models/database/openTicketModel.ts`, `services/floo
 
 ## PIN session rules
 
-- Comptoir order create: account login enough; optional PIN → that waiter’s Z
+- Feature permissions (including POS) require an active PIN actor (`x-pin-actor-token`). Account JWT alone → 403 `PIN_ACTOR_REQUIRED`.
 - Table order create / floor mutations: active PIN session required
 - Step-up: `StepUpAuthContext.ensurePermission()` for HH / offert / cancel / sensitive nav
 - PIN actor token on all floor mutations
@@ -115,15 +115,10 @@ dispatchKitchenTicketsForCompletedOrder
   → kitchenTicketRenderer
 ```
 
-## Large files (split when touching)
+## File size
 
-| File | Role |
-|------|------|
-| `routes/floor.ts` | All floor REST handlers |
-| `useFloorService.ts` | Caisse floor sync |
-| `useFloorPlanManagement.ts` | Plan de salle tab logic |
-| `openTicketModel.ts` | Ticket persistence |
-| `POSContainer.tsx` | POS orchestrator |
+Former floor/POS monoliths were split in the 562 hygiene pass. Keep new work in dedicated
+modules (see `code-hygiene`); do not grow a file past ~250 if a seam exists.
 
 ## Hot path (Caisse catalog)
 
@@ -147,7 +142,7 @@ Update this table as you finish page-by-page polish:
 |------|--------|
 | Caisse (cart, payment, catalog) | **refined** (specific perms + ownership/Z) |
 | Historique (orders, returns, ongoing) | **refined** (+ Total comptoir) |
-| Plan de salle tab | **in progress** — takeover removed; abandon gated |
+| Plan de salle tab | **shipped** (`455`–`460`, PIN/nav `536`–`561`) — takeover removed; abandon gated |
 | Caisse floor map dialog | follows Plan de salle / floor API |
 | Administration floor editor | see `administration-space` skill |
 

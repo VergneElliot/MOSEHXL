@@ -250,7 +250,7 @@ const CompletionStep: React.FC<CompletionStepProps> = ({
       {isLoading && (
         <Box display="flex" justifyContent="center" mt={2}>
           <Typography variant="body2" color="text.secondary">
-            This may take a few moments. Please don't close this page.
+            This may take a few moments. Please don’t close this page.
           </Typography>
         </Box>
       )}

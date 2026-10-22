@@ -107,7 +107,7 @@ export const EstablishmentsList: React.FC = () => {
           Aucun établissement créé
         </Typography>
         <Typography variant="body2" color="textSecondary">
-          Cliquez sur "Créer un Établissement" pour commencer
+          Cliquez sur {'"Créer un Établissement"'} pour commencer
         </Typography>
       </Box>
     );

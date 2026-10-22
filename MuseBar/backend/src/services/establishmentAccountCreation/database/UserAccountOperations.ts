@@ -1,37 +1,29 @@
 import { PoolClient } from 'pg';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import type { SignOptions } from 'jsonwebtoken';
 import { Logger } from '../../../utils/logger';
-import { validatePassword, validatePasswordWithBreachCheck } from '../../../utils/passwordValidation';
-import { UserQueries } from '../../../utils/database';
+import { validatePasswordWithBreachCheck } from '../../../utils/passwordValidation';
 import { MembershipModel } from '../../../models/membership';
+import type { CreatedUserAccount, UserAccountData } from './userAccountTypes';
+import { generateUserAccountJwt } from './userAccountJwt';
+import {
+  validatePasswordStrength,
+  validateUserAccountData,
+} from './userAccountValidation';
+import {
+  checkUserExists,
+  createOrUpdateUserAccount,
+  getUserWithEstablishment,
+  updateUserRole,
+  validateUserCredentials,
+} from './userAccountSetupOperations';
 
-export interface UserAccountData {
-  email: string;
-  password: string;
-  establishmentId: string;
-  role: string;
-}
-
-export interface CreatedUserAccount {
-  id: string;
-  email: string;
-  role: string;
-  establishmentId: string;
-  token: string;
-}
-
-export interface SetupUserAccountInput {
-  first_name: string;
-  last_name: string;
-  email: string;
-  password: string;
-  phone: string;
-}
+export type {
+  CreatedUserAccount,
+  SetupUserAccountInput,
+  UserAccountData,
+} from './userAccountTypes';
 
 export class UserAccountOperations {
-  private static logger = Logger.getInstance();
   private logger: Logger;
   private jwtSecret: string;
   private jwtExpiresIn: string;
@@ -79,58 +71,9 @@ export class UserAccountOperations {
       let user: { id: string | number; email: string; role: string; establishment_id: string };
 
       if (existing.rows[0]) {
-        if (existing.rows[0].role === 'system_admin') {
-          throw new Error('Cannot attach a system administrator account as establishment admin');
-        }
-
-        const alreadyMember = await client.query(
-          `SELECT 1 FROM user_establishment_memberships
-           WHERE user_id = $1 AND establishment_id = $2 AND is_active = TRUE`,
-          [existing.rows[0].id, establishmentId]
-        );
-        if (alreadyMember.rows.length > 0) {
-          throw new Error('This account already administers this establishment');
-        }
-
-        // Keep existing password; only refresh last-active establishment + role cache.
-        const updated = await client.query(
-          `UPDATE users
-           SET establishment_id = $2,
-               role = $3,
-               email_verified = TRUE,
-               updated_at = NOW()
-           WHERE id = $1
-           RETURNING id, email, role, establishment_id`,
-          [existing.rows[0].id, establishmentId, membershipRole]
-        );
-        user = updated.rows[0];
-        this.logger.info('Linked existing user as establishment admin membership', {
-          userId: user.id,
-          email: user.email,
-          establishmentId: user.establishment_id,
-        });
+        user = await this.linkExistingAdmin(client, existing.rows[0], establishmentId, membershipRole);
       } else {
-        const passwordHash = await bcrypt.hash(password, 12);
-        const userResult = await client.query(
-          `INSERT INTO users (
-            email,
-            password_hash,
-            role,
-            establishment_id,
-            is_admin,
-            email_verified,
-            created_at,
-            updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-          RETURNING id, email, role, establishment_id`,
-          [normalizedEmail, passwordHash, membershipRole, establishmentId, false, true]
-        );
-        user = userResult.rows[0];
-        this.logger.info('Establishment admin user created successfully', {
-          userId: user.id,
-          email: user.email,
-          establishmentId: user.establishment_id,
-        });
+        user = await this.insertAdminUser(client, normalizedEmail, password, establishmentId, membershipRole);
       }
 
       await client.query(
@@ -144,37 +87,26 @@ export class UserAccountOperations {
       );
       await MembershipModel.ensureCalendarColor(Number(user.id), establishmentId, client);
 
-      const token = this.generateJWTToken({
-        id: parseInt(String(user.id), 10),
-        email: user.email,
-        role: membershipRole,
-        establishment_id: establishmentId,
-      });
-
-      await client.query(
-        `INSERT INTO audit_trail (
-          user_id, action_type, resource_type, resource_id,
-          action_details, ip_address, user_agent, session_id, establishment_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [
-          user.id,
-          existing.rows[0] ? 'ESTABLISHMENT_ADMIN_LINKED' : 'ESTABLISHMENT_ADMIN_CREATED',
-          'USER',
-          user.id,
-          JSON.stringify({
-            email: user.email,
-            role: membershipRole,
-            establishment_id: establishmentId,
-            account_type: 'establishment_admin',
-            linked_existing: Boolean(existing.rows[0]),
-          }),
-          ipAddress,
-          userAgent,
-          null,
-          establishmentId,
-        ]
+      const token = generateUserAccountJwt(
+        {
+          id: parseInt(String(user.id), 10),
+          email: user.email,
+          role: membershipRole,
+          establishment_id: establishmentId,
+        },
+        this.jwtSecret,
+        this.jwtExpiresIn
       );
-      this.logger.info('Audit trail logged for establishment admin creation', { userId: user.id });
+
+      await this.logAdminAudit(
+        client,
+        user,
+        membershipRole,
+        establishmentId,
+        Boolean(existing.rows[0]),
+        ipAddress,
+        userAgent
+      );
 
       return {
         id: String(user.id),
@@ -189,250 +121,116 @@ export class UserAccountOperations {
     }
   }
 
-  /**
-   * Validate user account data
-   */
-  public validateUserAccountData(userData: UserAccountData): { isValid: boolean; error?: string } {
-    const { email, password, establishmentId, role } = userData;
+  public validateUserAccountData = validateUserAccountData;
+  public validatePasswordStrength = validatePasswordStrength;
 
-    // Email validation
-    if (!email || email.trim() === '') {
-      return { isValid: false, error: 'Email is required' };
+  static checkUserExists = checkUserExists;
+  static createOrUpdateUserAccount = createOrUpdateUserAccount;
+  static validateUserCredentials = validateUserCredentials;
+  static updateUserRole = updateUserRole;
+  static getUserWithEstablishment = getUserWithEstablishment;
+
+  private async linkExistingAdmin(
+    client: PoolClient,
+    existingRow: { id: string | number; email: string; role: string },
+    establishmentId: string,
+    membershipRole: string
+  ): Promise<{ id: string | number; email: string; role: string; establishment_id: string }> {
+    if (existingRow.role === 'system_admin') {
+      throw new Error('Cannot attach a system administrator account as establishment admin');
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return { isValid: false, error: 'Invalid email format' };
+    const alreadyMember = await client.query(
+      `SELECT 1 FROM user_establishment_memberships
+           WHERE user_id = $1 AND establishment_id = $2 AND is_active = TRUE`,
+      [existingRow.id, establishmentId]
+    );
+    if (alreadyMember.rows.length > 0) {
+      throw new Error('This account already administers this establishment');
     }
 
-    const passwordCheck = validatePassword(password ?? '');
-    if (!passwordCheck.isValid) {
-      return { isValid: false, error: passwordCheck.error ?? 'Invalid password' };
-    }
-
-    // Establishment ID validation
-    if (!establishmentId || establishmentId.trim() === '') {
-      return { isValid: false, error: 'Establishment ID is required' };
-    }
-
-    // Role validation
-    if (!role || role.trim() === '') {
-      return { isValid: false, error: 'Role is required' };
-    }
-
-    const validRoles = ['establishment_admin', 'establishment_manager', 'establishment_staff'];
-    if (!validRoles.includes(role)) {
-      return { isValid: false, error: 'Invalid role. Must be one of: establishment_admin, establishment_manager, establishment_staff' };
-    }
-
-    return { isValid: true };
-  }
-
-  // Email uniqueness check removed - users can have multiple establishments with same email
-
-  /**
-   * Generate JWT token for user
-   */
-  private generateJWTToken(user: { id: number; email: string; role: string; establishment_id?: string }): string {
-    const payload = {
-      id: user.id,
+    const updated = await client.query(
+      `UPDATE users
+           SET establishment_id = $2,
+               role = $3,
+               email_verified = TRUE,
+               updated_at = NOW()
+           WHERE id = $1
+           RETURNING id, email, role, establishment_id`,
+      [existingRow.id, establishmentId, membershipRole]
+    );
+    const user = updated.rows[0];
+    this.logger.info('Linked existing user as establishment admin membership', {
+      userId: user.id,
       email: user.email,
-      role: user.role,
-      establishment_id: user.establishment_id
-    };
-
-    return jwt.sign(payload, this.jwtSecret, { expiresIn: this.jwtExpiresIn } as SignOptions);
+      establishmentId: user.establishment_id,
+    });
+    return user;
   }
 
-  /**
-   * Verify password strength (uses shared utils/passwordValidation — same rule as all other flows).
-   */
-  public validatePasswordStrength(password: string): { isValid: boolean; error?: string; score?: number } {
-    const result = validatePassword(password);
-    if (!result.isValid) {
-      return { isValid: false, error: result.error };
-    }
-    const score = [/[A-Z]/.test(password), /[a-z]/.test(password), /\d/.test(password)].filter(Boolean).length + (password.length >= 12 ? 1 : 0);
-    return { isValid: true, score };
-  }
-
-  /**
-   * Shared helper used by setup and account-creation flows.
-   * Keeps user lookup logic centralized in a single module.
-   */
-  static async checkUserExists(
-    client: PoolClient,
-    email: string
-  ): Promise<{ exists: boolean; userId?: number; hasEstablishment?: boolean }> {
-    try {
-      const existing = await UserQueries.checkUserExists(client, email);
-      if (!existing.exists) {
-        return { exists: false };
-      }
-
-      const userRecord = existing.user as { id?: number | string } | undefined;
-      const parsedUserId = Number(userRecord?.id);
-
-      return {
-        exists: true,
-        userId: Number.isFinite(parsedUserId) ? parsedUserId : undefined,
-        hasEstablishment: existing.hasEstablishment
-      };
-    } catch (error) {
-      this.logger.error('Error checking user existence:', error as Error);
-      throw new Error('Failed to check user existence');
-    }
-  }
-
-  /**
-   * Shared setup-compatible create/update path.
-   * This replaces the legacy setup-local userAccountOperations module.
-   */
-  static async createOrUpdateUserAccount(
-    client: PoolClient,
-    setupData: SetupUserAccountInput,
-    establishmentId: string
-  ) {
-    try {
-      const existingUser = await this.checkUserExists(client, setupData.email);
-
-      if (existingUser.exists) {
-        const updateResult = await client.query(
-          `UPDATE users
-           SET
-             first_name = $1,
-             last_name = $2,
-             phone = $3,
-             establishment_id = $4,
-             role = 'establishment_admin',
-             is_admin = false,
-             updated_at = CURRENT_TIMESTAMP
-           WHERE email = $5
-           RETURNING id, email, first_name, last_name, establishment_id`,
-          [
-            setupData.first_name,
-            setupData.last_name,
-            setupData.phone,
-            establishmentId,
-            setupData.email
-          ]
-        );
-
-        const updated = updateResult.rows[0];
-        if (updated?.id) {
-          await client.query(
-            `INSERT INTO user_establishment_memberships (user_id, establishment_id, role, is_active)
-             VALUES ($1, $2, 'establishment_admin', TRUE)
-             ON CONFLICT (user_id, establishment_id) DO UPDATE
-             SET role = 'establishment_admin', is_active = TRUE, updated_at = CURRENT_TIMESTAMP`,
-            [updated.id, establishmentId]
-          );
-          await MembershipModel.ensureCalendarColor(Number(updated.id), establishmentId, client);
-        }
-
-        this.logger.info(`Updated existing user: ${setupData.email}`);
-        return updated;
-      }
-
-      const hashedPassword = await bcrypt.hash(setupData.password, 12);
-      const newUserResult = await client.query(
-        `INSERT INTO users (
-           first_name,
-           last_name,
-           email,
-           password_hash,
-           phone,
-           establishment_id,
-           role,
-           is_admin,
-           created_at,
-           updated_at
-         ) VALUES ($1, $2, $3, $4, $5, $6, 'establishment_admin', false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-         RETURNING id, email, first_name, last_name, establishment_id`,
-        [
-          setupData.first_name,
-          setupData.last_name,
-          setupData.email,
-          hashedPassword,
-          setupData.phone,
-          establishmentId
-        ]
-      );
-
-      const created = newUserResult.rows[0];
-      if (created?.id) {
-        await client.query(
-          `INSERT INTO user_establishment_memberships (user_id, establishment_id, role, is_active)
-           VALUES ($1, $2, 'establishment_admin', TRUE)
-           ON CONFLICT (user_id, establishment_id) DO NOTHING`,
-          [created.id, establishmentId]
-        );
-        await MembershipModel.ensureCalendarColor(Number(created.id), establishmentId, client);
-      }
-
-      this.logger.info(`Created new user: ${setupData.email}`);
-      return created;
-    } catch (error) {
-      this.logger.error('Error creating/updating user account:', error as Error);
-      throw new Error('Failed to create or update user account');
-    }
-  }
-
-  static async validateUserCredentials(
+  private async insertAdminUser(
     client: PoolClient,
     email: string,
-    password: string
-  ): Promise<boolean> {
-    try {
-      const userQuery = await client.query(
-        `SELECT password_hash
-         FROM users
-         WHERE email = $1`,
-        [email]
-      );
-
-      if (userQuery.rows.length === 0) {
-        return false;
-      }
-
-      const { password_hash } = userQuery.rows[0] as { password_hash: string };
-      return await bcrypt.compare(password, password_hash);
-    } catch (error) {
-      this.logger.error('Error validating user credentials:', error as Error);
-      return false;
-    }
+    password: string,
+    establishmentId: string,
+    membershipRole: string
+  ): Promise<{ id: string | number; email: string; role: string; establishment_id: string }> {
+    const passwordHash = await bcrypt.hash(password, 12);
+    const userResult = await client.query(
+      `INSERT INTO users (
+            email,
+            password_hash,
+            role,
+            establishment_id,
+            is_admin,
+            email_verified,
+            created_at,
+            updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+          RETURNING id, email, role, establishment_id`,
+      [email, passwordHash, membershipRole, establishmentId, false, true]
+    );
+    const user = userResult.rows[0];
+    this.logger.info('Establishment admin user created successfully', {
+      userId: user.id,
+      email: user.email,
+      establishmentId: user.establishment_id,
+    });
+    return user;
   }
 
-  static async updateUserRole(
+  private async logAdminAudit(
     client: PoolClient,
-    userId: number,
-    role: string,
-    isAdmin: boolean = false
+    user: { id: string | number; email: string },
+    membershipRole: string,
+    establishmentId: string,
+    linkedExisting: boolean,
+    ipAddress?: string,
+    userAgent?: string
   ): Promise<void> {
-    try {
-      await client.query(
-        `UPDATE users
-         SET
-           role = $1,
-           is_admin = $2,
-           updated_at = CURRENT_TIMESTAMP
-         WHERE id = $3`,
-        [role, isAdmin, userId]
-      );
-
-      this.logger.info(`Updated user role: ${userId} -> ${role} (admin: ${isAdmin})`);
-    } catch (error) {
-      this.logger.error('Error updating user role:', error as Error);
-      throw new Error('Failed to update user role');
-    }
-  }
-
-  static async getUserWithEstablishment(client: PoolClient, userId: number) {
-    try {
-      return await UserQueries.getUserWithEstablishment(client, userId);
-    } catch (error) {
-      this.logger.error('Error getting user with establishment:', error as Error);
-      throw new Error('Failed to retrieve user information');
-    }
+    await client.query(
+      `INSERT INTO audit_trail (
+          user_id, action_type, resource_type, resource_id,
+          action_details, ip_address, user_agent, session_id, establishment_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        user.id,
+        linkedExisting ? 'ESTABLISHMENT_ADMIN_LINKED' : 'ESTABLISHMENT_ADMIN_CREATED',
+        'USER',
+        user.id,
+        JSON.stringify({
+          email: user.email,
+          role: membershipRole,
+          establishment_id: establishmentId,
+          account_type: 'establishment_admin',
+          linked_existing: linkedExisting,
+        }),
+        ipAddress,
+        userAgent,
+        null,
+        establishmentId,
+      ]
+    );
+    this.logger.info('Audit trail logged for establishment admin creation', { userId: user.id });
   }
 }

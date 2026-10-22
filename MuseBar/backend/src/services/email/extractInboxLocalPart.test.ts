@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractInboxLocalPart, extractInboxRecipient } from './extractInboxLocalPart';
+import { extractInboxRecipient } from './extractInboxLocalPart';
 
 describe('extractInboxRecipient', () => {
   it('parses plain and display-name recipients', () => {
@@ -34,6 +34,5 @@ describe('extractInboxRecipient', () => {
 
   it('returns null when no mosehxl.com local-part', () => {
     expect(extractInboxRecipient('someone@gmail.com')).toBeNull();
-    expect(extractInboxLocalPart('someone@gmail.com')).toBeNull();
   });
 });

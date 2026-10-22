@@ -35,6 +35,16 @@ vi.mock('../models/user', () => ({
     incrementFailedLoginAttempts: mocks.incrementFailedLoginAttempts,
     applyLoginLockout: mocks.applyLoginLockout,
     getMfaTotpState: mocks.getMfaTotpState,
+    getUserPermissions: vi.fn().mockResolvedValue([]),
+  },
+}));
+
+vi.mock('../models/membership', () => ({
+  MembershipModel: {
+    listForUser: vi.fn().mockResolvedValue([]),
+    resolveActive: vi.fn().mockResolvedValue(null),
+    setActiveEstablishment: vi.fn(),
+    toApiList: vi.fn((rows: unknown[]) => rows),
   },
 }));
 

@@ -1,9 +1,5 @@
 /**
- * Happy Hour State Management Hook
- * Centralized state management and business logic for happy hour functionality
- * 
- * @deprecated Use individual modules from './hooks/' instead for better modularity
- * This file is maintained for backward compatibility
+ * Happy Hour Control hook — orchestrates state, settings, and product modules.
  */
 
 import { useEffect, useCallback } from 'react';

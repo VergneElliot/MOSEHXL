@@ -26,14 +26,12 @@ const ProgressiveLoading: React.FC<ProgressiveLoadingProps> = ({ stages, onCompl
       if (onComplete) onComplete();
       return;
     }
-    let progressInterval: ReturnType<typeof setInterval> | undefined;
-
     const stageTimeout = setTimeout(() => {
       setCurrentStage(prev => prev + 1);
       setProgress(0);
     }, stage.duration);
 
-    progressInterval = setInterval(() => {
+    const progressInterval = setInterval(() => {
       setProgress(prev => {
         const increment = 100 / (stage.duration / 100);
         return Math.min(prev + increment, 100);

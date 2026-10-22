@@ -43,7 +43,7 @@ interface PasswordResetFormProps {
 }
 
 export const PasswordResetForm: React.FC<PasswordResetFormProps> = ({
-  token,
+  token: _token,
   onSubmit,
   loading,
   error,

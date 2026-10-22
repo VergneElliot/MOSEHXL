@@ -62,6 +62,9 @@ specific-permission step-up UX is authorization-only).
 - Réservations : bouton **Accéder à la conversation** ; **commentaire** e-mailé
   au client (changement de statut ou du texte) ; **notes** strictement internes
   (plus de remplissage auto depuis le formulaire public).
+- Hygiène interne (patch 562/563) : plus aucun fichier source au-dessus de 400
+  lignes ; tests de permission sur l’acteur PIN ; lint et build sans warning.
+  Refactor uniquement — **Fiscal impact: PATCH**.
 
 ### Fixed
 

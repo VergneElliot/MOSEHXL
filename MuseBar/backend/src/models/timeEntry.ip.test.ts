@@ -3,7 +3,7 @@ import {
   isIpAllowed,
   isValidIpOrCidr,
   normalizeAllowedIps,
-} from '../../models/timeEntry';
+} from './timeEntry';
 
 describe('time clock IP allowlist', () => {
   it('validates bare IPv4 and CIDR', () => {

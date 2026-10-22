@@ -34,5 +34,4 @@ export interface AuthenticatedUser {
   establishment_id: string | null;
 }
 
-/** @deprecated Use UserRow instead. */
 export type User = UserRow;

@@ -80,7 +80,7 @@ export const HappyHourSchedule: React.FC<HappyHourScheduleProps> = ({
           
           <Alert severity="info">
             <Typography variant="body2">
-              Aucun produit n'est actuellement éligible pour l'Happy Hour.
+              Aucun produit n’est actuellement éligible pour l’Happy Hour.
               <br />
               Vérifiez que vos produits sont marqués comme éligibles dans la gestion des produits.
             </Typography>
@@ -253,7 +253,7 @@ export const HappyHourSchedule: React.FC<HappyHourScheduleProps> = ({
             Gestion des produits Happy Hour:
           </Typography>
           <Typography variant="body2">
-            • Cliquez sur l'icône d'édition pour personnaliser la réduction d'un produit<br />
+            • Cliquez sur l’icône d’édition pour personnaliser la réduction d’un produit<br />
             • Les produits sans réduction personnalisée utilisent la réduction par défaut<br />
             • Les modifications sont appliquées immédiatement après sauvegarde<br />
             • Les prix Happy Hour sont automatiquement calculés

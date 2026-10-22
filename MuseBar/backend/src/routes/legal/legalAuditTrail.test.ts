@@ -3,7 +3,7 @@ import request from 'supertest';
 import express from 'express';
 import { generateToken } from '../auth';
 import { errorHandler } from '../../middleware/errorHandler';
-import { signPinActorToken } from '../../services/auth/pinActorToken';
+import { pinActorTokenFor, withPinActor } from '../../test/pinActorTestUtils';
 
 const EST = '11111111-1111-4111-8111-111111111111';
 
@@ -67,12 +67,10 @@ function tokenFor(role: 'establishment_admin' | 'staff', establishmentId: string
 }
 
 function pinFor(role: 'establishment_admin' | 'staff', permissions: string[] = []) {
-  return signPinActorToken({
+  return pinActorTokenFor({
     id: role === 'staff' ? 12 : 7,
-    email: `${role}@example.com`,
+    establishmentId: EST,
     role,
-    establishment_id: EST,
-    display_name: role,
     permissions,
   });
 }
@@ -100,28 +98,32 @@ describe('legal audit trail route', () => {
   });
 
   it('denies /audit/trail for staff JWT without PIN', async () => {
-    mocks.getUserPermissions.mockResolvedValue([]);
     const res = await request(app)
       .get('/audit/trail')
       .set('Authorization', `Bearer ${tokenFor('staff')}`);
     expect(res.status).toBe(403);
+    expect(res.body.code).toBe('PIN_ACTOR_REQUIRED');
     expect(mocks.getEstablishmentAuditTrail).not.toHaveBeenCalled();
   });
 
   it('denies /audit/trail for staff PIN without access_compliance', async () => {
-    const res = await request(app)
-      .get('/audit/trail')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`)
-      .set('x-pin-actor-token', pinFor('staff', ['access_pos']));
+    const res = await withPinActor(
+      request(app)
+        .get('/audit/trail')
+        .set('Authorization', `Bearer ${tokenFor('staff')}`),
+      pinFor('staff', ['access_pos'])
+    );
     expect(res.status).toBe(403);
     expect(mocks.getEstablishmentAuditTrail).not.toHaveBeenCalled();
   });
 
   it('allows /audit/trail for establishment_admin PIN', async () => {
-    const res = await request(app)
-      .get('/audit/trail?limit=25&offset=0')
-      .set('Authorization', `Bearer ${tokenFor('establishment_admin')}`)
-      .set('x-pin-actor-token', pinFor('establishment_admin'));
+    const res = await withPinActor(
+      request(app)
+        .get('/audit/trail?limit=25&offset=0')
+        .set('Authorization', `Bearer ${tokenFor('establishment_admin')}`),
+      pinFor('establishment_admin')
+    );
 
     expect(res.status).toBe(200);
     expect(res.body.audit_entries).toHaveLength(1);
@@ -133,10 +135,12 @@ describe('legal audit trail route', () => {
   });
 
   it('allows /audit/trail for staff PIN with access_compliance', async () => {
-    const res = await request(app)
-      .get('/audit/trail')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`)
-      .set('x-pin-actor-token', pinFor('staff', ['access_compliance']));
+    const res = await withPinActor(
+      request(app)
+        .get('/audit/trail')
+        .set('Authorization', `Bearer ${tokenFor('staff')}`),
+      pinFor('staff', ['access_compliance'])
+    );
 
     expect(res.status).toBe(200);
     expect(mocks.getEstablishmentAuditTrail).toHaveBeenCalled();

@@ -6,12 +6,13 @@ import os from 'os';
 import path from 'path';
 import { generateToken } from '../auth';
 import { errorHandler } from '../../middleware/errorHandler';
+import type { Test } from 'supertest';
+import { pinActorTokenFor, withPinActor } from '../../test/pinActorTestUtils';
 
 const EST = '11111111-1111-4111-8111-111111111111';
 
 const mocks = vi.hoisted(() => ({
   poolQuery: vi.fn(),
-  getUserPermissions: vi.fn(),
   getArchiveExports: vi.fn(),
   getArchiveExportById: vi.fn(),
   verifyArchiveExport: vi.fn(),
@@ -39,12 +40,6 @@ vi.mock('../../db/pool', () => ({
 vi.mock('../../utils/logger', () => ({
   Logger: {
     getInstance: () => ({ error: vi.fn(), info: vi.fn(), warn: vi.fn() }),
-  },
-}));
-
-vi.mock('../../models/user', () => ({
-  UserModel: {
-    getUserPermissions: mocks.getUserPermissions,
   },
 }));
 
@@ -96,10 +91,16 @@ function tokenFor(role: 'establishment_admin' | 'staff') {
   );
 }
 
+function asStaff(req: Test, permissions: string[] = ['access_closure']) {
+  return withPinActor(
+    req.set('Authorization', `Bearer ${tokenFor('staff')}`),
+    pinActorTokenFor({ id: 22, establishmentId: EST, permissions })
+  );
+}
+
 describe('legal archive/closure permission gating', () => {
   beforeEach(() => {
     mocks.poolQuery.mockReset();
-    mocks.getUserPermissions.mockReset();
     mocks.getArchiveExports.mockReset();
     mocks.getArchiveExportById.mockReset();
     mocks.verifyArchiveExport.mockReset();
@@ -183,39 +184,40 @@ describe('legal archive/closure permission gating', () => {
     mocks.deleteOpenClosureBulletin.mockResolvedValue(true);
   });
 
-  it('denies /archive/list without access_closure', async () => {
-    mocks.getUserPermissions.mockResolvedValue([]);
-
+  it('denies access with the account JWT alone (no PIN actor)', async () => {
     const res = await request(app)
       .get('/archive/list')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+      .set('Authorization', `Bearer ${tokenFor('establishment_admin')}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('PIN_ACTOR_REQUIRED');
+    expect(mocks.getArchiveExports).not.toHaveBeenCalled();
+  });
+
+  it('denies /archive/list without access_closure', async () => {
+
+    const res = await asStaff(request(app).get('/archive/list'), []);
 
     expect(res.status).toBe(403);
     expect(mocks.getArchiveExports).not.toHaveBeenCalled();
   });
 
   it('allows /archive/list with access_closure', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
 
-    const res = await request(app)
-      .get('/archive/list')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await asStaff(request(app).get('/archive/list'));
 
     expect(res.status).toBe(200);
     expect(mocks.getArchiveExports).toHaveBeenCalledWith(EST);
   });
 
   it('allows /archive/:id with access_closure and scopes archive lookup', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
     mocks.getArchiveExportById.mockResolvedValue({
       id: 12,
       establishment_id: EST,
       export_type: 'DAILY',
     });
 
-    const res = await request(app)
-      .get('/archive/12')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await asStaff(request(app).get('/archive/12'));
 
     expect(res.status).toBe(200);
     expect(mocks.getArchiveExportById).toHaveBeenCalledWith(12, EST);
@@ -223,23 +225,17 @@ describe('legal archive/closure permission gating', () => {
   });
 
   it('denies /archive/:id without access_closure', async () => {
-    mocks.getUserPermissions.mockResolvedValue([]);
 
-    const res = await request(app)
-      .get('/archive/12')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await asStaff(request(app).get('/archive/12'), []);
 
     expect(res.status).toBe(403);
     expect(mocks.getArchiveExportById).not.toHaveBeenCalled();
   });
 
   it('returns 404 for /archive/:id when archive is missing despite access_closure', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
     mocks.getArchiveExportById.mockResolvedValue(null);
 
-    const res = await request(app)
-      .get('/archive/999')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await asStaff(request(app).get('/archive/999'));
 
     expect(res.status).toBe(404);
     expect(mocks.getArchiveExportById).toHaveBeenCalledWith(999, EST);
@@ -247,11 +243,8 @@ describe('legal archive/closure permission gating', () => {
   });
 
   it('returns 400 for /archive/:id when archive id is invalid and skips lookup', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
 
-    const res = await request(app)
-      .get('/archive/not-a-number')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await asStaff(request(app).get('/archive/not-a-number'));
 
     expect(res.status).toBe(400);
     expect(res.body.error?.message).toBe('Invalid archive ID');
@@ -259,30 +252,30 @@ describe('legal archive/closure permission gating', () => {
   });
 
   it('returns 400 for /archive/create when required fields are missing', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
 
-    const res = await request(app)
-      .post('/archive/create')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`)
-      .send({ archiveType: 'DAILY' });
+    const res = await asStaff(
+      request(app)
+        .post('/archive/create')
+        .send({ archiveType: 'DAILY' }),
+    );
 
     expect(res.status).toBe(400);
     expect(res.body.error?.message).toBe('Archive type, start date, and end date are required');
   });
 
   it('allows /archive/create with access_closure and sends establishment-scoped export payload', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
     const archiveRecord = { id: 41, establishment_id: EST, export_type: 'DAILY' };
     mocks.exportData.mockResolvedValue(archiveRecord);
 
-    const res = await request(app)
-      .post('/archive/create')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`)
-      .send({
+    const res = await asStaff(
+      request(app)
+        .post('/archive/create')
+        .send({
         archiveType: 'DAILY',
         startDate: '2026-01-01',
         endDate: '2026-01-31',
-      });
+      }),
+    );
 
     expect(res.status).toBe(201);
     expect(mocks.exportData).toHaveBeenCalledWith(
@@ -299,44 +292,45 @@ describe('legal archive/closure permission gating', () => {
   });
 
   it('denies /archive/create without access_closure', async () => {
-    mocks.getUserPermissions.mockResolvedValue([]);
 
-    const res = await request(app)
-      .post('/archive/create')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`)
-      .send({
+    const res = await asStaff(
+      request(app)
+        .post('/archive/create')
+        .send({
         archiveType: 'DAILY',
         startDate: '2026-01-01',
         endDate: '2026-01-31',
-      });
+      }),
+      []
+    );
 
     expect(res.status).toBe(403);
     expect(mocks.exportData).not.toHaveBeenCalled();
   });
 
   it('returns 400 for /archive/:id/export when archive id is invalid', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
 
-    const res = await request(app)
-      .post('/archive/not-a-number/export')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`)
-      .send({ format: 'json' });
+    const res = await asStaff(
+      request(app)
+        .post('/archive/not-a-number/export')
+        .send({ format: 'json' }),
+    );
 
     expect(res.status).toBe(400);
     expect(res.body.error?.message).toBe('Invalid archive ID');
   });
 
   it('verifies archive integrity via /archive/:id/verify', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
     mocks.verifyArchiveExport.mockResolvedValue({
       isValid: false,
       errors: ['Digital signature verification failed - file authenticity compromised'],
     });
 
-    const res = await request(app)
-      .post('/archive/77/verify')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`)
-      .send({});
+    const res = await asStaff(
+      request(app)
+        .post('/archive/77/verify')
+        .send({}),
+    );
 
     expect(res.status).toBe(200);
     expect(mocks.verifyArchiveExport).toHaveBeenCalledWith(77, EST);
@@ -347,23 +341,22 @@ describe('legal archive/closure permission gating', () => {
   });
 
   it('returns 404 for /archive/:id/verify when archive is missing', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
     mocks.verifyArchiveExport.mockResolvedValue({
       isValid: false,
       errors: ['Archive export not found'],
     });
 
-    const res = await request(app)
-      .post('/archive/77/verify')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`)
-      .send({});
+    const res = await asStaff(
+      request(app)
+        .post('/archive/77/verify')
+        .send({}),
+    );
 
     expect(res.status).toBe(404);
     expect(res.body.error?.message).toBe('Archive not found');
   });
 
   it('downloads archive via /archive/:id/download', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
     const tempFilePath = path.join(os.tmpdir(), `archive-download-${Date.now()}.json`);
     fs.writeFileSync(tempFilePath, '{"ok":true}', 'utf-8');
     mocks.downloadArchiveExport.mockResolvedValue({
@@ -371,9 +364,7 @@ describe('legal archive/closure permission gating', () => {
       fileName: 'musebar_export_DAILY_77.json',
     });
 
-    const res = await request(app)
-      .get('/archive/77/download')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await asStaff(request(app).get('/archive/77/download'));
 
     expect(res.status).toBe(200);
     expect(res.header['content-disposition']).toContain('musebar_export_DAILY_77.json');
@@ -383,18 +374,18 @@ describe('legal archive/closure permission gating', () => {
   });
 
   it('denies /archive/:id/export without access_closure', async () => {
-    mocks.getUserPermissions.mockResolvedValue([]);
 
-    const res = await request(app)
-      .post('/archive/77/export')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`)
-      .send({ format: 'json' });
+    const res = await asStaff(
+      request(app)
+        .post('/archive/77/export')
+        .send({ format: 'json' }),
+      []
+    );
 
     expect(res.status).toBe(403);
   });
 
   it('supports legacy /archive/:id/export as a download alias', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
     const tempFilePath = path.join(os.tmpdir(), `archive-export-${Date.now()}.json`);
     fs.writeFileSync(tempFilePath, '{"ok":true}', 'utf-8');
     mocks.downloadArchiveExport.mockResolvedValue({
@@ -402,10 +393,11 @@ describe('legal archive/closure permission gating', () => {
       fileName: 'musebar_export_DAILY_77.json',
     });
 
-    const res = await request(app)
-      .post('/archive/77/export')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`)
-      .send({});
+    const res = await asStaff(
+      request(app)
+        .post('/archive/77/export')
+        .send({}),
+    );
 
     expect(res.status).toBe(200);
     expect(res.header['content-disposition']).toContain('musebar_export_DAILY_77.json');
@@ -416,25 +408,19 @@ describe('legal archive/closure permission gating', () => {
   });
 
   it('denies /closure/bulletins without access_closure', async () => {
-    mocks.getUserPermissions.mockResolvedValue([]);
 
-    const res = await request(app)
-      .get('/closure/bulletins')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await asStaff(request(app).get('/closure/bulletins'), []);
 
     expect(res.status).toBe(403);
     expect(mocks.getClosureBulletins).not.toHaveBeenCalled();
   });
 
   it('allows /closure/bulletins with access_closure and scopes to caller establishment', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
     mocks.getClosureBulletins.mockResolvedValue([
       { id: 1, closure_type: 'DAILY', establishment_id: EST },
     ]);
 
-    const res = await request(app)
-      .get('/closure/bulletins')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await asStaff(request(app).get('/closure/bulletins'));
 
     expect(res.status).toBe(200);
     expect(mocks.getClosureBulletins).toHaveBeenCalledWith(EST, undefined);
@@ -446,7 +432,6 @@ describe('legal archive/closure permission gating', () => {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
 
-    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
     mocks.getClosureBulletins.mockResolvedValue([
       {
         id: 77,
@@ -457,9 +442,7 @@ describe('legal archive/closure permission gating', () => {
       },
     ]);
 
-    const res = await request(app)
-      .get('/closure/monthly-latest')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await asStaff(request(app).get('/closure/monthly-latest'));
 
     expect(res.status).toBe(200);
     expect(mocks.getClosureBulletins).toHaveBeenCalledWith(EST, 'MONTHLY');
@@ -467,7 +450,6 @@ describe('legal archive/closure permission gating', () => {
   });
 
   it('returns 404 on /closure/monthly-latest when no current-month bulletin exists', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
     mocks.getClosureBulletins.mockResolvedValue([
       {
         id: 66,
@@ -477,9 +459,7 @@ describe('legal archive/closure permission gating', () => {
       },
     ]);
 
-    const res = await request(app)
-      .get('/closure/monthly-latest')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await asStaff(request(app).get('/closure/monthly-latest'));
 
     expect(res.status).toBe(404);
     expect(mocks.getClosureBulletins).toHaveBeenCalledWith(EST, 'MONTHLY');
@@ -487,7 +467,6 @@ describe('legal archive/closure permission gating', () => {
   });
 
   it('allows /closure/today-status with access_closure and strips total_transactions from bulletin', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
     mocks.getClosureBulletins.mockResolvedValue([
       {
         id: 88,
@@ -498,9 +477,7 @@ describe('legal archive/closure permission gating', () => {
     ]);
     mocks.getLastFondDeCaisse.mockResolvedValue(150);
 
-    const res = await request(app)
-      .get('/closure/today-status')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await asStaff(request(app).get('/closure/today-status'));
 
     expect(res.status).toBe(200);
     expect(mocks.getClosureBulletins).toHaveBeenCalledWith(EST, 'DAILY');
@@ -511,16 +488,16 @@ describe('legal archive/closure permission gating', () => {
   });
 
   it('allows /closure/create with access_closure and appends CLOSURE legal journal entry', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
 
-    const res = await request(app)
-      .post('/closure/create')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`)
-      .send({
+    const res = await asStaff(
+      request(app)
+        .post('/closure/create')
+        .send({
         date: '2026-04-29',
         type: 'DAILY',
         fond_de_caisse: 100,
-      });
+      }),
+    );
 
     expect(res.status).toBe(201);
     expect(mocks.createDailyClosureOpen).toHaveBeenCalledWith(
@@ -528,7 +505,8 @@ describe('legal archive/closure permission gating', () => {
       EST,
       undefined,
       false,
-      100
+      100,
+      'business_day'
     );
     expect(mocks.logClosure).toHaveBeenCalledWith(
       EST,
@@ -550,7 +528,6 @@ describe('legal archive/closure permission gating', () => {
   });
 
   it('fails closed on /closure/create when journal append fails and rolls back open bulletin', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
     mocks.createDailyClosureOpen.mockResolvedValue({
       id: 222,
       closure_type: 'DAILY',
@@ -565,14 +542,15 @@ describe('legal archive/closure permission gating', () => {
     });
     mocks.logClosure.mockRejectedValue(new Error('journal fail'));
 
-    const res = await request(app)
-      .post('/closure/create')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`)
-      .send({
+    const res = await asStaff(
+      request(app)
+        .post('/closure/create')
+        .send({
         date: '2026-04-29',
         type: 'DAILY',
         fond_de_caisse: 100,
-      });
+      }),
+    );
 
     expect(res.status).toBe(500);
     expect(String(res.body?.error?.message ?? '')).toContain(

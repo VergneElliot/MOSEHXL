@@ -1,7 +1,7 @@
 import { Router, type Response } from 'express';
 
 import { pool } from '../../db/pool';
-import { authenticateToken } from '../../middleware/auth';
+import { requireAuth } from '../../middleware/auth';
 import {
   buildClosureBulletinData,
   buildReceiptDataForInvoice,
@@ -22,7 +22,7 @@ import {
 const router = Router();
 
 // GET /api/printing/receipt/:orderId/preview
-router.get('/receipt/:orderId/preview', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.get('/receipt/:orderId/preview', requireAuth, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const orderId = parseInt(req.params.orderId ?? '', 10);
@@ -52,7 +52,7 @@ router.get('/receipt/:orderId/preview', authenticateToken, ensureEstablishment, 
 }));
 
 // POST /api/printing/receipt/:orderId
-router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.post('/receipt/:orderId', requireAuth, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const orderId = parseInt(req.params.orderId ?? '', 10);
@@ -79,7 +79,7 @@ router.post('/receipt/:orderId', authenticateToken, ensureEstablishment, asyncHa
 }));
 
 // GET /api/printing/closure/:bulletinId/preview
-router.get('/closure/:bulletinId/preview', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.get('/closure/:bulletinId/preview', requireAuth, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const bulletinId = parseInt(req.params.bulletinId ?? '', 10);
@@ -104,7 +104,7 @@ router.get('/closure/:bulletinId/preview', authenticateToken, ensureEstablishmen
 }));
 
 // POST /api/printing/closure/:bulletinId
-router.post('/closure/:bulletinId', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.post('/closure/:bulletinId', requireAuth, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const bulletinId = parseInt(req.params.bulletinId ?? '', 10);
@@ -129,7 +129,7 @@ router.post('/closure/:bulletinId', authenticateToken, ensureEstablishment, asyn
 }));
 
 // GET /api/printing/invoice/:invoiceId/preview
-router.get('/invoice/:invoiceId/preview', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.get('/invoice/:invoiceId/preview', requireAuth, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const invoiceId = parseInt(req.params.invoiceId ?? '', 10);
@@ -157,7 +157,7 @@ router.get('/invoice/:invoiceId/preview', authenticateToken, ensureEstablishment
 }));
 
 // POST /api/printing/invoice/:invoiceId
-router.post('/invoice/:invoiceId', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.post('/invoice/:invoiceId', requireAuth, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const invoiceId = parseInt(req.params.invoiceId ?? '', 10);

@@ -62,7 +62,6 @@ const ProductOptionDialog: React.FC<ProductOptionDialogProps> = ({
   onClose,
   onConfirm,
 }) => {
-  const groups = product?.optionGroups ?? [];
   const [selections, setSelections] = useState<SelectionState>({});
   const [lineNote, setLineNote] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -76,8 +75,8 @@ const ProductOptionDialog: React.FC<ProductOptionDialogProps> = ({
   }, [open, product]);
 
   const sortedGroups = useMemo(
-    () => [...groups].sort((a, b) => a.displayOrder - b.displayOrder),
-    [groups]
+    () => [...(product?.optionGroups ?? [])].sort((a, b) => a.displayOrder - b.displayOrder),
+    [product?.optionGroups]
   );
 
   const handleConfirm = () => {

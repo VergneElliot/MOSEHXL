@@ -31,6 +31,17 @@ vi.mock('../models/user', () => ({
     incrementFailedLoginAttempts: mocks.incrementFailedLoginAttempts,
     applyLoginLockout: mocks.applyLoginLockout,
     clearLoginLockoutState: mocks.clearLoginLockoutState,
+    getUserPermissions: vi.fn().mockResolvedValue([]),
+    getMfaTotpState: vi.fn().mockResolvedValue(null),
+  },
+}));
+
+vi.mock('../models/membership', () => ({
+  MembershipModel: {
+    listForUser: vi.fn().mockResolvedValue([]),
+    resolveActive: vi.fn().mockResolvedValue(null),
+    setActiveEstablishment: vi.fn(),
+    toApiList: vi.fn((rows: unknown[]) => rows),
   },
 }));
 
@@ -113,7 +124,7 @@ describe('POST /auth/login account lockout', () => {
   });
 
   it('locks account once threshold is reached', async () => {
-    mocks.incrementFailedLoginAttempts.mockResolvedValueOnce(5);
+    mocks.incrementFailedLoginAttempts.mockResolvedValueOnce(8);
 
     const res = await request(app).post('/auth/login').send({
       email: 'staff@est.example.com',

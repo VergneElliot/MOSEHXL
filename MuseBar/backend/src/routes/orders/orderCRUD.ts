@@ -7,7 +7,6 @@ import express from 'express';
 import { OrderModel, OrderItemModel, SubBillModel } from '../../models';
 import { queryWaiterDayReport } from '../../models/database/orderWaiterDayReport';
 import { Logger } from '../../utils/logger';
-import { pool } from '../../db/pool';
 import { getEstablishmentId, requireAuth, requireEstablishmentAdmin, requirePermission } from '../auth';
 import { validateBody, validateParams, commonValidations, paramValidations } from '../../middleware/validation';
 import { assertPosOrderLinePermissions } from '../../middleware/orderPosLinePermissions';

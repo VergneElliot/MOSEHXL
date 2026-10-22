@@ -5,92 +5,24 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import {
-  Alert,
-  Box,
-  Button,
-  CircularProgress,
-  Container,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  MenuItem,
-  TextField,
-  Typography,
-} from '@mui/material';
+import { Box, CircularProgress, Container, Typography } from '@mui/material';
 import { apiConfig } from '../../config/api';
-import AdminMonthCalendar, {
-  addMonths,
-  startOfMonth,
-} from '../Administration/AdminMonthCalendar';
-import { formatDateLong, parisYmdHmToUtcIso } from '../../utils/formatDate';
-
-interface DayHours {
-  closed: boolean;
-  open: string;
-  close: string;
-}
-
-interface PublicBookingInfo {
-  establishment: { name: string; slug: string };
-  opening_hours: {
-    timezone?: string;
-    weekly: Record<string, DayHours>;
-  };
-  opening_hours_configured: boolean;
-  closed_dates?: string[];
-}
-
-const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
-
-function dateKey(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function parseDayFromKey(key: string): Date {
-  const [y, m, d] = key.split('-').map(Number);
-  return new Date(y!, m! - 1, d!, 12, 0, 0, 0);
-}
-
-function timeToMinutes(hhmm: string): number {
-  const [h, m] = hhmm.split(':').map(Number);
-  return (h || 0) * 60 + (m || 0);
-}
-
-function minutesToTime(mins: number): string {
-  const h = Math.floor(mins / 60) % 24;
-  const m = mins % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
-/** Build 30-min slots within open–close (supports overnight). */
-function buildOpenTimeSlots(day: DayHours, stepMin = 30): string[] {
-  if (day.closed) return [];
-  const openM = timeToMinutes(day.open);
-  const closeM = timeToMinutes(day.close);
-  const slots: string[] = [];
-  if (closeM > openM) {
-    for (let m = openM; m < closeM; m += stepMin) {
-      slots.push(minutesToTime(m));
-    }
-  } else {
-    for (let m = openM; m < 24 * 60; m += stepMin) {
-      slots.push(minutesToTime(m));
-    }
-    for (let m = 0; m < closeM; m += stepMin) {
-      slots.push(minutesToTime(m));
-    }
-  }
-  return slots;
-}
-
-function formatDateFr(d: Date): string {
-  return formatDateLong(d);
-}
+import AdminMonthCalendar, { startOfMonth } from '../Administration/AdminMonthCalendar';
+import { parisYmdHmToUtcIso } from '../../utils/formatDate';
+import PublicReservationAlerts from './PublicReservationAlerts';
+import PublicReservationFormDialog from './PublicReservationFormDialog';
+import {
+  dateKey,
+  emptyPublicReservationForm,
+  formatDateFr,
+  isDayBookable,
+  parseDayFromKey,
+  readPublicApiError,
+  slotsForCalendarDay,
+  timeSlotsForDay,
+  type PublicBookingInfo,
+  type PublicReservationForm,
+} from './publicReservationHours';
 
 const PublicReservationPage: React.FC = () => {
   const { slug = '' } = useParams<{ slug: string }>();
@@ -103,14 +35,7 @@ const PublicReservationPage: React.FC = () => {
   const [success, setSuccess] = useState(false);
   const [selectedDayKey, setSelectedDayKey] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
-  const [form, setForm] = useState({
-    customer_name: '',
-    customer_email: '',
-    customer_phone: '',
-    party_size: 2,
-    notes: '',
-    website: '',
-  });
+  const [form, setForm] = useState<PublicReservationForm>(emptyPublicReservationForm);
 
   const todayStart = useMemo(() => {
     const t = new Date();
@@ -118,30 +43,10 @@ const PublicReservationPage: React.FC = () => {
     return t;
   }, []);
 
-  const isDayBookable = useCallback(
-    (day: Date) => {
-      if (!info) return false;
-      const d = new Date(day);
-      d.setHours(0, 0, 0, 0);
-      if (d < todayStart) return false;
-      const dk = dateKey(d);
-      if ((info.closed_dates || []).includes(dk)) return false;
-      const key = WEEKDAY_KEYS[d.getDay()]!;
-      const hours = info.opening_hours.weekly[key];
-      return Boolean(hours && !hours.closed);
-    },
-    [info, todayStart]
+  const timeSlots = useMemo(
+    () => (info ? timeSlotsForDay(info, selectedDayKey) : []),
+    [selectedDayKey, info]
   );
-
-  const timeSlots = useMemo(() => {
-    if (!selectedDayKey || !info) return [];
-    if ((info.closed_dates || []).includes(selectedDayKey)) return [];
-    const day = parseDayFromKey(selectedDayKey);
-    const key = WEEKDAY_KEYS[day.getDay()]!;
-    const hours = info.opening_hours.weekly[key];
-    if (!hours || hours.closed) return [];
-    return buildOpenTimeSlots(hours, 30);
-  }, [selectedDayKey, info]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -153,12 +58,7 @@ const PublicReservationPage: React.FC = () => {
       );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        const errObj = (body as { error?: string | { message?: string } }).error;
-        const msg =
-          typeof errObj === 'string'
-            ? errObj
-            : errObj?.message || `Erreur ${res.status}`;
-        throw new Error(msg);
+        throw new Error(readPublicApiError(body, res.status));
       }
       const data = (await res.json()) as PublicBookingInfo;
       setInfo(data);
@@ -175,11 +75,9 @@ const PublicReservationPage: React.FC = () => {
   }, [load]);
 
   const onDayClick = (day: Date) => {
-    if (!isDayBookable(day)) return;
+    if (!info || !isDayBookable(day, info, todayStart)) return;
     const key = dateKey(day);
-    const wd = WEEKDAY_KEYS[day.getDay()]!;
-    const hours = info?.opening_hours.weekly[wd];
-    const slots = hours && !hours.closed ? buildOpenTimeSlots(hours, 30) : [];
+    const slots = slotsForCalendarDay(info, day);
     setSelectedDayKey(key);
     setSelectedTime(slots[0] || '');
     setSuccess(false);
@@ -211,23 +109,11 @@ const PublicReservationPage: React.FC = () => {
       );
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const errObj = (body as { error?: string | { message?: string } }).error;
-        const msg =
-          typeof errObj === 'string'
-            ? errObj
-            : errObj?.message || `Erreur ${res.status}`;
-        throw new Error(msg);
+        throw new Error(readPublicApiError(body, res.status));
       }
       setSuccess(true);
       setOpen(false);
-      setForm({
-        customer_name: '',
-        customer_email: '',
-        customer_phone: '',
-        party_size: 2,
-        notes: '',
-        website: '',
-      });
+      setForm(emptyPublicReservationForm);
       setSelectedDayKey('');
       setSelectedTime('');
     } catch (err) {
@@ -245,9 +131,7 @@ const PublicReservationPage: React.FC = () => {
     );
   }
 
-  const selectedDayLabel = selectedDayKey
-    ? formatDateFr(parseDayFromKey(selectedDayKey))
-    : '';
+  const selectedDayLabel = selectedDayKey ? formatDateFr(parseDayFromKey(selectedDayKey)) : '';
 
   return (
     <Box
@@ -274,19 +158,13 @@ const PublicReservationPage: React.FC = () => {
           par e-mail.
         </Typography>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        )}
-        {success && (
-          <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(false)}>
-            Demande envoyée. Vous recevrez un e-mail de confirmation de la part de l’établissement.
-          </Alert>
-        )}
-        {!info && !error && (
-          <Alert severity="warning">Établissement introuvable.</Alert>
-        )}
+        <PublicReservationAlerts
+          error={error}
+          success={success}
+          missingEstablishment={!info && !error}
+          onClearError={() => setError(null)}
+          onClearSuccess={() => setSuccess(false)}
+        />
 
         {info && (
           <Box
@@ -302,7 +180,7 @@ const PublicReservationPage: React.FC = () => {
               onMonthChange={setMonth}
               items={[]}
               onDayClick={onDayClick}
-              dayDisabled={(day) => !isDayBookable(day)}
+              dayDisabled={(day) => !isDayBookable(day, info, todayStart)}
               hideFooterHint
             />
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
@@ -313,106 +191,19 @@ const PublicReservationPage: React.FC = () => {
         )}
       </Container>
 
-      <Dialog open={open} onClose={() => !submitting && setOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Demande de réservation</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-          <TextField
-            label="Date"
-            value={selectedDayLabel}
-            fullWidth
-            InputProps={{ readOnly: true }}
-            helperText="Format français (jour / mois / année)"
-          />
-          <TextField
-            select
-            label="Heure"
-            value={selectedTime}
-            onChange={(e) => setSelectedTime(e.target.value)}
-            fullWidth
-            required
-            helperText="Horaires d’ouverture uniquement (24 h)"
-          >
-            {timeSlots.length === 0 ? (
-              <MenuItem value="" disabled>
-                Aucun créneau
-              </MenuItem>
-            ) : (
-              timeSlots.map((t) => (
-                <MenuItem key={t} value={t}>
-                  {t.replace(':', ' h ')}
-                </MenuItem>
-              ))
-            )}
-          </TextField>
-          <TextField
-            label="Nombre de personnes"
-            type="number"
-            inputProps={{ min: 1, max: 200 }}
-            value={form.party_size}
-            onChange={(e) => setForm({ ...form, party_size: Number(e.target.value) })}
-            fullWidth
-            required
-          />
-          <TextField
-            label="Nom"
-            value={form.customer_name}
-            onChange={(e) => setForm({ ...form, customer_name: e.target.value })}
-            fullWidth
-            required
-          />
-          <TextField
-            label="Email"
-            type="email"
-            value={form.customer_email}
-            onChange={(e) => setForm({ ...form, customer_email: e.target.value })}
-            fullWidth
-            required
-          />
-          <TextField
-            label="Téléphone"
-            value={form.customer_phone}
-            onChange={(e) => setForm({ ...form, customer_phone: e.target.value })}
-            fullWidth
-            required
-          />
-          <TextField
-            label="Notes (optionnel)"
-            multiline
-            minRows={2}
-            value={form.notes}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            fullWidth
-          />
-          <TextField
-            label="Website"
-            value={form.website}
-            onChange={(e) => setForm({ ...form, website: e.target.value })}
-            sx={{ position: 'absolute', left: -9999, opacity: 0, height: 0, width: 0 }}
-            tabIndex={-1}
-            autoComplete="off"
-            inputProps={{ 'aria-hidden': true }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpen(false)} disabled={submitting}>
-            Annuler
-          </Button>
-          <Button
-            variant="contained"
-            disabled={
-              submitting ||
-              !form.customer_name ||
-              !form.customer_email ||
-              !form.customer_phone ||
-              !selectedDayKey ||
-              !selectedTime
-            }
-            onClick={() => void submit()}
-          >
-            {submitting ? 'Envoi…' : 'Envoyer la demande'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <PublicReservationFormDialog
+        open={open}
+        submitting={submitting}
+        selectedDayLabel={selectedDayLabel}
+        selectedTime={selectedTime}
+        timeSlots={timeSlots}
+        form={form}
+        selectedDayKey={selectedDayKey}
+        onClose={() => setOpen(false)}
+        onTimeChange={setSelectedTime}
+        onFormChange={setForm}
+        onSubmit={() => void submit()}
+      />
     </Box>
   );
 };

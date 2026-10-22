@@ -21,11 +21,14 @@ we measure because it is cheap to measure; the real target is single responsibil
 | Route handler | ≤ 40 lines (orchestration only) | — |
 
 `npm run check:module-size` enforces the cap. It runs in `pre-commit` (staged files) and in CI
-(all files). Files already over the cap are listed in `scripts/module-size-baseline.json`:
-they are allowed to stay, but **they fail the moment they grow**. Never add to a baselined
-file — put the new code in a new module. After a cleanup pass, lock the gain in with
+(all files). After a cleanup pass, `scripts/module-size-baseline.json` **should be empty**
+(0 files over 400). Files in the 251–400 band are allowed; the target for new work remains
+≤ 250. **Never add to a file over ~250 if a seam exists** — put the new code in a new
+module. If a leftover still sits in the baseline, it is allowed to stay but **fails the
+moment it grows**; never add to it. After a cleanup pass, lock the gain in with
 `node scripts/check-module-size.mjs --update`; it refuses to raise any existing allowance, so
-it can only tighten.
+it can only tighten. The baseline must stay empty unless a genuine unsplittable exception is
+agreed in a patch note.
 
 Test files are exempt from the cap, but split them by behaviour anyway — one file per concern
 makes failures readable.
@@ -36,8 +39,9 @@ Ask, in order:
 
 1. **Is this a new responsibility?** Then it is a new file, whatever the current line count.
 2. **Would a reader need to scroll past unrelated code to understand it?** New file.
-3. **Is the host file baselined or above ~250 lines?** New file, and consider extracting the
-   part you are about to touch while you are there.
+3. **Is the host file above ~250 lines, or is there already a seam?** New file — never add
+   to a file over ~250 if a seam exists. If it is still in the baseline, extract rather
+   than grow it.
 4. Only then append.
 
 ## Splitting patterns

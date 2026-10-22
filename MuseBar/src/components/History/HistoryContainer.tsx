@@ -136,14 +136,15 @@ const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn =
   };
 
   const handleConfirmReturn = () => {
-    if (!state.orderToReturn) return;
+    const orderToReturn = state.orderToReturn;
+    if (!orderToReturn) return;
     void ensurePermission(PERMISSIONS.orders_cancel, {
       title: 'Confirmer l’annulation',
       description: 'PIN d’un profil autorisé à confirmer l’annulation / retour.',
     })
       .then(() => {
         api.processReturn({
-          order: state.orderToReturn!,
+          order: orderToReturn,
           reason: state.returnReason,
           selectedItems: state.selectedItemsToReturn,
           selectedTip: state.selectedTipToReturn,

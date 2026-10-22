@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
+import type { Test } from 'supertest';
 import express from 'express';
 import { generateToken } from '../auth';
 import { errorHandler } from '../../middleware/errorHandler';
+import { pinActorTokenFor, withPinActor } from '../../test/pinActorTestUtils';
 
 const EST = '11111111-1111-4111-8111-111111111111';
 
 const mocks = vi.hoisted(() => ({
   poolQuery: vi.fn(),
-  getUserPermissions: vi.fn(),
   verifyJournalIntegrity: vi.fn(),
   getEntriesWithCountForPeriod: vi.fn(),
   getJournalStatsSummary: vi.fn(),
@@ -29,12 +30,6 @@ vi.mock('../../db/pool', () => ({
 vi.mock('../../utils/logger', () => ({
   Logger: {
     getInstance: () => ({ error: vi.fn(), info: vi.fn(), warn: vi.fn() }),
-  },
-}));
-
-vi.mock('../../models/user', () => ({
-  UserModel: {
-    getUserPermissions: mocks.getUserPermissions,
   },
 }));
 
@@ -90,10 +85,31 @@ function tokenFor(role: 'system_admin' | 'establishment_admin' | 'staff', establ
   );
 }
 
+function pinWith(permissions: string[]) {
+  return pinActorTokenFor({ id: 12, establishmentId: EST, permissions });
+}
+
+function adminPin() {
+  return pinActorTokenFor({ id: 7, establishmentId: EST, role: 'establishment_admin' });
+}
+
+function withStaffPin(req: Test, permissions: string[]) {
+  return withPinActor(
+    req.set('Authorization', `Bearer ${tokenFor('staff')}`),
+    pinWith(permissions)
+  );
+}
+
+function withAdminPin(req: Test) {
+  return withPinActor(
+    req.set('Authorization', `Bearer ${tokenFor('establishment_admin')}`),
+    adminPin()
+  );
+}
+
 describe('legal route compliance permission gates', () => {
   beforeEach(() => {
     mocks.poolQuery.mockReset();
-    mocks.getUserPermissions.mockReset();
     mocks.verifyJournalIntegrity.mockReset();
     mocks.getEntriesWithCountForPeriod.mockReset();
     mocks.getJournalStatsSummary.mockReset();
@@ -119,46 +135,42 @@ describe('legal route compliance permission gates', () => {
     mocks.countDailyClosuresForPeriod.mockResolvedValue({ closure_count: 0 });
   });
 
-  it('denies /journal/verify without access_compliance', async () => {
-    mocks.getUserPermissions.mockResolvedValue([]);
+  it('denies access with the account JWT alone (no PIN actor)', async () => {
     const res = await request(app)
       .get('/journal/verify')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+      .set('Authorization', `Bearer ${tokenFor('establishment_admin')}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('PIN_ACTOR_REQUIRED');
+    expect(mocks.verifyJournalIntegrity).not.toHaveBeenCalled();
+  });
+
+  it('denies /journal/verify without access_compliance', async () => {
+    const res = await withStaffPin(request(app).get('/journal/verify'), []);
     expect(res.status).toBe(403);
     expect(mocks.verifyJournalIntegrity).not.toHaveBeenCalled();
   });
 
   it('allows /journal/verify with access_compliance', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
-    const res = await request(app)
-      .get('/journal/verify')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await withStaffPin(request(app).get('/journal/verify'), ['access_compliance']);
     expect(res.status).toBe(200);
     expect(mocks.verifyJournalIntegrity).toHaveBeenCalledWith(EST);
   });
 
   it('allows /journal/verify for establishment_admin without explicit permissions', async () => {
-    mocks.getUserPermissions.mockResolvedValue([]);
-    const res = await request(app)
-      .get('/journal/verify')
-      .set('Authorization', `Bearer ${tokenFor('establishment_admin')}`);
+    const res = await withAdminPin(request(app).get('/journal/verify'));
     expect(res.status).toBe(200);
     expect(mocks.verifyJournalIntegrity).toHaveBeenCalledWith(EST);
   });
 
   it('denies /journal/entries without access_compliance', async () => {
-    mocks.getUserPermissions.mockResolvedValue([]);
-
-    const res = await request(app)
-      .get('/journal/entries')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await withStaffPin(request(app).get('/journal/entries'), []);
 
     expect(res.status).toBe(403);
     expect(mocks.getEntriesWithCountForPeriod).not.toHaveBeenCalled();
   });
 
   it('allows /journal/entries with access_compliance and passes scoped query options', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
     mocks.getEntriesWithCountForPeriod.mockResolvedValue({
       entries: [{ id: 1, transaction_type: 'SALE' }],
       total: 1,
@@ -166,9 +178,10 @@ describe('legal route compliance permission gates', () => {
       offset: 10,
     });
 
-    const res = await request(app)
-      .get('/journal/entries?start_date=2026-02-01&end_date=2026-02-29&limit=50&offset=10')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await withStaffPin(
+      request(app).get('/journal/entries?start_date=2026-02-01&end_date=2026-02-29&limit=50&offset=10'),
+      ['access_compliance']
+    );
 
     expect(res.status).toBe(200);
     expect(mocks.getEntriesWithCountForPeriod).toHaveBeenCalledWith({
@@ -184,7 +197,6 @@ describe('legal route compliance permission gates', () => {
   });
 
   it('uses default pagination for /journal/entries when limit/offset are omitted', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
     mocks.getEntriesWithCountForPeriod.mockResolvedValue({
       entries: [],
       total: 0,
@@ -192,9 +204,7 @@ describe('legal route compliance permission gates', () => {
       offset: 0,
     });
 
-    const res = await request(app)
-      .get('/journal/entries')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await withStaffPin(request(app).get('/journal/entries'), ['access_compliance']);
 
     expect(res.status).toBe(200);
     expect(mocks.getEntriesWithCountForPeriod).toHaveBeenCalledWith({
@@ -209,68 +219,52 @@ describe('legal route compliance permission gates', () => {
   });
 
   it('denies /journal/stats without access_compliance', async () => {
-    mocks.getUserPermissions.mockResolvedValue([]);
-
-    const res = await request(app)
-      .get('/journal/stats')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await withStaffPin(request(app).get('/journal/stats'), []);
 
     expect(res.status).toBe(403);
   });
 
   it('allows /journal/stats with access_compliance', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
-
-    const res = await request(app)
-      .get('/journal/stats')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await withStaffPin(request(app).get('/journal/stats'), ['access_compliance']);
 
     expect(res.status).toBe(200);
   });
 
-  it('allows /journal/stats for establishment_admin with access_compliance', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
-
-    const res = await request(app)
-      .get('/journal/stats')
-      .set('Authorization', `Bearer ${tokenFor('establishment_admin')}`);
+  it('allows /journal/stats for establishment_admin PIN without explicit permissions', async () => {
+    const res = await withAdminPin(request(app).get('/journal/stats'));
 
     expect(res.status).toBe(200);
     expect(mocks.getJournalStatsSummary).toHaveBeenCalledWith(EST);
   });
 
   it('returns 403 on /journal/stats when system_admin has no establishment context', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
-
-    const res = await request(app)
-      .get('/journal/stats')
-      .set('Authorization', `Bearer ${tokenFor('system_admin', null)}`);
+    const res = await withPinActor(
+      request(app)
+        .get('/journal/stats')
+        .set('Authorization', `Bearer ${tokenFor('system_admin', null)}`),
+      pinActorTokenFor({ establishmentId: EST, permissions: ['access_compliance'] })
+    );
 
     expect(res.status).toBe(403);
-    expect(res.body.error).toBe('No establishment associated with this account');
+    expect(res.body.code).toBe('PIN_ACTOR_REQUIRED');
     expect(mocks.getJournalStatsSummary).not.toHaveBeenCalled();
   });
 
   it('denies /journal/reset for non-admin users', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
-
-    const res = await request(app)
-      .post('/journal/reset')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await withStaffPin(request(app).post('/journal/reset'), ['access_compliance']);
 
     expect(res.status).toBe(403);
   });
 
   it('denies /compliance/report without access_compliance', async () => {
-    mocks.getUserPermissions.mockResolvedValue([]);
-    const res = await request(app)
-      .get('/compliance/report?start_date=2026-01-01&end_date=2026-01-31')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await withStaffPin(
+      request(app).get('/compliance/report?start_date=2026-01-01&end_date=2026-01-31'),
+      []
+    );
     expect(res.status).toBe(403);
   });
 
   it('allows /compliance/report with access_compliance and executes report queries', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
     mocks.getEntriesForPeriod.mockResolvedValue([
       { transaction_type: 'SALE' },
       { transaction_type: 'REFUND' },
@@ -282,9 +276,10 @@ describe('legal route compliance permission gates', () => {
       },
     ]);
 
-    const res = await request(app)
-      .get('/compliance/report?start_date=2026-01-01&end_date=2026-01-31')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await withStaffPin(
+      request(app).get('/compliance/report?start_date=2026-01-01&end_date=2026-01-31'),
+      ['access_compliance']
+    );
 
     expect(res.status).toBe(200);
     expect(mocks.getEntriesForPeriod).toHaveBeenCalledWith(
@@ -298,11 +293,7 @@ describe('legal route compliance permission gates', () => {
   });
 
   it('returns 400 on /compliance/report when dates are missing despite access_compliance', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
-
-    const res = await request(app)
-      .get('/compliance/report')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await withStaffPin(request(app).get('/compliance/report'), ['access_compliance']);
 
     expect(res.status).toBe(400);
     expect(res.body.error?.message).toBe('Start date and end date are required');
@@ -310,11 +301,10 @@ describe('legal route compliance permission gates', () => {
   });
 
   it('returns 400 on /compliance/report for invalid dates despite access_compliance', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
-
-    const res = await request(app)
-      .get('/compliance/report?start_date=nope&end_date=still-nope')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await withStaffPin(
+      request(app).get('/compliance/report?start_date=nope&end_date=still-nope'),
+      ['access_compliance']
+    );
 
     expect(res.status).toBe(400);
     expect(res.body.error?.message).toBe('Invalid date format');
@@ -322,15 +312,12 @@ describe('legal route compliance permission gates', () => {
   });
 
   it('allows /compliance/status with access_compliance and returns compliance snapshot', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
     mocks.verifyJournalIntegrity.mockResolvedValue({ isValid: true, errors: [] });
     mocks.getClosureBulletins.mockResolvedValue([
       { closure_type: 'DAILY', period_start: new Date().toISOString() },
     ]);
 
-    const res = await request(app)
-      .get('/compliance/status')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await withStaffPin(request(app).get('/compliance/status'), ['access_compliance']);
 
     expect(res.status).toBe(200);
     expect(mocks.verifyJournalIntegrity).toHaveBeenCalledWith(EST);
@@ -342,35 +329,24 @@ describe('legal route compliance permission gates', () => {
   });
 
   it('denies /compliance/status without access_compliance', async () => {
-    mocks.getUserPermissions.mockResolvedValue([]);
-
-    const res = await request(app)
-      .get('/compliance/status')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await withStaffPin(request(app).get('/compliance/status'), []);
 
     expect(res.status).toBe(403);
     expect(mocks.verifyJournalIntegrity).not.toHaveBeenCalled();
   });
 
   it('allows /compliance/status for establishment_admin without explicit permissions', async () => {
-    mocks.getUserPermissions.mockResolvedValue([]);
     mocks.verifyJournalIntegrity.mockResolvedValue({ isValid: true, errors: [] });
     mocks.getClosureBulletins.mockResolvedValue([]);
 
-    const res = await request(app)
-      .get('/compliance/status')
-      .set('Authorization', `Bearer ${tokenFor('establishment_admin')}`);
+    const res = await withAdminPin(request(app).get('/compliance/status'));
 
     expect(res.status).toBe(200);
     expect(mocks.verifyJournalIntegrity).toHaveBeenCalledWith(EST);
   });
 
   it('allows /compliance/requirements with access_compliance', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
-
-    const res = await request(app)
-      .get('/compliance/requirements')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await withStaffPin(request(app).get('/compliance/requirements'), ['access_compliance']);
 
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.requirements)).toBe(true);
@@ -378,25 +354,17 @@ describe('legal route compliance permission gates', () => {
   });
 
   it('denies /compliance/requirements without access_compliance', async () => {
-    mocks.getUserPermissions.mockResolvedValue([]);
-
-    const res = await request(app)
-      .get('/compliance/requirements')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await withStaffPin(request(app).get('/compliance/requirements'), []);
 
     expect(res.status).toBe(403);
   });
 
   it('denies /stats/monthly-live without access_closure or access_compliance', async () => {
-    mocks.getUserPermissions.mockResolvedValue([]);
-    const res = await request(app)
-      .get('/stats/monthly-live')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await withStaffPin(request(app).get('/stats/monthly-live'), []);
     expect(res.status).toBe(403);
   });
 
   it('allows /stats/monthly-live with access_closure and returns monthly live metrics', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_closure']);
     mocks.getOrdersTotalsForPeriod.mockResolvedValue({
       total_ttc: 320.5,
       card_total: 200.25,
@@ -404,9 +372,7 @@ describe('legal route compliance permission gates', () => {
     });
     mocks.countDailyClosuresForPeriod.mockResolvedValue({ closure_count: 9 });
 
-    const res = await request(app)
-      .get('/stats/monthly-live')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await withStaffPin(request(app).get('/stats/monthly-live'), ['access_closure']);
 
     expect(res.status).toBe(200);
     expect(mocks.getOrdersTotalsForPeriod).toHaveBeenCalled();
@@ -414,7 +380,6 @@ describe('legal route compliance permission gates', () => {
   });
 
   it('allows /stats/monthly-live with access_compliance and returns monthly live metrics', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
     mocks.getOrdersTotalsForPeriod.mockResolvedValue({
       total_ttc: 320.5,
       card_total: 200.25,
@@ -422,9 +387,7 @@ describe('legal route compliance permission gates', () => {
     });
     mocks.countDailyClosuresForPeriod.mockResolvedValue({ closure_count: 9 });
 
-    const res = await request(app)
-      .get('/stats/monthly-live')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await withStaffPin(request(app).get('/stats/monthly-live'), ['access_compliance']);
 
     expect(res.status).toBe(200);
     expect(mocks.getOrdersTotalsForPeriod).toHaveBeenCalledWith(

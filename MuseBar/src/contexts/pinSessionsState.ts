@@ -187,7 +187,8 @@ export function dismissSession(state: PinSessionsState, id: string): PinSessions
 /** Normalizes a persisted or legacy payload, dropping anything unusable. */
 export function normalizeState(input: unknown): PinSessionsState {
   const parsed = input as { sessions?: unknown; activeSessionId?: unknown } | null;
-  const rawSessions = Array.isArray(parsed?.sessions) ? parsed!.sessions : [];
+  const sessionsInput = parsed?.sessions;
+  const rawSessions = Array.isArray(sessionsInput) ? sessionsInput : [];
   const sessions: PinSession[] = [];
   for (const candidate of rawSessions) {
     const s = candidate as PinSession | null;

@@ -11,7 +11,7 @@ interface UseHappyHourProductsProps {
   onProductUpdate: () => void;
 }
 
-export const useHappyHourProducts = ({ onProductUpdate }: UseHappyHourProductsProps) => {
+export const useHappyHourProducts = ({ onProductUpdate: _onProductUpdate }: UseHappyHourProductsProps) => {
 
   /**
    * Calculate happy hour price for a product

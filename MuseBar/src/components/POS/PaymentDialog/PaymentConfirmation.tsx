@@ -156,7 +156,7 @@ export const PaymentConfirmation: React.FC<PaymentConfirmationProps> = ({
       {isValid && paymentMethod === 'cash' && changeAmount > 0 && (
         <Alert severity="warning" sx={{ mb: 2 }}>
           <Typography variant="body2">
-            <strong>Attention:</strong> N'oubliez pas de remettre le rendu de {formatCurrency(changeAmount)} au client.
+            <strong>Attention:</strong> N’oubliez pas de remettre le rendu de {formatCurrency(changeAmount)} au client.
           </Typography>
         </Alert>
       )}
@@ -165,7 +165,7 @@ export const PaymentConfirmation: React.FC<PaymentConfirmationProps> = ({
         <Alert severity="success" sx={{ mb: 2 }}>
           <Typography variant="body2">
             <strong>Paiement prêt à être traité:</strong><br />
-            Cliquez sur "Confirmer le paiement" pour finaliser la transaction.
+            Cliquez sur {'"Confirmer le paiement"'} pour finaliser la transaction.
           </Typography>
         </Alert>
       )}

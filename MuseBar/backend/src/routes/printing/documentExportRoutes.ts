@@ -1,7 +1,7 @@
 import { Router, type Response } from 'express';
 
 import { pool } from '../../db/pool';
-import { authenticateToken } from '../../middleware/auth';
+import { requireAuth } from '../../middleware/auth';
 import {
   buildClosureBulletinData,
   buildReceiptDataForInvoice,
@@ -39,7 +39,7 @@ import {
 const router = Router();
 
 // GET /api/printing/receipt/:orderId/export-pdf
-router.get('/receipt/:orderId/export-pdf', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.get('/receipt/:orderId/export-pdf', requireAuth, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const orderId = parseInt(req.params.orderId ?? '', 10);
@@ -58,7 +58,7 @@ router.get('/receipt/:orderId/export-pdf', authenticateToken, ensureEstablishmen
 }));
 
 // POST /api/printing/receipt/:orderId/email
-router.post('/receipt/:orderId/email', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.post('/receipt/:orderId/email', requireAuth, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const orderId = parseInt(req.params.orderId ?? '', 10);
@@ -85,7 +85,7 @@ router.post('/receipt/:orderId/email', authenticateToken, ensureEstablishment, a
 }));
 
 // GET /api/printing/invoice/:invoiceId/export-pdf
-router.get('/invoice/:invoiceId/export-pdf', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.get('/invoice/:invoiceId/export-pdf', requireAuth, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const invoiceId = parseInt(req.params.invoiceId ?? '', 10);
@@ -99,7 +99,7 @@ router.get('/invoice/:invoiceId/export-pdf', authenticateToken, ensureEstablishm
 }));
 
 // POST /api/printing/invoice/:invoiceId/email
-router.post('/invoice/:invoiceId/email', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.post('/invoice/:invoiceId/email', requireAuth, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const invoiceId = parseInt(req.params.invoiceId ?? '', 10);
@@ -120,7 +120,7 @@ router.post('/invoice/:invoiceId/email', authenticateToken, ensureEstablishment,
 }));
 
 // GET /api/printing/closure/:bulletinId/export-pdf
-router.get('/closure/:bulletinId/export-pdf', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.get('/closure/:bulletinId/export-pdf', requireAuth, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const bulletinId = parseInt(req.params.bulletinId ?? '', 10);
@@ -135,7 +135,7 @@ router.get('/closure/:bulletinId/export-pdf', authenticateToken, ensureEstablish
 }));
 
 // GET /api/printing/closure/:bulletinId/export-xlsx
-router.get('/closure/:bulletinId/export-xlsx', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.get('/closure/:bulletinId/export-xlsx', requireAuth, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const bulletinId = parseInt(req.params.bulletinId ?? '', 10);
@@ -150,7 +150,7 @@ router.get('/closure/:bulletinId/export-xlsx', authenticateToken, ensureEstablis
 }));
 
 // GET /api/printing/closure/:bulletinId/export-flux103
-router.get('/closure/:bulletinId/export-flux103', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.get('/closure/:bulletinId/export-flux103', requireAuth, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const bulletinId = parseInt(req.params.bulletinId ?? '', 10);
@@ -164,7 +164,7 @@ router.get('/closure/:bulletinId/export-flux103', authenticateToken, ensureEstab
 }));
 
 // POST /api/printing/closure/:bulletinId/email
-router.post('/closure/:bulletinId/email', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.post('/closure/:bulletinId/email', requireAuth, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const bulletinId = parseInt(req.params.bulletinId ?? '', 10);

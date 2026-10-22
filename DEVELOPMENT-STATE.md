@@ -9,6 +9,8 @@ It is the working reference for what is complete, what is broken, and what needs
 
 > **Product backlog (September 2026):** Open feature ideas, soft debt, and parked Phase D+ items live in [`docs/PRODUCT-BACKLOG.md`](docs/PRODUCT-BACKLOG.md). Prefer that list over the “in progress” wording below when choosing next work.
 
+> **Hygiene pass (October 2026):** Patch notes `562` (PLAN) / `563` (IMPLEMENTATION). Module cap 400 lines is met (`scripts/module-size-baseline.json` empty); ~100 files remain 251–400 (allowed; new work still targets ≤250). Floor service is shipped. Permission-gated tests send `x-pin-actor-token` via `pinActorTestUtils.ts` (account JWT alone → 403 `PIN_ACTOR_REQUIRED`). `authenticateToken` removed (printing uses `requireAuth`). `SchemaOperations` deleted (shared schema + RLS). `EmailReceiptService` is a thin nodemailer adapter for `DigitalReceiptService`; production receipt email is SendGrid. Environment validation is idempotent (`initializeEnvironment` caches; banner once). Vite `manualChunks` for react/mui/i18n; Login statically imports `config/api`.
+
 ---
 
 ## What Is Complete
@@ -21,7 +23,7 @@ It is the working reference for what is complete, what is broken, and what needs
 - Two separate user interfaces: **System Admin** (SaaS management) and **Business** (POS) — detected by JWT role after login
 - Structured logging system (`utils/logger/`) — all core route handlers use Logger, no `console.error` in POS routes
 - Security middleware stack: rate limiting, CORS, input sanitization, security headers (`middleware/security/`)
-- Environment validation on startup (`config/environment.ts`)
+- Environment validation on startup (`config/environment.ts`) — idempotent (`initializeEnvironment` caches; banner once)
 - Unified error handling with AppError hierarchy (`middleware/errorHandler.ts`) — consolidated from three separate systems
 - Migration CLI system (`src/migrations/cli.ts`, `npm run migration:*`) with correct filename generation
 - PostgreSQL-backed rate limiting (shared across processes, survives restarts)
@@ -36,7 +38,7 @@ It is the working reference for what is complete, what is broken, and what needs
 - Daily closures: business day cut from settings; manual « close now » (last closure → now) or dated business day
 - Order creation via `POST /api/orders` with legal journal + audit trail write on completion
 - Cash register change operation via `POST /api/orders/payment/change` (dedicated endpoint)
-- **Floor service (in progress on `development`):** Phases A–C — PIN badge, map, open tickets, transfer/merge/à suivre, waiter snapshot + History filter (patch notes `455`–`460`).
+- **Floor service (shipped):** PIN badge, map, open tickets, transfer/merge/à suivre, waiter snapshot + History filter (patch notes `455`–`460`); PIN-actor permissions and nav (patch notes `536`–`561`).
 
 ### Menu Management
 - Full CRUD for categories and products

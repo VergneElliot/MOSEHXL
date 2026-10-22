@@ -1,5 +1,27 @@
 import { request } from './core';
-import type { DiningTableStatusDto } from './floor';
+
+export interface DiningTableStatusDto {
+  id: number;
+  establishment_id: string;
+  floor_plan_id: number;
+  label: string;
+  pos_x: number;
+  pos_y: number;
+  width: number;
+  height: number;
+  capacity: number | null;
+  shape: string;
+  sort_order: number;
+  is_active: boolean;
+  open_ticket_id: number | null;
+  open_ticket_updated_at: string | null;
+  opened_by_user_id: number | null;
+  last_served_by_user_id: number | null;
+  /** True when the open ticket has at least one validated line (service en cours). */
+  has_validated_items: boolean;
+  /** Draft or validated lines — not free for transfer. */
+  has_active_items?: boolean;
+}
 
 function coerce(value: unknown, fallback: number): number {
   const n = typeof value === 'number' ? value : Number(value);

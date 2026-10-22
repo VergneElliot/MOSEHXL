@@ -9,7 +9,7 @@ import { BusinessInfo } from '../../routes/establishmentAccountCreation/types';
 import { BusinessInfoValidator } from './BusinessInfoValidator';
 import { UserAccountOperations } from './database/UserAccountOperations';
 import { EstablishmentOperations } from './database/EstablishmentOperations';
-import { SchemaOperations } from './database/SchemaOperations';
+import { TenancyAuditOperations } from './database/TenancyAuditOperations';
 import { InvitationOperations } from './database/InvitationOperations';
 import { EmailService } from '../email/EmailService';
 import { EnvironmentConfig, getEnvironmentConfig } from '../../config/environment';
@@ -43,7 +43,7 @@ export class AccountCreationOrchestrator {
   private businessInfoValidator: BusinessInfoValidator;
   private userAccountOperations: UserAccountOperations;
   private establishmentOperations: EstablishmentOperations;
-  private schemaOperations: SchemaOperations;
+  private tenancyAuditOperations: TenancyAuditOperations;
   private invitationOperations: InvitationOperations;
   private emailService: EmailService;
   private config: EnvironmentConfig;
@@ -54,7 +54,7 @@ export class AccountCreationOrchestrator {
     this.businessInfoValidator = new BusinessInfoValidator(logger);
     this.userAccountOperations = new UserAccountOperations(logger, this.config.security.jwtSecret);
     this.establishmentOperations = new EstablishmentOperations(logger);
-    this.schemaOperations = new SchemaOperations(logger);
+    this.tenancyAuditOperations = new TenancyAuditOperations(logger);
     this.invitationOperations = new InvitationOperations(logger);
     this.emailService = EmailService.getInstance(this.config, logger);
   }
@@ -121,15 +121,13 @@ export class AccountCreationOrchestrator {
           userAgent
         );
 
-        // Step 3: Create establishment schema for data isolation
-        const schemaCreationData = {
-          establishmentId: invitationData.establishment.id,
-          establishmentName: sanitizedBusinessInfo.companyName
-        };
-
-        const createdSchema = await this.schemaOperations.createEstablishmentSchema(
+        // Step 3: Record tenant activation (shared-table isolation, no schema to create)
+        await this.tenancyAuditOperations.logTenancyInitialized(
           client,
-          schemaCreationData,
+          {
+            establishmentId: invitationData.establishment.id,
+            establishmentName: sanitizedBusinessInfo.companyName
+          },
           createdUser.id,
           ipAddress,
           userAgent
@@ -162,8 +160,7 @@ export class AccountCreationOrchestrator {
 
         this.logger.info('Establishment account creation completed successfully', {
           establishmentId: invitationData.establishment.id,
-          userId: createdUser.id,
-          schemaName: createdSchema.schemaName
+          userId: createdUser.id
         });
 
         // Send setup completion email (truly non-blocking)

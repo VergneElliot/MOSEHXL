@@ -90,12 +90,13 @@ export const BusinessSetupWizard: React.FC = () => {
         setInvitationData(validation);
         
         // Pre-fill form data from invitation
-        if (validation.establishment) {
+        const establishment = validation.establishment;
+        if (establishment) {
           setFormData(prev => ({
             ...prev,
-            businessName: validation.establishment!.name,
-            contactEmail: validation.establishment!.email,
-            email: validation.establishment!.email
+            businessName: establishment.name,
+            contactEmail: establishment.email,
+            email: establishment.email
           }));
         }
 
@@ -186,7 +187,7 @@ export const BusinessSetupWizard: React.FC = () => {
 
         {/* Progress Stepper */}
         <Stepper activeStep={currentStep - 1} sx={{ mb: 4 }}>
-          {SETUP_STEPS.map((step, index) => (
+          {SETUP_STEPS.map((step) => (
             <Step key={step.id}>
               <StepLabel>
                 <Typography variant="body2">{step.title}</Typography>
@@ -226,7 +227,7 @@ export const BusinessSetupWizard: React.FC = () => {
             <ConfirmationStep
               formData={formData}
               invitationData={invitationData}
-              invitationToken={token!}
+              invitationToken={token ?? ''}
               onNext={handleNext}
               onBack={handleBack}
             />

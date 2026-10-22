@@ -43,9 +43,9 @@ export const ComplianceAlerts: React.FC<ComplianceAlertsProps> = ({
       {/* Integrity Errors */}
       {hasErrors && (
         <Alert severity="error" sx={{ mb: 2 }}>
-          <AlertTitle>Erreurs d'Intégrité Détectées</AlertTitle>
+          <AlertTitle>Erreurs d’Intégrité Détectées</AlertTitle>
           <Typography variant="body2" sx={{ mb: 2 }}>
-            Des erreurs d'intégrité ont été détectées dans le journal légal. 
+            Des erreurs d’intégrité ont été détectées dans le journal légal. 
             Ces erreurs doivent être corrigées immédiatement pour maintenir la conformité.
           </Typography>
           
@@ -72,8 +72,8 @@ export const ComplianceAlerts: React.FC<ComplianceAlertsProps> = ({
             </Typography>
             <Typography variant="body2">
               1. Contactez immédiatement votre prestataire technique<br />
-              2. Arrêtez toute nouvelle transaction jusqu'à résolution<br />
-              3. Documentez l'incident pour l'audit
+              2. Arrêtez toute nouvelle transaction jusqu’à résolution<br />
+              3. Documentez l’incident pour l’audit
             </Typography>
           </Box>
         </Alert>
@@ -107,7 +107,7 @@ export const ComplianceAlerts: React.FC<ComplianceAlertsProps> = ({
         <Alert severity="warning" sx={{ mb: 2 }}>
           <AlertTitle>Avertissement Intégrité Journal</AlertTitle>
           <Typography variant="body2">
-            Des problèmes mineurs ont été détectés dans l'intégrité du journal. 
+            Des problèmes mineurs ont été détectés dans l’intégrité du journal. 
             Bien que le système reste fonctionnel, une vérification est recommandée.
           </Typography>
         </Alert>
@@ -153,7 +153,7 @@ export const ComplianceAlerts: React.FC<ComplianceAlertsProps> = ({
       <Alert severity="info">
         <AlertTitle>Conformité Légale Française</AlertTitle>
         <Typography variant="body2" sx={{ mb: 1 }}>
-          Ce tableau de bord surveille la conformité de votre système de caisse aux exigences de l'article 286-I-3 bis du CGI.
+          Ce tableau de bord surveille la conformité de votre système de caisse aux exigences de l’article 286-I-3 bis du CGI.
         </Typography>
         
         <Typography variant="body2">

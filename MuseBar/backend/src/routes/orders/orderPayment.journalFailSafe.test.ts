@@ -3,6 +3,7 @@ import request from 'supertest';
 import express from 'express';
 import { generateToken } from '../auth';
 import { errorHandler } from '../../middleware/errorHandler';
+import { adminPinActorTokenFor, withPinActor } from '../../test/pinActorTestUtils';
 
 const EST = '11111111-1111-1111-1111-111111111111';
 
@@ -86,6 +87,10 @@ function tokenFor(establishmentId: string) {
   );
 }
 
+function adminPin() {
+  return adminPinActorTokenFor(EST);
+}
+
 describe('POST /orders/payment legal journal fail-safe parity', () => {
   beforeEach(() => {
     mocks.orderGetById.mockReset();
@@ -126,6 +131,17 @@ describe('POST /orders/payment legal journal fail-safe parity', () => {
     mocks.auditLogAction.mockResolvedValue({});
   });
 
+  it('denies POST /orders/payment/change with the account JWT alone (no PIN actor)', async () => {
+    const res = await request(app)
+      .post('/orders/payment/change')
+      .set('Authorization', `Bearer ${tokenFor(EST)}`)
+      .send({ amount: 10 });
+
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('PIN_ACTOR_REQUIRED');
+    expect(mocks.orderCreate).not.toHaveBeenCalled();
+  });
+
   it('returns 500 and compensating delete when change journal write fails', async () => {
     mocks.orderCreate.mockResolvedValue({
       id: 700,
@@ -143,10 +159,13 @@ describe('POST /orders/payment legal journal fail-safe parity', () => {
     });
     mocks.legalLogChange.mockRejectedValue(new Error('journal fail'));
 
-    const res = await request(app)
-      .post('/orders/payment/change')
-      .set('Authorization', `Bearer ${tokenFor(EST)}`)
-      .send({ amount: 10 });
+    const res = await withPinActor(
+      request(app)
+        .post('/orders/payment/change')
+        .set('Authorization', `Bearer ${tokenFor(EST)}`)
+        .send({ amount: 10 }),
+      adminPin()
+    );
 
     expect(res.status).toBe(500);
     expect(String(res.body?.error?.message ?? '')).toContain(
@@ -186,10 +205,13 @@ describe('POST /orders/payment legal journal fail-safe parity', () => {
     });
     mocks.legalLogChange.mockRejectedValue(new Error('journal fail'));
 
-    const res = await request(app)
-      .post('/orders/payment/cancel-unified')
-      .set('Authorization', `Bearer ${tokenFor(EST)}`)
-      .send({ orderId: 10, reason: 'mistake' });
+    const res = await withPinActor(
+      request(app)
+        .post('/orders/payment/cancel-unified')
+        .set('Authorization', `Bearer ${tokenFor(EST)}`)
+        .send({ orderId: 10, reason: 'mistake' }),
+      adminPin()
+    );
 
     expect(res.status).toBe(500);
     expect(String(res.body?.error?.message ?? '')).toContain(
@@ -238,10 +260,13 @@ describe('POST /orders/payment legal journal fail-safe parity', () => {
     });
     mocks.legalAddEntry.mockRejectedValue(new Error('refund journal fail'));
 
-    const res = await request(app)
-      .post('/orders/payment/cancel-unified')
-      .set('Authorization', `Bearer ${tokenFor(EST)}`)
-      .send({ orderId: 11, reason: 'customer request', cancellationType: 'full' });
+    const res = await withPinActor(
+      request(app)
+        .post('/orders/payment/cancel-unified')
+        .set('Authorization', `Bearer ${tokenFor(EST)}`)
+        .send({ orderId: 11, reason: 'customer request', cancellationType: 'full' }),
+      adminPin()
+    );
 
     expect(res.status).toBe(500);
     expect(String(res.body?.error?.message ?? '')).toContain(
@@ -305,15 +330,18 @@ describe('POST /orders/payment legal journal fail-safe parity', () => {
       });
     mocks.legalLogChange.mockRejectedValue(new Error('tip journal fail'));
 
-    const res = await request(app)
-      .post('/orders/payment/cancel-unified')
-      .set('Authorization', `Bearer ${tokenFor(EST)}`)
-      .send({
-        orderId: 12,
-        reason: 'tip correction',
-        cancellationType: 'full',
-        includeTipReversal: true,
-      });
+    const res = await withPinActor(
+      request(app)
+        .post('/orders/payment/cancel-unified')
+        .set('Authorization', `Bearer ${tokenFor(EST)}`)
+        .send({
+          orderId: 12,
+          reason: 'tip correction',
+          cancellationType: 'full',
+          includeTipReversal: true,
+        }),
+      adminPin()
+    );
 
     expect(res.status).toBe(500);
     expect(String(res.body?.error?.message ?? '')).toContain(

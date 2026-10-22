@@ -1,55 +1,33 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React from 'react';
 import {
-  Alert,
   Box,
   Button,
-  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   FormControl,
-  FormControlLabel,
   MenuItem,
-  Radio,
-  RadioGroup,
   TextField,
-  Tooltip,
   Typography,
 } from '@mui/material';
-import { apiCore } from '../../services/api';
-import { formatDate, parisTodayYmd } from '../../utils/formatDate';
 import { ParisDateField } from '../common/ParisDateTimeField';
+import CreateClosureDailyMode from './CreateClosureDailyMode';
+import CreateClosureDailyPreview from './CreateClosureDailyPreview';
+import CreateClosureExtraFields from './CreateClosureExtraFields';
+import {
+  type ClosureType,
+  type CreateClosurePayload,
+  type DailyClosureMode,
+} from './createClosureTypes';
+import { useCreateClosureDialog } from './useCreateClosureDialog';
 
-export type ClosureType = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ANNUAL';
-export type DailyClosureMode = 'business_day' | 'close_now';
-
-type ClosurePreview =
-  | {
-      ok: true;
-      period_start: string;
-      period_end: string;
-      total_transactions: number;
-      total_amount: number;
-    }
-  | { ok: false; reason: string };
-
-function formatPeriodBound(iso: string): string {
-  const formatted = formatDate(iso);
-  return formatted === 'N/A' ? iso : formatted;
-}
+export type { ClosureType, DailyClosureMode };
 
 interface CreateClosureDialogProps {
   open: boolean;
   onClose: () => void;
-  onCreate: (payload: {
-    date: string;
-    type: ClosureType;
-    force?: boolean;
-    fond_de_caisse: number;
-    email_recipients?: string[];
-    mode?: DailyClosureMode;
-  }) => Promise<void>;
+  onCreate: (payload: CreateClosurePayload) => Promise<void>;
   creating: boolean;
   selectedDate: string;
   selectedClosureType: ClosureType;
@@ -71,150 +49,22 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
   disableForceCreation = true,
   defaultFondDeCaisse = null,
 }) => {
-  const todayISO = useMemo(() => parisTodayYmd(), []);
-  const [forceCreation, setForceCreation] = useState(false);
-  const [fondDeCaisse, setFondDeCaisse] = useState<string>('');
-  const [emailRecipients, setEmailRecipients] = useState('');
-  const [dailyMode, setDailyMode] = useState<DailyClosureMode>('close_now');
-  const [cutTime, setCutTime] = useState('02:00');
-  const [preview, setPreview] = useState<ClosurePreview | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    const initial = defaultFondDeCaisse ?? 0;
-    setFondDeCaisse(String(initial));
-    setDailyMode('close_now');
-
-    let cancelled = false;
-    (async () => {
-      try {
-        const settingsRes = await apiCore.request<{
-          settings?: { accounting_emails?: string[]; daily_closure_time?: string };
-          daily_closure_time?: string;
-        }>('/legal/closure-settings', { method: 'GET' });
-        if (cancelled) return;
-        const defaults = settingsRes?.settings?.accounting_emails;
-        setEmailRecipients(Array.isArray(defaults) && defaults.length > 0 ? defaults.join(', ') : '');
-        const time =
-          settingsRes?.settings?.daily_closure_time ||
-          settingsRes?.daily_closure_time ||
-          '02:00';
-        setCutTime(time);
-      } catch {
-        if (!cancelled) {
-          setEmailRecipients('');
-          setCutTime('02:00');
-        }
-      }
-
-      try {
-        const suggestion = await apiCore.request<{ date?: string }>(
-          '/legal/closure/suggest-business-day-date',
-          { method: 'GET' }
-        );
-        if (!cancelled && suggestion?.date) {
-          onDateChange(suggestion.date);
-        }
-      } catch {
-        // Keep whatever date the parent already has.
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [open, defaultFondDeCaisse, onDateChange]);
-
-  // When switching to business_day, refresh the suggested date once.
-  useEffect(() => {
-    if (!open || selectedClosureType !== 'DAILY' || dailyMode !== 'business_day') return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const suggestion = await apiCore.request<{ date?: string }>(
-          '/legal/closure/suggest-business-day-date',
-          { method: 'GET' }
-        );
-        if (!cancelled && suggestion?.date) {
-          onDateChange(suggestion.date);
-        }
-      } catch {
-        // ignore
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [open, selectedClosureType, dailyMode, onDateChange]);
-
-  // Daily bulletins are the ones that can silently land on the wrong night, so
-  // resolve the exact window server-side and show it before anything is written.
-  useEffect(() => {
-    if (!open || selectedClosureType !== 'DAILY') {
-      setPreview(null);
-      return;
-    }
-    if (dailyMode === 'business_day' && !selectedDate) {
-      setPreview(null);
-      return;
-    }
-
-    let cancelled = false;
-    setPreviewLoading(true);
-
-    const params = new URLSearchParams({ mode: dailyMode });
-    if (dailyMode === 'business_day') params.set('date', selectedDate);
-    if (forceCreation) params.set('force', 'true');
-
-    (async () => {
-      try {
-        const res = await apiCore.request<ClosurePreview>(
-          `/legal/closure/daily-preview?${params.toString()}`,
-          { method: 'GET' }
-        );
-        if (!cancelled) setPreview(res ?? null);
-      } catch {
-        if (!cancelled) setPreview(null);
-      } finally {
-        if (!cancelled) setPreviewLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [open, selectedClosureType, dailyMode, selectedDate, forceCreation]);
-
-  const fondDeCaisseNumber = useMemo(() => {
-    const n = parseFloat(fondDeCaisse.replace(',', '.'));
-    if (!Number.isFinite(n) || n < 0) return null;
-    return n;
-  }, [fondDeCaisse]);
-
-  const parsedEmails = useMemo(
-    () =>
-      emailRecipients
-        .split(/[,;\n]+/)
-        .map((part) => part.trim())
-        .filter(Boolean),
-    [emailRecipients]
-  );
-
-  const isDaily = selectedClosureType === 'DAILY';
-  const needsDate = !isDaily || dailyMode === 'business_day';
-
-  const previewBlocks = isDaily && preview !== null && preview.ok === false;
-  const previewIsEmpty = isDaily && preview?.ok === true && preview.total_transactions === 0;
+  const dialog = useCreateClosureDialog({
+    open,
+    selectedDate,
+    selectedClosureType,
+    onDateChange,
+    defaultFondDeCaisse,
+  });
 
   const canCreate =
     !creating &&
-    !previewLoading &&
-    !previewBlocks &&
-    (!previewIsEmpty || forceCreation) &&
-    (!needsDate || selectedDate.trim().length > 0) &&
+    !dialog.previewLoading &&
+    !dialog.previewBlocks &&
+    (!dialog.previewIsEmpty || dialog.forceCreation) &&
+    (!dialog.needsDate || selectedDate.trim().length > 0) &&
     !!selectedClosureType &&
-    fondDeCaisseNumber !== null;
+    dialog.fondDeCaisseNumber !== null;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -226,7 +76,7 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
               select
               label="Type"
               value={selectedClosureType}
-              onChange={e => onClosureTypeChange(e.target.value as ClosureType)}
+              onChange={(e) => onClosureTypeChange(e.target.value as ClosureType)}
               size="small"
             >
               <MenuItem value="DAILY">Journalière</MenuItem>
@@ -236,44 +86,15 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
             </TextField>
           </FormControl>
 
-          {isDaily && (
-            <FormControl component="fieldset">
-              <Typography variant="subtitle2" gutterBottom>
-                Mode journalier
-              </Typography>
-              <RadioGroup
-                value={dailyMode}
-                onChange={e => setDailyMode(e.target.value as DailyClosureMode)}
-              >
-                <FormControlLabel
-                  value="close_now"
-                  control={<Radio size="small" />}
-                  label="Clôturer maintenant (depuis la dernière clôture → maintenant)"
-                />
-                <FormControlLabel
-                  value="business_day"
-                  control={<Radio size="small" />}
-                  label="Clôturer une journée commerciale (date + heure de coupure)"
-                />
-              </RadioGroup>
-              <Alert severity="info" sx={{ mt: 1 }}>
-                {dailyMode === 'close_now' ? (
-                  <>
-                    Inclut toutes les ventes depuis la fin de la dernière clôture journalière
-                    jusqu’à l’instant présent. Idéal en fin de service.
-                  </>
-                ) : (
-                  <>
-                    Journée commerciale : de <strong>{cutTime}</strong> le jour choisi jusqu’à{' '}
-                    <strong>{cutTime}</strong> le lendemain (paramètre « heure de clôture »). Les
-                    ventes déjà couvertes par une clôture précédente sont exclues.
-                  </>
-                )}
-              </Alert>
-            </FormControl>
+          {dialog.isDaily && (
+            <CreateClosureDailyMode
+              dailyMode={dialog.dailyMode}
+              cutTime={dialog.cutTime}
+              onChange={dialog.setDailyMode}
+            />
           )}
 
-          {needsDate && (
+          {dialog.needsDate && (
             <ParisDateField
               label="Date de clôture (jj/mm/aaaa)"
               value={selectedDate}
@@ -281,116 +102,34 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
               size="small"
             />
           )}
-          {needsDate && (
+          {dialog.needsDate && (
             <Typography variant="caption" color="text.secondary">
               {selectedClosureType === 'ANNUAL'
                 ? 'Bulletin annuel : année glissante se terminant à cette date (ex. 01/08/2025 → 01/08/2026)'
-                : isDaily
-                  ? `Journée du calendrier sélectionné, coupée à ${cutTime}`
+                : dialog.isDaily
+                  ? `Journée du calendrier sélectionné, coupée à ${dialog.cutTime}`
                   : null}
             </Typography>
           )}
 
-          {isDaily && (
-            <Box>
-              {previewLoading && (
-                <Alert severity="info" icon={false}>
-                  Calcul de la période…
-                </Alert>
-              )}
-              {!previewLoading && preview?.ok === false && (
-                <Alert severity="error">
-                  <Typography variant="subtitle2">Clôture impossible</Typography>
-                  {preview.reason}
-                </Alert>
-              )}
-              {!previewLoading && preview?.ok === true && (
-                <Alert severity={preview.total_transactions === 0 ? 'warning' : 'success'}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Cette clôture couvrira
-                  </Typography>
-                  <Typography variant="body2">
-                    Du <strong>{formatPeriodBound(preview.period_start)}</strong> au{' '}
-                    <strong>{formatPeriodBound(preview.period_end)}</strong>
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>{preview.total_transactions}</strong> vente
-                    {preview.total_transactions > 1 ? 's' : ''} —{' '}
-                    <strong>
-                      {preview.total_amount.toLocaleString('fr-FR', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}{' '}
-                      €
-                    </strong>
-                  </Typography>
-                  {preview.total_transactions === 0 && (
-                    <Typography variant="body2" sx={{ mt: 1 }}>
-                      Aucune vente sur cette période. Après l’heure de coupure ({cutTime}), la nuit
-                      qui vient de s’achever porte la date de la veille. Cochez « Forcer la
-                      création » s’il s’agit réellement d’une journée sans vente.
-                    </Typography>
-                  )}
-                </Alert>
-              )}
-            </Box>
+          {dialog.isDaily && (
+            <CreateClosureDailyPreview
+              previewLoading={dialog.previewLoading}
+              preview={dialog.preview}
+              cutTime={dialog.cutTime}
+            />
           )}
 
-          <TextField
-            label="Fond de caisse (€)"
-            value={fondDeCaisse}
-            onChange={(e) => setFondDeCaisse(e.target.value)}
-            size="small"
-            fullWidth
-            required
-            error={fondDeCaisse.trim().length === 0 || fondDeCaisseNumber === null}
-            helperText={
-              fondDeCaisse.trim().length === 0
-                ? 'Champ obligatoire'
-                : fondDeCaisseNumber === null
-                  ? 'Veuillez saisir un montant valide (≥ 0)'
-                  : 'Montant informatif (n’impacte pas les totaux)'
-            }
-            inputMode="decimal"
+          <CreateClosureExtraFields
+            fondDeCaisse={dialog.fondDeCaisse}
+            fondDeCaisseNumber={dialog.fondDeCaisseNumber}
+            emailRecipients={dialog.emailRecipients}
+            forceCreation={dialog.forceCreation}
+            disableForceCreation={disableForceCreation}
+            onFondChange={dialog.setFondDeCaisse}
+            onEmailsChange={dialog.setEmailRecipients}
+            onForceChange={dialog.setForceCreation}
           />
-
-          <TextField
-            label="Emails destinataires (optionnel)"
-            value={emailRecipients}
-            onChange={(e) => setEmailRecipients(e.target.value)}
-            size="small"
-            fullWidth
-            multiline
-            minRows={2}
-            placeholder="comptable@exemple.com, associe@exemple.com"
-            helperText="Envoi ponctuel pour ce bulletin. Prérempli depuis les paramètres — ajoutez d'autres adresses ici sans les enregistrer. Les emails comptables des paramètres restent envoyés automatiquement s'ils sont configurés. Séparez par des virgules ; laissez vide pour n'utiliser que les paramètres."
-          />
-
-          <Tooltip
-            title={
-              disableForceCreation
-                ? 'A activer plus tard après validation légale et backend (force de création).'
-                : 'Cette option force la création même si un bulletin existe déjà.'
-            }
-          >
-            <Box>
-              <FormControlLabel
-                disabled={disableForceCreation}
-                control={
-                  <Checkbox
-                    checked={forceCreation}
-                    onChange={(e) => setForceCreation(e.target.checked)}
-                  />
-                }
-                label="Forcer la création (crée un bulletin correctif, sans supprimer l'ancien)"
-              />
-            </Box>
-          </Tooltip>
-
-          <Typography variant="caption" color="textSecondary">
-            Chaque vente doit figurer dans une clôture journalière : les périodes sont continues,
-            sans chevauchement.
-          </Typography>
         </Box>
       </DialogContent>
 
@@ -401,12 +140,12 @@ const CreateClosureDialog: React.FC<CreateClosureDialogProps> = ({
         <Button
           onClick={() =>
             onCreate({
-              date: selectedDate || todayISO,
+              date: selectedDate || dialog.todayISO,
               type: selectedClosureType,
-              force: forceCreation,
-              fond_de_caisse: fondDeCaisseNumber ?? 0,
-              email_recipients: parsedEmails.length > 0 ? parsedEmails : undefined,
-              ...(isDaily ? { mode: dailyMode } : {}),
+              force: dialog.forceCreation,
+              fond_de_caisse: dialog.fondDeCaisseNumber ?? 0,
+              email_recipients: dialog.parsedEmails.length > 0 ? dialog.parsedEmails : undefined,
+              ...(dialog.isDaily ? { mode: dialog.dailyMode } : {}),
             })
           }
           variant="contained"

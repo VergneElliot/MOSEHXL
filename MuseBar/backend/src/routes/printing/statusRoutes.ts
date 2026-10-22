@@ -1,6 +1,6 @@
 import { Router, type Response } from 'express';
 
-import { authenticateToken } from '../../middleware/auth';
+import { requireAuth } from '../../middleware/auth';
 import { getLogger } from '../../utils/logger';
 import type { AuthenticatedRequest } from '../userManagement/types';
 import { AppError, asyncHandler } from '../../middleware/errorHandler';
@@ -10,7 +10,7 @@ import { getStatusResponse, testPrintResponse } from './handlers';
 const router = Router();
 
 // GET /api/printing/status
-router.get('/status', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.get('/status', requireAuth, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const data = await getStatusResponse(user);
@@ -22,7 +22,7 @@ router.get('/status', authenticateToken, ensureEstablishment, asyncHandler(async
 }));
 
 // GET /api/printing/printers
-router.get('/printers', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.get('/printers', requireAuth, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const service = await getPrintingService(user.establishment_id);
@@ -40,7 +40,7 @@ router.get('/printers', authenticateToken, ensureEstablishment, asyncHandler(asy
 }));
 
 // POST /api/printing/test
-router.post('/test', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.post('/test', requireAuth, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const result = await testPrintResponse(user, req.body?.printerId);

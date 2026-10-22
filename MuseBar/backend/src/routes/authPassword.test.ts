@@ -123,7 +123,6 @@ describe('authPassword routes', () => {
     mocks.invalidateActiveRequestsForUser.mockResolvedValue(undefined);
     mocks.createRequest.mockResolvedValue({ id: 'req-1' });
     process.env.PASSWORD_BREACH_CHECK_ENABLED = originalBreachToggle;
-    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 

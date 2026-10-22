@@ -1,0 +1,191 @@
+import type { Pool } from 'pg';
+import { getRegisterIdForEstablishment } from '../utils/registerId';
+import type { ReceiptData as PrintingReceiptData } from '../services/printing/types';
+import type { PrintingUser } from './printDataTypes';
+
+export async function buildTestReceiptData(pool: Pool, user: PrintingUser): Promise<PrintingReceiptData> {
+  const estResult = await pool.query(
+    `SELECT
+       COALESCE(bs.name, e.name) AS name,
+       COALESCE(bs.address, e.address) AS address,
+       COALESCE(bs.phone, e.phone) AS phone,
+       COALESCE(bs.email, e.email) AS email,
+       bs.siret AS siret,
+       bs.tax_identification AS tax_identification
+     FROM establishments e
+     LEFT JOIN LATERAL (
+       SELECT name, address, phone, email, siret, tax_identification
+       FROM business_settings
+       WHERE establishment_id = e.id
+       ORDER BY updated_at DESC
+       LIMIT 1
+     ) bs ON true
+     WHERE e.id = $1
+     LIMIT 1`,
+    [user.establishment_id]
+  );
+
+  const est = estResult.rows[0] ?? {};
+
+  return {
+    order_id: 0,
+    sequence_number: 0,
+    total_amount: 10.0,
+    total_tax: 2.0,
+    payment_method: 'TEST',
+    created_at: new Date().toISOString(),
+    receipt_type: 'detailed',
+    items: [
+      {
+        product_name: 'Test Item',
+        quantity: 1,
+        unit_price: 8.0,
+        total_price: 8.0,
+        tax_rate: 20,
+      },
+    ],
+    business_info: {
+      name: String(est.name ?? ''),
+      address: String(est.address ?? ''),
+      phone: String(est.phone ?? ''),
+      email: String(est.email ?? ''),
+      siret: est.siret ? String(est.siret) : undefined,
+      tax_identification: est.tax_identification ? String(est.tax_identification) : undefined,
+    },
+    compliance_info: {
+      cash_register_id: getRegisterIdForEstablishment(user.establishment_id),
+      operator_id: user.username,
+    },
+  };
+}
+
+export async function buildReceiptDataForOrder(
+  pool: Pool,
+  establishmentId: string,
+  user: PrintingUser,
+  orderId: number,
+  type: string
+): Promise<PrintingReceiptData> {
+  const receiptResult = await pool.query(
+    `SELECT 
+      o.id as order_id,
+      COALESCE(lj.sequence_number, o.id) as sequence_number,
+      o.total_amount,
+      o.total_tax as total_tax,
+      o.payment_method,
+      o.created_at,
+      o.tips,
+      o.change AS change,
+      lj.current_hash as receipt_hash,
+      json_agg(
+        json_build_object(
+          'product_name', oi.product_name,
+          'quantity', oi.quantity,
+          'unit_price', oi.unit_price,
+          'total_price', oi.total_price,
+          'tax_rate', p.tax_rate
+        )
+      ) as items,
+      MAX(COALESCE(bs.name, e.name)) as business_name,
+      MAX(COALESCE(bs.address, e.address)) as business_address,
+      MAX(COALESCE(bs.phone, e.phone)) as business_phone,
+      MAX(COALESCE(bs.email, e.email)) as business_email,
+      MAX(bs.siret) as siret,
+      MAX(bs.tax_identification) as tax_identification
+    FROM public.orders o
+    LEFT JOIN LATERAL (
+      SELECT sequence_number, current_hash
+      FROM public.legal_journal
+      WHERE order_id = o.id
+        AND establishment_id = o.establishment_id
+        AND transaction_type = 'SALE'
+      ORDER BY sequence_number DESC
+      LIMIT 1
+    ) lj ON true
+    JOIN public.establishments e ON e.id = $2
+    LEFT JOIN LATERAL (
+      SELECT name, address, phone, email, siret, tax_identification
+      FROM public.business_settings
+      WHERE establishment_id = e.id
+      ORDER BY updated_at DESC
+      LIMIT 1
+    ) bs ON true
+    LEFT JOIN public.order_items oi ON o.id = oi.order_id
+    LEFT JOIN public.products p ON oi.product_id = p.id
+    WHERE o.id = $1 AND o.establishment_id = $2
+    GROUP BY o.id, e.id, lj.sequence_number, lj.current_hash`,
+    [orderId, establishmentId]
+  );
+
+  if (receiptResult.rows.length === 0) {
+    const err = Object.assign(new Error('Receipt not found'), { statusCode: 404 });
+    throw err;
+  }
+
+  const receiptRow = receiptResult.rows[0];
+  const parsedSequence = Number(receiptRow.sequence_number);
+  const parsedTotalTax =
+    typeof receiptRow.total_tax === 'number'
+      ? receiptRow.total_tax
+      : parseFloat(String(receiptRow.total_tax ?? '0'));
+  const safeSequenceNumber = Number.isFinite(parsedSequence) && parsedSequence > 0 ? parsedSequence : Number(receiptRow.order_id);
+  const safeTotalTax = Number.isFinite(parsedTotalTax) ? parsedTotalTax : 0;
+
+  const receiptData: PrintingReceiptData = {
+    order_id: Number(receiptRow.order_id),
+    sequence_number: safeSequenceNumber,
+    document_kind: 'ticket',
+    document_number: String(safeSequenceNumber).padStart(6, '0'),
+    total_amount: parseFloat(receiptRow.total_amount),
+    total_tax: safeTotalTax,
+    payment_method: String(receiptRow.payment_method ?? ''),
+    created_at: new Date(receiptRow.created_at).toISOString(),
+    items: Array.isArray(receiptRow.items) ? receiptRow.items : [],
+    business_info: {
+      name: String(receiptRow.business_name ?? ''),
+      address: String(receiptRow.business_address ?? ''),
+      phone: String(receiptRow.business_phone ?? ''),
+      email: String(receiptRow.business_email ?? ''),
+      siret: receiptRow.siret ? String(receiptRow.siret) : undefined,
+      tax_identification: receiptRow.tax_identification ? String(receiptRow.tax_identification) : undefined,
+    },
+    receipt_type: type as 'detailed' | 'summary',
+    tips: receiptRow.tips ? parseFloat(receiptRow.tips) : undefined,
+    change: receiptRow.change ? parseFloat(receiptRow.change) : undefined,
+    compliance_info: {
+      receipt_hash: receiptRow.receipt_hash ? String(receiptRow.receipt_hash) : undefined,
+      cash_register_id: getRegisterIdForEstablishment(user.establishment_id),
+      operator_id: user.username,
+    },
+  };
+
+  const toNumber = (v: unknown): number => {
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string') {
+      const n = parseFloat(v);
+      return Number.isFinite(n) ? n : 0;
+    }
+    return 0;
+  };
+
+  const items: Array<{ tax_rate?: number; total_price?: string | number }> = Array.isArray(receiptRow.items)
+    ? (receiptRow.items as Array<{ tax_rate?: number; total_price?: string | number }>)
+    : [];
+
+  const vatBreakdown: Array<{ rate: number; subtotal_ht: number; vat: number }> = [];
+  const vat10Items = items.filter((item) => item.tax_rate === 10);
+  const vat20Items = items.filter((item) => item.tax_rate === 20);
+  if (vat10Items.length > 0) {
+    const subtotal = vat10Items.reduce((sum, item) => sum + toNumber(item.total_price), 0);
+    const vat = (subtotal * 0.1) / 1.1;
+    vatBreakdown.push({ rate: 10, subtotal_ht: subtotal - vat, vat });
+  }
+  if (vat20Items.length > 0) {
+    const subtotal = vat20Items.reduce((sum, item) => sum + toNumber(item.total_price), 0);
+    const vat = (subtotal * 0.2) / 1.2;
+    vatBreakdown.push({ rate: 20, subtotal_ht: subtotal - vat, vat });
+  }
+  receiptData.vat_breakdown = vatBreakdown;
+
+  return receiptData;
+}

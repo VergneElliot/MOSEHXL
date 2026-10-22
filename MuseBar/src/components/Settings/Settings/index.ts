@@ -6,7 +6,6 @@
 // Core components
 export { SettingsTabs } from './SettingsTabs';
 export { ClosureSettings } from './ClosureSettings';
-export { PrinterSettings } from './PrinterSettings';
 
 // Hook
 export { useSettings } from './useSettings';
@@ -16,12 +15,9 @@ export type {
   ClosureSettings as ClosureSettingsType,
   SchedulerStatus,
   SchedulerStatusResponse,
-  GeneralSettings as GeneralSettingsType,
   BusinessInfo,
-  PrinterSettings as PrinterSettingsType,
   SettingsState,
   SettingsProps,
-  GeneralSettingsProps,
   BusinessSettingsProps,
   ClosureSettingsProps,
   UseSettingsReturn,

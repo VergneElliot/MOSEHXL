@@ -47,7 +47,7 @@ export const InvitationSuccess: React.FC<InvitationSuccessProps> = ({
           Account Created Successfully!
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-          Your account has been set up and you're now ready to use the system.
+          Your account has been set up and you’re now ready to use the system.
         </Typography>
       </Box>
 

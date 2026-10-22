@@ -81,7 +81,7 @@ const ClosureStatusCards: React.FC<ClosureStatusCardsProps> = ({
             </Typography>
           ) : (
             <Typography variant="body2">
-              La clôture journalière n'a pas encore été effectuée pour aujourd'hui.
+              La clôture journalière n’a pas encore été effectuée pour aujourd’hui.
             </Typography>
           )}
         </Alert>

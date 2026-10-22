@@ -145,7 +145,7 @@ const ReturnDialog: React.FC<ReturnDialogProps> = ({
                   onChange={e => onSelectedTipChange(e.target.checked)}
                 />
               }
-              label={`Inclure le pourboire (${formatCurrency(order.tips!)}) dans le retour`}
+              label={`Inclure le pourboire (${formatCurrency(order.tips ?? 0)}) dans le retour`}
             />
           )}
 

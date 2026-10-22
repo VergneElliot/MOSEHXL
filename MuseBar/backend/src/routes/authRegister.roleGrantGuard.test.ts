@@ -123,7 +123,7 @@ describe('authRegister establishment_admin role grant guard', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ userId: 9, role: 'establishment_admin' });
-    expect(mocks.updateUserRoleById).toHaveBeenCalledWith(9, 'establishment_admin');
+    expect(mocks.updateUserRoleById).toHaveBeenCalledWith(9, 'establishment_admin', 'est-1');
     expect(mocks.auditLogAction).toHaveBeenCalledTimes(1);
     expect(mocks.logSoftwareEventBestEffort).toHaveBeenCalledTimes(1);
   });

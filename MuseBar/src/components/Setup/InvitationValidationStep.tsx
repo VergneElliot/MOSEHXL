@@ -97,7 +97,7 @@ export const InvitationValidationStep: React.FC<InvitationValidationStepProps> =
 
       <Alert severity="info" sx={{ mb: 4 }}>
         <Typography variant="body2">
-          <strong>Next Steps:</strong> You'll be guided through setting up your personal account 
+          <strong>Next Steps:</strong> You’ll be guided through setting up your personal account 
           and completing your business information. This process will create your dedicated POS 
           management system with all the tools you need to run your establishment.
         </Typography>

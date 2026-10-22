@@ -104,7 +104,6 @@ export function applyPlanningDraftToShifts<
         );
       } else {
         const oldStart = new Date(anchor.starts_at).getTime();
-        const oldEnd = new Date(anchor.ends_at).getTime();
         const newStart = new Date(u.starts_at).getTime();
         const newEnd = new Date(u.ends_at).getTime();
         const startDelta = newStart - oldStart;

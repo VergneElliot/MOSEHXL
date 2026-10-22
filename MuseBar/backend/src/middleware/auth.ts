@@ -286,5 +286,3 @@ export function requireSetupSecret(req: Request, res: Response, next: NextFuncti
   return next();
 }
 
-/** @deprecated Use requireAuth instead. Kept for printing routes backward compat. */
-export const authenticateToken = requireAuth;

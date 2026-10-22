@@ -237,7 +237,7 @@ export const ClosureSettings: React.FC<ClosureSettingsProps> = ({
               <Typography variant="body2">
                 • La clôture automatique génère les bulletins de clôture obligatoires<br />
                 • Cette fonctionnalité est requise pour la conformité légale française<br />
-                • Assurez-vous que l'heure de clôture correspond à vos horaires d'exploitation<br />
+                • Assurez-vous que l’heure de clôture correspond à vos horaires d’exploitation<br />
                 • La période de grâce permet de finaliser les commandes en cours
               </Typography>
             </Alert>

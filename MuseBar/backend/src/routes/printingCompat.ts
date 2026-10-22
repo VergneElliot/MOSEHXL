@@ -1,5 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
-import { authenticateToken } from '../middleware/auth';
+import { requireAuth } from '../middleware/auth';
 import type { AuthenticatedRequest } from './userManagement/types';
 import {
   getStatusResponse,
@@ -37,7 +37,7 @@ const ensureEstablishment = (req: AuthenticatedRequest, res: Response, next: Nex
  */
 
 // POST /api/legal/receipt/:orderId/thermal-print
-router.post('/api/legal/receipt/:orderId/thermal-print', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.post('/api/legal/receipt/:orderId/thermal-print', requireAuth, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const orderId = parseInt(req.params.orderId ?? '', 10);
@@ -62,7 +62,7 @@ router.post('/api/legal/receipt/:orderId/thermal-print', authenticateToken, ensu
 }));
 
 // POST /api/legal/closure/:bulletinId/thermal-print
-router.post('/api/legal/closure/:bulletinId/thermal-print', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.post('/api/legal/closure/:bulletinId/thermal-print', requireAuth, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const bulletinId = parseInt(req.params.bulletinId ?? '', 10);
@@ -85,7 +85,7 @@ router.post('/api/legal/closure/:bulletinId/thermal-print', authenticateToken, e
 }));
 
 // GET /api/legal/thermal-printer/status
-router.get('/api/legal/thermal-printer/status', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.get('/api/legal/thermal-printer/status', requireAuth, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const data = await getStatusResponse(user);
@@ -103,7 +103,7 @@ router.get('/api/legal/thermal-printer/status', authenticateToken, ensureEstabli
 }));
 
 // POST /api/legal/thermal-printer/test
-router.post('/api/legal/thermal-printer/test', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.post('/api/legal/thermal-printer/test', requireAuth, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const result = await testPrintResponse(user, req.body?.printerId);

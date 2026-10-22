@@ -35,7 +35,7 @@ export function useFloorPlanManagement(options: {
   const activeTicketId = activeTable?.ticketId ?? null;
   const ensureTableIntervention = useTableInterventionGate(activeTable, pinActor);
   const { ensurePermission } = useStepUpAuth();
-  const sessionCart = activeSession?.cart ?? [];
+  const sessionCart = activeSession?.cart;
 
   const [loading, setLoading] = useState(false);
   const [tables, setTables] = useState<floorApi.DiningTableStatusDto[]>([]);
@@ -228,7 +228,7 @@ export function useFloorPlanManagement(options: {
       await abandonFloorTicket({
         ticketId: activeTicketId,
         pinToken: pinActor.token,
-        cart: sessionCart,
+        cart: sessionCart ?? [],
         ensureIntervention: ensureTableIntervention,
         ensureOrdersCancel: ensurePermission,
       });

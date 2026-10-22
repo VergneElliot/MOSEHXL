@@ -86,7 +86,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
           </Typography>
           {isEditing && (
             <Typography variant="body2" color="textSecondary">
-              Modification du produit "{editingProduct.name}"
+              {`Modification du produit "${editingProduct.name}"`}
             </Typography>
           )}
         </DialogTitle>

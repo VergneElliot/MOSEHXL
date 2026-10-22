@@ -35,7 +35,7 @@ export const ReceiptSignature: React.FC<ReceiptSignatureProps> = ({
 
       {/* Legal Compliance Information */}
       <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-        Conforme à l'article 286-I-3 bis du CGI
+        Conforme à l’article 286-I-3 bis du CGI
       </Typography>
 
       <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>

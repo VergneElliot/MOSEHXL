@@ -8,38 +8,12 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
-  Grid,
   TextField,
-  Typography,
 } from '@mui/material';
-import { apiCore, printingApi } from '../../services/api';
-
-type ClosurePreviewData = {
-  id: number;
-  closure_type: string;
-  period_start: string;
-  period_end: string;
-  total_transactions: number;
-  fond_de_caisse: number;
-  total_amount: number;
-  total_vat: number;
-  vat_breakdown: {
-    vat_10?: { amount?: number; vat?: number; ttc?: number };
-    vat_20?: { amount?: number; vat?: number; ttc?: number };
-  };
-  payment_methods_breakdown: { [key: string]: number };
-  tips_total?: number;
-  change_total?: number;
-  business_info?: {
-    name?: string;
-    address?: string;
-    phone?: string;
-    email?: string;
-    siret?: string;
-    tax_identification?: string;
-  };
-};
+import { apiCore } from '../../services/api';
+import ClosurePreviewSummary from './ClosurePreviewSummary';
+import type { ClosurePreviewData } from './closurePreviewTotals';
+import { usePrintClosureActions } from './usePrintClosureActions';
 
 interface PrintClosureDialogProps {
   open: boolean;
@@ -49,15 +23,6 @@ interface PrintClosureDialogProps {
   onPrintError: (message: string) => void;
   formatCurrency: (amount: number) => string;
   formatDate: (dateString: string) => string;
-}
-
-function toNumber(value: unknown): number {
-  const n = typeof value === 'number' ? value : parseFloat(String(value ?? 0));
-  return Number.isFinite(n) ? n : 0;
-}
-
-function roundToCents(amount: number): number {
-  return Math.round(amount * 100);
 }
 
 const PrintClosureDialog: React.FC<PrintClosureDialogProps> = ({
@@ -70,12 +35,6 @@ const PrintClosureDialog: React.FC<PrintClosureDialogProps> = ({
   formatDate,
 }) => {
   const [loadingPreview, setLoadingPreview] = useState(false);
-  const [printing, setPrinting] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [exportingPdf, setExportingPdf] = useState(false);
-  const [exportingXlsx, setExportingXlsx] = useState(false);
-  const [exportingFlux103, setExportingFlux103] = useState(false);
-  const [emailing, setEmailing] = useState(false);
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -122,122 +81,17 @@ const PrintClosureDialog: React.FC<PrintClosureDialogProps> = ({
     })();
   }, [open, hasValidId, bulletinId]);
 
-  const handlePrint = async () => {
-    if (!hasValidId || bulletinId == null) {
-      setError('Identifiant de bulletin invalide.');
-      return;
-    }
-
-    try {
-      setPrinting(true);
-      setError(null);
-      await apiCore.request(`/printing/closure/${bulletinId}`, { method: 'POST' });
-      onPrintSuccess('Impression du bulletin envoyée à la file avec succès.');
-      onClose();
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'Échec de la mise en file de l’impression';
-      setError(message);
-      onPrintError(message);
-    } finally {
-      setPrinting(false);
-    }
-  };
-
-  const handleExportJson = async () => {
-    if (!preview) return;
-    try {
-      setExporting(true);
-      const payload = JSON.stringify(preview, null, 2);
-      const blob = new Blob([payload], { type: 'application/json;charset=utf-8' });
-      const url = window.URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `closure-bulletin-${preview.id}.json`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      window.URL.revokeObjectURL(url);
-      onPrintSuccess('Export du bulletin téléchargé (.json).');
-    } catch {
-      onPrintError('Échec de l’export du bulletin.');
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const handleExportPdf = async () => {
-    if (!hasValidId || bulletinId == null) return;
-    try {
-      setExportingPdf(true);
-      setError(null);
-      await printingApi.exportClosureBulletinPdf(bulletinId);
-      onPrintSuccess('Export PDF du bulletin téléchargé.');
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'Échec export PDF';
-      setError(message);
-      onPrintError(message);
-    } finally {
-      setExportingPdf(false);
-    }
-  };
-
-  const handleExportXlsx = async () => {
-    if (!hasValidId || bulletinId == null) return;
-    try {
-      setExportingXlsx(true);
-      setError(null);
-      await printingApi.exportClosureBulletinXlsx(bulletinId);
-      onPrintSuccess('Export Excel du récapitulatif téléchargé.');
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'Échec export Excel';
-      setError(message);
-      onPrintError(message);
-    } finally {
-      setExportingXlsx(false);
-    }
-  };
-
-  const handleExportFlux103 = async () => {
-    if (!hasValidId || bulletinId == null) return;
-    try {
-      setExportingFlux103(true);
-      setError(null);
-      await printingApi.exportClosureBulletinFlux103(bulletinId);
-      onPrintSuccess('Export Flux 10.3 XML du bulletin téléchargé.');
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'Échec export Flux 10.3';
-      setError(message);
-      onPrintError(message);
-    } finally {
-      setExportingFlux103(false);
-    }
-  };
-
-  const handleSendEmail = async () => {
-    if (!hasValidId || bulletinId == null) return;
-    const recipients = email
-      .split(/[,;\n]+/)
-      .map((part) => part.trim())
-      .filter(Boolean);
-    if (recipients.length === 0) {
-      setError('Au moins une adresse email destinataire est requise.');
-      return;
-    }
-    try {
-      setEmailing(true);
-      setError(null);
-      setSuccess(null);
-      const result = await printingApi.emailClosureBulletin(bulletinId, recipients);
-      setSuccess(result.message);
-      onPrintSuccess(result.message);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'Échec envoi email';
-      setError(message);
-      onPrintError(message);
-    } finally {
-      setEmailing(false);
-    }
-  };
+  const [busy, actions] = usePrintClosureActions({
+    bulletinId,
+    hasValidId,
+    preview,
+    email,
+    setError,
+    setSuccess,
+    onClose,
+    onPrintSuccess,
+    onPrintError,
+  });
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
@@ -273,150 +127,36 @@ const PrintClosureDialog: React.FC<PrintClosureDialogProps> = ({
         )}
 
         {!loadingPreview && preview && (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography variant="subtitle2" color="text.secondary">
-              Établissement
-            </Typography>
-            <Typography variant="body2">{preview.business_info?.name ?? '—'}</Typography>
-            <Typography variant="body2" color="text.secondary">
-              {preview.business_info?.address ?? '—'}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              SIRET: {preview.business_info?.siret ?? '—'} | TVA: {preview.business_info?.tax_identification ?? '—'}
-            </Typography>
-
-            <Divider sx={{ my: 1 }} />
-
-            {(() => {
-              const totalTtc = toNumber(preview.total_amount);
-              const cardTotal = toNumber(preview.payment_methods_breakdown?.card);
-              const cashTotal = toNumber(preview.payment_methods_breakdown?.cash);
-              const tipsTotal = toNumber(preview.tips_total);
-              const changeTotal = toNumber(preview.change_total);
-              const fondDeCaisse = toNumber(preview.fond_de_caisse);
-
-              const vat10Base = toNumber(preview.vat_breakdown?.vat_10?.amount);
-              const vat20Base = toNumber(preview.vat_breakdown?.vat_20?.amount);
-              const vat10Amount = toNumber(preview.vat_breakdown?.vat_10?.vat);
-              const vat20Amount = toNumber(preview.vat_breakdown?.vat_20?.vat);
-
-              const vat10TtcExact = toNumber(preview.vat_breakdown?.vat_10?.ttc) || vat10Base + vat10Amount;
-              const vat20TtcExact = toNumber(preview.vat_breakdown?.vat_20?.ttc) || vat20Base + vat20Amount;
-
-              const vat10TtcDisplay = roundToCents(vat10TtcExact) / 100;
-              const vat20TtcDisplay = roundToCents(vat20TtcExact) / 100;
-              const vat10AmountCents = roundToCents(vat10Amount);
-              const vat20AmountCents = roundToCents(vat20Amount);
-              const vat10AmountDisplay = vat10AmountCents / 100;
-              const vat20AmountDisplay = vat20AmountCents / 100;
-
-              const ttcTotalCents = roundToCents(totalTtc);
-              const vatTotalCents = vat10AmountCents + vat20AmountCents;
-
-              return (
-                <>
-                  <Typography variant="body2">
-                    <strong>Type:</strong> {preview.closure_type}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Période:</strong> {formatDate(preview.period_start)} au {formatDate(preview.period_end)}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Transactions:</strong> {preview.total_transactions}
-                  </Typography>
-
-                  <Divider sx={{ my: 1 }} />
-
-                  <Grid container spacing={2}>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">Total TTC</Typography>
-                      <Typography variant="body1" fontWeight="bold">{formatCurrency(totalTtc)}</Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">Total HT</Typography>
-                      <Typography variant="body1" fontWeight="bold">
-                        {formatCurrency((ttcTotalCents - vatTotalCents) / 100)}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">Montant total TVA</Typography>
-                      <Typography variant="body1" fontWeight="bold">{formatCurrency(vatTotalCents / 100)}</Typography>
-                    </Grid>
-
-                    <Grid item xs={12}>
-                      <Divider sx={{ my: 1 }} />
-                      <Typography variant="subtitle2" color="text.secondary">Détail TVA (France)</Typography>
-                    </Grid>
-
-                    <Grid item xs={6}>
-                      <Typography variant="caption" color="text.secondary">Total soumis à TVA 10%</Typography>
-                      <Typography variant="body1" fontWeight="bold">{formatCurrency(vat10TtcDisplay)}</Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>Montant TVA 10%</Typography>
-                      <Typography variant="body1" fontWeight="bold">{formatCurrency(vat10AmountDisplay)}</Typography>
-                    </Grid>
-
-                    <Grid item xs={6}>
-                      <Typography variant="caption" color="text.secondary">Total soumis à TVA 20%</Typography>
-                      <Typography variant="body1" fontWeight="bold">{formatCurrency(vat20TtcDisplay)}</Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>Montant TVA 20%</Typography>
-                      <Typography variant="body1" fontWeight="bold">{formatCurrency(vat20AmountDisplay)}</Typography>
-                    </Grid>
-
-                    <Grid item xs={6}>
-                      <Typography variant="caption" color="text.secondary">Total cartes</Typography>
-                      <Typography variant="body1" fontWeight="bold">{formatCurrency(cardTotal)}</Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="caption" color="text.secondary">Total cash</Typography>
-                      <Typography variant="body1" fontWeight="bold">{formatCurrency(cashTotal)}</Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="caption" color="text.secondary">Pourboires (opérations tips)</Typography>
-                      <Typography variant="body1" fontWeight="bold">{formatCurrency(tipsTotal)}</Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="caption" color="text.secondary">Monnaie rendue (faire de la monnaie)</Typography>
-                      <Typography variant="body1" fontWeight="bold">{formatCurrency(changeTotal)}</Typography>
-                    </Grid>
-                    <Grid item xs={12}>
-                      <Divider sx={{ my: 1 }} />
-                      <Typography variant="caption" color="text.secondary">Fond de caisse (informatif)</Typography>
-                      <Typography variant="body1" fontWeight="bold">{formatCurrency(fondDeCaisse)}</Typography>
-                    </Grid>
-                  </Grid>
-                </>
-              );
-            })()}
-          </Box>
+          <ClosurePreviewSummary preview={preview} formatCurrency={formatCurrency} formatDate={formatDate} />
         )}
       </DialogContent>
       <DialogActions sx={{ flexWrap: 'wrap', gap: 1 }}>
         <Button onClick={onClose}>Fermer</Button>
-        <Button onClick={handleExportJson} variant="outlined" disabled={loadingPreview || exporting || !preview}>
-          {exporting ? 'Export...' : 'JSON'}
+        <Button onClick={actions.handleExportJson} variant="outlined" disabled={loadingPreview || busy.exporting || !preview}>
+          {busy.exporting ? 'Export...' : 'JSON'}
         </Button>
-        <Button onClick={handleExportPdf} variant="outlined" disabled={loadingPreview || exportingPdf || !preview}>
-          {exportingPdf ? 'PDF...' : 'PDF comptable'}
+        <Button onClick={actions.handleExportPdf} variant="outlined" disabled={loadingPreview || busy.exportingPdf || !preview}>
+          {busy.exportingPdf ? 'PDF...' : 'PDF comptable'}
         </Button>
-        <Button onClick={handleExportXlsx} variant="outlined" disabled={loadingPreview || exportingXlsx || !preview}>
-          {exportingXlsx ? 'Excel...' : 'Excel comptable'}
-        </Button>
-        <Button
-          onClick={handleExportFlux103}
-          variant="outlined"
-          disabled={loadingPreview || exportingFlux103 || !preview}
-        >
-          {exportingFlux103 ? 'XML...' : 'Flux 10.3 XML'}
+        <Button onClick={actions.handleExportXlsx} variant="outlined" disabled={loadingPreview || busy.exportingXlsx || !preview}>
+          {busy.exportingXlsx ? 'Excel...' : 'Excel comptable'}
         </Button>
         <Button
-          onClick={handleSendEmail}
+          onClick={actions.handleExportFlux103}
           variant="outlined"
-          disabled={loadingPreview || emailing || !preview || !email.trim()}
+          disabled={loadingPreview || busy.exportingFlux103 || !preview}
         >
-          {emailing ? 'Envoi...' : 'Envoyer par email'}
+          {busy.exportingFlux103 ? 'XML...' : 'Flux 10.3 XML'}
         </Button>
-        <Button onClick={handlePrint} variant="contained" disabled={loadingPreview || printing || !preview}>
-          {printing ? 'Impression...' : 'Imprimer'}
+        <Button
+          onClick={actions.handleSendEmail}
+          variant="outlined"
+          disabled={loadingPreview || busy.emailing || !preview || !email.trim()}
+        >
+          {busy.emailing ? 'Envoi...' : 'Envoyer par email'}
+        </Button>
+        <Button onClick={actions.handlePrint} variant="contained" disabled={loadingPreview || busy.printing || !preview}>
+          {busy.printing ? 'Impression...' : 'Imprimer'}
         </Button>
       </DialogActions>
     </Dialog>

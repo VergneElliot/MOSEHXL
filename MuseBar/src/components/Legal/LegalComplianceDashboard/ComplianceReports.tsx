@@ -35,7 +35,7 @@ export const ComplianceReports: React.FC<ComplianceReportsProps> = ({
   showClosuresDialog,
   onCloseJournalDialog,
   onCloseClosuresDialog,
-  loading = false,
+  loading: _loading = false,
 }) => {
   return (
     <>
@@ -49,7 +49,7 @@ export const ComplianceReports: React.FC<ComplianceReportsProps> = ({
         <DialogTitle>
           Journal Légal - Entrées Récentes
           <Typography variant="body2" color="text.secondary">
-            Journal immuable conforme à l'article 286-I-3 bis du CGI
+            Journal immuable conforme à l’article 286-I-3 bis du CGI
           </Typography>
         </DialogTitle>
         

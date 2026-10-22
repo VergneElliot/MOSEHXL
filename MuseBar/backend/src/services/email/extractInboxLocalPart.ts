@@ -39,8 +39,3 @@ export function extractInboxRecipient(rawTo: string): InboxRecipient | null {
         : null,
   };
 }
-
-/** @deprecated prefer extractInboxRecipient */
-export function extractInboxLocalPart(rawTo: string): string | null {
-  return extractInboxRecipient(rawTo)?.slug ?? null;
-}

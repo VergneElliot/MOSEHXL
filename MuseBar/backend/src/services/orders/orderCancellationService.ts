@@ -1,10 +1,3 @@
-import { OrderItemModel, OrderModel, SubBillModel } from '../../models';
-import type { Order } from '../../models/interfaces';
-import { Logger } from '../../utils/logger';
-import { pool } from '../../db/pool';
-import { attachOptionsToOrderItems } from './orderItemOptionsService';
-import { dispatchKitchenTicketsForCancellation } from '../kitchenPrinting/kitchenTicketDispatchService';
-import type { ActorContext } from '../auth/actorContext';
 import {
   auditChangeCancellation,
   auditOrderCancellation,
@@ -12,61 +5,20 @@ import {
   journalOrderCancellation,
   journalTipReversal,
 } from './cancellationActorWrites';
+import {
+  cleanupCompensatingOrders,
+  createChangeReversalOrder,
+  createSaleCancellationRecords,
+  createTipReversalOrder,
+  dispatchCancellationKitchenTickets,
+} from './orderCancellationTickets';
+import { computeCancellationAmounts, validateUnifiedCancellation } from './orderCancellationValidate';
+import type {
+  UnifiedCancellationRequest,
+  UnifiedCancellationResponse,
+} from './orderCancellationTypes';
 
-type CancellationType = 'full' | 'partial' | 'items-only';
-
-export type UnifiedCancellationRequest = {
-  establishmentId: string;
-  orderId: number;
-  reason: string;
-  cancellationType: CancellationType;
-  itemsToCancel?: number[];
-  includeTipReversal?: boolean;
-  userId?: string;
-  performedByDisplayName?: string;
-  ipAddress?: string;
-  userAgent?: string;
-  /** Account + PIN pair that authorised the cancellation. */
-  actor?: ActorContext | null;
-};
-
-export type UnifiedCancellationResponse = {
-  status: number;
-  body: Record<string, unknown>;
-};
-
-const logger = Logger.getInstance();
-
-function salesAttributionFromOrder(order: Order) {
-  return {
-    waiter_user_id: order.waiter_user_id ?? null,
-    waiter_display_name: order.waiter_display_name ?? null,
-    table_label: order.table_label ?? null,
-  };
-}
-
-function appendPerformedByNote(
-  notes: string,
-  performedBy?: { userId?: string; displayName?: string }
-): string {
-  if (!performedBy?.userId) return notes;
-  const label = performedBy.displayName?.trim() || `user #${performedBy.userId}`;
-  return `${notes} | Effectué par: ${label}`;
-}
-
-async function cleanupCompensatingOrders(establishmentId: string, orderIds: number[]) {
-  for (const orderId of orderIds) {
-    try {
-      await OrderModel.delete(orderId, establishmentId);
-    } catch (cleanupError: unknown) {
-      logger.error(
-        `Compensating delete failed for order ${orderId}`,
-        cleanupError instanceof Error ? cleanupError : new Error(String(cleanupError)),
-        'ORDER_PAYMENT'
-      );
-    }
-  }
-}
+export type { UnifiedCancellationRequest, UnifiedCancellationResponse } from './orderCancellationTypes';
 
 export class OrderCancellationService {
   static async cancelUnified(input: UnifiedCancellationRequest): Promise<UnifiedCancellationResponse> {
@@ -84,51 +36,16 @@ export class OrderCancellationService {
       actor,
     } = input;
 
-    const performedBy = { userId, displayName: performedByDisplayName };
-
-    if (!orderId || !reason || typeof reason !== 'string' || !reason.trim()) {
-      return {
-        status: 400,
-        body: { error: 'Order ID and cancellation reason are required' },
-      };
-    }
-
-    const validTypes: CancellationType[] = ['full', 'partial', 'items-only'];
-    if (!validTypes.includes(cancellationType)) {
-      return {
-        status: 400,
-        body: { error: 'Invalid cancellation type' },
-      };
-    }
-
-    const originalOrder = await OrderModel.getById(orderId, establishmentId);
-    if (!originalOrder) {
-      return {
-        status: 404,
-        body: { error: 'Order not found' },
-      };
-    }
-
-    if (originalOrder.status !== 'completed') {
-      return {
-        status: 400,
-        body: { error: 'Only completed orders can be cancelled' },
-      };
-    }
-
-    const salesAttribution = salesAttributionFromOrder(originalOrder);
-
-    const isChangeOperation =
-      originalOrder.total_amount === 0 &&
-      originalOrder.total_tax === 0 &&
-      originalOrder.notes &&
-      originalOrder.notes.includes('Faire de la Monnaie');
-
-    const originalItems = await OrderItemModel.getByOrderId(orderId, establishmentId);
-    const originalSubBills =
-      originalOrder.payment_method === 'split'
-        ? await SubBillModel.getByOrderId(orderId, establishmentId)
-        : [];
+    const validated = await validateUnifiedCancellation(input);
+    if (!validated.ok) return validated.response;
+    const {
+      originalOrder,
+      originalItems,
+      originalSubBills,
+      salesAttribution,
+      isChangeOperation,
+      performedBy,
+    } = validated.data;
 
     if (isChangeOperation) {
       const amount =
@@ -143,25 +60,15 @@ export class OrderCancellationService {
         };
       }
 
-      const reversalOrder = await OrderModel.create(
-        {
-          total_amount: 0,
-          total_tax: 0,
-          payment_method: originalOrder.payment_method,
-          status: 'completed',
-          notes: appendPerformedByNote(
-            `ANNULATION FAIRE DE LA MONNAIE - Raison: ${reason} - Order ID: ${orderId}`,
-            performedBy
-          ),
-          tips: 0,
-          change: -amount,
-          operation_type: 'change',
-          change_amount: -amount,
-          establishment_id: establishmentId,
-          ...salesAttribution,
-        },
-        establishmentId
-      );
+      const reversalOrder = await createChangeReversalOrder({
+        establishmentId,
+        originalOrder,
+        orderId,
+        reason,
+        amount,
+        performedBy,
+        salesAttribution,
+      });
 
       try {
         await journalChangeCancellation({
@@ -197,160 +104,46 @@ export class OrderCancellationService {
       };
     }
 
-    let cancellationAmount = 0;
-    let cancellationTax = 0;
-    let cancelledItems: typeof originalItems = [];
-
-    if (cancellationType === 'full') {
-      const rawTotal = Number(originalOrder.total_amount);
-      const rawTax = Number(originalOrder.total_tax);
-      cancellationAmount = Number.isFinite(rawTotal) ? rawTotal : 0;
-      cancellationTax = Number.isFinite(rawTax) ? rawTax : 0;
-      cancelledItems = originalItems;
-    } else {
-      if (!itemsToCancel || !Array.isArray(itemsToCancel) || itemsToCancel.length === 0) {
-        return {
-          status: 400,
-          body: { error: 'Items to cancel are required for partial cancellation' },
-        };
-      }
-
-      for (const itemId of itemsToCancel) {
-        const item = originalItems.find((i) => i.id === itemId);
-        if (item) {
-          const itemTotal = Number(item.total_price);
-          const itemTax = Number(item.tax_amount);
-          if (Number.isFinite(itemTotal)) cancellationAmount += itemTotal;
-          if (Number.isFinite(itemTax)) cancellationTax += itemTax;
-          cancelledItems.push(item);
-        }
-      }
-    }
-
-    if (!Number.isFinite(cancellationAmount) || !Number.isFinite(cancellationTax)) {
-      return {
-        status: 400,
-        body: {
-          error: 'Invalid cancellation totals computed from original order; data appears corrupted',
-        },
-      };
-    }
-
-    const cancellationOrder = await OrderModel.create(
-      {
-        total_amount: -cancellationAmount,
-        total_tax: -cancellationTax,
-        payment_method: originalOrder.payment_method,
-        status: 'completed',
-        notes: appendPerformedByNote(
-          `ANNULATION - ${cancellationType.toUpperCase()} - Raison: ${reason} - Order ID: ${orderId}`,
-          performedBy
-        ),
-        establishment_id: establishmentId,
-        ...salesAttribution,
-      },
-      establishmentId
+    const amounts = computeCancellationAmounts(
+      cancellationType,
+      originalOrder,
+      originalItems,
+      itemsToCancel
     );
+    if (!amounts.ok) return amounts.response;
+    const { cancellationAmount, cancellationTax, cancelledItems } = amounts;
+
+    const { cancellationOrder, cancellationOrderItems, cancellationSubBills } =
+      await createSaleCancellationRecords({
+        establishmentId,
+        originalOrder,
+        orderId,
+        reason,
+        cancellationType,
+        cancellationAmount,
+        cancellationTax,
+        cancelledItems,
+        originalSubBills,
+        performedBy,
+        salesAttribution,
+      });
     const createdOrderIds: number[] = [cancellationOrder.id];
 
-    const cancellationOrderItems = await Promise.all(
-      cancelledItems.map(async (item) => {
-        return await OrderItemModel.create(
-          {
-            order_id: cancellationOrder.id,
-            product_id: item.product_id,
-            product_name: `[ANNULATION] ${item.product_name}`,
-            quantity: -Math.abs(item.quantity),
-            unit_price: item.unit_price,
-            total_price: -item.total_price,
-            tax_rate: item.tax_rate,
-            tax_amount: -item.tax_amount,
-            happy_hour_applied: item.happy_hour_applied,
-            happy_hour_discount_amount: -item.happy_hour_discount_amount,
-            is_manual_happy_hour: item.is_manual_happy_hour === true,
-          },
-          establishmentId
-        );
-      })
-    );
-
-    let cancellationSubBills: Awaited<ReturnType<typeof SubBillModel.getByOrderId>> = [];
-    if (originalOrder.payment_method === 'split' && originalSubBills.length > 0) {
-      if (cancellationType === 'full') {
-        cancellationSubBills = await Promise.all(
-          originalSubBills.map(async (sb) =>
-            SubBillModel.create(
-              {
-                order_id: cancellationOrder.id,
-                payment_method: sb.payment_method,
-                amount: -sb.amount,
-                status: sb.status,
-              },
-              establishmentId
-            )
-          )
-        );
-      } else if (cancellationAmount > 0) {
-        const totalOriginalSplitAmount = originalSubBills.reduce(
-          (sum, sb) => sum + Number(sb.amount),
-          0
-        );
-
-        if (totalOriginalSplitAmount > 0) {
-          const ratio = cancellationAmount / totalOriginalSplitAmount;
-          let remaining = cancellationAmount;
-
-          cancellationSubBills = await Promise.all(
-            originalSubBills.map(async (sb, index) => {
-              let amountToCancel: number;
-              if (index === originalSubBills.length - 1) {
-                amountToCancel = remaining;
-              } else {
-                amountToCancel = Number((Number(sb.amount) * ratio).toFixed(4));
-                remaining -= amountToCancel;
-              }
-
-              return SubBillModel.create(
-                {
-                  order_id: cancellationOrder.id,
-                  payment_method: sb.payment_method,
-                  amount: -amountToCancel,
-                  status: sb.status,
-                },
-                establishmentId
-              );
-            })
-          );
-        }
-      }
-    }
-
-    let tipReversalOrder: Awaited<ReturnType<typeof OrderModel.create>> | null = null;
     const rawTipAmount =
       includeTipReversal && originalOrder.tips && originalOrder.tips > 0
         ? Number(originalOrder.tips)
         : 0;
     const tipAmountToReverse = Number.isFinite(rawTipAmount) ? rawTipAmount : 0;
     if (tipAmountToReverse > 0) {
-      tipReversalOrder = await OrderModel.create(
-        {
-          total_amount: 0,
-          total_tax: 0,
-          payment_method: originalOrder.payment_method,
-          status: 'completed',
-          notes: appendPerformedByNote(
-            `ANNULATION POURBOIRE - Raison: ${reason} - Order ID: ${orderId}`,
-            performedBy
-          ),
-          tips: 0,
-          change: -tipAmountToReverse,
-          operation_type: 'change',
-          change_amount: -tipAmountToReverse,
-          establishment_id: establishmentId,
-          ...salesAttribution,
-        },
-        establishmentId
-      );
+      const tipReversalOrder = await createTipReversalOrder({
+        establishmentId,
+        originalOrder,
+        orderId,
+        reason,
+        tipAmountToReverse,
+        performedBy,
+        salesAttribution,
+      });
       createdOrderIds.push(tipReversalOrder.id);
 
       try {
@@ -401,14 +194,12 @@ export class OrderCancellationService {
       userAgent,
     });
 
-    const cancelledItemsWithOptions = await attachOptionsToOrderItems(cancelledItems, establishmentId);
-    void dispatchKitchenTicketsForCancellation(pool, {
+    await dispatchCancellationKitchenTickets({
       establishmentId,
       originalOrderId: orderId,
       cancellationType,
-      cancelledItems: cancelledItemsWithOptions,
-      createdByUserId: userId != null ? Number(userId) : undefined,
-      logger,
+      cancelledItems,
+      userId,
     });
 
     return {

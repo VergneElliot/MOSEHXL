@@ -18,7 +18,8 @@ Backend services/kitchenPrinting/ — kitchen ticket dispatch + render
 MuseBar/bridge/                — LAN Node bridge (cloud queue → Epson TM-m30II)
 ```
 
-Routes: `routes/printing.ts`, `routes/printing/`, `routes/kitchenPrinters.ts`
+Routes: `routes/printing.ts`, `routes/printing/`, `routes/kitchenPrinters.ts`. Printing routes
+use `requireAuth` (the `authenticateToken` alias is gone).
 
 ## Print methods
 
@@ -60,7 +61,8 @@ Product → printer mapping: `product_kitchen_printers` table.
 
 ## Email receipts
 
-`services/receipts/EmailReceiptService.ts` — SendGrid templates.
+`EmailReceiptService` is a thin nodemailer adapter used only by `DigitalReceiptService`.
+Production receipt email is SendGrid via `documentEmailService` and printing email routes.
 
 Closure auto-email: `services/documents/closureAutoEmail.ts` attaches Flux 10.3 XML.
 

@@ -113,13 +113,13 @@ export const ConfirmationStep: React.FC<ConfirmationStepProps> = ({
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <Business color="primary" sx={{ mr: 1 }} />
                 <Typography variant="h6">
-                  Informations de l'Établissement
+                  Informations de l’Établissement
                 </Typography>
               </Box>
               <Divider sx={{ mb: 2 }} />
               
               <Typography variant="body2" color="text.secondary" gutterBottom>
-                Nom de l'établissement
+                Nom de l’établissement
               </Typography>
               <Typography variant="body1" sx={{ mb: 2 }}>
                 {setupSummary.businessInfo.name}
@@ -242,9 +242,9 @@ export const ConfirmationStep: React.FC<ConfirmationStepProps> = ({
             }
             label={
               <Typography variant="body2">
-                J'accepte les{' '}
+                J’accepte les{' '}
                 <Typography component="span" variant="body2" color="primary" sx={{ cursor: 'pointer' }}>
-                  conditions générales d'utilisation
+                  conditions générales d’utilisation
                 </Typography>
                 {' '}et la{' '}
                 <Typography component="span" variant="body2" color="primary" sx={{ cursor: 'pointer' }}>
@@ -288,7 +288,7 @@ export const ConfirmationStep: React.FC<ConfirmationStepProps> = ({
       {/* Help Text */}
       <Box sx={{ mt: 3, p: 2, bgcolor: 'info.50', borderRadius: 1, border: 1, borderColor: 'info.200' }}>
         <Typography variant="body2" color="info.800" align="center">
-          🎉 <strong>Dernière étape !</strong> Une fois validé, votre système sera prêt à l'emploi. 
+          🎉 <strong>Dernière étape !</strong> Une fois validé, votre système sera prêt à l’emploi. 
           Vous pourrez modifier ces paramètres ultérieurement dans les réglages.
         </Typography>
       </Box>

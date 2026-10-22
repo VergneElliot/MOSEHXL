@@ -187,7 +187,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, formatCurrency 
       {stats.businessDayPeriod && (
         <Box mt={2}>
           <Typography variant="body2" color="textSecondary" align="center">
-            📅 Période d'activité:{' '}
+            📅 Période d’activité:{' '}
             {formatDateOnly(stats.businessDayPeriod.start)} -{' '}
             {formatDateOnly(stats.businessDayPeriod.end)}
           </Typography>

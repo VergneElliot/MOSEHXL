@@ -1,6 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { ClosureScheduler } from './utils/closureScheduler';
 import { initializeLogger, requestLoggerMiddleware } from './utils/logger';
 import { initializeEnvironment } from './config/environment';
@@ -16,9 +15,6 @@ import type { Request, Response } from 'express';
 import { logSoftwareEventForAllEstablishmentsBestEffort } from './services/legal/softwareEventJournal';
 import { TimeChangeMonitor } from './services/legal/timeChangeMonitor';
 import { pool } from './db/pool';
-
-// Load environment variables
-dotenv.config();
 
 const app = express();
 app.disable('x-powered-by');

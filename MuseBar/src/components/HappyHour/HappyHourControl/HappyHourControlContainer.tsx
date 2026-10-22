@@ -82,7 +82,7 @@ export const HappyHourControlContainer: React.FC<HappyHourControlProps> = ({
         <Grid item xs={12}>
           <Alert severity="info">
             <Typography variant="subtitle2" gutterBottom>
-              Comment fonctionne l'Happy Hour :
+              Comment fonctionne l’Happy Hour :
             </Typography>
             <List dense>
               <ListItem>

@@ -1,10 +1,7 @@
-import dotenv from 'dotenv';
 import { Pool } from 'pg';
 import { initializeEnvironment } from '../config/environment';
 import { DEFAULT_APP_TIMEZONE } from '../config/timezone';
 import { getCurrentEstablishmentId } from '../rls/tenantContext';
-
-dotenv.config();
 
 const config = initializeEnvironment();
 

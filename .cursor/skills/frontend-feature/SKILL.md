@@ -68,6 +68,11 @@ PIN-gated calls: pass `pinActorToken` from `usePinSessions().activeSession?.acto
 
 Non-critical tabs/dialogs: `React.lazy` + `Suspense` via `appLazyTabPanels.tsx`. POS tab stays eager.
 
+## Vite split
+
+`manualChunks` for `react` / `mui` / `i18n`. Login **statically** imports `config/api` — do not
+mix a static and a dynamic import of that module (Vite warns and duplicates the chunk).
+
 ## Related skills
 
 - `auth-and-multi-tenancy` — PIN sessions, permissions, tab visibility

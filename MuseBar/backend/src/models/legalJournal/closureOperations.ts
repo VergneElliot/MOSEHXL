@@ -3,92 +3,30 @@
  * Daily, weekly, monthly, and annual closure bulletin generation
  */
 
-import { ClosureBulletin, VATBreakdown, ClosureType } from './types';
-import { JournalQueries } from './journalQueries';
-import { JournalSigning } from './journalSigning';
-import { pool } from '../../db/pool';
-import { DEFAULT_APP_TIMEZONE } from '../../config/timezone';
-import moment from 'moment-timezone';
+import { ClosureBulletin, ClosureType } from './types';
+import type { DailyClosureMode } from './businessDayPeriod';
 import {
-  getBusinessDayDateKey,
-  getBusinessPeriodBounds,
-  getCurrentBusinessDayPeriod,
-  resolveDailyClosurePeriod,
-  type DailyClosureMode,
-} from './businessDayPeriod';
-import { computePaymentBreakdownFromOrders } from './paymentBreakdown';
-import { ClosureSettingsModel } from '../closureSettings';
+  createDailyClosure,
+  previewDailyClosure,
+  suggestBusinessDayDate,
+} from './closureDailyCreate';
+import {
+  createAnnualClosure,
+  createMonthlyClosure,
+  createWeeklyClosure,
+} from './closurePeriodCreate';
+import {
+  closeOpenClosureBulletin,
+  deleteOpenClosureBulletin,
+  getClosureBulletins,
+  getClosureBulletinsPaginated,
+  setSupersededBy,
+  voidClosureBulletin,
+} from './closureOperationsRead';
 
-function roundTo4(amount: number): number {
-  return Math.round(amount * 10000) / 10000;
-}
-
-function isVat10Rate(rate: number): boolean {
-  // 10%: rate 0.10 or 10; otherwise treat as 20%
-  return rate <= 0.15 || (rate >= 9 && rate <= 11);
-}
-
-function vatFromTtc(ttc: number, rate: 0.1 | 0.2): number {
-  // Reverse extraction from TTC. For exactness and to avoid float drift:
-  // 10% => VAT = TTC / 11 ; 20% => VAT = TTC / 6
-  const denom = rate === 0.1 ? 11 : 6;
-  return roundTo4(ttc / denom);
-}
-
-function computeReconciliation(
-  closureTotals: { transactions: number; amount: number; vat: number },
-  journalTotals: { count: number; amount: number; vat: number }
-): { ok: boolean; details: Record<string, unknown> } {
-  // Amount stays strict at sub-cent; VAT allows €0.01 slack for reverse-TTC vs
-  // journal total_tax float/cent drift (see C-RECON in anomaly register).
-  const RECON_VAT_TOLERANCE_EUR = 0.01;
-  const txDelta = closureTotals.transactions - journalTotals.count;
-  const amountDelta = roundTo4(closureTotals.amount - journalTotals.amount);
-  const vatDelta = roundTo4(closureTotals.vat - journalTotals.vat);
-  const ok =
-    txDelta === 0 &&
-    Math.abs(amountDelta) < 0.0001 &&
-    Math.abs(vatDelta) <= RECON_VAT_TOLERANCE_EUR;
-
-  return {
-    ok,
-    details: {
-      closure_transactions: closureTotals.transactions,
-      journal_sale_transactions: journalTotals.count,
-      transaction_delta: txDelta,
-      closure_total_amount: roundTo4(closureTotals.amount),
-      journal_sale_amount: roundTo4(journalTotals.amount),
-      amount_delta: amountDelta,
-      closure_total_vat: roundTo4(closureTotals.vat),
-      journal_sale_vat: roundTo4(journalTotals.vat),
-      vat_delta: vatDelta,
-      vat_tolerance_eur: RECON_VAT_TOLERANCE_EUR,
-      compared_at: new Date().toISOString(),
-    },
-  };
-}
-
-/** Exported for unit tests only. */
-export const __testComputeReconciliation = computeReconciliation;
+export { __testComputeReconciliation } from './closureOperationsMath';
 
 export class ClosureOperations {
-  /** Business-day cut time and timezone used by every closure period. */
-  private static async getPeriodSettings(
-    establishmentId: string
-  ): Promise<{ cutTime: string; tz: string }> {
-    const settings = await ClosureSettingsModel.getClosureSettings(establishmentId);
-    return {
-      cutTime: settings.daily_closure_time || '02:00',
-      tz: settings.timezone || DEFAULT_APP_TIMEZONE,
-    };
-  }
-
-  /**
-   * Create daily closure bulletin for one establishment (multi-tenant: only that establishment's orders).
-   * Period uses establishment closure settings (daily_closure_time + timezone):
-   * - business_day (default): cut→next cut for `date`, clamped after last closed DAILY
-   * - close_now: last closed DAILY end → now
-   */
   static async createDailyClosure(
     date: Date,
     establishmentId: string,
@@ -98,256 +36,37 @@ export class ClosureOperations {
     closeImmediately = true,
     mode: DailyClosureMode = 'business_day'
   ): Promise<ClosureBulletin> {
-    const settings = await ClosureSettingsModel.getClosureSettings(establishmentId);
-    const tz = timezone || settings.timezone || DEFAULT_APP_TIMEZONE;
-    const cutTime = settings.daily_closure_time || '02:00';
-    const lastClosedPeriodEnd = await JournalQueries.getLastClosedDailyPeriodEnd(establishmentId);
-
-    const { start, end } = resolveDailyClosurePeriod({
-      mode,
+    return createDailyClosure(
       date,
-      closureTime: cutTime,
-      timezone: tz,
-      lastClosedPeriodEnd,
+      establishmentId,
+      timezone,
       force,
-    });
-
-    // Check if closure already exists for this establishment
-    const exists = await JournalQueries.closureBulletinExists('DAILY', start.toDate(), end.toDate(), establishmentId);
-    if (exists && !force) {
-      throw new Error('Daily closure bulletin already exists for this period');
-    }
-
-    // Get orders for the period for this establishment only (multi-tenant)
-    const ordersQuery = `
-      SELECT * FROM orders 
-      WHERE created_at >= $1 AND created_at <= $2 
-      AND status IN ('completed', 'paid')
-      AND establishment_id = $3
-      ORDER BY created_at ASC
-    `;
-    const ordersResult = await pool.query(ordersQuery, [start.toDate(), end.toDate(), establishmentId]);
-    const orders = ordersResult.rows;
-    const orderIds = orders.map((o: { id: number }) => o.id);
-
-    const splitOrderIds = orders.filter((o: { payment_method: string }) => o.payment_method === 'split').map((o: { id: number }) => o.id);
-    let subBills: Array<{ order_id: number; payment_method: string; amount: string | number }> = [];
-    if (splitOrderIds.length > 0) {
-      const subBillsResult = await pool.query(
-        'SELECT order_id, payment_method, amount FROM sub_bills WHERE order_id = ANY($1)',
-        [splitOrderIds]
-      );
-      subBills = subBillsResult.rows;
-    }
-
-    const { paymentBreakdown } = computePaymentBreakdownFromOrders(orders, subBills);
-    const totalTransactions = orders.length;
-
-    // An empty daily bulletin is almost always the wrong day rather than a real
-    // day off, and once closed it blankets that period. Make the operator confirm.
-    if (totalTransactions === 0 && !force) {
-      throw new Error(
-        `Aucune vente entre le ${start.format('DD/MM/YYYY HH:mm')} et le ` +
-          `${end.format('DD/MM/YYYY HH:mm')}. Vérifiez la date : après l’heure de coupure ` +
-          `(${cutTime}), la nuit qui vient de s’achever porte la date de la veille. ` +
-          'Cochez « Forcer la création » s’il s’agit réellement d’une journée sans vente.'
-      );
-    }
-
-    const vatBreakdown = await getExactVatBreakdownFromOrderItems(pool, orderIds);
-    const computedTotalAmount = vatBreakdown.vat_10.ttc + vatBreakdown.vat_20.ttc;
-    const computedTotalVat = vatBreakdown.vat_10.vat + vatBreakdown.vat_20.vat;
-
-    const netTipsTotal = orders.reduce((sum: number, order: { tips?: string | number }) => sum + parseFloat(String(order.tips || '0')), 0);
-    const netChangeTotal = orders.reduce((sum: number, order: { change?: string | number }) => sum + parseFloat(String(order.change || '0')), 0);
-    const tipsTotal = Math.max(0, netTipsTotal);
-    const changeTotal = Math.max(0, netChangeTotal);
-
-    // Get legal journal entries for sequence calculation
-    const entries = await JournalQueries.getEntriesForPeriod(establishmentId, start.toDate(), end.toDate());
-    const firstSequence = entries.length > 0 ? Math.min(...entries.map((e) => e.sequence_number)) : 0;
-    const lastSequence = entries.length > 0 ? Math.max(...entries.map((e) => e.sequence_number)) : 0;
-    const journalSaleSummary = await JournalQueries.getSaleSummaryForPeriod(
-      establishmentId,
-      start.toDate(),
-      end.toDate()
-    );
-    const reconciliation = computeReconciliation(
-      { transactions: totalTransactions, amount: computedTotalAmount, vat: computedTotalVat },
-      journalSaleSummary
-    );
-
-    // Generate closure hash
-    const closureData = `DAILY|${date.toISOString().split('T')[0]}|${totalTransactions}|${computedTotalAmount}|${computedTotalVat}|${firstSequence}|${lastSequence}`;
-    const closureHash = JournalSigning.generateClosureHash(closureData);
-
-    if (!force) {
-      const sameDay = await JournalQueries.findClosedDailyBulletinsForBusinessDay(
-        establishmentId,
-        start.toDate(),
-        tz
-      );
-      for (const existing of sameDay) {
-        if (existing.closure_hash === closureHash) {
-          throw new Error('Daily closure bulletin already exists for this period');
-        }
-        if (existing.total_amount >= computedTotalAmount) {
-          throw new Error(
-            'Daily closure bulletin already exists with equal or higher amount for this day'
-          );
-        }
-      }
-    }
-
-    const lastFondDeCaisse = await JournalQueries.getLastFondDeCaisse(establishmentId);
-    const fondDeCaisseToStore = Number.isFinite(fondDeCaisse as number) ? (fondDeCaisse as number) : (lastFondDeCaisse ?? 0);
-
-    // Insert closure bulletin (scoped to this establishment)
-    return await JournalQueries.insertClosureBulletin(
-      'DAILY',
-      start.toDate(),
-      end.toDate(),
-      totalTransactions,
-      fondDeCaisseToStore,
-      computedTotalAmount,
-      computedTotalVat,
-      vatBreakdown,
-      paymentBreakdown,
-      tipsTotal,
-      changeTotal,
-      journalSaleSummary.count,
-      journalSaleSummary.amount,
-      journalSaleSummary.vat,
-      reconciliation.ok,
-      reconciliation.details,
-      firstSequence,
-      lastSequence,
-      closureHash,
-      establishmentId,
-      closeImmediately
+      fondDeCaisse,
+      closeImmediately,
+      mode
     );
   }
 
-  /**
-   * Suggest the YYYY-MM-DD to prefill for business_day mode:
-   * the business day of the first uncovered paid sale after the last closed DAILY,
-   * else the previous completed business day (not the in-progress one).
-   */
-  static async suggestBusinessDayDate(establishmentId: string): Promise<{
-    date: string;
-    closure_time: string;
-    timezone: string;
-    reason: 'unclosed_sales' | 'previous_business_day';
-  }> {
-    const { cutTime, tz } = await this.getPeriodSettings(establishmentId);
-    const lastClosedPeriodEnd = await JournalQueries.getLastClosedDailyPeriodEnd(establishmentId);
-    const now = new Date();
-    const searchStart = lastClosedPeriodEnd
-      ? new Date(lastClosedPeriodEnd.getTime() + 1)
-      : moment.tz(now, tz).subtract(90, 'days').toDate();
-
-    const firstSale = await pool.query(
-      `
-        SELECT MIN(created_at) AS first_at
-        FROM orders
-        WHERE establishment_id = $1
-          AND status IN ('completed', 'paid')
-          AND created_at >= $2
-          AND created_at <= $3
-      `,
-      [establishmentId, searchStart, now]
-    );
-    const firstAt = firstSale.rows[0]?.first_at as Date | string | undefined;
-    if (firstAt) {
-      const instant = firstAt instanceof Date ? firstAt : new Date(firstAt);
-      return {
-        date: getBusinessDayDateKey(instant, cutTime, tz),
-        closure_time: cutTime,
-        timezone: tz,
-        reason: 'unclosed_sales',
-      };
-    }
-
-    const current = getCurrentBusinessDayPeriod(cutTime, tz);
-    const previousStart = current.start.clone().subtract(1, 'day');
-    return {
-      date: previousStart.format('YYYY-MM-DD'),
-      closure_time: cutTime,
-      timezone: tz,
-      reason: 'previous_business_day',
-    };
+  static async suggestBusinessDayDate(establishmentId: string) {
+    return suggestBusinessDayDate(establishmentId);
   }
 
-  /**
-   * Resolve what a daily closure would cover, without writing anything.
-   * Lets the POS show the exact period and totals before the operator commits,
-   * which is what makes a wrong-day closure impossible to miss.
-   */
   static async previewDailyClosure(
     date: Date,
     establishmentId: string,
     mode: DailyClosureMode = 'business_day',
     force = false
-  ): Promise<{
-    period_start: string;
-    period_end: string;
-    total_transactions: number;
-    total_amount: number;
-    closure_time: string;
-    timezone: string;
-  }> {
-    const settings = await ClosureSettingsModel.getClosureSettings(establishmentId);
-    const tz = settings.timezone || DEFAULT_APP_TIMEZONE;
-    const cutTime = settings.daily_closure_time || '02:00';
-    const lastClosedPeriodEnd = await JournalQueries.getLastClosedDailyPeriodEnd(establishmentId);
-
-    const { start, end } = resolveDailyClosurePeriod({
-      mode,
-      date,
-      closureTime: cutTime,
-      timezone: tz,
-      lastClosedPeriodEnd,
-      force,
-    });
-
-    const result = await pool.query(
-      `
-        SELECT COUNT(*)::int AS n, COALESCE(SUM(total_amount), 0) AS total
-        FROM orders
-        WHERE created_at >= $1 AND created_at <= $2
-          AND status IN ('completed', 'paid')
-          AND establishment_id = $3
-      `,
-      [start.toDate(), end.toDate(), establishmentId]
-    );
-    const row = result.rows[0] as { n?: number; total?: string | number } | undefined;
-
-    return {
-      period_start: start.toISOString(),
-      period_end: end.toISOString(),
-      total_transactions: Number(row?.n ?? 0),
-      total_amount: parseFloat(String(row?.total ?? 0)) || 0,
-      closure_time: cutTime,
-      timezone: tz,
-    };
+  ) {
+    return previewDailyClosure(date, establishmentId, mode, force);
   }
 
-  /**
-   * Annul a closed bulletin issued in error and optionally record which
-   * corrective bulletin replaces it. The original is retained in full.
-   */
   static async voidClosureBulletin(
     closureBulletinId: number,
     establishmentId: string,
     reason: string,
     voidedBy: string
   ): Promise<ClosureBulletin | null> {
-    return await JournalQueries.voidClosureBulletin(
-      closureBulletinId,
-      establishmentId,
-      reason,
-      voidedBy
-    );
+    return voidClosureBulletin(closureBulletinId, establishmentId, reason, voidedBy);
   }
 
   static async setSupersededBy(
@@ -355,16 +74,9 @@ export class ClosureOperations {
     supersedingBulletinId: number,
     establishmentId: string
   ): Promise<void> {
-    return await JournalQueries.setSupersededBy(
-      voidedBulletinId,
-      supersedingBulletinId,
-      establishmentId
-    );
+    return setSupersededBy(voidedBulletinId, supersedingBulletinId, establishmentId);
   }
 
-  /**
-   * Create weekly closure bulletin for one establishment.
-   */
   static async createWeeklyClosure(
     date: Date,
     establishmentId: string,
@@ -372,30 +84,9 @@ export class ClosureOperations {
     fondDeCaisse?: number,
     closeImmediately = true
   ): Promise<ClosureBulletin> {
-    const { cutTime, tz } = await this.getPeriodSettings(establishmentId);
-    const monday = moment.tz(date, tz).startOf('isoWeek');
-    const { start, end } = getBusinessPeriodBounds(
-      monday,
-      monday.clone().add(7, 'days'),
-      cutTime,
-      tz
-    );
-
-    return await this.createPeriodClosure(
-      'WEEKLY',
-      start.toDate(),
-      end.toDate(),
-      date,
-      establishmentId,
-      force,
-      fondDeCaisse,
-      closeImmediately
-    );
+    return createWeeklyClosure(date, establishmentId, force, fondDeCaisse, closeImmediately);
   }
 
-  /**
-   * Create monthly closure bulletin for one establishment.
-   */
   static async createMonthlyClosure(
     date: Date,
     establishmentId: string,
@@ -403,30 +94,9 @@ export class ClosureOperations {
     fondDeCaisse?: number,
     closeImmediately = true
   ): Promise<ClosureBulletin> {
-    const { cutTime, tz } = await this.getPeriodSettings(establishmentId);
-    const monthStart = moment.tz(date, tz).startOf('month');
-    const { start, end } = getBusinessPeriodBounds(
-      monthStart,
-      monthStart.clone().add(1, 'month'),
-      cutTime,
-      tz
-    );
-
-    return await this.createPeriodClosure(
-      'MONTHLY',
-      start.toDate(),
-      end.toDate(),
-      date,
-      establishmentId,
-      force,
-      fondDeCaisse,
-      closeImmediately
-    );
+    return createMonthlyClosure(date, establishmentId, force, fondDeCaisse, closeImmediately);
   }
 
-  /**
-   * Create annual closure bulletin for one establishment.
-   */
   static async createAnnualClosure(
     date: Date,
     establishmentId: string,
@@ -434,149 +104,28 @@ export class ClosureOperations {
     fondDeCaisse?: number,
     closeImmediately = true
   ): Promise<ClosureBulletin> {
-    // Rolling year ending at the selected date, which is treated as the first day
-    // *outside* the period: selecting 01/08/2026 yields 01/08/2025 → 01/08/2026 at
-    // the cut time, i.e. exactly one year with no split night and no extra day.
-    // Annual bulletins are intentionally not tied to the calendar year: fiscal
-    // years can end on any date and venues may go live mid-year.
-    const { cutTime, tz } = await this.getPeriodSettings(establishmentId);
-    const endExclusive = moment.tz(date, tz).startOf('day');
-    const { start, end } = getBusinessPeriodBounds(
-      endExclusive.clone().subtract(1, 'year'),
-      endExclusive,
-      cutTime,
-      tz
-    );
-
-    return await this.createPeriodClosure(
-      'ANNUAL',
-      start.toDate(),
-      end.toDate(),
-      date,
-      establishmentId,
-      force,
-      fondDeCaisse,
-      closeImmediately
-    );
-  }
-
-  /**
-   * Generic period closure creation for one establishment (multi-tenant).
-   */
-  private static async createPeriodClosure(
-    closureType: ClosureType,
-    startDate: Date,
-    endDate: Date,
-    referenceDate: Date,
-    establishmentId: string,
-    force = false,
-    fondDeCaisse?: number,
-    closeImmediately = true
-  ): Promise<ClosureBulletin> {
-    // Check if closure already exists for this establishment
-    const exists = await JournalQueries.closureBulletinExists(closureType, startDate, endDate, establishmentId);
-    if (exists && !force) {
-      throw new Error(`${closureType.toLowerCase()} closure bulletin already exists for this period`);
-    }
-
-    // Get orders for the period for this establishment only
-    const ordersQuery = `
-      SELECT * FROM orders 
-      WHERE created_at >= $1 AND created_at <= $2 
-      AND status IN ('completed', 'paid')
-      AND establishment_id = $3
-      ORDER BY created_at ASC
-    `;
-    const ordersResult = await pool.query(ordersQuery, [startDate, endDate, establishmentId]);
-    const orders = ordersResult.rows;
-    const orderIds = orders.map((o: { id: number }) => o.id);
-
-    const splitOrderIds = orders.filter((o: { payment_method: string }) => o.payment_method === 'split').map((o: { id: number }) => o.id);
-    let subBills: Array<{ order_id: number; payment_method: string; amount: string | number }> = [];
-    if (splitOrderIds.length > 0) {
-      const subBillsResult = await pool.query(
-        'SELECT order_id, payment_method, amount FROM sub_bills WHERE order_id = ANY($1)',
-        [splitOrderIds]
-      );
-      subBills = subBillsResult.rows;
-    }
-
-    const { paymentBreakdown } = computePaymentBreakdownFromOrders(orders, subBills);
-    const totalTransactions = orders.length;
-    const vatBreakdown = await getExactVatBreakdownFromOrderItems(pool, orderIds);
-    const computedTotalAmount = vatBreakdown.vat_10.ttc + vatBreakdown.vat_20.ttc;
-    const computedTotalVat = vatBreakdown.vat_10.vat + vatBreakdown.vat_20.vat;
-    const tipsTotal = Math.max(0, orders.reduce((sum: number, order: { tips?: string | number }) => sum + parseFloat(String(order.tips || '0')), 0));
-    const changeTotal = Math.max(0, orders.reduce((sum: number, order: { change?: string | number }) => sum + parseFloat(String(order.change || '0')), 0));
-
-    // Get journal sequence range
-    const entries = await JournalQueries.getEntriesForPeriod(establishmentId, startDate, endDate);
-    const firstSequence = entries.length > 0 ? Math.min(...entries.map(e => e.sequence_number)) : 0;
-    const lastSequence = entries.length > 0 ? Math.max(...entries.map(e => e.sequence_number)) : 0;
-    const journalSaleSummary = await JournalQueries.getSaleSummaryForPeriod(
-      establishmentId,
-      startDate,
-      endDate
-    );
-    const reconciliation = computeReconciliation(
-      { transactions: totalTransactions, amount: computedTotalAmount, vat: computedTotalVat },
-      journalSaleSummary
-    );
-
-    // Generate closure hash
-    const closureData = `${closureType}|${startDate.toISOString()}|${endDate.toISOString()}|${totalTransactions}|${computedTotalAmount}|${computedTotalVat}|${firstSequence}|${lastSequence}`;
-    const closureHash = JournalSigning.generateClosureHash(closureData);
-
-    const lastFondDeCaisse = await JournalQueries.getLastFondDeCaisse(establishmentId);
-    const fondDeCaisseToStore = Number.isFinite(fondDeCaisse as number) ? (fondDeCaisse as number) : (lastFondDeCaisse ?? 0);
-
-    return await JournalQueries.insertClosureBulletin(
-      closureType,
-      startDate,
-      endDate,
-      totalTransactions,
-      fondDeCaisseToStore,
-      computedTotalAmount,
-      computedTotalVat,
-      vatBreakdown,
-      paymentBreakdown,
-      tipsTotal,
-      changeTotal,
-      journalSaleSummary.count,
-      journalSaleSummary.amount,
-      journalSaleSummary.vat,
-      reconciliation.ok,
-      reconciliation.details,
-      firstSequence,
-      lastSequence,
-      closureHash,
-      establishmentId,
-      closeImmediately
-    );
+    return createAnnualClosure(date, establishmentId, force, fondDeCaisse, closeImmediately);
   }
 
   static async closeOpenClosureBulletin(
     closureBulletinId: number,
     establishmentId: string
   ): Promise<ClosureBulletin | null> {
-    return await JournalQueries.closeOpenClosureBulletin(closureBulletinId, establishmentId);
+    return closeOpenClosureBulletin(closureBulletinId, establishmentId);
   }
 
   static async deleteOpenClosureBulletin(
     closureBulletinId: number,
     establishmentId: string
   ): Promise<boolean> {
-    return await JournalQueries.deleteOpenClosureBulletin(closureBulletinId, establishmentId);
+    return deleteOpenClosureBulletin(closureBulletinId, establishmentId);
   }
 
-  /**
-   * Get closure bulletins for one establishment (optionally filtered by type).
-   */
   static async getClosureBulletins(
     establishmentId: string,
     type?: ClosureType
   ): Promise<ClosureBulletin[]> {
-    return await JournalQueries.getClosureBulletins(establishmentId, type);
+    return getClosureBulletins(establishmentId, type);
   }
 
   static async getClosureBulletinsPaginated(
@@ -584,57 +133,6 @@ export class ClosureOperations {
     type?: ClosureType,
     opts?: { limit?: number; offset?: number }
   ): Promise<{ bulletins: ClosureBulletin[]; total: number }> {
-    return await JournalQueries.getClosureBulletinsPaginated(establishmentId, type, opts);
+    return getClosureBulletinsPaginated(establishmentId, type, opts);
   }
 }
-
-/**
- * Build exact VAT breakdown from order_items (no rounding).
- * Used for closure bulletins so stored totals match sum of order tax amounts.
- * tax_rate in DB may be 0.10/0.20 (decimal) or 10/20 (percentage); we bucket by 10% vs 20%.
- */
-async function getExactVatBreakdownFromOrderItems(
-  pool: { query: (q: string, values?: unknown[]) => Promise<{ rows: unknown[] }> },
-  orderIds: number[]
-): Promise<VATBreakdown> {
-  const vatBreakdown: VATBreakdown = {
-    vat_10: { amount: 0, vat: 0, ttc: 0 },
-    vat_20: { amount: 0, vat: 0, ttc: 0 }
-  };
-  if (orderIds.length === 0) return vatBreakdown;
-
-  const itemsResult = await pool.query(
-    'SELECT total_price, tax_rate FROM order_items WHERE order_id = ANY($1)',
-    [orderIds]
-  );
-  const items = itemsResult.rows as Array<{ total_price: string | number; tax_rate: string | number }>;
-
-  let ttc10 = 0;
-  let ttc20 = 0;
-  for (const item of items) {
-    const totalPrice = parseFloat(String(item.total_price ?? 0));
-    const rate = parseFloat(String(item.tax_rate ?? 0.2));
-    if (isVat10Rate(rate)) {
-      ttc10 += totalPrice;
-    } else {
-      ttc20 += totalPrice;
-    }
-  }
-
-  // Compute VAT/HT from the bucket totals (audit-friendly, avoids per-line rounding drift)
-  const vat10 = vatFromTtc(ttc10, 0.1);
-  const vat20 = vatFromTtc(ttc20, 0.2);
-  const ht10 = roundTo4(ttc10 - vat10);
-  const ht20 = roundTo4(ttc20 - vat20);
-
-  vatBreakdown.vat_10.ttc = roundTo4(ttc10);
-  vatBreakdown.vat_10.vat = vat10;
-  vatBreakdown.vat_10.amount = ht10;
-
-  vatBreakdown.vat_20.ttc = roundTo4(ttc20);
-  vatBreakdown.vat_20.vat = vat20;
-  vatBreakdown.vat_20.amount = ht20;
-
-  return vatBreakdown;
-}
-

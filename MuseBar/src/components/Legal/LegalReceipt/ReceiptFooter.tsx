@@ -32,7 +32,7 @@ export const ReceiptFooter: React.FC<ReceiptFooterProps> = ({
       {/* VAT Breakdown */}
       <Box sx={{ mb: 2 }}>
         <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-          BREVET D'IMPÔT SUR LA VALEUR AJOUTÉE (TVA)
+          BREVET D’IMPÔT SUR LA VALEUR AJOUTÉE (TVA)
         </Typography>
         
         <Grid container spacing={1}>

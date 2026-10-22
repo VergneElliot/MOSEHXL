@@ -29,13 +29,19 @@ function remote(partial: Partial<ActivePinSessionDto> & Pick<ActivePinSessionDto
   };
 }
 
+function firstSession(state: PinSessionsState) {
+  const session = state.sessions[0];
+  if (!session) throw new Error('expected a session');
+  return session;
+}
+
 describe('mergeServerSessions', () => {
   it('shows remote badges without a local token as locked placeholders', () => {
     const local: PinSessionsState = { sessions: [], activeSessionId: null };
     const next = mergeServerSessions(local, [remote({ id: 'sid-1', user_id: 9 })]);
     expect(next.sessions).toHaveLength(1);
     expect(next.sessions[0]?.id).toBe('sid-1');
-    expect(isSessionUnlocked(next.sessions[0]!)).toBe(false);
+    expect(isSessionUnlocked(firstSession(next))).toBe(false);
     expect(next.activeSessionId).toBeNull();
   });
 
@@ -52,7 +58,7 @@ describe('mergeServerSessions', () => {
       activeSessionId: 'sid-1',
     };
     const next = mergeServerSessions(local, [remote({ id: 'sid-1', user_id: 9 })]);
-    expect(isSessionUnlocked(next.sessions[0]!)).toBe(true);
+    expect(isSessionUnlocked(firstSession(next))).toBe(true);
     expect(next.sessions[0]?.cart).toHaveLength(1);
     expect(next.activeSessionId).toBe('sid-1');
   });
@@ -123,7 +129,7 @@ describe('mergeServerSessions', () => {
     ]);
     expect(next.sessions).toHaveLength(1);
     expect(next.sessions[0]?.id).toBe('sid-canonical');
-    expect(isSessionUnlocked(next.sessions[0]!)).toBe(true);
+    expect(isSessionUnlocked(firstSession(next))).toBe(true);
     expect(next.sessions[0]?.cart).toHaveLength(1);
     expect(next.activeSessionId).toBe('sid-canonical');
   });

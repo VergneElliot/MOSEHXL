@@ -88,7 +88,10 @@ export const FloorMapDialog: React.FC<FloorMapDialogProps> = ({
   }, [tables]);
 
   const activePlans = useMemo(() => plans.filter((p) => p.is_active), [plans]);
-  const planTables = selectedPlanId != null ? byPlan.get(selectedPlanId) ?? [] : [];
+  const planTables = useMemo(
+    () => (selectedPlanId != null ? byPlan.get(selectedPlanId) ?? [] : []),
+    [selectedPlanId, byPlan]
+  );
 
   const canvasTables: FloorCanvasTable[] = useMemo(
     () =>

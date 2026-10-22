@@ -138,9 +138,9 @@ export const HappyHourStatus: React.FC<HappyHourStatusProps> = ({
         {!settings.isEnabled && (
           <Alert severity="warning" sx={{ mt: 2 }}>
             <Typography variant="body2">
-              <strong>Attention:</strong> L'Happy Hour automatique est désactivé.
+              <strong>Attention:</strong> L’Happy Hour automatique est désactivé.
               <br />
-              Activez-le dans la configuration pour qu'il fonctionne selon les horaires.
+              Activez-le dans la configuration pour qu’il fonctionne selon les horaires.
             </Typography>
           </Alert>
         )}

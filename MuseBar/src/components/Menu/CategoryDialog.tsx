@@ -55,7 +55,7 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
           </Typography>
           {isEditing && (
             <Typography variant="body2" color="textSecondary">
-              Modification de la catégorie "{editingCategory.name}"
+              {`Modification de la catégorie "${editingCategory.name}"`}
             </Typography>
           )}
         </DialogTitle>

@@ -24,7 +24,8 @@ export function hitTestFloorTable(
 ): FloorCanvasTable | null {
   // Top-most: higher z ≈ later in list; walk reverse
   for (let i = tables.length - 1; i >= 0; i -= 1) {
-    const t = tables[i]!;
+    const t = tables[i];
+    if (!t) continue;
     if (excludeId != null && t.id === excludeId) continue;
     if (t.disabled) continue;
     if (

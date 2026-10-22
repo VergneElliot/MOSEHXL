@@ -101,7 +101,7 @@ This bypasses RLS during DDL/DML. Application queries use tenant context instead
 | Deploy via manual SQL in prod | Use migration chain |
 | UPDATE/DELETE legal_journal via migration | Fiscal compliance |
 | Drop immutability triggers without recreating | Legal compliance |
-| Assume schema-per-tenant via `schema_name` | Deprecated — use `establishment_id` + RLS |
+| Assume schema-per-tenant via `schema_name` or `SchemaOperations` | Deleted — shared schema + RLS (`establishment_id`) |
 
 ## Production deploy
 

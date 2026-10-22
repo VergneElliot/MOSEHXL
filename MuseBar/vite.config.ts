@@ -52,6 +52,22 @@ export default defineConfig({
   build: {
     outDir: 'build',
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        // Vendor code changes rarely; keeping it in its own chunks lets cashier PCs reuse the
+        // cached copy across app releases and keeps the app chunk under Rollup's 500 kB warning.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          if (/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//.test(id)) {
+            return 'vendor-react';
+          }
+          if (/node_modules\/@mui\/icons-material\//.test(id)) return 'vendor-mui-icons';
+          if (/node_modules\/(@mui|@emotion)\//.test(id)) return 'vendor-mui';
+          if (/node_modules\/(i18next|react-i18next)\//.test(id)) return 'vendor-i18n';
+          return undefined;
+        },
+      },
+    },
   },
   server: {
     port: 3000,

@@ -43,7 +43,7 @@ Live status: [docs/CURRENT-TRUTH.md](docs/CURRENT-TRUTH.md), [DEVELOPMENT-STATE.
 3. **Never edit applied migrations** — create a new migration; checksum verification blocks edits.
 4. **Backend auth is mandatory** — frontend permission UI is UX only; every mutating route needs `requireAuth` + permission/PIN gates.
 5. **Parameterized SQL only** — `$1`, `$2`; whitelist dynamic column names via allowlists.
-6. **No monolithic files** — one file per component or concern, **400 lines max** (target ≤ 250). A new responsibility means a new file, whatever the current size. Never add code to a file listed in `scripts/module-size-baseline.json`; put it in a new module. Enforced by `npm run check:module-size` in pre-commit and CI. Details: `.cursor/skills/code-hygiene/SKILL.md`.
+6. **No monolithic files** — one file per component or concern, **400 lines max** (target ≤ 250). A new responsibility means a new file, whatever the current size. The size baseline is empty after the October 2026 hygiene pass; do not grow a file past 400, and do not add to a file already over ~250 if a seam exists. Enforced by `npm run check:module-size` in pre-commit and CI. Details: `.cursor/skills/code-hygiene/SKILL.md`.
 
 ## Permission tiers
 

@@ -11,6 +11,7 @@ import {
   Checkbox,
 } from '@mui/material';
 import { apiService } from '../../services/apiService';
+import { apiConfig } from '../../config/api';
 import type { User } from '../../types';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from '../common/LanguageSwitcher';
@@ -38,7 +39,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   useEffect(() => {
     const initApi = async () => {
       try {
-        const { apiConfig } = await import('../../config/api');
         await apiConfig.initialize();
       } catch {
         // Config init failure will surface when user submits login

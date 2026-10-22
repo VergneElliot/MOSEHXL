@@ -3,12 +3,12 @@ import request from 'supertest';
 import express from 'express';
 import { generateToken } from '../auth';
 import { errorHandler } from '../../middleware/errorHandler';
+import { pinActorTokenFor, withPinActor } from '../../test/pinActorTestUtils';
 
 const EST = '11111111-1111-4111-8111-111111111111';
 
 const mocks = vi.hoisted(() => ({
   poolQuery: vi.fn(),
-  getUserPermissions: vi.fn(),
   logAction: vi.fn(),
 }));
 
@@ -17,12 +17,6 @@ vi.mock('../../db/pool', () => ({
   default: express(),
   pool: {
     query: mocks.poolQuery,
-  },
-}));
-
-vi.mock('../../models/user', () => ({
-  UserModel: {
-    getUserPermissions: mocks.getUserPermissions,
   },
 }));
 
@@ -59,10 +53,13 @@ function staffToken() {
   );
 }
 
+function pinWith(permissions: string[]) {
+  return pinActorTokenFor({ id: 42, establishmentId: EST, permissions });
+}
+
 describe('orderAudit log endpoint permission and identity binding', () => {
   beforeEach(() => {
     mocks.poolQuery.mockReset();
-    mocks.getUserPermissions.mockReset();
     mocks.logAction.mockReset();
 
     mocks.poolQuery.mockImplementation(async (query: unknown) => {
@@ -82,9 +79,7 @@ describe('orderAudit log endpoint permission and identity binding', () => {
     });
   });
 
-  it('denies POST /audit/log when access_pos is missing', async () => {
-    mocks.getUserPermissions.mockResolvedValue([]);
-
+  it('denies POST /audit/log with the account JWT alone (no PIN actor)', async () => {
     const res = await request(app)
       .post('/audit/log')
       .set('Authorization', `Bearer ${staffToken()}`)
@@ -97,22 +92,43 @@ describe('orderAudit log endpoint permission and identity binding', () => {
       });
 
     expect(res.status).toBe(403);
+    expect(res.body.code).toBe('PIN_ACTOR_REQUIRED');
+    expect(mocks.logAction).not.toHaveBeenCalled();
+  });
+
+  it('denies POST /audit/log when access_pos is missing', async () => {
+    const res = await withPinActor(
+      request(app)
+        .post('/audit/log')
+        .set('Authorization', `Bearer ${staffToken()}`)
+        .send({
+          actionType: 'ORDER_CREATED',
+          resourceType: 'ORDER',
+          resourceId: 123,
+          actionDetails: { note: 'x' },
+          userId: '999',
+        }),
+      pinWith([])
+    );
+
+    expect(res.status).toBe(403);
     expect(mocks.logAction).not.toHaveBeenCalled();
   });
 
   it('uses session user id and ignores body userId when access_pos is granted', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_pos']);
-
-    const res = await request(app)
-      .post('/audit/log')
-      .set('Authorization', `Bearer ${staffToken()}`)
-      .send({
-        actionType: 'ORDER_CREATED',
-        resourceType: 'ORDER',
-        resourceId: 123,
-        actionDetails: { note: 'x' },
-        userId: '999',
-      });
+    const res = await withPinActor(
+      request(app)
+        .post('/audit/log')
+        .set('Authorization', `Bearer ${staffToken()}`)
+        .send({
+          actionType: 'ORDER_CREATED',
+          resourceType: 'ORDER',
+          resourceId: 123,
+          actionDetails: { note: 'x' },
+          userId: '999',
+        }),
+      pinWith(['access_pos'])
+    );
 
     expect(res.status).toBe(201);
     expect(mocks.logAction).toHaveBeenCalledWith(
@@ -126,18 +142,20 @@ describe('orderAudit log endpoint permission and identity binding', () => {
   });
 
   it('returns unified 500 payload when audit log persistence fails', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_pos']);
     mocks.logAction.mockRejectedValue(new Error('db exploded'));
 
-    const res = await request(app)
-      .post('/audit/log')
-      .set('Authorization', `Bearer ${staffToken()}`)
-      .send({
-        actionType: 'ORDER_CREATED',
-        resourceType: 'ORDER',
-        resourceId: 123,
-        actionDetails: { note: 'x' },
-      });
+    const res = await withPinActor(
+      request(app)
+        .post('/audit/log')
+        .set('Authorization', `Bearer ${staffToken()}`)
+        .send({
+          actionType: 'ORDER_CREATED',
+          resourceType: 'ORDER',
+          resourceId: 123,
+          actionDetails: { note: 'x' },
+        }),
+      pinWith(['access_pos'])
+    );
 
     expect(res.status).toBe(500);
     expect(res.body.success).toBe(false);

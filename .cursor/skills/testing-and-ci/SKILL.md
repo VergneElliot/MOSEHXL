@@ -29,10 +29,12 @@ cd MuseBar/backend && npx vitest run src/routes/floor.routes.test.ts
 
 ## Frameworks
 
+Exact versions live in `MuseBar/package.json` and `MuseBar/backend/package.json`.
+
 | Package | Framework |
 |---------|-----------|
-| Frontend | Vitest 3 + Testing Library + jsdom |
-| Backend | Vitest 4 + supertest |
+| Frontend | Vitest ^3.0.5 + Testing Library + jsdom |
+| Backend | Vitest ^4.1.5 + supertest |
 | Bridge | Node native `--test` |
 
 ## Real-db compliance tests
@@ -74,17 +76,26 @@ Node version: **20** (`.nvmrc` = 20.12.0).
 
 ## Writing backend route tests
 
-Spin mini Express app with router under test + error handler:
+Spin a mini Express app with the router under test + error handler.
+
+Permission-gated routes read **PIN identity only**. Account JWT alone → `403 PIN_ACTOR_REQUIRED`.
+Tests must send `x-pin-actor-token` via `MuseBar/backend/src/test/pinActorTestUtils.ts`
+(`pinActorTokenFor` / `adminPinActorTokenFor` / `withPinActor`). Keep a negative case
+(no PIN actor → 403) next to the positive one.
 
 ```typescript
 import request from 'supertest';
 import express from 'express';
 import router from './floor';
-// mount, mock auth, assert 403 without permission
+import { adminPinActorTokenFor, withPinActor } from '../test/pinActorTestUtils';
+// mount, mock account JWT, then:
+// withPinActor(request(app).get('/...'), adminPinActorTokenFor(establishmentId))
+// assert 403 without the PIN header
 ```
 
 ## Related skills
 
+- `auth-and-multi-tenancy` — PIN actor vs account JWT
 - `legal-journal-compliance` — what real-db tests protect
 - `database-migrations` — migration tests in backend suite
 - `patch-notes-workflow` — document test additions in IMPLEMENTATION notes

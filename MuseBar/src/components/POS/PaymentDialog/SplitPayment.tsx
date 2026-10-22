@@ -312,7 +312,7 @@ export const SplitPayment: React.FC<SplitPaymentProps> = ({
       {subBills.length === 0 && (
         <Alert severity="info" sx={{ mb: 2 }}>
           <Typography variant="body2">
-            Cliquez sur "Initialiser" pour configurer les paiements partagés.
+            Cliquez sur {'"Initialiser"'} pour configurer les paiements partagés.
           </Typography>
         </Alert>
       )}

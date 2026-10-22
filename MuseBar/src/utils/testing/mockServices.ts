@@ -42,10 +42,11 @@ export const mockApiResponses = {
 export const mockFetch = (responses: Array<{ url?: string; response: any; status?: number }>) => {
   const mockFn = vi.fn();
   
-  responses.forEach((response, index) => {
-    if (response.url) {
+  responses.forEach((response) => {
+    const matchUrl = response.url;
+    if (matchUrl) {
       mockFn.mockImplementationOnce((url: string) => {
-          if (url.includes(response.url!)) {
+          if (url.includes(matchUrl)) {
             return Promise.resolve({
               ok: (response.status || 200) < 400,
               status: response.status || 200,

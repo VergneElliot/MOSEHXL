@@ -3,12 +3,12 @@ import request from 'supertest';
 import express from 'express';
 import { generateToken } from '../auth';
 import { errorHandler } from '../../middleware/errorHandler';
+import { pinActorTokenFor, withPinActor } from '../../test/pinActorTestUtils';
 
 const EST = '11111111-1111-4111-8111-111111111111';
 
 const mocks = vi.hoisted(() => ({
   poolQuery: vi.fn(),
-  getUserPermissions: vi.fn(),
 }));
 
 vi.mock('../../db/pool', () => ({
@@ -16,12 +16,6 @@ vi.mock('../../db/pool', () => ({
   default: express(),
   pool: {
     query: mocks.poolQuery,
-  },
-}));
-
-vi.mock('../../models/user', () => ({
-  UserModel: {
-    getUserPermissions: mocks.getUserPermissions,
   },
 }));
 
@@ -51,10 +45,13 @@ function staffToken() {
   );
 }
 
+function pinWith(permissions: string[]) {
+  return pinActorTokenFor({ id: 42, establishmentId: EST, permissions });
+}
+
 describe('orderAudit read endpoints', () => {
   beforeEach(() => {
     mocks.poolQuery.mockReset();
-    mocks.getUserPermissions.mockReset();
     mocks.poolQuery.mockImplementation(async (query: unknown, values?: unknown[]) => {
       const sql = String(query ?? '');
 
@@ -93,13 +90,24 @@ describe('orderAudit read endpoints', () => {
 
       return { rows: [] };
     });
-    mocks.getUserPermissions.mockResolvedValue(['access_pos']);
   });
 
-  it('returns real audit entries for an order id', async () => {
+  it('denies reading audit entries with the account JWT alone (no PIN actor)', async () => {
     const res = await request(app)
       .get('/audit/123')
       .set('Authorization', `Bearer ${staffToken()}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('PIN_ACTOR_REQUIRED');
+  });
+
+  it('returns real audit entries for an order id', async () => {
+    const res = await withPinActor(
+      request(app)
+        .get('/audit/123')
+        .set('Authorization', `Bearer ${staffToken()}`),
+      pinWith(['access_pos'])
+    );
 
     expect(res.status).toBe(200);
     expect(res.body.order_id).toBe(123);
@@ -112,31 +120,36 @@ describe('orderAudit read endpoints', () => {
   });
 
   it('denies reading audit entries when user has neither access_pos nor access_compliance', async () => {
-    mocks.getUserPermissions.mockResolvedValue([]);
-
-    const res = await request(app)
-      .get('/audit/123')
-      .set('Authorization', `Bearer ${staffToken()}`);
+    const res = await withPinActor(
+      request(app)
+        .get('/audit/123')
+        .set('Authorization', `Bearer ${staffToken()}`),
+      pinWith([])
+    );
 
     expect(res.status).toBe(403);
-    expect(res.body.error).toBe('Permission denied');
+    expect(res.body.error).toBe('PIN session required');
   });
 
   it('allows reading audit entries with access_compliance permission', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
-
-    const res = await request(app)
-      .get('/audit/123')
-      .set('Authorization', `Bearer ${staffToken()}`);
+    const res = await withPinActor(
+      request(app)
+        .get('/audit/123')
+        .set('Authorization', `Bearer ${staffToken()}`),
+      pinWith(['access_compliance'])
+    );
 
     expect(res.status).toBe(200);
     expect(res.body.total_entries).toBe(2);
   });
 
   it('returns computed summary for an order id', async () => {
-    const res = await request(app)
-      .get('/audit/123/summary')
-      .set('Authorization', `Bearer ${staffToken()}`);
+    const res = await withPinActor(
+      request(app)
+        .get('/audit/123/summary')
+        .set('Authorization', `Bearer ${staffToken()}`),
+      pinWith(['access_pos'])
+    );
 
     expect(res.status).toBe(200);
     expect(res.body.summary.total_actions).toBe(2);
@@ -148,9 +161,12 @@ describe('orderAudit read endpoints', () => {
   });
 
   it('returns 400 for invalid order id', async () => {
-    const res = await request(app)
-      .get('/audit/not-a-number')
-      .set('Authorization', `Bearer ${staffToken()}`);
+    const res = await withPinActor(
+      request(app)
+        .get('/audit/not-a-number')
+        .set('Authorization', `Bearer ${staffToken()}`),
+      pinWith(['access_pos'])
+    );
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Invalid order ID');

@@ -11,9 +11,11 @@ description: >-
 Handlers stay orchestration only (≈40 lines): rules go to a service, SQL to a model. Route
 files cap at 400 lines — split by resource and mount from an index. See `code-hygiene`.
 
-`requirePermission` authorizes from the account **or** the PIN identity on the request, which
-is what makes a step-up PIN prompt work; `requirePinActor` stays strict when an action must be
-attributed to a badge.
+`requirePermission` authorizes from the **PIN identity** on the request (`x-pin-actor-token`).
+Account JWT alone is `403 PIN_ACTOR_REQUIRED`. That is what makes a step-up PIN prompt work;
+`requirePinActor` stays strict when an action must be attributed to a badge. Route tests must
+send a PIN actor token — see `testing-and-ci` (`pinActorTestUtils.ts`). Auth middleware name
+is `requireAuth` only (the `authenticateToken` alias is gone).
 
 ## Route template
 

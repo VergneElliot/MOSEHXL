@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 import { errorHandler } from '../middleware/errorHandler';
+import { pinActorTokenFor, withPinActor } from '../test/pinActorTestUtils';
 
 const mocks = vi.hoisted(() => ({
   poolQuery: vi.fn(),
@@ -42,30 +43,34 @@ vi.mock('../db/pool', () => ({
   },
 }));
 
-vi.mock('../middleware/auth', () => ({
-  authenticateToken: (req: express.Request, _res: express.Response, next: express.NextFunction) => {
-    const mode = req.header('x-test-auth-mode');
-    if (mode === 'no-est') {
+vi.mock('../middleware/auth', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../middleware/auth')>();
+  return {
+    ...actual,
+    requireAuth: (req: express.Request, _res: express.Response, next: express.NextFunction) => {
+      const mode = req.header('x-test-auth-mode');
+      if (mode === 'no-est') {
+        (req as express.Request & { user?: unknown }).user = {
+          id: 7,
+          email: 'staff@example.com',
+          role: 'staff',
+          is_admin: false,
+          establishment_id: null,
+        };
+        return next();
+      }
+
       (req as express.Request & { user?: unknown }).user = {
-        id: 7,
+        id: 8,
         email: 'staff@example.com',
         role: 'staff',
         is_admin: false,
-        establishment_id: null,
+        establishment_id: 'est-1',
       };
       return next();
-    }
-
-    (req as express.Request & { user?: unknown }).user = {
-      id: 8,
-      email: 'staff@example.com',
-      role: 'staff',
-      is_admin: false,
-      establishment_id: 'est-1',
-    };
-    return next();
-  },
-}));
+    },
+  };
+});
 
 vi.mock('../utils/logger', () => ({
   getLogger: () => ({
@@ -136,6 +141,10 @@ const app = express();
 app.use(express.json());
 app.use('/printing', printingRouter);
 app.use(errorHandler);
+
+function settingsPin() {
+  return pinActorTokenFor({ establishmentId: 'est-1', permissions: ['access_settings'] });
+}
 
 describe('printing routes', () => {
   beforeEach(() => {
@@ -385,25 +394,41 @@ describe('printing routes', () => {
     expect(res.body?.error?.message).toBe('Test print failed');
   });
 
+  it('denies configuration read with requireAuth alone (no PIN actor)', async () => {
+    const res = await request(app)
+      .get('/printing/configuration')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('PIN_ACTOR_REQUIRED');
+    expect(mocks.listPrintingConfigurations).not.toHaveBeenCalled();
+  });
+
   it('returns 400 for invalid provider on configuration update', async () => {
     mocks.savePrintingConfiguration.mockRejectedValue(
       Object.assign(new Error('Provider must be one of: epson-server-direct, digital'), { statusCode: 400 })
     );
 
-    const res = await request(app)
-      .post('/printing/configuration')
-      .set('Authorization', 'Bearer test-token')
-      .send({ provider: 'invalid-provider', config: {} });
+    const res = await withPinActor(
+      request(app)
+        .post('/printing/configuration')
+        .set('Authorization', 'Bearer test-token')
+        .send({ provider: 'invalid-provider', config: {} }),
+      settingsPin()
+    );
 
     expect(res.status).toBe(400);
     expect(String(res.body.error?.message ?? '')).toContain('Provider must be one of');
   });
 
   it('returns 400 when provider is missing on configuration update', async () => {
-    const res = await request(app)
-      .post('/printing/configuration')
-      .set('Authorization', 'Bearer test-token')
-      .send({ config: {} });
+    const res = await withPinActor(
+      request(app)
+        .post('/printing/configuration')
+        .set('Authorization', 'Bearer test-token')
+        .send({ config: {} }),
+      settingsPin()
+    );
 
     expect(res.status).toBe(400);
     expect(res.body.error?.message).toBe('Provider is required');
@@ -420,10 +445,13 @@ describe('printing routes', () => {
       },
     });
 
-    const res = await request(app)
-      .post('/printing/configuration')
-      .set('Authorization', 'Bearer test-token')
-      .send({ provider: 'epson-server-direct', config: {} });
+    const res = await withPinActor(
+      request(app)
+        .post('/printing/configuration')
+        .set('Authorization', 'Bearer test-token')
+        .send({ provider: 'epson-server-direct', config: {} }),
+      settingsPin()
+    );
 
     expect(res.status).toBe(200);
     expect(res.body.message).toBe('Printing configuration updated successfully');
@@ -448,9 +476,12 @@ describe('printing routes', () => {
       { id: 2, provider: 'epson-server-direct', is_active: true, config: {} },
     ]);
 
-    const res = await request(app)
-      .get('/printing/configuration')
-      .set('Authorization', 'Bearer test-token');
+    const res = await withPinActor(
+      request(app)
+        .get('/printing/configuration')
+        .set('Authorization', 'Bearer test-token'),
+      settingsPin()
+    );
 
     expect(res.status).toBe(200);
     expect(res.body.establishment_id).toBe('est-1');
@@ -472,9 +503,12 @@ describe('printing routes', () => {
   it('returns 500 when fetching printing configuration fails unexpectedly', async () => {
     mocks.listPrintingConfigurations.mockRejectedValue(new Error('config read failed'));
 
-    const res = await request(app)
-      .get('/printing/configuration')
-      .set('Authorization', 'Bearer test-token');
+    const res = await withPinActor(
+      request(app)
+        .get('/printing/configuration')
+        .set('Authorization', 'Bearer test-token'),
+      settingsPin()
+    );
 
     expect(res.status).toBe(500);
     expect(res.body?.error?.message).toBe('Failed to get printing configuration');

@@ -208,13 +208,13 @@ export const HappyHourForm: React.FC<HappyHourFormProps> = ({
         {/* Information */}
         <Alert severity="info" sx={{ mt: 2 }}>
           <Typography variant="subtitle2" gutterBottom>
-            Configuration de l'Happy Hour:
+            Configuration de l’Happy Hour:
           </Typography>
           <Typography variant="body2">
-            • L'Happy Hour s'active automatiquement selon les horaires configurés<br />
-            • La réduction par défaut s'applique aux produits sans réduction spécifique<br />
+            • L’Happy Hour s’active automatiquement selon les horaires configurés<br />
+            • La réduction par défaut s’applique aux produits sans réduction spécifique<br />
             • Vous pouvez personnaliser la réduction pour chaque produit individuellement<br />
-            • Le contrôle manuel permet d'activer/désactiver temporairement
+            • Le contrôle manuel permet d’activer/désactiver temporairement
           </Typography>
         </Alert>
       </CardContent>

@@ -1,7 +1,7 @@
 import { Router, type Response } from 'express';
 
 import { pool } from '../../db/pool';
-import { authenticateToken } from '../../middleware/auth';
+import { requireAuth } from '../../middleware/auth';
 import { getLogger } from '../../utils/logger';
 import type { AuthenticatedRequest } from '../userManagement/types';
 import { AppError, asyncHandler } from '../../middleware/errorHandler';
@@ -10,7 +10,7 @@ import { ensureEstablishment, getPrintingUser } from './context';
 const router = Router();
 
 // GET /api/printing/history
-router.get('/history', authenticateToken, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+router.get('/history', requireAuth, ensureEstablishment, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getPrintingUser(req)!;
     const rawLimit = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : 50;

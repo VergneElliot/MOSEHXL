@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 import { generateToken } from '../auth';
+import { pinActorTokenFor, withPinActor } from '../../test/pinActorTestUtils';
 
 const EST = '11111111-1111-4111-8111-111111111111';
 
 const mocks = vi.hoisted(() => ({
   poolQuery: vi.fn(),
-  getUserPermissions: vi.fn(),
   getOrdersAndSubBillsForPeriod: vi.fn(),
   getTopProductsForOrders: vi.fn(),
   getCurrentBusinessDayPeriod: vi.fn(),
@@ -20,12 +20,6 @@ vi.mock('../../db/pool', () => ({
   default: express(),
   pool: {
     query: mocks.poolQuery,
-  },
-}));
-
-vi.mock('../../models/user', () => ({
-  UserModel: {
-    getUserPermissions: mocks.getUserPermissions,
   },
 }));
 
@@ -76,10 +70,13 @@ function tokenFor(role: 'establishment_admin' | 'staff') {
   );
 }
 
+function pinWith(permissions: string[]) {
+  return pinActorTokenFor({ id: 12, establishmentId: EST, permissions });
+}
+
 describe('legal business-day-stats permission gate', () => {
   beforeEach(() => {
     mocks.poolQuery.mockReset();
-    mocks.getUserPermissions.mockReset();
     mocks.getOrdersAndSubBillsForPeriod.mockReset();
     mocks.getTopProductsForOrders.mockReset();
     mocks.getCurrentBusinessDayPeriod.mockReset();
@@ -113,34 +110,47 @@ describe('legal business-day-stats permission gate', () => {
     mocks.getTopProductsForOrders.mockResolvedValue([]);
   });
 
-  it('denies access without access_compliance or access_pos', async () => {
-    mocks.getUserPermissions.mockResolvedValue([]);
-
+  it('denies access with the account JWT alone (no PIN actor)', async () => {
     const res = await request(app)
       .get('/legal/business-day-stats')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+      .set('Authorization', `Bearer ${tokenFor('establishment_admin')}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('PIN_ACTOR_REQUIRED');
+    expect(mocks.getOrdersAndSubBillsForPeriod).not.toHaveBeenCalled();
+  });
+
+  it('denies access when the PIN actor lacks access_compliance and access_pos', async () => {
+    const res = await withPinActor(
+      request(app)
+        .get('/legal/business-day-stats')
+        .set('Authorization', `Bearer ${tokenFor('staff')}`),
+      pinWith(['access_settings'])
+    );
 
     expect(res.status).toBe(403);
     expect(mocks.getOrdersAndSubBillsForPeriod).not.toHaveBeenCalled();
   });
 
   it('allows access with access_compliance', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_compliance']);
-
-    const res = await request(app)
-      .get('/legal/business-day-stats')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await withPinActor(
+      request(app)
+        .get('/legal/business-day-stats')
+        .set('Authorization', `Bearer ${tokenFor('staff')}`),
+      pinWith(['access_compliance'])
+    );
 
     expect(res.status).toBe(200);
     expect(mocks.getOrdersAndSubBillsForPeriod).toHaveBeenCalled();
   });
 
   it('allows access with access_pos', async () => {
-    mocks.getUserPermissions.mockResolvedValue(['access_pos']);
-
-    const res = await request(app)
-      .get('/legal/business-day-stats')
-      .set('Authorization', `Bearer ${tokenFor('staff')}`);
+    const res = await withPinActor(
+      request(app)
+        .get('/legal/business-day-stats')
+        .set('Authorization', `Bearer ${tokenFor('staff')}`),
+      pinWith(['access_pos'])
+    );
 
     expect(res.status).toBe(200);
     expect(mocks.getOrdersAndSubBillsForPeriod).toHaveBeenCalled();

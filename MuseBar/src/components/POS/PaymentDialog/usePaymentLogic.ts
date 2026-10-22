@@ -24,6 +24,7 @@ export const usePaymentLogic = (
   onClose: () => void
 ): UsePaymentLogicReturn => {
   const stateHook = usePaymentState();
+  const { setTabValue } = stateHook;
 
   const calculationsHook = usePaymentCalculations({
     state: stateHook.state,
@@ -62,9 +63,9 @@ export const usePaymentLogic = (
 
   const handleTabChange = useCallback(
     (newValue: number) => {
-      stateHook.setTabValue(newValue);
+      setTabValue(newValue);
     },
-    [stateHook.setTabValue]
+    [setTabValue]
   );
 
   return {
