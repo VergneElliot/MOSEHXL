@@ -88,8 +88,9 @@ Env keys: `SPACES_*`, `SENDGRID_API_KEY`, `FROM_EMAIL`, `PUBLIC_API_URL`.
 1. Add permission to `@mosehxl/types` `PERMISSIONS` if new sub-area
 2. Register sub-tab in `AdministrationContainer` with permission filter
 3. Add route under `routes/admin/` and mount in `admin/index.ts`
-4. Add client functions to `adminSpace.ts`
-5. Patch note PLAN + IMPLEMENTATION; update runbook if new env vars
+4. Add client functions under `services/api/admin/` (barrel `adminSpace.ts`)
+5. Colocated route/service tests (admin routes are a known gap — see `testing-and-ci`)
+6. Patch note PLAN + IMPLEMENTATION; update runbook if new env vars
 
 ## Related skills
 
@@ -98,6 +99,7 @@ Env keys: `SPACES_*`, `SENDGRID_API_KEY`, `FROM_EMAIL`, `PUBLIC_API_URL`.
 - `legal-journal-compliance` — compliance dashboard sub-tab
 - `backend-api-route` — new admin endpoints
 - `frontend-feature` — panel/hook structure
+- `testing-and-ci` — mandatory tests with new behaviour
 
 ## Docs
 
