@@ -18,4 +18,14 @@ describe('canEnterWithoutStepUpPin', () => {
       canEnterWithoutStepUpPin([PERMISSIONS.access_pos, PERMISSIONS.access_documents])
     ).toBe(false);
   });
+
+  it('allows a basic-only list even when repeated', () => {
+    expect(
+      canEnterWithoutStepUpPin([PERMISSIONS.access_pos, PERMISSIONS.access_pos])
+    ).toBe(true);
+  });
+
+  it('treats unknown names as non-basic (must step up)', () => {
+    expect(canEnterWithoutStepUpPin(['not_a_real_permission'])).toBe(false);
+  });
 });

@@ -37,4 +37,14 @@ describe('canSkipPinForActiveActor', () => {
   it('treats unknown permission names as non-basic (always prompt)', () => {
     expect(canSkipPinForActiveActor(['not_a_real_permission'], () => true)).toBe(false);
   });
+
+  it('never skips an empty permission list', () => {
+    expect(canSkipPinForActiveActor([], () => true)).toBe(false);
+  });
+
+  it('skips when the actor holds at least one requested basic key', () => {
+    expect(
+      canSkipPinForActiveActor([PERMISSIONS.access_pos], (p) => p === PERMISSIONS.access_pos)
+    ).toBe(true);
+  });
 });

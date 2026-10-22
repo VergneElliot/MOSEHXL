@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ActivePinSessionDto } from '../services/api/pin';
-import { mergeServerSessions, isSessionUnlocked } from './pinSessionsMerge';
+import { dedupeRemoteByUser, mergeServerSessions, isSessionUnlocked } from './pinSessionsMerge';
 import type { PinActorState, PinSessionsState } from './pinSessionsState';
 
 function actor(userId: number, overrides: Partial<PinActorState> = {}): PinActorState {
@@ -141,5 +141,53 @@ describe('mergeServerSessions', () => {
     };
     const next = mergeServerSessions(local, [remote({ id: 'sid-1', user_id: 9 })]);
     expect(next.activeSessionId).toBeNull();
+  });
+
+  it('preserves prior cart on a locked remote placeholder', () => {
+    const local: PinSessionsState = {
+      sessions: [
+        {
+          id: 'sid-1',
+          actor: actor(9, { token: '', sessionId: 'sid-1' }),
+          cart: [{ id: 'kept' } as never],
+          activeTable: { id: 3, label: 'T3', floorPlanId: 1, ticketId: 10 },
+        },
+      ],
+      activeSessionId: null,
+    };
+    const next = mergeServerSessions(local, [remote({ id: 'sid-1', user_id: 9 })]);
+    expect(isSessionUnlocked(firstSession(next))).toBe(false);
+    expect(next.sessions[0]?.cart).toHaveLength(1);
+    expect(next.sessions[0]?.activeTable?.label).toBe('T3');
+  });
+
+  it('keeps local email when the remote row omits it', () => {
+    const local: PinSessionsState = {
+      sessions: [
+        {
+          id: 'sid-1',
+          actor: actor(9, { sessionId: 'sid-1', email: 'local@ex.com' }),
+          cart: [],
+          activeTable: null,
+        },
+      ],
+      activeSessionId: 'sid-1',
+    };
+    const next = mergeServerSessions(local, [
+      remote({ id: 'sid-1', user_id: 9, email: '', display_name: 'Remote Name' }),
+    ]);
+    expect(next.sessions[0]?.actor.email).toBe('local@ex.com');
+    expect(next.sessions[0]?.actor.displayName).toBe('Remote Name');
+  });
+});
+
+describe('dedupeRemoteByUser', () => {
+  it('keeps the first row per user_id', () => {
+    const rows = dedupeRemoteByUser([
+      remote({ id: 'a', user_id: 1 }),
+      remote({ id: 'b', user_id: 1 }),
+      remote({ id: 'c', user_id: 2 }),
+    ]);
+    expect(rows.map((r) => r.id)).toEqual(['a', 'c']);
   });
 });

@@ -6,6 +6,7 @@ This page is the fastest way to find the current state of the project without sc
 
 - Latest audit state: `docs/audits/2026-05-20-full-repo-state-audit-hard-copy.md`
 - Latest code closure pass: October 2026 hygiene — `docs/patch-notes/562-Q-CODE-HYGIENE-MONOLITH-SPLIT-AND-LEGACY-PURGE-PLAN.md` (IMPLEMENTATION 563). 400-line cap met (`scripts/module-size-baseline.json` empty); PIN-actor tests; shared schema + RLS.
+- Unit-test coverage campaign: PLAN `564` → slices `565`–`569`. CI floors (never lower): backend ~43% lines; FE business-logic include ~18% + pure globs ≥80%. Run `npm run test:coverage` from repo root. Details: `.cursor/skills/testing-and-ci/SKILL.md`.
 - Prior May 2026 code closure: `docs/audits/2026-05-28-code-closure-pass.md`
 - Branch reality and operational notes: `DEVELOPMENT-STATE.md`
 - Latest patch-note index (auto-generated): `docs/patch-notes/LATEST-INDEX.md`

@@ -86,14 +86,116 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
-      include: ['src/**/*.{ts,tsx}'],
-      exclude: ['src/index.tsx', 'src/setupTests.ts'],
-      // Vitest flat thresholds (not Jest's `global` key). Baseline ~2026-09-02; ratchet +5% lines/quarter.
+      // Wave-2 Slice D: business-logic denominator only (no heavy UI .tsx trees).
+      // Still includes src/components/**/*.ts helpers; excludes containers/pages.
+      include: [
+        'src/utils/**/*.{ts,tsx}',
+        'src/contexts/**/*.ts',
+        'src/hooks/**/*.{ts,tsx}',
+        'src/services/**/*.{ts,tsx}',
+        'src/components/**/*.ts',
+        'src/i18n/**/*.ts',
+        'src/pwa/**/*.ts',
+        'src/config/**/*.ts',
+      ],
+      exclude: [
+        'src/index.tsx',
+        'src/setupTests.ts',
+        'src/**/*.{test,spec}.{ts,tsx}',
+        'src/**/__tests__/**',
+        'src/components/**/*.tsx',
+        'src/pages/**',
+        // Test-only helpers must not dilute the business-logic denominator.
+        'src/utils/testing/**',
+      ],
+      // Vitest flat thresholds + glob keys (Vitest 3). Overall = measured−3 (wave-2 ~20.4% → 18).
+      // Pure-module globs ≥80% aggregate (not perFile). Avoid `{ts,tsx}` braces in keys — micromatch
+      // mis-resolves them and the threshold then applies to the wrong file set.
+      // Never lower these floors (PLAN 564 / Slice E).
       thresholds: {
-        lines: 1,
-        statements: 1,
+        lines: 18,
+        statements: 18,
         branches: 60,
         functions: 60,
+        'src/utils/**/*.ts': {
+          lines: 80,
+          statements: 80,
+          branches: 70,
+          functions: 80,
+        },
+        'src/contexts/*Policy.ts': {
+          lines: 80,
+          statements: 80,
+          branches: 70,
+          functions: 80,
+        },
+        'src/contexts/pinSessions*.ts': {
+          lines: 80,
+          statements: 80,
+          branches: 70,
+          functions: 80,
+        },
+        'src/contexts/pinActorFromVerify.ts': {
+          lines: 80,
+          statements: 80,
+          branches: 70,
+          functions: 80,
+        },
+        'src/**/*Draft*.ts': {
+          lines: 80,
+          statements: 80,
+          branches: 70,
+          functions: 80,
+        },
+        'src/**/*Totals*.ts': {
+          lines: 80,
+          statements: 80,
+          branches: 70,
+          functions: 80,
+        },
+        'src/components/POS/PaymentDialog/split*.ts': {
+          lines: 80,
+          statements: 80,
+          branches: 70,
+          functions: 80,
+        },
+        'src/components/Administration/adminSectionAccess.ts': {
+          lines: 80,
+          statements: 80,
+          branches: 70,
+          functions: 80,
+        },
+        'src/components/Closure/closurePreviewTotals.ts': {
+          lines: 80,
+          statements: 80,
+          branches: 70,
+          functions: 80,
+        },
+        'src/components/Public/publicReservationHours.ts': {
+          lines: 80,
+          statements: 80,
+          branches: 70,
+          functions: 80,
+        },
+        'src/services/api/floorTicketMappers.ts': {
+          lines: 80,
+          statements: 80,
+          // Measured branches ~67.7% after Slice D; keep margin under 80 lines floor.
+          branches: 65,
+          functions: 80,
+        },
+        'src/hooks/usePOSOrderTotals.ts': {
+          lines: 80,
+          statements: 80,
+          branches: 70,
+          functions: 80,
+        },
+        'src/components/POS/posContainerItems.ts': {
+          lines: 80,
+          statements: 80,
+          branches: 70,
+          functions: 80,
+        },
       },
     },
   },

@@ -32,26 +32,21 @@ Skip only when the user explicitly says not to add tests, or the change cannot
 be unit-tested without a live DB and you document that in the IMPLEMENTATION
 patch note (prefer a mocked unit test first).
 
-## Current coverage reality (Oct 2026)
+## Current coverage floors (Oct 2026 — PLAN 564 campaign)
 
-| Area | Approx. test files | Gap |
-|------|--------------------|-----|
-| Backend routes (auth, orders, legal, floor, printing) | ~35 of ~108 route modules | Strong on fiscal/auth; **admin space routes mostly untested** |
-| Backend services | ~36 of ~189 | Labor / kitchen / some floor covered; many admin/email paths thin |
-| Backend models | ~11 of ~95 | Mostly legal journal; user/staff/time models thin |
-| Frontend | **19** files vs ~240 components + ~50 hooks | Almost all UI untested; pure helpers (split bill, planning draft, reservation hours) often lack tests after extracts |
-| Bridge | 3 | Acceptable for size |
+Ratchets are **never lowered**. Raise only when measured % is safely above the
+new floor (~3–5 pts margin). Prefer meaningful colocated tests over chasing %.
 
-Frontend line coverage threshold is still a **1%** ratchet floor — that is a CI
-safety net, not a quality target. Prefer meaningful colocated tests over chasing %.
+| Workspace | Measured (post-564) | CI floors |
+|-----------|---------------------|-----------|
+| Backend | ~47% lines (excl. setup/storage/userInvitation/migrations) | lines/stmts **43%**, branches **62%**, funcs **52%** (`backend/vitest.config.ts`) |
+| Frontend (business-logic include; no UI `.tsx`) | ~20% lines | lines/stmts **18%**, branches/funcs **60%** (`vite.config.ts`) |
+| Frontend pure globs (utils, *Policy*, pinSessions*, *Draft*, *Totals*, split*, …) | ≥80% on scoped keys | **80%** lines/stmts (see `vite.config.ts` glob thresholds) |
 
-Priority backlog when filling gaps (do not boil the ocean in one PR):
+Aspirational next targets (do not jump CI to these until measured): backend
+**≥70%**, FE overall **≥40%** on the business-logic include.
 
-1. Pure helpers extracted in hygiene (`splitBill*`, `planningShiftDraft`,
-   `closurePreviewTotals`, `publicReservationHours`, floor ticket mappers).
-2. Admin API routes (`routes/admin/*`) — permission + one happy path each.
-3. Frontend policies already partially covered (`pinSessions*`, `stepUp*`) —
-   keep extending those rather than mounting full MUI trees.
+Do **not** mount full Administration / POS MUI trees for coverage points.
 
 ## Commands (repo root)
 
@@ -59,6 +54,8 @@ Priority backlog when filling gaps (do not boil the ocean in one PR):
 npm test --workspace MuseBar              # frontend Vitest (watch)
 npm run test:ci --workspace MuseBar       # frontend + coverage thresholds
 npm test --workspace MuseBar/backend      # backend Vitest
+npm run test:coverage --workspace MuseBar/backend  # backend + coverage thresholds
+npm run test:coverage                     # root: FE test:ci + backend test:coverage
 npm run test:real-db --workspace MuseBar/backend   # fiscal/RLS (needs Postgres)
 npm test --workspace MuseBar/bridge       # Node --test
 
@@ -97,13 +94,20 @@ RUN_REAL_DB_TESTS=true npm run test:real-db
 
 ## Coverage
 
-Frontend thresholds in `MuseBar/vite.config.ts` (flat Vitest shape, not Jest `global`):
+**Never lower** `coverage.thresholds` in `MuseBar/vite.config.ts` or
+`MuseBar/backend/vitest.config.ts`. After adding tests, remeasure and raise
+floors only with margin under the new measured %.
 
-- Baseline ~2026-09-02: lines/statements 1%, branches/functions 60%
-- Ratchet +5% lines per quarter
+Frontend (`vite.config.ts`):
 
-Backend: coverage configured, no thresholds yet. Prefer colocated behaviour
-tests over raising a global % without meaning.
+- Overall lines/stmts on the **business-logic include** (utils/hooks/contexts/services + `components/**/*.ts`; excludes UI `.tsx`)
+- Additional **glob keys** for pure modules (≥80% lines/stmts)
+- Flat Vitest shape (not Jest `global`)
+
+Backend (`vitest.config.ts`):
+
+- Thresholds on include that excludes deferred setup/storage/userInvitation/migrations
+- Prefer colocated behaviour tests; exclude only paths the PLAN explicitly defers
 
 ## CI pipeline (`.github/workflows/ci-cd.yml`)
 

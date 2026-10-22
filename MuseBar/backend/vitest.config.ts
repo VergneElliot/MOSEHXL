@@ -35,7 +35,19 @@ export default defineConfig({
         'src/integration/real-db/**/*.test.ts',
         'src/test/**',
         'src/docs/**',
+        // Deferred / low-ROI (Slice C wave 2): keep out of denominator
+        'src/services/setup/**',
+        'src/services/storage/**',
+        'src/services/userInvitation/**',
+        'src/migrations/**',
       ],
+      // Soft ratchet (Slice C wave 3): ~measured−4 after new mocked suites (~47/66/56).
+      thresholds: {
+        lines: 43,
+        statements: 43,
+        branches: 62,
+        functions: 52,
+      },
     },
   },
 });

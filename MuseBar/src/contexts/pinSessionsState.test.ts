@@ -4,6 +4,8 @@ import {
   dismissSession,
   focusSession,
   isActorExpired,
+  isSessionExpired,
+  newSessionId,
   normalizeState,
   patchSession,
   readTokenExpiryMs,
@@ -200,6 +202,56 @@ describe('pinSessionsState — token expiry', () => {
 
   it('treats an actor without expiry as not expired', () => {
     expect(isActorExpired(actor(1, { expiresAt: null }))).toBe(false);
+  });
+});
+
+describe('pinSessionsState — expiry helpers', () => {
+  it('isSessionExpired mirrors the actor deadline', () => {
+    const now = 1_000_000;
+    const open = addOrFocusSession(
+      EMPTY_PIN_SESSIONS,
+      actor(1, { expiresAt: now + 5 }),
+      'a'
+    );
+    expect(isSessionExpired(open.sessions[0] ?? null, now)).toBe(false);
+    expect(isSessionExpired(open.sessions[0] ?? null, now + 10)).toBe(true);
+    expect(isSessionExpired(null, now)).toBe(false);
+  });
+
+  it('withTokenExpiry is a no-op when fields are already set', () => {
+    const stamped = withTokenExpiry(actor(1, { expiresAt: 99, sessionId: 'sid' }));
+    expect(withTokenExpiry(stamped)).toBe(stamped);
+  });
+
+  it('newSessionId returns a pin-prefixed unique id', () => {
+    expect(newSessionId()).toMatch(/^pin-\d+-[a-z0-9]+$/);
+    expect(newSessionId()).not.toBe(newSessionId());
+  });
+
+  it('focusSession(null) clears focus', () => {
+    const state = addOrFocusSession(EMPTY_PIN_SESSIONS, actor(1), 'a');
+    expect(focusSession(state, null).activeSessionId).toBeNull();
+  });
+
+  it('dismissSession is a no-op for unknown ids', () => {
+    const state = addOrFocusSession(EMPTY_PIN_SESSIONS, actor(1), 'a');
+    expect(dismissSession(state, 'ghost')).toBe(state);
+  });
+
+  it('normalizeState rebases tab ids onto actor.sessionId', () => {
+    const state = normalizeState({
+      sessions: [
+        {
+          id: 'local',
+          actor: { token: fakeToken(undefined, 'sid-99'), userId: 1, sessionId: 'sid-99' },
+          cart: [],
+          activeTable: null,
+        },
+      ],
+      activeSessionId: 'sid-99',
+    });
+    expect(state.sessions[0]?.id).toBe('sid-99');
+    expect(state.activeSessionId).toBe('sid-99');
   });
 });
 

@@ -21,9 +21,15 @@ Fiscal sequence counters are never reset across versions.
 **Fiscal impact:** MINOR (venue login + PIN-only actors; dual actor trace unchanged;
 per-PIN visual prefs / POS card UX are UI-only; PWA install is packaging/UI only;
 specific-permission step-up UX is authorization-only).
+**Fiscal impact (coverage campaign 564–569):** PATCH — tests and CI thresholds only;
+no product behaviour change.
 
 ### Added
 
+- Campagne de couverture de tests (PLAN 564, slices 565–569) : suites colocated
+  helpers/admin routes/services/policies ; seuils Vitest CI (backend ≥43 % lignes
+  hors modules différés ; frontend include métier ≥18 % + globs purs ≥80 %) ;
+  script racine `npm run test:coverage`. Impact fiscal **PATCH**.
 - Application installable (PWA) : manifeste `standalone`, icônes, méta iOS, bouton
   d’en-tête « Installer » (Chrome/Edge) ou aide « Sur l’écran d’accueil » (Safari iOS).
   Service worker minimal (précharge UI) ; `/api` en NetworkOnly ; toast

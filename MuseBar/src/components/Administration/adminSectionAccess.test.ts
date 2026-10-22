@@ -31,4 +31,24 @@ describe('adminSectionAccess', () => {
     const actor = { role: 'establishment_admin' as const, permissions: [] };
     expect(firstHeldAdminSectionIndex(sections, actor)).toBe(0);
   });
+
+  it('denies a specific section the staff PIN does not hold', () => {
+    expect(
+      adminSectionHeldByActor('access_inbox', { role: 'staff', permissions: ['access_planning'] })
+    ).toBe(false);
+  });
+
+  it('system_admin holds every gated section', () => {
+    expect(
+      adminSectionHeldByActor('access_documents', { role: 'system_admin', permissions: [] })
+    ).toBe(true);
+  });
+
+  it('falls back to index 0 when every section is gated and none are held', () => {
+    const gatedOnly = [
+      { key: 'inbox', permission: 'access_inbox' },
+      { key: 'docs', permission: 'access_documents' },
+    ];
+    expect(firstHeldAdminSectionIndex(gatedOnly, { role: 'staff', permissions: [] })).toBe(0);
+  });
 });

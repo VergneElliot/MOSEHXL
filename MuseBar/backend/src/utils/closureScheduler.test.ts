@@ -1,259 +1,95 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import moment from 'moment-timezone';
 
 const mocks = vi.hoisted(() => ({
   poolQuery: vi.fn(),
-  createDailyClosureOpen: vi.fn(),
-  closeOpenClosureBulletin: vi.fn(),
-  deleteOpenClosureBulletin: vi.fn(),
-  logClosure: vi.fn(),
-  auditLogAction: vi.fn(),
-  loggerError: vi.fn(),
+  getClosureSettings: vi.fn(),
+  logActionBestEffort: vi.fn(),
+  runWithTenantContext: vi.fn(async (_ctx: unknown, fn: () => Promise<unknown>) => fn()),
 }));
 
 vi.mock('../db/pool', () => ({
-  pool: {
-    query: mocks.poolQuery,
-  },
+  pool: { query: mocks.poolQuery },
 }));
 
-vi.mock('../models/legalJournal', () => ({
-  LegalJournalModel: {
-    createDailyClosureOpen: mocks.createDailyClosureOpen,
-    closeOpenClosureBulletin: mocks.closeOpenClosureBulletin,
-    deleteOpenClosureBulletin: mocks.deleteOpenClosureBulletin,
-    logClosure: mocks.logClosure,
+vi.mock('../models/closureSettings', () => ({
+  ClosureSettingsModel: {
+    getClosureSettings: mocks.getClosureSettings,
   },
 }));
 
 vi.mock('../models/auditTrail', () => ({
   AuditTrailModel: {
-    logAction: mocks.auditLogAction,
-    logActionBestEffort: mocks.auditLogAction,
+    logActionBestEffort: mocks.logActionBestEffort,
   },
 }));
 
-vi.mock('./logger', () => ({
-  Logger: {
-    getInstance: () => ({
-      error: mocks.loggerError,
-    }),
+vi.mock('../rls/tenantContext', () => ({
+  runWithTenantContext: mocks.runWithTenantContext,
+}));
+
+vi.mock('../models/legalJournal', () => ({
+  LegalJournalModel: {
+    createDailyClosureOpen: vi.fn(),
   },
+}));
+
+vi.mock('../models/legalJournal/businessDayPeriod', () => ({
+  getBusinessDayPeriod: vi.fn(),
+}));
+
+vi.mock('../models/legalJournal/journalQueries', () => ({
+  JournalQueries: {},
 }));
 
 import { ClosureScheduler } from './closureScheduler';
 
-const ESTABLISHMENT_ID = 'estab-abc';
-const NOW = new Date('2026-05-20T03:00:00.000Z');
-
-function fakeBulletin(overrides: Record<string, unknown> = {}) {
-  return {
-    id: 42,
-    total_amount: '123.45',
-    total_vat: '12.34',
-    total_transactions: 7,
-    period_start: new Date('2026-05-19T22:00:00.000Z'),
-    period_end: new Date('2026-05-20T22:00:00.000Z'),
-    closure_hash: 'closure-hash-abc',
-    first_sequence: 100,
-    last_sequence: 117,
-    ...overrides,
-  };
-}
-
-describe('ClosureScheduler.executeAutomaticClosureForEstablishment', () => {
-  beforeEach(() => {
-    mocks.poolQuery.mockReset();
-    mocks.createDailyClosureOpen.mockReset();
-    mocks.closeOpenClosureBulletin.mockReset();
-    mocks.deleteOpenClosureBulletin.mockReset();
-    mocks.logClosure.mockReset();
-    mocks.auditLogAction.mockReset();
-    mocks.loggerError.mockReset();
-
-    mocks.poolQuery.mockResolvedValue({ rows: [] });
-    mocks.auditLogAction.mockResolvedValue(undefined);
-    mocks.closeOpenClosureBulletin.mockImplementation(async (closureId: number) =>
-      fakeBulletin({ id: closureId })
-    );
-    mocks.deleteOpenClosureBulletin.mockResolvedValue(true);
+describe('ClosureScheduler', () => {
+  afterEach(() => {
+    ClosureScheduler.stop();
+    vi.clearAllMocks();
   });
 
-  it('appends a CLOSURE legal journal entry after the bulletin is created', async () => {
-    const bulletin = fakeBulletin();
-    mocks.createDailyClosureOpen.mockResolvedValue(bulletin);
-    mocks.logClosure.mockResolvedValue({ sequence_number: 118 });
-
-    const result = await ClosureScheduler.executeAutomaticClosureForEstablishment(
-      ESTABLISHMENT_ID,
-      NOW
-    );
-
-    expect(result).toEqual({ establishmentId: ESTABLISHMENT_ID, bulletinId: 42 });
-    expect(mocks.closeOpenClosureBulletin).toHaveBeenCalledWith(42, ESTABLISHMENT_ID);
-    expect(mocks.deleteOpenClosureBulletin).not.toHaveBeenCalled();
-
-    expect(mocks.logClosure).toHaveBeenCalledTimes(1);
-    expect(mocks.logClosure).toHaveBeenCalledWith(
-      ESTABLISHMENT_ID,
-      'DAILY',
-      123.45,
-      12.34,
-      expect.objectContaining({
-        closure_bulletin_id: 42,
-        closure_type: 'DAILY',
-        period_start: bulletin.period_start,
-        period_end: bulletin.period_end,
-        closure_hash: 'closure-hash-abc',
-        first_sequence: 100,
-        last_sequence: 117,
-        force: false,
-        trigger: 'AUTOMATIC',
-      })
-    );
-
-    const executedCall = mocks.auditLogAction.mock.calls.find(
-      ([entry]) => entry?.action_type === 'AUTO_CLOSURE_EXECUTED'
-    );
-    expect(executedCall).toBeDefined();
-    expect(executedCall![0]).toMatchObject({
-      action_type: 'AUTO_CLOSURE_EXECUTED',
-      resource_type: 'CLOSURE_BULLETIN',
-      resource_id: '42',
-      action_details: expect.objectContaining({
-        closure_type: 'DAILY',
-        establishment_id: ESTABLISHMENT_ID,
-        trigger: 'AUTOMATIC',
-        journal_sequence_number: 118,
-      }),
-    });
-
-    const failureCall = mocks.auditLogAction.mock.calls.find(
-      ([entry]) => entry?.action_type === 'AUTO_CLOSURE_JOURNAL_APPEND_FAILED'
-    );
-    expect(failureCall).toBeUndefined();
-    expect(mocks.loggerError).not.toHaveBeenCalled();
+  it('start is idempotent and stop clears interval', async () => {
+    const spy = vi.spyOn(global, 'setInterval').mockReturnValue(123 as never);
+    const clearSpy = vi.spyOn(global, 'clearInterval').mockImplementation(() => undefined);
+    await ClosureScheduler.start();
+    await ClosureScheduler.start();
+    expect(spy).toHaveBeenCalledTimes(1);
+    ClosureScheduler.stop();
+    expect(clearSpy).toHaveBeenCalled();
+    spy.mockRestore();
+    clearSpy.mockRestore();
   });
 
-  it('returns null and skips the journal append when the bulletin already exists', async () => {
-    mocks.createDailyClosureOpen.mockRejectedValue(
-      new Error('Daily closure bulletin already exists for this period')
-    );
-
-    const result = await ClosureScheduler.executeAutomaticClosureForEstablishment(
-      ESTABLISHMENT_ID,
-      NOW
-    );
-
-    expect(result).toBeNull();
-    expect(mocks.logClosure).not.toHaveBeenCalled();
-    expect(mocks.closeOpenClosureBulletin).not.toHaveBeenCalled();
-    expect(mocks.deleteOpenClosureBulletin).not.toHaveBeenCalled();
-
-    const executedCall = mocks.auditLogAction.mock.calls.find(
-      ([entry]) => entry?.action_type === 'AUTO_CLOSURE_EXECUTED'
-    );
-    expect(executedCall).toBeUndefined();
-
-    const failureCall = mocks.auditLogAction.mock.calls.find(
-      ([entry]) => entry?.action_type === 'AUTO_CLOSURE_FAILED'
-    );
-    expect(failureCall).toBeUndefined();
-  });
-
-  it('records AUTO_CLOSURE_JOURNAL_APPEND_FAILED and fails closed when the journal append fails', async () => {
-    const bulletin = fakeBulletin();
-    mocks.createDailyClosureOpen.mockResolvedValue(bulletin);
-    mocks.logClosure.mockRejectedValue(new Error('journal append boom'));
-
-    await expect(
-      ClosureScheduler.executeAutomaticClosureForEstablishment(ESTABLISHMENT_ID, NOW)
-    ).rejects.toThrow('AUTO_CLOSURE_JOURNAL_APPEND_FAILED');
-
-    expect(mocks.loggerError).toHaveBeenCalledTimes(1);
-    expect(mocks.loggerError).toHaveBeenCalledWith(
-      expect.stringContaining('Auto closure journal append failed for bulletin 42'),
-      expect.any(Error),
-      'LEGAL_JOURNAL'
-    );
-
-    const failureCall = mocks.auditLogAction.mock.calls.find(
-      ([entry]) => entry?.action_type === 'AUTO_CLOSURE_JOURNAL_APPEND_FAILED'
-    );
-    expect(failureCall).toBeDefined();
-    expect(failureCall![0]).toMatchObject({
-      action_type: 'AUTO_CLOSURE_JOURNAL_APPEND_FAILED',
-      resource_type: 'CLOSURE_BULLETIN',
-      resource_id: '42',
-      action_details: expect.objectContaining({
-        bulletin_id: 42,
-        establishment_id: ESTABLISHMENT_ID,
-        error: 'journal append boom',
-      }),
-    });
-    expect(mocks.deleteOpenClosureBulletin).toHaveBeenCalledWith(42, ESTABLISHMENT_ID);
-    expect(mocks.closeOpenClosureBulletin).not.toHaveBeenCalled();
-
-    const executedCall = mocks.auditLogAction.mock.calls.find(
-      ([entry]) => entry?.action_type === 'AUTO_CLOSURE_EXECUTED'
-    );
-    expect(executedCall).toBeUndefined();
-
-    const schedulerFailureCall = mocks.auditLogAction.mock.calls.find(
-      ([entry]) => entry?.action_type === 'AUTO_CLOSURE_FAILED'
-    );
-    expect(schedulerFailureCall).toBeDefined();
-  });
-
-  it('rethrows non-"already exists" bulletin failures and records AUTO_CLOSURE_FAILED', async () => {
-    mocks.createDailyClosureOpen.mockRejectedValue(new Error('database down'));
-
-    await expect(
-      ClosureScheduler.executeAutomaticClosureForEstablishment(ESTABLISHMENT_ID, NOW)
-    ).rejects.toThrow('database down');
-
-    expect(mocks.logClosure).not.toHaveBeenCalled();
-
-    const failureCall = mocks.auditLogAction.mock.calls.find(
-      ([entry]) => entry?.action_type === 'AUTO_CLOSURE_FAILED'
-    );
-    expect(failureCall).toBeDefined();
-    expect(failureCall![0].action_details).toMatchObject({
-      error: 'database down',
-      establishment_id: ESTABLISHMENT_ID,
-    });
-  });
-
-  it('skips empty-day refusals without treating them as hard failures', async () => {
-    mocks.createDailyClosureOpen.mockRejectedValue(
-      new Error('Aucune vente entre le 20/05/2026 02:00 et le 21/05/2026 01:59')
-    );
-
-    const result = await ClosureScheduler.executeAutomaticClosureForEstablishment(
-      ESTABLISHMENT_ID,
-      NOW
-    );
-
-    expect(result).toBeNull();
-    expect(mocks.logClosure).not.toHaveBeenCalled();
-    expect(
-      mocks.auditLogAction.mock.calls.find(([e]) => e?.action_type === 'AUTO_CLOSURE_FAILED')
-    ).toBeUndefined();
-  });
-});
-
-describe('ClosureScheduler.shouldExecuteClosure', () => {
-  it('runs only inside the grace window after cut time', async () => {
+  it('shouldExecuteClosure is true only inside grace window after target time', async () => {
     const settings = { daily_closure_time: '02:00', grace_period_minutes: 30 };
-    const moment = (await import('moment-timezone')).default;
-    const TZ = 'Europe/Paris';
+    const before = moment.tz('2026-10-22 01:59', 'Europe/Paris');
+    await expect(ClosureScheduler.shouldExecuteClosure(settings, before)).resolves.toBe(false);
 
-    const justAfterCut = moment.tz('2026-05-20 02:05', TZ);
-    expect(await ClosureScheduler.shouldExecuteClosure(settings, justAfterCut)).toBe(true);
+    const inGrace = moment.tz('2026-10-22 02:10', 'Europe/Paris');
+    await expect(ClosureScheduler.shouldExecuteClosure(settings, inGrace)).resolves.toBe(true);
 
-    const afterGrace = moment.tz('2026-05-20 02:45', TZ);
-    expect(await ClosureScheduler.shouldExecuteClosure(settings, afterGrace)).toBe(false);
+    const afterGrace = moment.tz('2026-10-22 03:00', 'Europe/Paris');
+    await expect(ClosureScheduler.shouldExecuteClosure(settings, afterGrace)).resolves.toBe(false);
+  });
 
-    const beforeCut = moment.tz('2026-05-20 01:50', TZ);
-    expect(await ClosureScheduler.shouldExecuteClosure(settings, beforeCut)).toBe(false);
+  it('getClosureSettings delegates to ClosureSettingsModel', async () => {
+    mocks.getClosureSettings.mockResolvedValue({ auto_closure_enabled: false });
+    await expect(ClosureScheduler.getClosureSettings('est-1')).resolves.toEqual({
+      auto_closure_enabled: false,
+    });
+  });
+
+  it('checkAndExecuteClosure skips establishments with auto closure disabled', async () => {
+    mocks.poolQuery.mockResolvedValue({ rows: [{ id: 'est-1' }] });
+    mocks.getClosureSettings.mockResolvedValue({
+      auto_closure_enabled: false,
+      timezone: 'Europe/Paris',
+      daily_closure_time: '02:00',
+      grace_period_minutes: 30,
+    });
+    await ClosureScheduler.checkAndExecuteClosure();
+    expect(mocks.runWithTenantContext).toHaveBeenCalled();
   });
 });

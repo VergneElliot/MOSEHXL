@@ -147,4 +147,84 @@ describe('orders API DTO mapper', () => {
     }
     expect(firstPaginatedOrder.id).toBe('2');
   });
+
+  it('maps waiter/table/kitchen metadata and option rows', async () => {
+    mockedRequest.mockResolvedValueOnce([
+      {
+        id: 9,
+        total_amount: 'bad',
+        total_tax: null,
+        created_at: '2026-05-01T00:00:00.000Z',
+        status: 'completed',
+        payment_method: 'cash',
+        waiter_user_id: 4,
+        waiter_display_name: 'Bob',
+        table_label: 'T2',
+        legal_sequence_number: 12,
+        kitchen_ticket_day_number: 3,
+        kitchen_print_targets: [
+          {
+            printer_id: 1,
+            printer_name: 'Cuisine',
+            printer_slug: 'cuisine',
+            kitchen_ticket_day_number: 3,
+          },
+        ],
+        cashier_user_id: 8,
+        cashier_display_name: 'Ann',
+        items: [
+          {
+            product_name: 'Mystery',
+            quantity: '1',
+            unit_price: '5',
+            total_price: '0',
+            tax_rate: '10',
+            tax_amount: '0',
+            options: [
+              {
+                id: 50,
+                group_id: 1,
+                group_name_snapshot: 'Extra',
+                choice_id: null,
+                choice_label_snapshot: null,
+                free_text: 'note',
+                display_order: 2,
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    const [order] = await getOrders();
+    expect(order).toMatchObject({
+      id: '9',
+      totalAmount: 0,
+      taxAmount: 0,
+      waiterUserId: 4,
+      waiterDisplayName: 'Bob',
+      tableLabel: 'T2',
+      legalSequenceNumber: 12,
+      kitchenTicketDayNumber: 3,
+      cashierUserId: 8,
+      cashierDisplayName: 'Ann',
+    });
+    expect(order?.kitchenPrintTargets?.[0]).toMatchObject({
+      printerId: 1,
+      printerName: 'Cuisine',
+      printerSlug: 'cuisine',
+    });
+    expect(order?.items[0]).toMatchObject({
+      productId: 'unknown',
+      productName: 'Mystery',
+      isOffert: true,
+      taxRate: 0.1,
+    });
+    expect(order?.items[0]?.options?.[0]).toMatchObject({
+      id: '50',
+      groupId: '1',
+      freeText: 'note',
+      choiceId: null,
+    });
+  });
 });
