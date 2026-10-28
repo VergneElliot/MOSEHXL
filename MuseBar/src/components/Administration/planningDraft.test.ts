@@ -164,7 +164,11 @@ describe('planningDraft', () => {
       updates: [],
       deletes: [],
     };
-    const next = applyPlanningDraftToShifts([], draft);
+    const next = applyPlanningDraftToShifts([], draft) as Array<{
+      id: number;
+      user_id: number;
+      _draft?: boolean;
+    }>;
     expect(next).toHaveLength(1);
     expect(next[0]?.id).toBe(localIdToTempId('local-x'));
     expect(next[0]?.user_id).toBe(7);

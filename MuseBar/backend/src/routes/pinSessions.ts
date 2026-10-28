@@ -7,12 +7,14 @@ import { StaffPinSessionModel } from '../models/staffPinSession';
 import { UserModel } from '../models/user';
 import { closePinSession } from '../services/auth/pinSessionService';
 import { logActorAction } from '../services/audit/auditActorLog';
+import pinSessionReportsRouter from './pinSessionReports';
 
 const router = express.Router();
 
 const UUID_RE = /^[0-9a-fA-F-]{36}$/;
 
 router.use(requireAuth);
+router.use(pinSessionReportsRouter);
 
 /** Active badges on this establishment (header tabs + admin panel). One row per PIN user. */
 router.get(

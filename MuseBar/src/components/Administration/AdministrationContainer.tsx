@@ -27,6 +27,7 @@ import ReservationsPanel from './ReservationsPanel';
 import PlanningPanel from './PlanningPanel';
 import TimeClockPanel from './TimeClockPanel';
 import { isPlanningUiDirty, setPlanningUiDirty } from './planningDraft';
+import { subscribeOpenAdmin } from '../../utils/adminNavigate';
 
 const LazyAuditTrailDashboard = React.lazy(() => import('../Admin/AuditTrailDashboard'));
 const LazyLegalComplianceDashboard = React.lazy(() =>
@@ -165,6 +166,16 @@ const AdministrationContainer: React.FC<AdministrationContainerProps> = ({ user,
     },
     [sections, ensureAccess, hasAccess, activeSession?.actor]
   );
+
+  useEffect(() => {
+    return subscribeOpenAdmin((detail) => {
+      if (detail.section === 'inbox' && detail.reservationId != null) {
+        openInboxConversation(detail.reservationId);
+        return;
+      }
+      selectAdminSectionById(detail.section);
+    });
+  }, [selectAdminSectionById, openInboxConversation]);
 
   if (!user.establishment_id) {
     return (

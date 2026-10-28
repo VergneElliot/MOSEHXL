@@ -23,9 +23,15 @@ per-PIN visual prefs / POS card UX are UI-only; PWA install is packaging/UI only
 specific-permission step-up UX is authorization-only).
 **Fiscal impact (coverage campaign 564–569):** PATCH — tests and CI thresholds only;
 no product behaviour change.
+**Fiscal impact (570–573):** MINOR — PIN session reports (operational, non-fiscal) +
+in-app notifications framework; no ISCA / legal_journal change.
 
 ### Added
 
+- Rapports de session PIN (570/571) : CA informatif par badge (`pin_session_id`),
+  génération / impression depuis Historique ; hors bulletins fiscaux.
+- Notifications in-app (572/573) : cloche en en-tête, feed établissement,
+  producteurs boîte mail / demandes de réservation + digest « réservations du jour ».
 - Campagne de couverture de tests (PLAN 564, slices 565–569) : suites colocated
   helpers/admin routes/services/policies ; seuils Vitest CI (backend ≥43 % lignes
   hors modules différés ; frontend include métier ≥18 % + globs purs ≥80 %) ;

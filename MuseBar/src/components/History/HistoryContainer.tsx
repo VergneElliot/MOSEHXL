@@ -19,6 +19,7 @@ import OrderDetailsDialog from './OrderDetailsDialog';
 import ReturnDialog from './ReturnDialog';
 import PrintAfterSaleDialog from '../POS/PrintAfterSaleDialog';
 import WaiterDayReportPanel from './WaiterDayReportPanel';
+import PinSessionReportPanel from './PinSessionReportPanel';
 import OngoingOrdersPanel from './OngoingOrdersPanel';
 import { Order } from '../../types';
 import { useStepUpAuth } from '../../contexts/StepUpAuthContext';
@@ -186,6 +187,7 @@ const HistoryContainer: React.FC<HistoryContainerProps> = ({ canCancelOrReturn =
           />
 
           <WaiterDayReportPanel />
+          <PinSessionReportPanel />
 
           <SearchBar
             search={state.search}

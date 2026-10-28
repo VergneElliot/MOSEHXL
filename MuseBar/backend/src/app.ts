@@ -243,6 +243,11 @@ const server = app.listen(config.server.port, '0.0.0.0', async () => {
 
     // Document expiry reminders (admin space) — hourly check
     DocumentExpiryScheduler.start();
+    // In-app « réservations du jour » digest — hourly, deduped per Paris day
+    const { ReservationDayNotificationScheduler } = await import(
+      './services/notifications/reservationDayDigest'
+    );
+    ReservationDayNotificationScheduler.start();
 
     // Start the automatic closure scheduler (only in production)
     if (NODE_ENV === 'production') {

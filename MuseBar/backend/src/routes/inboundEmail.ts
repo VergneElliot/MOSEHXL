@@ -19,6 +19,7 @@ import { EmailService } from '../services/email/EmailService';
 import { extractInboxRecipient } from '../services/email/extractInboxLocalPart';
 import { resolveVenueContactEmail } from '../services/establishment/venueContactEmail';
 import { asyncHandler } from '../middleware/errorHandler';
+import { emitInboxNotification } from '../services/notifications/emitInboxNotification';
 
 const router = express.Router();
 const upload = multer({
@@ -99,6 +100,21 @@ router.post(
         reservation_id: linkedReservationId,
         direction: 'inbound',
       });
+
+      try {
+        await emitInboxNotification({
+          establishmentId: establishment.id,
+          messageId: message.id,
+          subject,
+          reservationId: linkedReservationId,
+        });
+      } catch (error) {
+        Logger.getInstance().error(
+          'Failed to emit inbox notification',
+          error instanceof Error ? error : new Error(String(error)),
+          'INBOUND_EMAIL'
+        );
+      }
 
       if (linkedReservationId != null) {
         await pool.query(

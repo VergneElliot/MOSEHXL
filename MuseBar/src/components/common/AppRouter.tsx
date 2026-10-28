@@ -26,6 +26,7 @@ import { useStepUpAuth } from '../../contexts/StepUpAuthContext';
 import { usePinSessions } from '../../contexts/PinSessionsContext';
 import { canEnterWithoutStepUpPin } from '../../contexts/stepUpPageEntryPolicy';
 import { NavSubsectionsProvider } from '../../contexts/NavSubsectionsContext';
+import { subscribeOpenAdmin } from '../../utils/adminNavigate';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -212,6 +213,14 @@ const AppRouter: React.FC<AppRouterProps> = ({
     }
     lastSessionIdRef.current = id;
   }, [activeSessionId, releaseAllAccess, switchToPosTab]);
+
+  // Header bell → Administration tab (subsection handled inside the admin container).
+  useEffect(() => {
+    return subscribeOpenAdmin(() => {
+      const adminIdx = filteredTabs.findIndex((t) => t.value === 'administration');
+      if (adminIdx >= 0) selectTab(adminIdx);
+    });
+  }, [filteredTabs, selectTab]);
 
   useEffect(() => {
     if (!activeSession) switchToPosTab();

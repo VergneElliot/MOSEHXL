@@ -234,6 +234,57 @@ export class StaffPinSessionModel {
     return result.rowCount ?? 0;
   }
 
+  /**
+   * Sessions that were open at any point during [dayStart, dayEnd] (inclusive overlap).
+   * Used by History for operational session reports.
+   */
+  static async listOverlappingPeriod(
+    establishmentId: string,
+    dayStart: Date,
+    dayEnd: Date
+  ): Promise<
+    Array<{
+      id: string;
+      user_id: number;
+      display_name: string;
+      opened_at: Date;
+      closed_at: Date | null;
+      close_reason: string | null;
+    }>
+  > {
+    const result = await pool.query(
+      `SELECT s.id, s.user_id, s.opened_at, s.closed_at, s.close_reason,
+              u.email,
+              TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')) AS full_name
+       FROM staff_pin_sessions s
+       JOIN users u ON u.id = s.user_id
+       WHERE s.establishment_id = $1
+         AND s.opened_at <= $3
+         AND (s.closed_at IS NULL OR s.closed_at >= $2)
+       ORDER BY s.opened_at DESC`,
+      [establishmentId, dayStart, dayEnd]
+    );
+    return result.rows.map((row) => {
+      const r = row as {
+        id: string;
+        user_id: number;
+        email: string;
+        full_name: string | null;
+        opened_at: Date;
+        closed_at: Date | null;
+        close_reason: string | null;
+      };
+      return {
+        id: r.id,
+        user_id: r.user_id,
+        display_name: r.full_name?.trim() ? r.full_name.trim() : r.email,
+        opened_at: r.opened_at,
+        closed_at: r.closed_at,
+        close_reason: r.close_reason,
+      };
+    });
+  }
+
   static async listActive(establishmentId: string): Promise<ActivePinSessionSummary[]> {
     const result = await pool.query(
       `SELECT DISTINCT ON (s.user_id)

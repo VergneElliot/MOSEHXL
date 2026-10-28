@@ -32,6 +32,7 @@ import { TimeClockHeaderControl } from './TimeClockHeaderControl';
 import { DisplayScaleControl } from './DisplayScaleControl';
 import { HappyHourHeaderChip } from './HappyHourHeaderChip';
 import { PwaInstallControl } from './PwaInstallControl';
+import { NotificationBell } from './NotificationBell';
 
 interface AppHeaderProps {
   isHappyHourActive: boolean;
@@ -129,6 +130,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0 }}>
           <PwaInstallControl />
           {showPinSessions && <DisplayScaleControl />}
+          {user && user.role !== 'system_admin' && user.establishment_id && (
+            <NotificationBell />
+          )}
           {user && user.role !== 'system_admin' && user.establishment_id && (
             <TimeClockHeaderControl />
           )}
