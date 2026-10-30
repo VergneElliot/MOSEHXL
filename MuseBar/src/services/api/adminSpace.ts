@@ -364,24 +364,11 @@ export async function deleteTimeEntry(id: number) {
   return request(`/admin/time-clock/entries/${id}`, { method: 'DELETE' });
 }
 
-export async function getTimeClockNetwork() {
-  return request<{ allowed_ips: string[]; client_ip: string | null }>(
-    '/admin/time-clock/network'
-  );
-}
-
-export async function updateTimeClockNetwork(payload: {
-  allowed_ips?: string[];
-  capture_current?: boolean;
-}) {
-  return request<{ allowed_ips: string[]; client_ip: string | null }>(
-    '/admin/time-clock/network',
-    {
-      method: 'PUT',
-      body: JSON.stringify(payload),
-    }
-  );
-}
+export {
+  getTimeClockNetwork,
+  updateTimeClockNetwork,
+  type TimeClockNetworkDto,
+} from './adminTimeClockNetwork';
 
 export interface LaborViolationDto {
   code: string;

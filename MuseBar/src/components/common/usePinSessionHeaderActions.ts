@@ -139,20 +139,41 @@ export function usePinSessionHeaderActions() {
           throw new Error('Session introuvable — actualisez la liste puis réessayez.');
         }
         try {
-          await closeSessionAsPinUser(sessionId, result.pin_actor_token);
+          const closeResult = await closeSessionAsPinUser(
+            sessionId,
+            result.pin_actor_token
+          );
+          setPinOpen(false);
+          setRenewNotice(null);
+          setUnlockUserId(null);
+          setUnlockDisplayName(null);
+          setPendingCloseId(null);
+          const pointage = closeResult.pointage;
+          if (pointage?.recorded) {
+            setToastSeverity('success');
+            setToast(`Session fermée et sortie pointée : ${result.display_name}`);
+          } else if (pointage?.reason === 'off_network') {
+            setToastSeverity('info');
+            setToast(
+              `Badge fermé : ${result.display_name} — sortie NON pointée (réseau non autorisé). Ajoutez l’IP / préfixe IPv6 du lieu dans Paramètres → Pointage.`
+            );
+          } else if (pointage?.reason === 'no_open_entry') {
+            setToastSeverity('info');
+            setToast(
+              `Badge fermé : ${result.display_name} — aucun pointage ouvert à clôturer.`
+            );
+          } else {
+            setToastSeverity('info');
+            setToast(
+              `Badge fermé : ${result.display_name} — sortie non enregistrée (${pointage?.reason ?? 'inconnu'}).`
+            );
+          }
         } catch (err) {
           const message =
             (err as { message?: string }).message ||
             'Impossible de fermer ce badge (tables ouvertes ?).';
           throw new Error(message);
         }
-        setPinOpen(false);
-        setRenewNotice(null);
-        setUnlockUserId(null);
-        setUnlockDisplayName(null);
-        setPendingCloseId(null);
-        setToastSeverity('success');
-        setToast(`Session fermée : ${result.display_name}`);
         return;
       }
 

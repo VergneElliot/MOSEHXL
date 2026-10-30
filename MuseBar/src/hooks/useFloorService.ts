@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { OrderItem } from '../types';
 import * as floorApi from '../services/api/floor';
 import {
@@ -15,6 +15,9 @@ import { pinActorFromVerify } from '../contexts/pinActorFromVerify';
 import { useTableInterventionGate } from './useTableInterventionGate';
 import { buildActiveTableState, withTableDraftStatus } from './floorActiveTable';
 import { runFloorMoveToTable } from './floorMoveToTable';
+import { isOpenTicketGoneError } from './floorTicketGone';
+import { runValidateTableOrder } from './floorValidateTableOrder';
+import { useFloorTicketCartSync } from './useFloorTicketCartSync';
 
 export type { ActiveTableState, PinActorState };
 
@@ -55,7 +58,6 @@ export function useFloorService(options: {
   const [pinDialogMode, setPinDialogMode] = useState<'verify' | 'set'>('verify');
   const pendingAfterPin = useRef<'map' | null>(null);
   const pendingMapAction = useRef<FloorMapPendingAction>(null);
-  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipNextSync = useRef(false);
   const validateTableOrderRef = useRef<
     (order: OrderItem[], ticketIdOverride?: number) => Promise<void>
@@ -278,29 +280,38 @@ export function useFloorService(options: {
     updateActiveSession({ activeTable: null });
   }, [updateActiveSession]);
 
+  const releaseLocalTableCart = useCallback(
+    (infoMessage?: string) => {
+      skipNextSync.current = true;
+      updateActiveSession({ activeTable: null, cart: [] });
+      setCurrentOrder([]);
+      if (infoMessage) onInfo(infoMessage);
+    },
+    [setCurrentOrder, onInfo, updateActiveSession]
+  );
+
   const detachTableKeepTicket = useCallback(async () => {
     if (activeTable && pinActor) {
       try {
         await ensureTableIntervention();
         await floorApi.discardDraftTicketItems(activeTable.ticketId, pinActor.token);
       } catch (error: unknown) {
+        if (isOpenTicketGoneError(error)) {
+          releaseLocalTableCart('Table déjà clôturée — panier local libéré');
+          return;
+        }
         const err = error as { message?: string };
         onError(err.message || 'Impossible de quitter la table');
         return;
       }
     }
-    skipNextSync.current = true;
-    updateActiveSession({ activeTable: null, cart: [] });
-    setCurrentOrder([]);
-    onInfo('Mode comptoir');
+    releaseLocalTableCart('Mode comptoir');
   }, [
     activeTable,
     pinActor,
-    setCurrentOrder,
     onError,
-    onInfo,
-    updateActiveSession,
     ensureTableIntervention,
+    releaseLocalTableCart,
   ]);
 
   const selectFreeTable = useCallback(
@@ -384,25 +395,20 @@ export function useFloorService(options: {
         await ensureTableIntervention();
         await floorApi.abandonTicket(ticketId, pinActor.token);
         if (activeTable?.ticketId === ticketId) {
-          skipNextSync.current = true;
-          updateActiveSession({ activeTable: null, cart: [] });
-          setCurrentOrder([]);
+          releaseLocalTableCart('Addition abandonnée');
+        } else {
+          onInfo('Addition abandonnée');
         }
-        onInfo('Addition abandonnée');
       } catch (error: unknown) {
+        if (isOpenTicketGoneError(error) && activeTable?.ticketId === ticketId) {
+          releaseLocalTableCart('Table déjà clôturée — panier local libéré');
+          return;
+        }
         const err = error as { message?: string };
         onError(err.message || 'Abandon impossible');
       }
     },
-    [
-      pinActor,
-      activeTable,
-      setCurrentOrder,
-      onError,
-      onInfo,
-      updateActiveSession,
-      ensureTableIntervention,
-    ]
+    [pinActor, activeTable, onError, onInfo, ensureTableIntervention, releaseLocalTableCart]
   );
 
   const closeActiveTicketAfterOrder = useCallback(
@@ -419,13 +425,15 @@ export function useFloorService(options: {
         await ensureTableIntervention();
         await floorApi.closeTicket(activeTable.ticketId, parsed, pinActor.token);
       } catch (error: unknown) {
-        const err = error as { message?: string };
-        onError(err.message || 'Table non clôturée côté serveur');
+        if (!isOpenTicketGoneError(error)) {
+          const err = error as { message?: string };
+          onError(err.message || 'Table non clôturée côté serveur');
+        }
       } finally {
-        updateActiveSession({ activeTable: null });
+        releaseLocalTableCart();
       }
     },
-    [activeTable, pinActor, onError, updateActiveSession, ensureTableIntervention]
+    [activeTable, pinActor, onError, ensureTableIntervention, releaseLocalTableCart]
   );
 
   const transferActiveToTable = useCallback(
@@ -625,53 +633,29 @@ export function useFloorService(options: {
 
   const validateTableOrder = useCallback(
     async (order: OrderItem[], ticketIdOverride?: number) => {
-      if (!pinActor) {
-        openPinDialog('verify');
-        onError('Badge requis pour valider la commande table');
-        return;
-      }
-      const ticketId = ticketIdOverride ?? activeTable?.ticketId;
-      if (ticketId == null) {
-        onError('Table active requise');
-        return;
-      }
-      const targets = getActionItems(order);
-      const pending = targets.filter(
-        (line) => !line.isTip && line.tableLineStatus !== 'validated'
-      );
-      if (pending.length === 0) {
-        onError('Aucun article en attente de validation');
-        return;
-      }
-      try {
-        const { items: saved } = await floorApi.replaceTicketItems(
-          ticketId,
-          order,
-          pinActor.token
-        );
-        const synced = floorApi.mapTicketItemsToOrderItems(saved);
-        const draftLineIds = ticketLineIdsFromItems(
-          resolveTargetOrderItems(synced, getSelectedIds()).filter(
-            (line) => line.tableLineStatus !== 'validated'
-          )
-        );
-        const result = await floorApi.validateTicket(
-          ticketId,
-          pinActor.token,
-          draftLineIds.length > 0 ? draftLineIds : undefined
-        );
-        applyTicketItemsToCart(result.items);
-        onInfo(
-          result.print.enqueued > 0
-            ? `Commande table validée — ${result.print.enqueued} ticket(s) cuisine`
-            : 'Commande table validée (aucun ticket cuisine)'
-        );
-      } catch (error: unknown) {
-        const err = error as { message?: string };
-        onError(err.message || 'Validation commande table échouée');
-      }
+      await runValidateTableOrder({
+        order,
+        ticketIdOverride,
+        pinActor,
+        activeTable,
+        getActionItems,
+        getSelectedIds,
+        openPinDialog,
+        onError,
+        onInfo,
+        releaseLocalTableCart,
+      });
     },
-    [pinActor, activeTable, openPinDialog, onError, onInfo, applyTicketItemsToCart, getActionItems, getSelectedIds]
+    [
+      pinActor,
+      activeTable,
+      openPinDialog,
+      onError,
+      onInfo,
+      getActionItems,
+      getSelectedIds,
+      releaseLocalTableCart,
+    ]
   );
 
   validateTableOrderRef.current = validateTableOrder;
@@ -699,42 +683,26 @@ export function useFloorService(options: {
             : 'Article retiré de la commande'
         );
       } catch (error: unknown) {
+        if (isOpenTicketGoneError(error)) {
+          releaseLocalTableCart('Table déjà clôturée — panier local libéré');
+          return;
+        }
         const err = error as { message?: string };
         onError(err.message || 'Retour impossible');
       }
     },
-    [pinActor, activeTable, onError, onInfo, applyTicketItemsToCart]
+    [pinActor, activeTable, onError, onInfo, applyTicketItemsToCart, releaseLocalTableCart]
   );
 
-  // Debounced cart → ticket sync
-  useEffect(() => {
-    if (!activeTable || !pinActor) {
-      if (syncTimer.current) {
-        clearTimeout(syncTimer.current);
-        syncTimer.current = null;
-      }
-      return;
-    }
-    if (skipNextSync.current) {
-      skipNextSync.current = false;
-      return;
-    }
-    if (syncTimer.current) clearTimeout(syncTimer.current);
-    syncTimer.current = setTimeout(() => {
-      void floorApi
-        .replaceTicketItems(activeTable.ticketId, currentOrder, pinActor.token)
-        .then(({ items }) => {
-          applyTicketItemsToCart(items);
-        })
-        .catch((error: unknown) => {
-          const err = error as { message?: string };
-          onError(err.message || 'Synchronisation table échouée');
-        });
-    }, 450);
-    return () => {
-      if (syncTimer.current) clearTimeout(syncTimer.current);
-    };
-  }, [currentOrder, activeTable, pinActor, onError, applyTicketItemsToCart]);
+  useFloorTicketCartSync({
+    activeTable,
+    pinActor,
+    currentOrder,
+    skipNextSync,
+    applyTicketItemsToCart,
+    releaseLocalTableCart,
+    onError,
+  });
 
   return {
     pinActor,

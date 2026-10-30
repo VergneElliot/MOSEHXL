@@ -55,10 +55,9 @@ interface StepUpAuthContextValue {
   /** Ensure an active PIN session exists (opens session pad if needed). */
   ensureSession: (opts?: { message?: string }) => Promise<PinActorState>;
   /**
-   * Single action step-up: always prompts for a PIN that holds a **specific**
-   * permission (even if the focused badge already has it). Basic permissions may
-   * use the focused actor without re-entry. Authorization applies to the next
-   * request only. Does not open a session tab.
+   * Single action step-up: skips the pad when the focused badge already holds the
+   * right (basic or specific); otherwise prompts for a PIN that holds it.
+   * Authorization applies to the next request only. Does not open a session tab.
    */
   ensurePermission: (
     permission: string | string[],
@@ -143,7 +142,7 @@ export function StepUpAuthProvider({ children }: { children: ReactNode }) {
       opts?: { title?: string; description?: string }
     ) => {
       const permissions = Array.isArray(permission) ? permission : [permission];
-      // Specific rights always prompt. Basic may reuse the focused badge without PIN.
+      // Focused badge already holds the right → no re-PIN (portal-default workflow).
       if (
         activeSession?.actor &&
         canSkipPinForActiveActor(permissions, (p) =>

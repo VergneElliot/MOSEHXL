@@ -17,31 +17,46 @@ import {
   Delete as DeleteIcon,
   MyLocation as CaptureIcon,
   Wifi as WifiIcon,
+  WifiOff as WifiOffIcon,
 } from '@mui/icons-material';
 import {
   getTimeClockNetwork,
   updateTimeClockNetwork,
-} from '../../../services/api/adminSpace';
+} from '../../../services/api/adminTimeClockNetwork';
 
 /**
  * Admin settings: public IPs / CIDRs allowed for employee clock-in/out.
+ * IPv6 captures store a /64 prefix so privacy-extension addresses keep matching.
  */
 export const TimeClockNetworkSettings: React.FC = () => {
   const [ips, setIps] = useState<string[]>([]);
   const [clientIp, setClientIp] = useState<string | null>(null);
+  const [onVenue, setOnVenue] = useState(false);
+  const [ipv6Prefix, setIpv6Prefix] = useState<string | null>(null);
   const [newIp, setNewIp] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const applyNetwork = (data: {
+    allowed_ips: string[];
+    client_ip: string | null;
+    on_venue_network?: boolean;
+    ipv6_prefix_suggestion?: string | null;
+  }) => {
+    setIps(data.allowed_ips);
+    setClientIp(data.client_ip);
+    setOnVenue(Boolean(data.on_venue_network));
+    setIpv6Prefix(data.ipv6_prefix_suggestion ?? null);
+  };
+
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await getTimeClockNetwork();
-      setIps(data.allowed_ips);
-      setClientIp(data.client_ip);
+      applyNetwork(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur chargement réseau');
     } finally {
@@ -53,17 +68,20 @@ export const TimeClockNetworkSettings: React.FC = () => {
     void refresh();
   }, [refresh]);
 
-  const saveIps = async (next: string[], captureCurrent = false) => {
+  const saveIps = async (
+    next: string[],
+    opts?: { captureCurrent?: boolean; captureAsPrefix?: boolean }
+  ) => {
     setSaving(true);
     setError(null);
     setMessage(null);
     try {
       const data = await updateTimeClockNetwork({
         allowed_ips: next,
-        capture_current: captureCurrent,
+        capture_current: opts?.captureCurrent === true,
+        capture_as_prefix: opts?.captureAsPrefix,
       });
-      setIps(data.allowed_ips);
-      setClientIp(data.client_ip);
+      applyNetwork(data);
       setMessage('Réseau de pointage enregistré');
       setNewIp('');
     } catch (err) {
@@ -96,12 +114,13 @@ export const TimeClockNetworkSettings: React.FC = () => {
         </Box>
 
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Les adresses IP publiques listées ci-dessous (en pratique l&apos;IP Internet
-          de la box Wi‑Fi du lieu) déterminent le <strong>pointage</strong> : ouvrir ou
+          Les adresses IP publiques / préfixes listés ci-dessous (IP Internet de la
+          box Wi‑Fi du lieu) déterminent le <strong>pointage</strong> : ouvrir ou
           fermer un badge PIN <strong>depuis le Wi‑Fi du lieu</strong> enregistre
-          l&apos;entrée / la sortie. Depuis chez soi ou un autre réseau, le badge
-          s&apos;ouvre et se ferme normalement <strong>sans</strong> compter d&apos;heures.
-          Connectez-vous au Wi‑Fi du bar puis cliquez sur « Ajouter l&apos;IP actuelle ».
+          l&apos;entrée / la sortie. En IPv6, les téléphones changent souvent
+          d&apos;adresse : utilisez un préfixe <strong>/64</strong> (bouton dédié)
+          plutôt que l&apos;adresse complète. Hors réseau autorisé, le badge
+          s&apos;ouvre et se ferme <strong>sans</strong> compter d&apos;heures.
         </Typography>
 
         {message && (
@@ -119,20 +138,46 @@ export const TimeClockNetworkSettings: React.FC = () => {
           <CircularProgress size={28} />
         ) : (
           <>
-            <Typography variant="body2" sx={{ mb: 1 }}>
-              Votre IP actuelle :{' '}
+            <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+              <Typography variant="body2">Votre IP actuelle :</Typography>
               <Chip size="small" label={clientIp || 'inconnue'} />
-            </Typography>
+              <Chip
+                size="small"
+                icon={onVenue ? <WifiIcon /> : <WifiOffIcon />}
+                color={onVenue ? 'success' : 'warning'}
+                label={
+                  onVenue
+                    ? 'Correspond à la liste — pointage actif'
+                    : 'Ne correspond pas — pointage désactivé sur cet appareil'
+                }
+              />
+            </Stack>
 
             <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap', gap: 1 }}>
               <Button
                 variant="contained"
                 startIcon={<CaptureIcon />}
                 disabled={saving || !clientIp}
-                onClick={() => void saveIps(ips, true)}
+                onClick={() =>
+                  void saveIps(ips, {
+                    captureCurrent: true,
+                    captureAsPrefix: Boolean(clientIp?.includes(':')),
+                  })
+                }
               >
-                Ajouter l&apos;IP actuelle
+                {clientIp?.includes(':')
+                  ? 'Ajouter le préfixe IPv6 /64'
+                  : 'Ajouter l’IP actuelle'}
               </Button>
+              {ipv6Prefix && (
+                <Button
+                  variant="outlined"
+                  disabled={saving || ips.includes(ipv6Prefix)}
+                  onClick={() => void saveIps([...ips, ipv6Prefix])}
+                >
+                  Ajouter {ipv6Prefix}
+                </Button>
+              )}
             </Stack>
 
             <Stack spacing={1} sx={{ mb: 2 }}>
@@ -175,7 +220,7 @@ export const TimeClockNetworkSettings: React.FC = () => {
               <TextField
                 size="small"
                 fullWidth
-                label="IP ou CIDR (ex. 203.0.113.10 ou 203.0.113.0/24)"
+                label="IP ou CIDR (ex. 203.0.113.0/24 ou 2a02:…::/64)"
                 value={newIp}
                 onChange={(e) => setNewIp(e.target.value)}
                 onKeyDown={(e) => {

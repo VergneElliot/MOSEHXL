@@ -53,8 +53,8 @@ Login rejects `can_login = false`. Setup wizard collects email + password + **ow
 | Close badge | Header ✕ requires that user's PIN (any device); token proves ownership; managers may force-close from admin |
 | Device focus | Shared tab *list*; which tab is **focused** stays per-device (`sessionStorage`) |
 | Pointage network | Badge open/close **always** allowed; clock-in/out **only** on venue Wi‑Fi allowlist (empty list = no hours recorded). Home→venue unlock can clock in on reuse. |
-| Specific rights | Always step-up PIN (`ensurePermission` / `ensureAccess`); UI must not short-circuit on `hasAccess` for specific keys before calling ensure* |
-| Page entry | Closures / Administration / Settings (non-Profil) always `ensureAccess`; scope reuse only after a successful PIN that visit |
+| Specific rights | `ensurePermission` / `ensureAccess`: skip PIN when focused badge already holds the right; step-up only when it lacks it. Prefer ensure* over raw `hasAccess` short-circuits for first entry. |
+| Page entry | Closures / Administration / Settings (non-Profil) call `ensureAccess`; pad skipped if badge holds the right; scope reuse after a successful step-up that visit |
 | Enforcement | `middleware/pinActor.ts` + `pinSessionGuard.ts` — `x-pin-actor-token` |
 | Frontend | `PinSessionsContext.tsx`, header PIN tabs, PIN-first shell |
 

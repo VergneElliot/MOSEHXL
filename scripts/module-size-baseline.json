@@ -3,14 +3,14 @@
   "note": "Files already above the cap when the ratchet was introduced. They may only shrink; remove an entry once the file is under the cap. Regenerate with --update only after a deliberate cleanup pass.",
   "files": {
     "MuseBar/src/components/Administration/PlanningPanel.tsx": 1067,
-    "MuseBar/src/components/POS/POSContainer.tsx": 869,
-    "MuseBar/src/hooks/useFloorService.ts": 776,
+    "MuseBar/src/components/POS/POSContainer.tsx": 845,
     "MuseBar/backend/src/routes/floor.ts": 771,
+    "MuseBar/src/hooks/useFloorService.ts": 738,
     "MuseBar/src/components/POS/PaymentDialog/SplitBoard.tsx": 727,
-    "MuseBar/src/components/POS/OrderSummary.tsx": 706,
+    "MuseBar/src/components/POS/OrderSummary.tsx": 687,
     "MuseBar/src/components/Administration/FloorPlansPanel.tsx": 669,
     "MuseBar/backend/src/routes/legal/closure.ts": 668,
-    "MuseBar/src/services/api/adminSpace.ts": 665,
+    "MuseBar/src/services/api/adminSpace.ts": 652,
     "MuseBar/backend/src/models/legalJournal/closureOperations.ts": 640,
     "MuseBar/backend/src/routes/authRegister.ts": 613,
     "MuseBar/backend/src/services/documents/closureXlsxService.ts": 594,
@@ -34,7 +34,6 @@
     "MuseBar/backend/src/services/orders/orderCancellationService.ts": 425,
     "MuseBar/src/components/Closure/CreateClosureDialog.tsx": 423,
     "MuseBar/src/components/Public/PublicReservationPage.tsx": 420,
-    "MuseBar/backend/src/models/timeEntry.ts": 410,
     "MuseBar/backend/src/models/database/productOptionGroupModel.ts": 408
   }
 }

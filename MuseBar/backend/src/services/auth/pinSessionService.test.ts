@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   closeAllForUser: vi.fn(),
   clockInOnPinOpen: vi.fn(),
   clockOutOnPinClose: vi.fn(),
+  clockOutUsersAfterBadgeExpiry: vi.fn(),
   isPinPointageOnVenueNetwork: vi.fn(),
   error: vi.fn(),
 }));
@@ -29,6 +30,7 @@ vi.mock('../../models/staffPinSession', () => ({
 vi.mock('./pinSessionPointage', () => ({
   clockInOnPinOpen: mocks.clockInOnPinOpen,
   clockOutOnPinClose: mocks.clockOutOnPinClose,
+  clockOutUsersAfterBadgeExpiry: mocks.clockOutUsersAfterBadgeExpiry,
 }));
 
 vi.mock('./venueNetworkGuard', () => ({
@@ -56,7 +58,7 @@ const BASE = {
 describe('openPinSession', () => {
   beforeEach(() => {
     for (const fn of Object.values(mocks)) fn.mockReset();
-    mocks.closeStale.mockResolvedValue(0);
+    mocks.closeStale.mockResolvedValue([]);
     mocks.touchAndExtend.mockResolvedValue(true);
     mocks.closeDuplicatesForUser.mockResolvedValue(0);
     mocks.clockInOnPinOpen.mockResolvedValue(undefined);
@@ -105,12 +107,25 @@ describe('closePinSession', () => {
   });
 
   it('clocks out then closes all open badges for that PIN user', async () => {
+    const pointage = {
+      recorded: true,
+      reason: 'ok' as const,
+      time_entry_id: 9,
+      client_ip: '127.0.0.1',
+      on_venue: true,
+    };
+    mocks.clockOutOnPinClose.mockResolvedValue(pointage);
+
     await expect(
       closePinSession('sid-1', 'est-1', 'closed_by_user', {
         pinUserId: 42,
         ipAddress: '127.0.0.1',
       })
-    ).resolves.toBe(true);
+    ).resolves.toEqual({
+      closed: true,
+      already_closed: false,
+      pointage,
+    });
 
     expect(mocks.clockOutOnPinClose).toHaveBeenCalledWith({
       establishmentId: 'est-1',
@@ -124,13 +139,24 @@ describe('closePinSession', () => {
 
   it('closes off venue without recording clock-out', async () => {
     mocks.isPinPointageOnVenueNetwork.mockResolvedValue(false);
+    const pointage = {
+      recorded: false,
+      reason: 'off_network' as const,
+      client_ip: '198.51.100.1',
+      on_venue: false,
+    };
+    mocks.clockOutOnPinClose.mockResolvedValue(pointage);
 
     await expect(
       closePinSession('sid-1', 'est-1', 'closed_by_user', {
         pinUserId: 42,
         ipAddress: '198.51.100.1',
       })
-    ).resolves.toBe(true);
+    ).resolves.toEqual({
+      closed: true,
+      already_closed: false,
+      pointage,
+    });
 
     expect(mocks.clockOutOnPinClose).toHaveBeenCalledWith({
       establishmentId: 'est-1',

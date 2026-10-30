@@ -82,6 +82,11 @@ and on **GET /floor/status** (`DiningTableModel.listStatus`). `POST /floor/ticke
 empty shell instead of conflicting. PIN close only blocks on tickets that still have
 draft/validated lines (and lists those table labels in the error).
 
+**Local cart vs server ticket:** Caisse binds `activeTable` + cart in the PIN session
+(sessionStorage). After **Valider** (kitchen), the local cart is released (ticket stays
+open on the floor). If sync / leave / abandon hits a closed/missing ticket, the local
+binding is cleared instead of trapping a ghost cart (`isOpenTicketGoneError`).
+
 
 ## Historique cancel + reopen table
 

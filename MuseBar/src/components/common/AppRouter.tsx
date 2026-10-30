@@ -1,5 +1,5 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Box, Paper } from '@mui/material';
+import { Box, Paper, Typography } from '@mui/material';
 import {
   PointOfSale as POSIcon,
   History as HistoryIcon,
@@ -19,6 +19,7 @@ import {
   TabPanelFallback,
 } from './appLazyTabPanels';
 import { AppMainNav } from './AppMainNav';
+import PinPortalPage from '../portal/PinPortalPage';
 
 import { Category, Product, User } from '../../types';
 import { PERMISSIONS, type PermissionName } from '@mosehxl/types';
@@ -26,6 +27,7 @@ import { useStepUpAuth } from '../../contexts/StepUpAuthContext';
 import { usePinSessions } from '../../contexts/PinSessionsContext';
 import { canEnterWithoutStepUpPin } from '../../contexts/stepUpPageEntryPolicy';
 import { NavSubsectionsProvider } from '../../contexts/NavSubsectionsContext';
+import type { PinPortalOwnedTableDto } from '../../services/api/pin';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -130,8 +132,10 @@ const AppRouter: React.FC<AppRouterProps> = ({
 }) => {
   const [tabValue, setTabValue] = useState(0);
   const [navOpen, setNavOpen] = useState(false);
-  const { ensureAccess, ensureSession, releaseAccess, releaseAllAccess } = useStepUpAuth();
-  const { activeSession, activeSessionId } = usePinSessions();
+  /** Portal home vs feature chrome — return to portal does not clock out. */
+  const [surface, setSurface] = useState<'portal' | 'app'>('portal');
+  const { ensureAccess, releaseAccess, releaseAllAccess } = useStepUpAuth();
+  const { activeSession, activeSessionId, updateActiveSession } = usePinSessions();
 
   const TABS: TabConfig[] = [
     { label: 'Caisse', icon: <POSIcon />, value: 'pos' },
@@ -155,9 +159,9 @@ const AppRouter: React.FC<AppRouterProps> = ({
   }, [posTabIndex]);
 
   /**
-   * Feature tabs require an active PIN session. Empty permission lists are basic
-   * (session enough). Specific lists always step-up via ensureAccess — never skip
-   * because the focused badge already holds the right (see canEnterWithoutStepUpPin).
+   * Feature tabs require an active PIN session. Empty / basic lists are session
+   * enough. Specific lists go through ensureAccess (skips PIN when the focused
+   * badge already holds the right).
    */
   const selectTab = useCallback(
     (newValue: number) => {
@@ -251,18 +255,32 @@ const AppRouter: React.FC<AppRouterProps> = ({
     };
   }, [activeSession?.id, onDataUpdate]);
 
-  // Remember-me JWT alone: open the PIN pad once so the user is not stuck.
-  const autoPinPrompted = useRef(false);
+  // Closing the last badge always returns to the portal.
   useEffect(() => {
-    if (!user?.establishment_id || activeSession || autoPinPrompted.current) return;
-    autoPinPrompted.current = true;
-    void ensureSession({
-      message:
-        'Connectez un badge PIN pour accéder à l’application. Le compte email n’accorde aucun droit seul.',
-    }).catch(() => undefined);
-  }, [user?.establishment_id, activeSession, ensureSession]);
+    if (!activeSession) setSurface('portal');
+  }, [activeSession]);
 
-  if (user?.establishment_id && !activeSession) {
+  const returnToPortal = useCallback(() => {
+    // Leave the floor selection on this device; do not clock out.
+    updateActiveSession({ activeTable: null, cart: [] });
+    setSurface('portal');
+    releaseAllAccess();
+  }, [releaseAllAccess, updateActiveSession]);
+
+  const enterApp = useCallback(() => {
+    setSurface('app');
+    switchToPosTab();
+  }, [switchToPosTab]);
+
+  const selectOwnedTable = useCallback(
+    (_table: PinPortalOwnedTableDto) => {
+      const floorIdx = filteredTabs.findIndex((tab) => tab.value === 'floor_plan');
+      if (floorIdx >= 0) setTabValue(floorIdx);
+    },
+    [filteredTabs]
+  );
+
+  if (user?.establishment_id && (surface === 'portal' || !activeSession)) {
     return (
       <Paper
         sx={{
@@ -274,31 +292,23 @@ const AppRouter: React.FC<AppRouterProps> = ({
           overflow: 'hidden',
         }}
       >
-        <AppMainNav
-          tabs={filteredTabs}
-          activeIndex={Math.max(0, posTabIndex)}
-          open={navOpen}
-          onOpen={() => setNavOpen(true)}
-          onClose={() => setNavOpen(false)}
-          onSelect={selectTab}
-          showPinSessions
-        />
         <Box
           sx={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            p: 4,
+            flexShrink: 0,
+            px: 2,
+            py: 1,
+            borderBottom: 1,
+            borderColor: 'divider',
+            bgcolor: 'background.paper',
+            color: 'text.primary',
           }}
         >
-          <Box sx={{ maxWidth: 480, textAlign: 'center' }}>
-            <Box sx={{ typography: 'h5', mb: 1, fontWeight: 600 }}>Ouvrez une session PIN</Box>
-            <Box sx={{ typography: 'body1', color: 'text.secondary', mb: 2 }}>
-              Le compte email ne donne aucun droit. Utilisez « Session » dans la barre ci-dessus
-              pour ouvrir un badge, ou déconnectez-vous (en-tête) si ce n’est pas votre poste.
-            </Box>
-          </Box>
+          <Typography component="div" variant="h6" fontWeight={700}>
+            Portail équipe
+          </Typography>
+        </Box>
+        <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', bgcolor: 'background.default' }}>
+          <PinPortalPage onEnterApp={enterApp} />
         </Box>
       </Paper>
     );
@@ -323,7 +333,9 @@ const AppRouter: React.FC<AppRouterProps> = ({
           onOpen={() => setNavOpen(true)}
           onClose={() => setNavOpen(false)}
           onSelect={selectTab}
-          showPinSessions
+          showOwnedTables
+          onReturnToPortal={returnToPortal}
+          onSelectOwnedTable={selectOwnedTable}
         />
 
         <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>

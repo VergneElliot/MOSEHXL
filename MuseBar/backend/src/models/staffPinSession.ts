@@ -102,11 +102,27 @@ export class StaffPinSessionModel {
     return (result.rows[0] as StaffPinSessionRow | undefined) ?? null;
   }
 
+  /** Any session row by id (open or closed) within the establishment. */
+  static async findById(
+    sessionId: string,
+    establishmentId: string
+  ): Promise<StaffPinSessionRow | null> {
+    const result = await pool.query(
+      `SELECT * FROM staff_pin_sessions
+       WHERE id = $1 AND establishment_id = $2`,
+      [sessionId, establishmentId]
+    );
+    return (result.rows[0] as StaffPinSessionRow | undefined) ?? null;
+  }
+
   /**
    * Marks time-expired badges closed. Access control does not depend on this (the queries
    * already exclude them); it keeps the sessions list and the audit reason honest.
+   * Returns closed rows so callers can clock out orphan open shifts.
    */
-  static async closeStale(establishmentId?: string): Promise<number> {
+  static async closeStale(
+    establishmentId?: string
+  ): Promise<Array<{ id: string; user_id: number; establishment_id: string }>> {
     const scoped = establishmentId != null;
     const result = await pool.query(
       `UPDATE staff_pin_sessions
@@ -114,10 +130,17 @@ export class StaffPinSessionModel {
            close_reason = 'expired'
        WHERE closed_at IS NULL
          AND expires_at <= CURRENT_TIMESTAMP
-         ${scoped ? 'AND establishment_id = $1' : ''}`,
+         ${scoped ? 'AND establishment_id = $1' : ''}
+       RETURNING id, user_id, establishment_id`,
       scoped ? [establishmentId] : []
     );
-    return result.rowCount ?? 0;
+    return result.rows.map(
+      (row: { id: string; user_id: number; establishment_id: string }) => ({
+        id: String(row.id),
+        user_id: Number(row.user_id),
+        establishment_id: String(row.establishment_id),
+      })
+    );
   }
 
   /** Closes every open badge of one establishment (e.g. admin wipe). Not used on daily closure. */

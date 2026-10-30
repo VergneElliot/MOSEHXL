@@ -19,6 +19,7 @@ import {
   TimeEntryModel,
   isIpAllowed,
   isValidIpOrCidr,
+  ipv6HostToPrefixCidr,
   normalizeAllowedIps,
 } from '../../models/timeEntry';
 import {
@@ -296,9 +297,12 @@ router.get(
     const establishmentId = getEstablishmentId(req, res);
     if (!establishmentId) return;
     const settings = await TimeClockNetworkSettingsModel.get(establishmentId);
+    const ip = clientIp(req);
     return res.json({
       ...settings,
-      client_ip: clientIp(req),
+      client_ip: ip,
+      on_venue_network: isIpAllowed(ip, settings.allowed_ips),
+      ipv6_prefix_suggestion: ip ? ipv6HostToPrefixCidr(ip) : null,
     });
   })
 );
@@ -321,7 +325,11 @@ router.put(
       if (!ip || !isValidIpOrCidr(ip)) {
         throw new ValidationError("Impossible de déterminer l'IP publique actuelle");
       }
-      if (!ips.includes(ip)) ips = [...ips, ip];
+      // IPv6 privacy addresses rotate — prefer /64 prefix when requested (default for IPv6).
+      const preferPrefix = req.body.capture_as_prefix !== false;
+      const toAdd =
+        preferPrefix && ip.includes(':') ? ipv6HostToPrefixCidr(ip) ?? ip : ip;
+      if (!ips.includes(toAdd)) ips = [...ips, toAdd];
     }
 
     for (const ip of ips) {
@@ -333,9 +341,12 @@ router.put(
     const settings = await TimeClockNetworkSettingsModel.upsert(establishmentId, {
       allowed_ips: ips,
     });
+    const ip = clientIp(req);
     return res.json({
       ...settings,
-      client_ip: clientIp(req),
+      client_ip: ip,
+      on_venue_network: isIpAllowed(ip, settings.allowed_ips),
+      ipv6_prefix_suggestion: ip ? ipv6HostToPrefixCidr(ip) : null,
     });
   })
 );

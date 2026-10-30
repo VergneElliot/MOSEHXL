@@ -15,7 +15,8 @@ import {
   Typography,
 } from '@mui/material';
 import { Menu as MenuIcon } from '@mui/icons-material';
-import { PinSessionHeaderTabs } from './PinSessionHeaderTabs';
+import { OwnedTablesHeaderStrip } from './OwnedTablesHeaderStrip';
+import type { PinPortalOwnedTableDto } from '../../services/api/pin';
 import { useNavSubsections } from '../../contexts/NavSubsectionsContext';
 
 export type AppNavTab = {
@@ -31,8 +32,10 @@ type AppMainNavProps = {
   onOpen: () => void;
   onClose: () => void;
   onSelect: (index: number) => void;
-  /** PIN badges strip — kept here so top-bar zoom never hides sessions. */
-  showPinSessions?: boolean;
+  /** Owned tables for the active PIN + return-to-portal control. */
+  showOwnedTables?: boolean;
+  onReturnToPortal?: () => void;
+  onSelectOwnedTable?: (table: PinPortalOwnedTableDto) => void;
 };
 
 export const AppMainNav: React.FC<AppMainNavProps> = ({
@@ -42,7 +45,9 @@ export const AppMainNav: React.FC<AppMainNavProps> = ({
   onOpen,
   onClose,
   onSelect,
-  showPinSessions = false,
+  showOwnedTables = false,
+  onReturnToPortal,
+  onSelectOwnedTable,
 }) => {
   const active = tabs[activeIndex];
   const subsections = useNavSubsections();
@@ -99,8 +104,11 @@ export const AppMainNav: React.FC<AppMainNavProps> = ({
             </Typography>
           </Box>
         )}
-        {showPinSessions ? (
-          <PinSessionHeaderTabs tone="onPaper" />
+        {showOwnedTables && onReturnToPortal ? (
+          <OwnedTablesHeaderStrip
+            onReturnToPortal={onReturnToPortal}
+            onSelectTable={onSelectOwnedTable}
+          />
         ) : (
           <Box sx={{ flex: 1 }} />
         )}

@@ -2,8 +2,35 @@ import { StaffPinSessionModel } from '../../models/staffPinSession';
 import { Logger } from '../../utils/logger';
 import { AppError } from '../../middleware/errorHandler';
 import { PIN_ACTOR_TTL_MS } from './pinActorToken';
-import { clockInOnPinOpen, clockOutOnPinClose } from './pinSessionPointage';
+import {
+  clockInOnPinOpen,
+  clockOutOnPinClose,
+  clockOutUsersAfterBadgeExpiry,
+  type PointageCloseResult,
+} from './pinSessionPointage';
 import { isPinPointageOnVenueNetwork } from './venueNetworkGuard';
+
+export interface ClosePinSessionResult {
+  closed: boolean;
+  already_closed: boolean;
+  pointage: PointageCloseResult;
+}
+
+/** Expire stale badges and clock out users who no longer have an open badge. */
+export async function settleExpiredPinSessions(establishmentId: string): Promise<number> {
+  const closed = await StaffPinSessionModel.closeStale(establishmentId);
+  if (closed.length === 0) return 0;
+  const byEst = new Map<string, number[]>();
+  for (const row of closed) {
+    const list = byEst.get(row.establishment_id) ?? [];
+    list.push(row.user_id);
+    byEst.set(row.establishment_id, list);
+  }
+  for (const [estId, userIds] of byEst) {
+    await clockOutUsersAfterBadgeExpiry(estId, userIds);
+  }
+  return closed.length;
+}
 
 /**
  * Opens or reuses the server-side badge session and returns its id (`sid` in the PIN actor
@@ -19,7 +46,7 @@ export async function openPinSession(input: {
   userAgent?: string | undefined;
 }): Promise<string | null> {
   try {
-    await StaffPinSessionModel.closeStale(input.establishmentId);
+    await settleExpiredPinSessions(input.establishmentId);
 
     const expiresAt = new Date(Date.now() + PIN_ACTOR_TTL_MS);
     const existing = await StaffPinSessionModel.findActiveForUser(
@@ -89,19 +116,21 @@ export async function openPinSession(input: {
  * Closes the badge session. Always allowed off-venue; clock-out only on venue Wi‑Fi.
  * Owned open tables with items still block close everywhere. Empty shells are purged.
  * Closes every open badge row for that PIN user (heals duplicate sessions).
+ * When the badge is already closed, still attempts clock-out by userId on allowlist
+ * (multi-device: earlier off-network close left hours open).
  */
 export async function closePinSession(
   sessionId: string,
   establishmentId: string,
   reason: string,
   options?: { pinUserId?: number; ipAddress?: string | null }
-): Promise<boolean> {
+): Promise<ClosePinSessionResult | boolean> {
   if (options?.pinUserId != null) {
     const onVenue = await isPinPointageOnVenueNetwork(
       establishmentId,
       options.ipAddress ?? null
     );
-    await clockOutOnPinClose({
+    const pointage = await clockOutOnPinClose({
       establishmentId,
       userId: options.pinUserId,
       ip: options.ipAddress ?? null,
@@ -112,7 +141,12 @@ export async function closePinSession(
       establishmentId,
       reason
     );
-    return n > 0;
+    return {
+      closed: n > 0,
+      already_closed: n === 0,
+      pointage,
+    };
   }
-  return StaffPinSessionModel.close(sessionId, establishmentId, reason);
+  const closed = await StaffPinSessionModel.close(sessionId, establishmentId, reason);
+  return closed;
 }

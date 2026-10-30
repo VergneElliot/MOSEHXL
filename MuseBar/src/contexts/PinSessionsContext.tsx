@@ -50,7 +50,10 @@ interface PinSessionsContextValue {
    * Closes the server badge with the given PIN actor token, then drops the local tab.
    * Throws on API errors (e.g. open tables) so the UI can keep the tab.
    */
-  closeSessionAsPinUser: (sessionId: string, pinActorToken: string) => Promise<void>;
+  closeSessionAsPinUser: (
+    sessionId: string,
+    pinActorToken: string
+  ) => Promise<import('../services/api/pin').ClosePinSessionResult>;
   /** @deprecated Prefer PIN-gated close via header; still used to clear the focused badge. */
   dismissActiveSession: () => void;
   updateSession: (id: string, patch: PinSessionPatch) => void;
@@ -187,7 +190,7 @@ export function PinSessionsProvider({ children }: { children: ReactNode }) {
 
   const closeSessionAsPinUser = useCallback(
     async (sessionId: string, pinActorToken: string) => {
-      await closePinSession(sessionId, pinActorToken);
+      const result = await closePinSession(sessionId, pinActorToken);
       setState((prev) => {
         const match =
           prev.sessions.find((s) => s.id === sessionId || s.actor.sessionId === sessionId) ??
@@ -196,6 +199,7 @@ export function PinSessionsProvider({ children }: { children: ReactNode }) {
         return dismissSessionState(prev, match.id);
       });
       await refreshRemoteSessions();
+      return result;
     },
     [refreshRemoteSessions]
   );

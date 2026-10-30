@@ -8,6 +8,7 @@ import {
 import { pinActorFromVerify } from '../contexts/pinActorFromVerify';
 import { useTableInterventionGate } from './useTableInterventionGate';
 import { abandonFloorTicket } from './floorTicketAbandon';
+import { isOpenTicketGoneError } from './floorTicketGone';
 import { tableHasActiveOrder } from '../components/floor/tableOccupancy';
 import { useStepUpAuth } from '../contexts/StepUpAuthContext';
 import type { TableDropPrompt } from '../components/floor/TableDropActionDialog';
@@ -236,6 +237,12 @@ export function useFloorPlanManagement(options: {
       onInfo('Addition abandonnée');
       void reload();
     } catch (err: unknown) {
+      if (isOpenTicketGoneError(err)) {
+        updateActiveSession({ activeTable: null, cart: [] });
+        onInfo('Table déjà clôturée — panier local libéré');
+        void reload();
+        return;
+      }
       const e = err as { message?: string };
       onError(e.message || 'Abandon impossible');
     }
@@ -263,6 +270,12 @@ export function useFloorPlanManagement(options: {
       onInfo('Table laissée ouverte — retour mode comptoir');
       void reload();
     } catch (err: unknown) {
+      if (isOpenTicketGoneError(err)) {
+        updateActiveSession({ activeTable: null, cart: [] });
+        onInfo('Table déjà clôturée — panier local libéré');
+        void reload();
+        return;
+      }
       const e = err as { message?: string };
       onError(e.message || 'Impossible de quitter la table');
     }

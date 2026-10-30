@@ -1,13 +1,14 @@
 /**
- * Page/tab entry: never treat “focused badge already holds a specific right” as enough.
- * Callers must still invoke ensureAccess / ensurePermission for specific keys.
+ * Page/tab entry routing helper: basic tabs only need an open PIN session;
+ * specific tabs always go through ensureAccess (which skips the pad when the
+ * focused badge already holds the right — see canSkipPinForActiveActor).
  */
 
 import { isBasicPermission } from '@mosehxl/types';
 
 /**
- * True only when entry needs no step-up pad: empty list (basic page with session already
- * open — caller checks session) or every key is basic. Specific keys always return false.
+ * True when entry is “session enough” (no ensureAccess for a specific key):
+ * empty list or every key is basic. Specific keys use ensureAccess instead.
  */
 export function canEnterWithoutStepUpPin(permissions: string[]): boolean {
   if (permissions.length === 0) return true;

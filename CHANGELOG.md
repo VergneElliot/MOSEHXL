@@ -20,17 +20,29 @@ Fiscal sequence counters are never reset across versions.
 
 **Fiscal impact:** MINOR (venue login + PIN-only actors; dual actor trace unchanged;
 per-PIN visual prefs / POS card UX are UI-only; PWA install is packaging/UI only;
-specific-permission step-up UX is authorization-only).
+specific-permission step-up UX is authorization-only; PIN portal / IPv6 pointage
+are authorization & labor UX only).
 
 ### Added
 
+- Champs date/heure FR : sélecteurs à molettes (calendrier / horloge) — jour,
+  mois nommés, année, heures 24 et minutes — à côté de la saisie `jj/mm/aaaa` /
+  `HH:mm` (plus de widgets natifs dépendants de la locale).
+- Portail équipe (après login établissement) : cartes PIN vert / orange / rouge
+  (flou si badge ouvert ailleurs) ; déconnexion uniquement via ✕ carte + PIN ;
+  en-tête = tables ouvertes du badge + retour Portail sans pointer la sortie.
+- Pointage : allowlist IPv6 CIDR (`/64`), capture préfixe dans Paramètres →
+  Pointage, indicateur « correspond / ne correspond pas » ; fermeture de badge
+  renvoie l’issue de sortie (`recorded` / `off_network` / …) et l’audit
+  `pin_session_closed` ; sortie possible si le badge est déjà fermé ailleurs ;
+  expiration TTL clôture aussi le pointage ouvert.
 - Application installable (PWA) : manifeste `standalone`, icônes, méta iOS, bouton
   d’en-tête « Installer » (Chrome/Edge) ou aide « Sur l’écran d’accueil » (Safari iOS).
   Service worker minimal (précharge UI) ; `/api` en NetworkOnly ; toast
   « Une mise à jour est prête » → Recharger. Pas de mode hors-ligne POS.
-- Droits **spécifiques** : le pavé PIN est toujours demandé (même si le badge
-  actif détient déjà le droit) ; les actions de base (caisse) restent sans
-  re-saisie tant qu’un badge est focalisé.
+- Droits **spécifiques** : si le badge focalisé détient déjà le droit, pas de
+  re-saisie PIN ; step-up seulement lorsqu’il ne l’a pas (portail équipe =
+  surface par défaut).
 - Badge PIN : une seule session serveur ouverte par utilisateur et établissement
   (re-saisie sur un autre appareil réutilise le même `sid`, sans double
   pointage entrée).
@@ -65,6 +77,9 @@ specific-permission step-up UX is authorization-only).
 
 ### Fixed
 
+- Caisse table : après **Valider**, le panier local est libéré (ticket reste ouvert
+  au plan) ; si le ticket a été clôturé ailleurs, sync / quitter / abandon
+  libèrent le panier fantôme au lieu de bloquer sur « ticket introuvable ».
 - Badges PIN : une seule pastille par profil (déduplication serveur + onglets) ;
   fermeture depuis n’importe quel appareil après saisie du PIN du profil
   (évite de clôturer le pointage d’autrui). Ouverture / fermeture de badge

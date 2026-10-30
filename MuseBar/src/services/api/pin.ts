@@ -64,13 +64,89 @@ export async function listActivePinSessions(): Promise<ActivePinSessionDto[]> {
   return response.data ?? [];
 }
 
-/** Closing a badge revokes its token server-side, ahead of the 8h expiry. */
+export interface PinPortalOwnedTableDto {
+  dining_table_id: number;
+  label: string;
+  open_ticket_id: number;
+}
+
+export interface PinPortalCardDto {
+  user_id: number;
+  display_name: string;
+  email: string;
+  badge: 'open' | 'closed';
+  session_id: string | null;
+  opened_at: string | null;
+  last_seen_at: string | null;
+  pointage: 'open' | 'closed';
+  clock_in_at: string | null;
+  owned_tables: PinPortalOwnedTableDto[];
+  owned_table_count: number;
+}
+
+export interface PinPortalDto {
+  on_venue_network: boolean;
+  client_ip: string | null;
+  cards: PinPortalCardDto[];
+}
+
+export async function getPinPortal(): Promise<PinPortalDto> {
+  const response = await request<{ success: boolean; data: PinPortalDto }>(
+    '/auth/pin/sessions/portal'
+  );
+  return (
+    response.data ?? {
+      on_venue_network: false,
+      client_ip: null,
+      cards: [],
+    }
+  );
+}
+
+export async function listOwnedTablesForSession(
+  sessionId: string
+): Promise<PinPortalOwnedTableDto[]> {
+  const response = await request<{ success: boolean; data: PinPortalOwnedTableDto[] }>(
+    `/auth/pin/sessions/${encodeURIComponent(sessionId)}/owned-tables`
+  );
+  return response.data ?? [];
+}
+
+export type PointageCloseReason =
+  | 'ok'
+  | 'off_network'
+  | 'no_open_entry'
+  | 'error'
+  | 'blocked_tables';
+
+export interface PointageCloseDto {
+  recorded: boolean;
+  reason: PointageCloseReason;
+  time_entry_id?: number;
+  clock_out_at?: string;
+  client_ip: string | null;
+  on_venue: boolean;
+}
+
+export interface ClosePinSessionResult {
+  success: boolean;
+  session_id: string;
+  close_reason: string;
+  already_closed?: boolean;
+  closed?: boolean;
+  pointage: PointageCloseDto;
+}
+
+/** Closing a badge revokes its token server-side; pointage may or may not record. */
 export async function closePinSession(
   sessionId: string,
   pinActorToken?: string
-): Promise<void> {
-  await request(`/auth/pin/sessions/${encodeURIComponent(sessionId)}/close`, {
-    method: 'POST',
-    headers: pinActorToken ? { 'x-pin-actor-token': pinActorToken } : undefined,
-  });
+): Promise<ClosePinSessionResult> {
+  return request<ClosePinSessionResult>(
+    `/auth/pin/sessions/${encodeURIComponent(sessionId)}/close`,
+    {
+      method: 'POST',
+      headers: pinActorToken ? { 'x-pin-actor-token': pinActorToken } : undefined,
+    }
+  );
 }

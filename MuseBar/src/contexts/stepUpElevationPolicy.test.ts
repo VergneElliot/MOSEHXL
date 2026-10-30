@@ -9,32 +9,35 @@ describe('canSkipPinForActiveActor', () => {
     ).toBe(true);
   });
 
-  it('never skips for a specific permission even when the actor holds it', () => {
+  it('allows skip for specific when the active actor holds it', () => {
     expect(
       canSkipPinForActiveActor([PERMISSIONS.pos_apply_remise], () => true)
-    ).toBe(false);
+    ).toBe(true);
     expect(
       canSkipPinForActiveActor([PERMISSIONS.access_settings], () => true)
-    ).toBe(false);
+    ).toBe(true);
     expect(
       canSkipPinForActiveActor([PERMISSIONS.orders_cancel], () => true)
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it('never skips when the list mixes basic and specific', () => {
+  it('skips when any listed key is held (OR semantics)', () => {
     expect(
       canSkipPinForActiveActor(
         [PERMISSIONS.access_pos, PERMISSIONS.pos_apply_remise],
-        () => true
+        (p) => p === PERMISSIONS.pos_apply_remise
       )
+    ).toBe(true);
+  });
+
+  it('does not skip when the actor holds none of the keys', () => {
+    expect(canSkipPinForActiveActor([PERMISSIONS.access_pos], () => false)).toBe(false);
+    expect(
+      canSkipPinForActiveActor([PERMISSIONS.orders_cancel], () => false)
     ).toBe(false);
   });
 
-  it('does not skip basic when the actor does not hold it', () => {
-    expect(canSkipPinForActiveActor([PERMISSIONS.access_pos], () => false)).toBe(false);
-  });
-
-  it('treats unknown permission names as non-basic (always prompt)', () => {
-    expect(canSkipPinForActiveActor(['not_a_real_permission'], () => true)).toBe(false);
+  it('does not skip an empty permission list', () => {
+    expect(canSkipPinForActiveActor([], () => true)).toBe(false);
   });
 });

@@ -73,8 +73,18 @@ describe('clockOutOnPinClose', () => {
 
   it('clocks out when no active owned tables remain after purge', async () => {
     mocks.query.mockResolvedValueOnce({ rows: [] });
-    mocks.clockOut.mockResolvedValueOnce(undefined);
-    await clockOutOnPinClose({ establishmentId: 'est-1', userId: 7, ip: '1.2.3.4' });
+    mocks.clockOut.mockResolvedValueOnce({
+      id: 3,
+      clock_out_at: '2026-10-29T12:00:00.000Z',
+    });
+    await expect(
+      clockOutOnPinClose({ establishmentId: 'est-1', userId: 7, ip: '1.2.3.4' })
+    ).resolves.toMatchObject({
+      recorded: true,
+      reason: 'ok',
+      time_entry_id: 3,
+      on_venue: true,
+    });
     expect(mocks.abandonEmptyOpenTicketsForWaiter).toHaveBeenCalledWith('est-1', 7);
     expect(mocks.clockOut).toHaveBeenCalledWith({
       establishmentId: 'est-1',
@@ -85,11 +95,21 @@ describe('clockOutOnPinClose', () => {
 
   it('checks tables but skips TimeEntry when recordPointage is false', async () => {
     mocks.query.mockResolvedValueOnce({ rows: [] });
-    await clockOutOnPinClose({
-      establishmentId: 'est-1',
-      userId: 7,
-      recordPointage: false,
-    });
+    await expect(
+      clockOutOnPinClose({
+        establishmentId: 'est-1',
+        userId: 7,
+        recordPointage: false,
+      })
+    ).resolves.toMatchObject({ recorded: false, reason: 'off_network', on_venue: false });
     expect(mocks.clockOut).not.toHaveBeenCalled();
+  });
+
+  it('reports no_open_entry when clockOut matches zero rows', async () => {
+    mocks.query.mockResolvedValueOnce({ rows: [] });
+    mocks.clockOut.mockResolvedValueOnce(null);
+    await expect(
+      clockOutOnPinClose({ establishmentId: 'est-1', userId: 7, ip: '1.2.3.4' })
+    ).resolves.toMatchObject({ recorded: false, reason: 'no_open_entry', on_venue: true });
   });
 });
